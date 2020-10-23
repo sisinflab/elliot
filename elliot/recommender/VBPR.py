@@ -22,7 +22,7 @@ class VBPR(RecommenderModel, VisualLoader):
     def __init__(self, data, path_output_rec_result, path_output_rec_weight, args):
         super(VBPR, self).__init__(data, path_output_rec_result, path_output_rec_weight, args.rec)
 
-        self.emb_K = args.emb1_K
+        self.embed_size = args.embed_size
         self.emb_D = args.emb1_D
         self.learning_rate = args.lr
         self.l_w = args.reg_w
@@ -32,7 +32,7 @@ class VBPR(RecommenderModel, VisualLoader):
         self.batch_size = args.batch_size
         self.verbose = args.verbose
         self.restore_epochs = args.restore_epochs
-        self.epsilon = args.epsilon
+        self.adv_eps = args.adv_eps
         self.process_visual_features(data)
         self.evaluator = Evaluator(self, data, args.k)
         self.best = args.best
@@ -44,10 +44,10 @@ class VBPR(RecommenderModel, VisualLoader):
         self.Bp = tf.Variable(
             initializer(shape=[self.num_image_feature, 1]), name='Bp', dtype=tf.float32)
         self.Gu = tf.Variable(
-            initializer(shape=[self.num_users, self.emb_K]),
+            initializer(shape=[self.num_users, self.embed_size]),
             name='Gu', dtype=tf.float32)  # (users, embedding_size)
         self.Gi = tf.Variable(
-            initializer(shape=[self.num_items, self.emb_K]),
+            initializer(shape=[self.num_items, self.embed_size]),
             name='Gi', dtype=tf.float32)  # (items, embedding_size)
         self.Tu = tf.Variable(
             initializer(shape=[self.num_users, self.emb_D]),
@@ -56,7 +56,7 @@ class VBPR(RecommenderModel, VisualLoader):
             initializer(shape=[self.num_items, self.num_image_feature]),
             name='F', dtype=tf.float32, trainable=False)
         self.E = tf.Variable(
-            initializer(shape=[self.num_image_feature, self.emb_D]),
+            initializer(shape=[self.emb_D, self.num_image_feature]),
             name='E', dtype=tf.float32)  # (items, low_embedding_size)
 
         self.set_delta()
@@ -70,14 +70,14 @@ class VBPR(RecommenderModel, VisualLoader):
         :return:
         """
         if delta_init:
-            self.delta_gu = tf.random.uniform(shape=[self.num_users, self.emb_K], minval=-0.05, maxval=0.05,
+            self.delta_gu = tf.random.uniform(shape=[self.num_users, self.embed_size], minval=-0.05, maxval=0.05,
                                              dtype=tf.dtypes.float32, seed=0)
-            self.delta_gi = tf.random.uniform(shape=[self.num_items, self.emb_K], minval=-0.05, maxval=0.05,
+            self.delta_gi = tf.random.uniform(shape=[self.num_items, self.embed_size], minval=-0.05, maxval=0.05,
                                               dtype=tf.dtypes.float32, seed=0)
         else:
-            self.delta_gu = tf.Variable(tf.zeros(shape=[self.num_users, self.emb_K]), dtype=tf.dtypes.float32,
+            self.delta_gu = tf.Variable(tf.zeros(shape=[self.num_users, self.embed_size]), dtype=tf.dtypes.float32,
                                        trainable=False)
-            self.delta_gi = tf.Variable(tf.zeros(shape=[self.num_items, self.emb_K]), dtype=tf.dtypes.float32,
+            self.delta_gi = tf.Variable(tf.zeros(shape=[self.num_items, self.embed_size]), dtype=tf.dtypes.float32,
                                      trainable=False)
 
     def get_inference(self, user_input, item_input_pos):
@@ -87,16 +87,16 @@ class VBPR(RecommenderModel, VisualLoader):
         :param item_input_pos: item indices
         :return:
         """
-        self.gamma_u = tf.nn.embedding_lookup(self.Gu, user_input)
-        self.theta_u = tf.nn.embedding_lookup(self.Tu, user_input)
+        self.gamma_u = tf.nn.embedding_lookup(self.Gu, user_input.reshape(-1))
+        self.theta_u = tf.nn.embedding_lookup(self.Tu, user_input.reshape(-1))
 
-        self.gamma_i = tf.nn.embedding_lookup(self.Gi, item_input_pos)
-        self.feature_i = tf.nn.embedding_lookup(self.F, item_input_pos)
+        self.gamma_i = tf.nn.embedding_lookup(self.Gi, item_input_pos.reshape(-1))
+        self.feature_i = tf.nn.embedding_lookup(self.F, item_input_pos.reshape(-1))
 
         self.beta_i = tf.nn.embedding_lookup(self.Bi, item_input_pos)
 
-        xui = self.beta_i + tf.reduce_sum((self.gamma_u * self.gamma_i), axis=1) + \
-              tf.reduce_sum((self.theta_u * tf.matmul(self.feature_i, self.E)), axis=1) + \
+        xui = self.beta_i + tf.tensordot(self.gamma_u, self.gamma_i,  axes=[[1], [1]]) + \
+              tf.matmul(self.theta_u, tf.tensordot(self.E, self.feature_i, axes=[[1], [1]])) + \
               tf.matmul(self.feature_i, self.Bp)
 
         return xui, self.gamma_u, self.gamma_i, self.feature_i, self.theta_u, self.beta_i

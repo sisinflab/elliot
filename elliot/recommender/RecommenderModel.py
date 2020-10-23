@@ -33,7 +33,7 @@ class RecommenderModel(tf.keras.Model):
     def restore(self):
         pass
 
-    def _l2_loss(*embs):
+    def _l2_loss(self, *embs):
         l2_loss = 0
         for emb in embs:
             l2_loss += tf.reduce_sum(tf.math.pow(emb, 2))

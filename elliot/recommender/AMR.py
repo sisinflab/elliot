@@ -23,8 +23,6 @@ class AMR(VBPR):
         super(AMR, self).__init__(data, path_output_rec_result, path_output_rec_weight, args.rec)
         self.adv_type = args.adv_type
         self.adv_reg = args.adv_reg
-        self.adv_iteration = args.adv_iteration
-        self.adv_step_size = args.adv_step_size
 
     def set_delta(self, delta_init=0):
         """
@@ -114,7 +112,7 @@ class AMR(VBPR):
 
         d = tape_adv.gradient(loss, [self.F])[0]
         d = tf.stop_gradient(d)
-        self.feature_i = self.epsilon * tf.nn.l2_normalize(d, 1)
+        self.feature_i = self.adv_eps * tf.nn.l2_normalize(d, 1)
 
     def random_perturbation(self):
         initializer = tf.initializers.GlorotUniform()

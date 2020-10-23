@@ -37,7 +37,7 @@ def _evaluate_input(user):
         item_input = np.array(item_input)[:, None]
         return user_input, item_input
     except:
-        print('******'+user)
+        print('******'+str(user))
         return 0, 0
 
 
