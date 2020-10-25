@@ -81,8 +81,8 @@ class BPRMF(RecommenderModel, ABC):
         """
         user, pos, neg = batch
         with tf.GradientTape() as tape:
-            xu_pos, beta_pos, gamma_u, gamma_pos = self(inputs=(user, pos))
-            xu_neg, beta_neg, gamma_u, gamma_neg = self(inputs=(user, neg))
+            xu_pos, beta_pos, gamma_u, gamma_pos = self(inputs=(user, pos), training=True)
+            xu_neg, beta_neg, gamma_u, gamma_neg = self(inputs=(user, neg), training=True)
 
             difference = tf.clip_by_value(xu_pos - xu_neg, -80.0, 1e8)
             loss = tf.reduce_sum(tf.nn.softplus(-difference))
