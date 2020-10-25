@@ -19,7 +19,7 @@ def parse_args():
     parser.add_argument('--k', type=int, default=10, help='top-k of recommendation.')
     parser.add_argument('--epochs', type=int, default=2000, help='Number of epochs.')
     parser.add_argument('--verbose', type=int, default=1000, help='number of epochs to store model parameters.')
-    parser.add_argument('--embed_size', type=int, default=10, help='Embedding size.')
+    parser.add_argument('--embed_k', type=int, default=10, help='Embedding size.')
     parser.add_argument('--reg', type=float, default=0, help='Regularization for user and item embeddings.')
     parser.add_argument('--lr', type=float, default=0.05, help='Learning rate.')
     parser.add_argument('--restore_epochs', type=int, default=1, help='Default is 1: The restore epochs (Must be lower than the epochs)')
@@ -33,10 +33,10 @@ def parse_args():
     parser.add_argument('--adv_eps', type=float, default=0.5, help='Epsilon for adversarial weights.')
 
     # Parameters useful during the visual recs
-    parser.add_argument('--emb1_D', type=int, default=20, help='size of low dimensionality')
-    parser.add_argument('--reg_w', type=float, default=1.0, help='size of low dimensionality')
-    parser.add_argument('--reg_b', type=float, default=1e-2, help='size of low dimensionality')
-    parser.add_argument('--reg_e', type=float, default=0, help='size of low dimensionality')
+    parser.add_argument('--embed_d', type=int, default=20, help='size of low dimensionality')
+    parser.add_argument('--l_w', type=float, default=1.0, help='size of low dimensionality')
+    parser.add_argument('--l_b', type=float, default=1e-2, help='size of low dimensionality')
+    parser.add_argument('--l_e', type=float, default=0, help='size of low dimensionality')
 
     return parser.parse_args()
 
@@ -64,28 +64,28 @@ def train():
     if args.rec == 'bprmf':
         path_output_rec_result = path_output_rec_result.format(args.dataset,
                                                                args.rec,
-                                                               'emb' + str(args.embed_size),
+                                                               'emb' + str(args.embed_k),
                                                                'ep' + str(args.epochs),
                                                                'XX',
                                                                'XX')
 
         path_output_rec_weight = path_output_rec_weight.format(args.dataset,
                                                                args.rec,
-                                                               'emb' + str(args.embed_size),
+                                                               'emb' + str(args.embed_k),
                                                                'ep' + str(args.epochs),
                                                                'XX',
                                                                'XX')
     elif args.rec == 'apr' or args.rec == 'vbpr' or args.rec == 'amr':
         path_output_rec_result = path_output_rec_result.format(args.dataset,
                                                                args.rec,
-                                                               'emb' + str(args.embed_size),
+                                                               'emb' + str(args.embed_k),
                                                                'ep' + str(args.epochs),
                                                                'eps' + str(args.adv_eps),
                                                                '' + args.adv_type)
 
         path_output_rec_weight = path_output_rec_weight.format(args.dataset,
                                                                args.rec,
-                                                               'emb' + str(args.embed_size),
+                                                               'emb' + str(args.embed_k),
                                                                'ep' + str(args.epochs),
                                                                'eps' + str(args.adv_eps),
                                                                '' + args.adv_type)
@@ -119,13 +119,13 @@ def train():
     os.environ['CUDA_VISIBLE_DEVICES'] = str(args.gpu)
 
     if args.rec == 'bprmf':
-        model = BPRMF(data, path_output_rec_result, path_output_rec_weight, args)
+        model = BPRMF(data, args)
     elif args.rec == 'vbpr':
-        model = VBPR(data, path_output_rec_result, path_output_rec_weight, args)
+        model = VBPR(data, args)
     elif args.rec == 'apr':
-        model = APR(data, path_output_rec_result, path_output_rec_weight, args)
+        model = APR(data, args)
     elif args.rec == 'random':
-        model = Random(data, path_output_rec_result, path_output_rec_weight, args)
+        model = Random(data, args)
     else:
         raise NotImplementedError('Unknown Recommender Model.')
     model.train()

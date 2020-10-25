@@ -44,7 +44,7 @@ def _evaluate_input(user):
 def _eval_by_user(user):
     # get predictions of data in testing set
     user_input, item_input = _feed_dicts[user]
-    predictions, _, _ = _model.get_inference(user_input, item_input)
+    predictions, *_ = _model(inputs=(user_input, item_input), training=False)
 
     neg_predict, pos_predict = predictions[:-1], predictions[-1]
     position = (neg_predict.numpy() >= pos_predict.numpy()).sum()

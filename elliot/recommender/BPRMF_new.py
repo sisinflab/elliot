@@ -1,15 +1,16 @@
-from recommender.RecommenderModel import RecommenderModel
-from recommender.Evaluator import Evaluator
-from utils.read import find_checkpoint
-from utils.write import save_obj
-from config.configs import *
 from copy import deepcopy
 from time import time
-from abc import ABC
+
 import tensorflow as tf
 
+from config.configs import *
+from recommender.Evaluator import Evaluator
+from recommender.RecommenderModel import RecommenderModel
+from utils.read import find_checkpoint
+from utils.write import save_obj
 
-class BPRMF(RecommenderModel, ABC):
+
+class BPRMF(RecommenderModel):
     def __init__(self, data, params):
         """
         Create a BPR-MF instance.
@@ -22,17 +23,17 @@ class BPRMF(RecommenderModel, ABC):
                                       optimizer: training optimizer (with its parameters)}
         """
         super(BPRMF, self).__init__(data, params)
-        self.k = self.params.k
+        self.embed_k = self.params.embed_k
         self.l_w = self.params.l_w
         self.l_b = self.params.l_b
 
-        self.evaluator = Evaluator(self, data, params.k)
+        self.evaluator = Evaluator(self, data, params.embed_k)
 
         # Initialize Model Parameters
         initializer = tf.initializers.GlorotUniform()
         self.Bi = tf.Variable(tf.zeros(self.num_items), name='Bi', dtype=tf.float32)
-        self.Gu = tf.Variable(initializer(shape=[self.num_users, self.k]), name='Gu', dtype=tf.float32)
-        self.Gi = tf.Variable(initializer(shape=[self.num_items, self.k]), name='Gi', dtype=tf.float32)
+        self.Gu = tf.Variable(initializer(shape=[self.num_users, self.embed_k]), name='Gu', dtype=tf.float32)
+        self.Gi = tf.Variable(initializer(shape=[self.num_items, self.embed_k]), name='Gi', dtype=tf.float32)
 
         self.optimizer = tf.optimizers.Adam(self.params.lr)
         self.saver_ckpt = tf.train.Checkpoint(optimizer=self.optimizer, model=self)
