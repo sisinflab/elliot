@@ -1,40 +1,23 @@
-"""
-Created on April 1, 2020
-Define Recommender Model.
-@author Anonymized
-"""
+from abc import ABC
 import tensorflow as tf
 
 
-class RecommenderModel(tf.keras.Model):
-    """
-    This class represents a recommender model.
-    You can load a pretrained model by specifying its ckpt path
-     and use it for training/testing purposes.
+class RecommenderModel(tf.keras.Model, ABC):
+    def __init__(self, data, params, *args, **kwargs):
+        """
+        This class represents a recommender model. You can load a pretrained model
+        by specifying its checkpoint path and use it for training/testing purposes.
 
-    Attributes:
-        model:
-        do_eval: True to use the model in inference-mode, otherwise False
-        gpu (int): index of gpu to use (-1 for cpu)
-        model_path (str): model path
-    """
-
-    def __init__(self, data, path_output_rec_result, path_output_rec_weight, rec):
-        self.rec = rec
+        Args:
+            data: data loader object
+            params: dictionary with all parameters
+        """
+        super().__init__(*args, **kwargs)
         self.data = data
         self.num_items = data.num_items
         self.num_users = data.num_users
-        self.path_output_rec_result = path_output_rec_result
-        self.path_output_rec_weight = path_output_rec_weight
-
-    def train(self):
-        pass
-
-    def restore(self):
-        pass
-
-    def _l2_loss(self, *embs):
-        l2_loss = 0
-        for emb in embs:
-            l2_loss += tf.reduce_sum(tf.math.pow(emb, 2))
-        return l2_loss / 2
+        self.params = params
+        self.epochs = self.params.epochs
+        self.batch_size = self.params.batch_size
+        self.verbose = self.params.verbose
+        self.restore_epochs = self.params.restore_epochs
