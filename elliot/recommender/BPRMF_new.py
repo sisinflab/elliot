@@ -2,6 +2,9 @@ from copy import deepcopy
 from time import time
 
 import tensorflow as tf
+import numpy as np
+import os
+import logging
 
 from config.configs import *
 from recommender.Evaluator import Evaluator
@@ -9,8 +12,13 @@ from recommender.RecommenderModel import RecommenderModel
 from utils.read import find_checkpoint
 from utils.write import save_obj
 
+np.random.seed(0)
+logging.disable(logging.WARNING)
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+
 
 class BPRMF(RecommenderModel):
+
     def __init__(self, data, params):
         """
         Create a BPR-MF instance.
@@ -18,12 +26,13 @@ class BPRMF(RecommenderModel):
 
         Args:
             data: data loader object
-            params: model parameters {k: embedding size,
+            params: model parameters {embed_k: embedding size,
                                       [l_w, l_b]: regularization,
-                                      optimizer: training optimizer (with its parameters)}
+                                      lr: learning rate}
         """
         super(BPRMF, self).__init__(data, params)
         self.embed_k = self.params.embed_k
+        self.learning_rate = self.params.lr
         self.l_w = self.params.l_w
         self.l_b = self.params.l_b
 
@@ -35,7 +44,7 @@ class BPRMF(RecommenderModel):
         self.Gu = tf.Variable(initializer(shape=[self.num_users, self.embed_k]), name='Gu', dtype=tf.float32)
         self.Gi = tf.Variable(initializer(shape=[self.num_items, self.embed_k]), name='Gi', dtype=tf.float32)
 
-        self.optimizer = tf.optimizers.Adam(self.params.lr)
+        self.optimizer = tf.optimizers.Adam(self.learning_rate)
         self.saver_ckpt = tf.train.Checkpoint(optimizer=self.optimizer, model=self)
 
     def call(self, inputs, training=None, mask=None):
@@ -82,19 +91,22 @@ class BPRMF(RecommenderModel):
         """
         user, pos, neg = batch
         with tf.GradientTape() as tape:
+
+            # Clean Inference
             xu_pos, beta_pos, gamma_u, gamma_pos = self(inputs=(user, pos), training=True)
             xu_neg, beta_neg, gamma_u, gamma_neg = self(inputs=(user, neg), training=True)
 
             difference = tf.clip_by_value(xu_pos - xu_neg, -80.0, 1e8)
             loss = tf.reduce_sum(tf.nn.softplus(-difference))
 
-            # regularization
+            # Regularization Component
             reg_loss = self.l_w * tf.reduce_sum([tf.nn.l2_loss(gamma_u),
                                                  tf.nn.l2_loss(gamma_pos),
                                                  tf.nn.l2_loss(gamma_neg)]) \
                        + self.l_b * tf.nn.l2_loss(beta_pos) \
-                       + self.l_b * tf.nn.l2_loss(beta_neg) / 10
+                       + self.l_b * tf.nn.l2_loss(beta_neg)/10
 
+            # Loss to be optimized
             loss += reg_loss
 
         grads = tape.gradient(loss, [self.Bi, self.Gu, self.Gi])

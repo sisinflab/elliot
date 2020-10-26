@@ -6,7 +6,6 @@ import tensorflow as tf
 
 from dataset.visual_loader_mixin import VisualLoader
 from recommender.BPRMF_new import BPRMF
-from recommender.Evaluator import Evaluator
 
 np.random.seed(0)
 logging.disable(logging.WARNING)
@@ -16,6 +15,16 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 class VBPR(BPRMF, VisualLoader):
 
     def __init__(self, data, params):
+        """
+        Create a VBPR instance.
+        (see https://arxiv.org/pdf/1510.01784.pdf for details about the algorithm design choices).
+
+        Args:
+            data: data loader object
+            params: model parameters {embed_k: embedding size,
+                                      [l_w, l_b]: regularization,
+                                      lr: learning rate}
+        """
         super(VBPR, self).__init__(data, params)
 
         self.embed_k = self.params.embed_k
@@ -65,10 +74,17 @@ class VBPR(BPRMF, VisualLoader):
 
     def call(self, inputs, training=None, mask=None):
         """
-        generate predicition matrix with respect to passed users' and items indices
-        :param user_input: user indices
-        :param item_input_pos: item indices
-        :return:
+        Generates prediction for passed users and items indices
+
+        Args:
+            inputs: user, item (batch)
+            training: Boolean or boolean scalar tensor, indicating whether to run
+            the `Network` in training mode or inference mode.
+            mask: A mask or list of masks. A mask can be
+            either a tensor or None (no mask).
+
+        Returns:
+            prediction and extracted model parameters
         """
         user, item = inputs
         gamma_u = tf.nn.embedding_lookup(self.Gu, user)
@@ -87,43 +103,49 @@ class VBPR(BPRMF, VisualLoader):
 
     def predict_all(self):
         """
-        Get Full Predictions useful for Full Store of Predictions
-        :return: The matrix of predicted values.
+        Get full predictions on the whole users/items matrix.
+
+        Returns:
+            The matrix of predicted values.
         """
         return self.Bi + tf.tensordot(self.Gu, self.Gi, axes=[[1], [1]]) \
                + tf.tensordot(self.Tu, tf.matmul(self.F, self.E), axes=[[1], [1]]) \
                + tf.matmul(self.F, self.Bp)
 
-    def train_step(self, batches):
+    def train_step(self, batch):
         """
-                Apply a single training step (across all batched in the dataset).
-                :param batches: set of batches used fr the training
-                :return:
+        Apply a single training step on one batch.
 
-                """
-        for user, pos, neg in zip(*batches):
-            with tf.GradientTape() as t:
-                t.watch([self.Bi, self.Gu, self.Gi, self.Tu, self.E, self.Bp])
+        Args:
+            batch: batch used for the current train step
 
-                # Clean Inference
-                xu_pos, gamma_u, gamma_pos, emb_pos_feature, theta_u, beta_pos = \
-                    self(inputs=(user, pos), training=True)
-                xu_neg, _, gamma_neg, _, _, beta_neg = self(inputs=(user, pos), training=True)
+        Returns:
+            loss value at the current batch
+        """
+        user, pos, neg = batch
+        with tf.GradientTape() as t:
 
-                result = tf.clip_by_value(xu_pos - xu_neg, -80.0, 1e8)
-                loss = tf.reduce_sum(tf.nn.softplus(-result))
+            # Clean Inference
+            xu_pos, gamma_u, gamma_pos, emb_pos_feature, theta_u, beta_pos = \
+                self(inputs=(user, pos), training=True)
+            xu_neg, _, gamma_neg, _, _, beta_neg = self(inputs=(user, pos), training=True)
 
-                # Regularization Component
-                reg_loss = self.l_w * tf.reduce_sum([tf.nn.l2_loss(gamma_u),
-                                                     tf.nn.l2_loss(gamma_pos),
-                                                     tf.nn.l2_loss(gamma_neg),
-                                                     tf.nn.l2_loss(theta_u)]) \
-                        + self.l_b * tf.nn.l2_loss(beta_pos) \
-                        + self.l_b * tf.nn.l2_loss(beta_pos)/10 \
-                        + self.l_e * tf.nn.l2_loss(self.E, self.Bp)
+            result = tf.clip_by_value(xu_pos - xu_neg, -80.0, 1e8)
+            loss = tf.reduce_sum(tf.nn.softplus(-result))
 
-                # Loss to be optimized
-                loss += reg_loss
+            # Regularization Component
+            reg_loss = self.l_w * tf.reduce_sum([tf.nn.l2_loss(gamma_u),
+                                                 tf.nn.l2_loss(gamma_pos),
+                                                 tf.nn.l2_loss(gamma_neg),
+                                                 tf.nn.l2_loss(theta_u)]) \
+                    + self.l_b * tf.nn.l2_loss(beta_pos) \
+                    + self.l_b * tf.nn.l2_loss(beta_pos)/10 \
+                    + self.l_e * tf.nn.l2_loss(self.E, self.Bp)
 
-            grads = t.gradient(loss, [self.Bi, self.Gu, self.Gi, self.Tu, self.E, self.Bp])
-            self.optimizer.apply_gradients(zip(grads, [self.Bi, self.Gu, self.Gi, self.Tu, self.E, self.Bp]))
+            # Loss to be optimized
+            loss += reg_loss
+
+        grads = t.gradient(loss, [self.Bi, self.Gu, self.Gi, self.Tu, self.E, self.Bp])
+        self.optimizer.apply_gradients(zip(grads, [self.Bi, self.Gu, self.Gi, self.Tu, self.E, self.Bp]))
+
+        return loss.numpy()
