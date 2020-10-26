@@ -5,7 +5,7 @@ import numpy as np
 import tensorflow as tf
 
 from dataset.visual_loader_mixin import VisualLoader
-from recommender.BPRMF_new import BPRMF
+from recommender.BPRMF import BPRMF
 
 np.random.seed(0)
 tf.random.set_seed(0)
