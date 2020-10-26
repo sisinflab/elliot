@@ -44,6 +44,8 @@ def _evaluate_input(user):
 def _eval_by_user(user):
     # get predictions of data in testing set
     user_input, item_input = _feed_dicts[user]
+    if type(user_input) != np.ndarray:
+        return ()
     predictions, *_ = _model(inputs=(user_input, item_input), training=False)
 
     neg_predict, pos_predict = predictions[:-1], predictions[-1]
@@ -90,6 +92,7 @@ class Evaluator:
         for user in range(self.model.data.num_users):
             res.append(_eval_by_user(user))
 
+        res = list(filter(None, res))
         hr, ndcg, auc = (np.array(res).mean(axis=0)).tolist()
         print("%s %.3f Performance@%d \tHR: %.4f\tnDCG: %.4f\tAUC: %.4f" % (
             epoch_text, time() - start_time, _K, hr[_K - 1], ndcg[_K - 1], auc[_K - 1]))

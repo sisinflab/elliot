@@ -6,6 +6,7 @@ import tensorflow as tf
 
 from dataset.visual_loader_mixin import VisualLoader
 from recommender.BPRMF import BPRMF
+from recommender.attack.attack_visual_feature_mixin import AttackVisualFeature
 
 np.random.seed(0)
 tf.random.set_seed(0)
@@ -13,7 +14,7 @@ logging.disable(logging.WARNING)
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 
-class VBPR(BPRMF, VisualLoader):
+class VBPR(BPRMF, VisualLoader, AttackVisualFeature):
 
     def __init__(self, data, params):
         """
@@ -55,23 +56,6 @@ class VBPR(BPRMF, VisualLoader):
 
         self.optimizer = tf.keras.optimizers.Adagrad(learning_rate=self.learning_rate)
         self.saver_ckpt = tf.train.Checkpoint(optimizer=self.optimizer, model=self)
-
-    def set_delta(self, delta_init=0):
-        """
-        Set delta variables useful to store delta perturbations,
-        :param delta_init: 0: zero-like initialization, 1 uniform random noise initialization
-        :return:
-        """
-        if delta_init:
-            self.delta_gu = tf.random.uniform(shape=[self.num_users, self.embed_k], minval=-0.05, maxval=0.05,
-                                             dtype=tf.dtypes.float32, seed=0)
-            self.delta_gi = tf.random.uniform(shape=[self.num_items, self.embed_k], minval=-0.05, maxval=0.05,
-                                              dtype=tf.dtypes.float32, seed=0)
-        else:
-            self.delta_gu = tf.Variable(tf.zeros(shape=[self.num_users, self.embed_k]), dtype=tf.dtypes.float32,
-                                       trainable=False)
-            self.delta_gi = tf.Variable(tf.zeros(shape=[self.num_items, self.embed_k]), dtype=tf.dtypes.float32,
-                                     trainable=False)
 
     def call(self, inputs, training=None, mask=None):
         """

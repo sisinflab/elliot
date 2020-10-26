@@ -17,19 +17,39 @@ class AMR(VBPR):
         super(AMR, self).__init__(data, params)
         self.adv_type = self.params.adv_type
         self.adv_reg = self.params.adv_reg
+        self.set_delta(delta_init=params.delta)
 
-    def set_delta(self, delta_init=0):
+    def call(self, inputs, training=None, mask=None):
+        user, item = inputs
+        gamma_u = tf.squeeze(tf.nn.embedding_lookup(self.Gu, user))
+        theta_u = tf.squeeze(tf.nn.embedding_lookup(self.Tu, user))
+
+        gamma_i = tf.squeeze(tf.nn.embedding_lookup(self.Gi, item))
+        feature_i = tf.squeeze(tf.nn.embedding_lookup(self.F + self.delta, item))
+
+        beta_i = tf.squeeze(tf.nn.embedding_lookup(self.Bi, item))
+
+        xui = beta_i + tf.reduce_sum(gamma_u * gamma_i, 1) + \
+              tf.reduce_sum(theta_u * tf.matmul(feature_i, self.E), 1) + \
+              tf.squeeze(tf.matmul(feature_i, self.Bp))
+
+        return xui, gamma_u, gamma_i, feature_i, theta_u, beta_i
+
+    def predict_all_adv(self):
         """
-        Set delta variables useful to store delta perturbations,
-        :param delta_init: 0: zero-like initialization, 1 uniform random noise initialization
-        :return:
+        Get full predictions on the whole users/items matrix.
+
+        Returns:
+            The matrix of predicted values.
         """
-        if delta_init:
-            self.delta = tf.random.uniform(shape=self.F.shape, minval=-0.05, maxval=0.05,
-                                              dtype=tf.dtypes.float32, seed=0)
+        if self.adv_type == 'fgsm':
+            user, pos, neg = self.data.shuffle(len(self.data._user_input))
+            self.fgsm_perturbation(user, pos, neg)
         else:
-            self.delta = tf.Variable(tf.zeros(shape=self.F.shape), dtype=tf.dtypes.float32,
-                                        trainable=False)
+            self.rand_perturbation()
+        return self.Bi + tf.matmul(self.Gu, self.Gi, transpose_b=True) \
+               + tf.matmul(self.Tu, tf.matmul((self.F + self.delta), self.E), transpose_b=True) \
+               + tf.squeeze(tf.matmul(self.F, self.Bp))
 
     def train_step(self, batch):
         """
@@ -107,13 +127,11 @@ class AMR(VBPR):
 
         d = tape_adv.gradient(loss, [self.F])[0]
         d = tf.stop_gradient(d)
-        feature_i = tf.nn.embedding_lookup(self.F, pos)
-        feature_i.assign(self.adv_eps * tf.nn.l2_normalize(d, 1))
+        self.delta = self.adv_eps * tf.nn.l2_normalize(d, 1)
 
-    def random_perturbation(self, item):
+    def rand_perturbation(self):
         initializer = tf.initializers.GlorotUniform()
         d = tf.Variable(
                 initializer(shape=self.F.shape), name='delta', dtype=tf.float32)
-        feature_i = tf.nn.embedding_lookup(self.F, item)
-        feature_i += d
+        self.delta = d
 
