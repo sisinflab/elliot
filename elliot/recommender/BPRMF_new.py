@@ -63,11 +63,11 @@ class BPRMF(RecommenderModel):
             prediction and extracted model parameters
         """
         user, item = inputs
-        beta_i = tf.nn.embedding_lookup(self.Bi, item)
-        gamma_u = tf.nn.embedding_lookup(self.Gu, user)
-        gamma_i = tf.nn.embedding_lookup(self.Gi, item)
+        beta_i = tf.squeeze(tf.nn.embedding_lookup(self.Bi, item))
+        gamma_u = tf.squeeze(tf.nn.embedding_lookup(self.Gu, user))
+        gamma_i = tf.squeeze(tf.nn.embedding_lookup(self.Gi, item))
 
-        xui = beta_i + tf.tensordot(gamma_u, gamma_i, axes=[[1], [1]])
+        xui = beta_i + tf.reduce_sum(gamma_u * gamma_i, 1)
 
         return xui, beta_i, gamma_u, gamma_i
 
@@ -78,7 +78,19 @@ class BPRMF(RecommenderModel):
         Returns:
             The matrix of predicted values.
         """
-        return self.Bi + tf.tensordot(self.Gu, self.Gi, axes=[[1], [1]])
+        return self.Bi + tf.matmul(self.Gu, self.Gi, transpose_b=True)
+
+    def one_epoch(self, batches):
+        """
+        #TODO comment
+        Args:
+            batches:
+
+        Returns:
+
+        """
+        for batch in zip(*batches):
+            self.train_step(batch)
 
     def train_step(self, batch):
         """
@@ -127,21 +139,21 @@ class BPRMF(RecommenderModel):
         best_epoch = self.restore_epochs
         results = {}
 
-        for epoch in range(self.restore_epochs, self.epochs + 1):
+        for self.epoch in range(self.restore_epochs, self.epochs + 1):
             start_ep = time()
             batches = self.data.shuffle(self.batch_size)
-            self.train_step(batches)
-            epoch_text = 'Epoch {0}/{1}'.format(epoch, self.epochs)
-            self.evaluator.eval(epoch, results, epoch_text, start_ep)
+            self.one_epoch(batches)
+            epoch_text = 'Epoch {0}/{1}'.format(self.epoch, self.epochs)
+            self.evaluator.eval(self.epoch, results, epoch_text, start_ep)
 
             # print and log the best result (HR@10)
-            if max_hr < results[epoch]['hr'][self.evaluator.k - 1]:
-                max_hr = results[epoch]['hr'][self.evaluator.k - 1]
-                best_epoch = epoch
+            if max_hr < results[self.epoch]['hr'][self.evaluator.k - 1]:
+                max_hr = results[self.epoch]['hr'][self.evaluator.k - 1]
+                best_epoch = self.epoch
                 best_model = deepcopy(self)
 
-            if epoch % self.verbose == 0 or epoch == 1:
-                self.saver_ckpt.save('{0}/weights-{1}-BPR_MF'.format(weight_dir, epoch))
+            if self.epoch % self.verbose == 0 or self.epoch == 1:
+                self.saver_ckpt.save('{0}/weights-{1}-BPR_MF'.format(weight_dir, self.epoch))
 
         self.evaluator.store_recommendation()
         save_obj(results, '{0}/{1}-results'.format(results_dir, self.path_output_rec_result.split('/')[-2]))

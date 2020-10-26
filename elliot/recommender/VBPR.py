@@ -48,7 +48,7 @@ class VBPR(BPRMF, VisualLoader):
             initializer(shape=[self.num_items, self.num_image_feature]),
             name='F', dtype=tf.float32, trainable=False)
         self.E = tf.Variable(
-            initializer(shape=[self.embed_d, self.num_image_feature]),
+            initializer(shape=[self.num_image_feature, self.embed_d]),
             name='E', dtype=tf.float32)  # (items, low_embedding_size)
 
         self.set_delta()
@@ -88,17 +88,17 @@ class VBPR(BPRMF, VisualLoader):
             prediction and extracted model parameters
         """
         user, item = inputs
-        gamma_u = tf.nn.embedding_lookup(self.Gu, user)
-        theta_u = tf.nn.embedding_lookup(self.Tu, user)
+        gamma_u = tf.squeeze(tf.nn.embedding_lookup(self.Gu, user))
+        theta_u = tf.squeeze(tf.nn.embedding_lookup(self.Tu, user))
 
-        gamma_i = tf.nn.embedding_lookup(self.Gi, item)
-        feature_i = tf.nn.embedding_lookup(self.F, item)
+        gamma_i = tf.squeeze(tf.nn.embedding_lookup(self.Gi, item))
+        feature_i = tf.squeeze(tf.nn.embedding_lookup(self.F, item))
 
-        beta_i = tf.nn.embedding_lookup(self.Bi, item)
+        beta_i = tf.squeeze(tf.nn.embedding_lookup(self.Bi, item))
 
-        xui = beta_i + tf.tensordot(gamma_u, gamma_i,  axes=[(1, 2), (1, 2)]) + \
-              tf.tensordot(theta_u, tf.tensordot(self.E, feature_i, axes=[[1], [2]]), axes=[(2, 1), (0, 2)]) + \
-              tf.tensordot(feature_i, self.Bp, axes=[(1, 2), (0, 1)])
+        xui = beta_i + tf.reduce_sum(gamma_u * gamma_i, 1) + \
+              tf.reduce_sum(theta_u * tf.matmul(feature_i, self.E), 1) + \
+              tf.squeeze(tf.matmul(feature_i, self.Bp))
 
         return xui, gamma_u, gamma_i, feature_i, theta_u, beta_i
 
@@ -109,9 +109,9 @@ class VBPR(BPRMF, VisualLoader):
         Returns:
             The matrix of predicted values.
         """
-        return self.Bi + tf.tensordot(self.Gu, self.Gi, axes=[[1], [1]]) \
-               + tf.tensordot(self.Tu, tf.matmul(self.F, self.E), axes=[[1], [1]]) \
-               + tf.matmul(self.F, self.Bp)
+        return self.Bi + tf.matmul(self.Gu, self.Gi, transpose_b=True) \
+               + tf.matmul(self.Tu, tf.matmul(self.F, self.E), transpose_b=True) \
+               + tf.squeeze(tf.matmul(self.F, self.Bp))
 
     def train_step(self, batch):
         """
