@@ -8,6 +8,7 @@ from dataset.visual_loader_mixin import VisualLoader
 from recommender.BPRMF_new import BPRMF
 
 np.random.seed(0)
+tf.random.set_seed(0)
 logging.disable(logging.WARNING)
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
