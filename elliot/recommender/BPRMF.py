@@ -37,13 +37,13 @@ class BPRMF(RecommenderModel):
         self.l_w = self.params.l_w
         self.l_b = self.params.l_b
 
-        self.evaluator = Evaluator(self, data, params.embed_k)
+        self.evaluator = Evaluator(self, data, params.k)
 
         # Initialize Model Parameters
-        initializer = tf.initializers.GlorotUniform()
+        self.initializer = tf.initializers.GlorotUniform()
         self.Bi = tf.Variable(tf.zeros(self.num_items), name='Bi', dtype=tf.float32)
-        self.Gu = tf.Variable(initializer(shape=[self.num_users, self.embed_k]), name='Gu', dtype=tf.float32)
-        self.Gi = tf.Variable(initializer(shape=[self.num_items, self.embed_k]), name='Gi', dtype=tf.float32)
+        self.Gu = tf.Variable(self.initializer(shape=[self.num_users, self.embed_k]), name='Gu', dtype=tf.float32)
+        self.Gi = tf.Variable(self.initializer(shape=[self.num_items, self.embed_k]), name='Gi', dtype=tf.float32)
 
         self.optimizer = tf.optimizers.Adam(self.learning_rate)
         self.saver_ckpt = tf.train.Checkpoint(optimizer=self.optimizer, model=self)
@@ -89,8 +89,12 @@ class BPRMF(RecommenderModel):
         Returns:
 
         """
+        loss = 0
+        steps = 0
         for batch in zip(*batches):
-            self.train_step(batch)
+            steps += 1
+            loss += self.train_step(batch)
+        return loss/steps
 
     def train_step(self, batch):
         """
@@ -142,8 +146,8 @@ class BPRMF(RecommenderModel):
         for self.epoch in range(self.restore_epochs, self.epochs + 1):
             start_ep = time()
             batches = self.data.shuffle(self.batch_size)
-            self.one_epoch(batches)
-            epoch_text = 'Epoch {0}/{1}'.format(self.epoch, self.epochs)
+            loss = self.one_epoch(batches)
+            epoch_text = 'Epoch {0}/{1} loss {2:.3f}'.format(self.epoch, self.epochs, loss)
             self.evaluator.eval(self.epoch, results, epoch_text, start_ep)
 
             # print and log the best result (HR@10)

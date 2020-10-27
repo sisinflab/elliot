@@ -78,9 +78,9 @@ class AMR(VBPR):
                                                  tf.nn.l2_loss(gamma_pos),
                                                  tf.nn.l2_loss(gamma_neg),
                                                  tf.nn.l2_loss(theta_u)]) \
-                    + self.l_b * self._l2_loss(beta_pos) \
-                    + self.l_b * self._l2_loss(beta_neg)/10 \
-                    + self.l_e * self._l2_loss(self.E, self.Bp)
+                    + self.l_b * tf.nn.l2_loss(beta_pos) \
+                    + self.l_b * tf.nn.l2_loss(beta_neg)/10 \
+                    + self.l_e * tf.reduce_sum([tf.nn.l2_loss(self.E), tf.nn.l2_loss(self.Bp)])
 
             if self.epoch >= 2000:
                 if self.adv_type == 'fgsm':
