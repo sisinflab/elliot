@@ -118,13 +118,13 @@ def train():
     os.environ['CUDA_VISIBLE_DEVICES'] = str(args.gpu)
 
     if args.rec == 'bprmf':
-        model = NNBPRMF(data, args)
+        model = NNBPRMF(config, args)
     elif args.rec == 'vbpr':
-        model = VBPR(data, args)
+        model = VBPR(config, args)
     elif args.rec == 'apr':
-        model = APR(data, args)
+        model = APR(config, args)
     elif args.rec == 'random':
-        model = Random(data, args)
+        model = Random(config, args)
     else:
         raise NotImplementedError('Unknown Recommender Model.')
     model.train()
