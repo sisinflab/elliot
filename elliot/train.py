@@ -2,8 +2,8 @@ import argparse
 import os
 import shutil
 
-from recommender.adversarial.APR import APR
-from recommender.latent_factor_models.NNBPRMF import NNBPRMF
+from recommender.adversarial.APR.APR import APR
+from recommender.latent_factor_models.NNBPRMF.NNBPRMF import BPRMF
 from recommender.unpersonalized.random_recommender.Random import Random
 from recommender.visual_recommenders.VBPR.VBPR import VBPR
 from utils.read import read_config
@@ -118,7 +118,7 @@ def train():
     os.environ['CUDA_VISIBLE_DEVICES'] = str(args.gpu)
 
     if args.rec == 'bprmf':
-        model = NNBPRMF(config, args)
+        model = BPRMF(config, args)
     elif args.rec == 'vbpr':
         model = VBPR(config, args)
     elif args.rec == 'apr':
