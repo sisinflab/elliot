@@ -9,5 +9,5 @@ classes_path = original + 'classes.csv'
 features_path = original + 'features.npy'
 
 # RESULTS
-weight_dir = '../results/rec_model_weights'
+weight_dir = '../results/rec_model_weight'
 results_dir = '../results/rec_results'

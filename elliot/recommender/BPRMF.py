@@ -157,16 +157,16 @@ class BPRMF(RecommenderModel):
                 best_model = deepcopy(self)
 
             if self.epoch % self.verbose == 0 or self.epoch == 1:
-                self.saver_ckpt.save('{0}/weights-{1}-BPR_MF'.format(weight_dir, self.epoch))
+                self.saver_ckpt.save(f'''{weight_dir}/{self.params.dataset}/weights-{self.epoch}-{self.learning_rate}-{self.__class__.__name__}''')
 
-        self.evaluator.store_recommendation()
-        save_obj(results, '{0}/{1}-results'.format(results_dir, self.path_output_rec_result.split('/')[-2]))
+        self.evaluator.store_recommendation(path=f'''{results_dir}/{self.params.dataset}/recs-{self.epoch}-{self.learning_rate}-{self.__class__.__name__}.tsv''')
+        save_obj(results, f'''{results_dir}/{self.params.dataset}/results-metrics-{self.learning_rate}''')
 
         # Store the best model
         print("Store Best Model at Epoch {0}".format(best_epoch))
         saver_ckpt = tf.train.Checkpoint(optimizer=self.optimizer, model=best_model)
-        saver_ckpt.save('{0}/best-weights-{1}'.format(self.path_output_rec_weight, best_epoch))
-        best_model.evaluator.store_recommendation()
+        saver_ckpt.save(f'''{weight_dir}/{self.params.dataset}/best-weights-{best_epoch}-{self.learning_rate}-{self.__class__.__name__}''')
+        best_model.evaluator.store_recommendation(path=f'''{results_dir}/{self.params.dataset}/best-recs-{best_epoch}-{self.learning_rate}-{self.__class__.__name__}.tsv''')
 
     def restore(self):
         if self.restore_epochs > 1:
