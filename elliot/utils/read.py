@@ -47,7 +47,7 @@ def read_config(sections_fields):
          A list of configuration values.
     """
     config = configparser.ConfigParser()
-    config.read('./../config/configs.ini')
+    config.read('./config/configs.ini')
     configs = []
     for s, f in sections_fields:
         configs.append(config[s][f])
