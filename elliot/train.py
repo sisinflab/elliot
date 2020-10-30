@@ -2,11 +2,10 @@ import argparse
 import os
 import shutil
 
-from dataset.dataset import DataLoader
-from recommender.APR import APR
-from recommender.BPRMF import BPRMF
-from recommender.Random import Random
-from recommender.VBPR import VBPR
+from recommender.adversarial.APR import APR
+from recommender.latent_factor_models.NNBPRMF import NNBPRMF
+from recommender.unpersonalized.random_recommender.Random import Random
+from recommender.visual_recommenders.VBPR.VBPR import VBPR
 from utils.read import read_config
 
 
@@ -105,9 +104,9 @@ def train():
 
     # Create directories to Store Results and Rec Models
     manage_directories(path_output_rec_result, path_output_rec_weight)
-
-    data = DataLoader(path_train_data=path_train_data
-                      , path_test_data=path_test_data, visual_features=path_feature_data)
+    config = {"path_train_data": path_train_data,"path_test_data":path_test_data, "path_feature_data": path_feature_data}
+    # data = DataLoader(path_train_data=path_train_data
+    #                   , path_test_data=path_test_data, visual_features=path_feature_data)
 
     print("RUNNING {0} Training on DATASET {1}".format(args.rec, args.dataset))
     print("- PARAMETERS:")
@@ -118,7 +117,7 @@ def train():
     os.environ['CUDA_VISIBLE_DEVICES'] = str(args.gpu)
 
     if args.rec == 'bprmf':
-        model = BPRMF(data, args)
+        model = NNBPRMF(data, args)
     elif args.rec == 'vbpr':
         model = VBPR(data, args)
     elif args.rec == 'apr':

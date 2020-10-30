@@ -7,8 +7,8 @@ import os
 import logging
 
 from config.configs import *
-from recommender.Evaluator import Evaluator
-from recommender.RecommenderModel import RecommenderModel
+from evaluation.Evaluator_old import Evaluator
+from recommender.keras_base_recommender_model import RecommenderModel
 from utils.read import find_checkpoint
 from utils.write import save_obj
 

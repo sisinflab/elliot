@@ -5,7 +5,7 @@ Tensorflow 2.1.0 implementation of APR.
 """
 import numpy as np
 from time import time
-from recommender.Evaluator import Evaluator
+from evaluation.Evaluator_old import Evaluator
 import os
 import logging
 from utils.write import save_obj
@@ -17,7 +17,7 @@ logging.disable(logging.WARNING)
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 import tensorflow as tf
-from recommender.RecommenderModel import RecommenderModel
+from recommender.keras_base_recommender_model import RecommenderModel
 
 
 class APR(RecommenderModel):

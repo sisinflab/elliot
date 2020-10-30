@@ -21,7 +21,7 @@ _num_items = None
 def _get_train_batch(i):
     """
     Generation of a batch in multiprocessing
-    :param i: index to control the batch generayion
+    :param i: index to control the batch generation
     :return:
     """
     user_batch, item_pos_batch, item_neg_batch = [], [], []
