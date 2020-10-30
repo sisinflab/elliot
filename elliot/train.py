@@ -104,7 +104,8 @@ def train():
 
     # Create directories to Store Results and Rec Models
     manage_directories(path_output_rec_result, path_output_rec_weight)
-    config = {"path_train_data": path_train_data,"path_test_data":path_test_data, "path_feature_data": path_feature_data}
+    config = {"path_train_data": path_train_data, "path_test_data": path_test_data,
+              "path_feature_data": path_feature_data}
     # data = DataLoader(path_train_data=path_train_data
     #                   , path_test_data=path_test_data, visual_features=path_feature_data)
 

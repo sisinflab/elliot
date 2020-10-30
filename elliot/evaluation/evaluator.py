@@ -1,5 +1,6 @@
 import numpy as np
 
+
 class Evaluator:
     def __init__(self, model, data, k):
         """

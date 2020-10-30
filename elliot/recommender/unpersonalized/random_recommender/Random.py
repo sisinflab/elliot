@@ -4,16 +4,16 @@ Tensorflow 2.1.0 implementation of APR.
 @author Anonymized
 """
 import numpy as np
-from evaluation.Evaluator_old import Evaluator
+from elliot.evaluation.Evaluator_old import Evaluator
 import os
 import logging
+import tensorflow as tf
+from recommender.keras_base_recommender_model import RecommenderModel
+
 
 np.random.seed(0)
 logging.disable(logging.WARNING)
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-
-import tensorflow as tf
-from recommender.keras_base_recommender_model import RecommenderModel
 
 
 class Random(RecommenderModel):

@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import scipy.sparse as sp
 
+
 class DataSet(object):
     """
     Load train and test dataset
@@ -21,11 +22,11 @@ class DataSet(object):
         #ATTENZIONE USERS E NUMERI SONO CALCOLATI SUL TRAIN MENTRE PRIMA SU ENTRAMBI, VERIFICARE
         self.users = list(self.train_dataframe['userId'].unique())
         self.num_users = len(self.users)
-        self.num_items = self.data['itemId'].nunique()
-        self.transactions = len(self.data)
+        self.num_items = self.train_dataframe['itemId'].nunique()
+        self.transactions = len(self.train_dataframe)
 
         self.train_dataframe_dict = self.build_dict(self.train_dataframe, self.users)
-        self.train = self.build_sparse(self.train_dataframe_dict, self.num_users, self. num_items)
+        self.train = self.build_sparse(self.train_dataframe_dict, self.num_users, self.num_items)
 
         self.test_dataframe = pd.read_csv(path_test_data, sep="\t", header=None, names=self.column_names)
         self.test = self.prepare_test(self.test_dataframe)

@@ -1,9 +1,9 @@
 import time
 import typing as t
 import numpy as np
-from ...base_recommender_model import base_recommender_model
-from ....dataset.DataSet import DataSet
-from ....dataset.samplers import pairwise_sampler as ps
+from recommender.base_recommender_model import BaseRecommenderModel
+from dataset.dataset import DataSet
+from dataset.samplers import pairwise_sampler as ps
 
 
 class MF(object):
@@ -109,9 +109,10 @@ class MF(object):
         self._item_factors[self._public_items[item]] = v
 
 
-class BPR(base_recommender_model):
+class BPR(BaseRecommenderModel):
 
-    def __init__(self, config, params):
+    def __init__(self, config, params, *args, **kwargs):
+        super().__init__(config, params, *args, **kwargs)
         np.random.seed(42)
 
         self._data = DataSet(config)
@@ -174,8 +175,8 @@ class BPR(base_recommender_model):
             #     print("Printing..")
             #     self.print_recs("../recs/" + name + ".tsv", 10)
 
-    def train(self, num_iters: int =10):
-        self.num_pos_events: int = self._datamodel.get_transactions()
+    def train(self, num_iters: int = 10):
+        self.num_pos_events = self._datamodel.get_transactions()
         print(f"Transactions: {self.num_pos_events}")
         for it in range(num_iters):
             print()

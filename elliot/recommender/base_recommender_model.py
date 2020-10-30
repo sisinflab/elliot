@@ -2,7 +2,7 @@ from abc import ABC
 from abc import abstractmethod
 
 
-class base_recommender_model(ABC):
+class BaseRecommenderModel(ABC):
     def __init__(self, config, params, *args, **kwargs):
         """
         This class represents a recommender model. You can load a pretrained model

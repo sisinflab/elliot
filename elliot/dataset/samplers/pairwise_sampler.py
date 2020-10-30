@@ -2,15 +2,15 @@ import typing as t
 
 
 class Sampler:
-    def __init__(self, ratings: t.Dict,
-                 random: t.Any,
+    def __init__(self, ratings,
+                 random,
                  sample_negative_items_empirically: bool = True
                  ):
-        self._ratings: t.Dict = ratings
-        self._random: t.Any = random
+        self._ratings = ratings
+        self._random = random
         self._sample_negative_items_empirically: bool = sample_negative_items_empirically
-        self._users: t.List = list(self._ratings.keys())
-        self._items: t.List = list({k for a in self._ratings.values() for k in a.keys()})
+        self._users = list(self._ratings.keys())
+        self._items = list({k for a in self._ratings.values() for k in a.keys()})
 
     def step(self, events: int):
         r_int = self._random.randint
@@ -24,7 +24,8 @@ class Sampler:
             u = users[r_int(n_users)]
             ui = set(ratings[u].keys())
             lui = len(ui)
-            if lui == n_items: continue
+            if lui == n_items:
+                continue
             i = list(ui)[r_int(lui)]
 
             j = items[r_int(n_items)]
