@@ -17,10 +17,10 @@ def parse_args():
     parser.add_argument('--rec', nargs='?', default="vbpr", help="bprmf, apr, random")
     parser.add_argument('--batch_size', type=int, default=512, help='batch_size')
     parser.add_argument('--k', type=int, default=50, help='top-k of recommendation.')
-    parser.add_argument('--epochs', type=int, default=4000, help='Number of epochs.')
-    parser.add_argument('--verbose', type=int, default=1000, help='number of epochs to store model parameters.')
+    parser.add_argument('--epochs', type=int, default=200, help='Number of epochs.')
+    parser.add_argument('--verbose', type=int, default=50, help='number of epochs to store model parameters.')
     parser.add_argument('--embed_k', type=int, default=64, help='Embedding size.')
-    parser.add_argument('--lr', type=float, default=0.005, help='Learning rate.')
+    parser.add_argument('--lr', type=float, default=0.01, help='Learning rate.')
     parser.add_argument('--restore_epochs', type=int, default=1, help='Default is 1: The restore epochs (Must be lower than the epochs)')
     parser.add_argument('--best', type=int, default=0, help='Parameter useful for attack scenario. Leave at 0 here.')
 
@@ -33,7 +33,7 @@ def parse_args():
 
     # Parameters useful during the visual recs
     parser.add_argument('--embed_d', type=int, default=20, help='size of low dimensionality')
-    parser.add_argument('--l_w', type=float, default=1, help='size of low dimensionality')
+    parser.add_argument('--l_w', type=float, default=1e-2, help='size of low dimensionality')
     parser.add_argument('--l_b', type=float, default=1e-2, help='size of low dimensionality')
     parser.add_argument('--l_e', type=float, default=0, help='size of low dimensionality')
 
