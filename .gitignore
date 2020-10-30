@@ -20,3 +20,4 @@ pip-selfcheck.json
 /data/tradesy/
 /rec_model_weight/tradesy/
 /rec_result/tradesy/
+/results/
