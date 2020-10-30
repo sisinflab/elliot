@@ -1,0 +1,2 @@
+model_checkpoint_path: "best-weights-2-0.01-VBPR-1"
+all_model_checkpoint_paths: "best-weights-2-0.01-VBPR-1"
