@@ -11,10 +11,10 @@ class MF(object):
     Simple Matrix Factorization class
     """
 
-    def __init__(self, F: int, ratings: t.Dict, random: t.Any, *args):
+    def __init__(self, F, ratings, random, *args):
         self._factors = F
         self._ratings = ratings
-        self._random: t.Any = random
+        self._random = random
         self.initialize(*args)
 
     def initialize(self, loc: float = 0, scale: float = 0.1):
@@ -24,14 +24,14 @@ class MF(object):
         :param scale:
         :return:
         """
-        self._users: t.List = list(self._ratings.keys())
-        self._items: t.List = list({k for a in self._ratings.values() for k in a.keys()})
-        self._private_users: t.Dict = {p:u for p,u in enumerate(self._users)}
-        self._public_users: t.Dict = {v: k for k, v in self._private_users.items()}
-        self._private_items: t.Dict = {p:i for p,i in enumerate(self._items)}
-        self._public_items: t.Dict = {v: k for k, v in self._private_items.items()}
+        self._users = list(self._ratings.keys())
+        self._items = list({k for a in self._ratings.values() for k in a.keys()})
+        self._private_users = {p: u for p, u in enumerate(self._users)}
+        self._public_users = {v: k for k, v in self._private_users.items()}
+        self._private_items = {p: i for p, i in enumerate(self._items)}
+        self._public_items = {v: k for k, v in self._private_items.items()}
 
-        self._global_bias: int = 0
+        self._global_bias = 0
 
         "same parameters as np.randn"
         self._user_bias = np.zeros(len(self._users))
@@ -49,11 +49,11 @@ class MF(object):
     def get_transactions(self):
         return self._transactions
 
-    def predict(self,user:int, item: int):
+    def predict(self, user, item):
         return self._global_bias + self._item_bias[self._public_items[item]] \
                + self._user_factors[self._public_users[user]] @ self._item_factors[self._public_items[item]]
 
-    def get_user_recs(self, user: int, k: int):
+    def get_user_recs(self, user, k):
         arr = self._item_bias + self._item_factors @ self._user_factors[self._public_users[user]]
         top_k = arr.argsort()[-(len(self._ratings[user].keys()) + k):][::-1]
         top_k_2 = [(self._private_items[i], arr[i]) for p, i in enumerate(top_k)
