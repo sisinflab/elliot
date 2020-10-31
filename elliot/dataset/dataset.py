@@ -73,3 +73,6 @@ class DataSet(object):
 
     def prepare_test(self, dataframe):
         return dataframe[["userId","itemId"]].values
+
+    def get_test(self):
+        return self.build_dict(self.test_dataframe)
