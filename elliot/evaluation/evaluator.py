@@ -12,7 +12,7 @@ class Evaluator(object):
         self.k = k
         self.model = model
         self.rel_threshold = rel_threshold
-        self.metrics = [metrics.precision.Precision]
+        self.metrics = [metrics.Precision]
         self.test = data.get_test()
         self.relevant_items = self.relevance_filter()
 

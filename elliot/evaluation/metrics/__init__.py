@@ -1,1 +1,1 @@
-from .Precision import precision
+from .Precision import Precision
