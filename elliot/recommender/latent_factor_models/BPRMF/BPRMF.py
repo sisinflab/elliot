@@ -5,6 +5,7 @@ from recommender.base_recommender_model import BaseRecommenderModel
 from dataset.dataset import DataSet
 from dataset.samplers import pairwise_sampler as ps
 from evaluation.evaluator import Evaluator
+from utils.write import store_recommendation
 
 
 class MF(object):
@@ -117,6 +118,7 @@ class BPRMF(BaseRecommenderModel):
         np.random.seed(42)
 
         self._data = DataSet(config, params)
+        self._config = config
         self._params = params
         self._num_items = self._data.num_items
         self._num_users = self._data.num_users
@@ -159,7 +161,7 @@ class BPRMF(BaseRecommenderModel):
 
     @property
     def name(self):
-        return "BPR" + self._data.name
+        return "BPR" + self._datamodel.name
 
     def train_step(self):
             start_it = time.perf_counter()
@@ -189,8 +191,11 @@ class BPRMF(BaseRecommenderModel):
             self._iteration = it
 
             self.train_step()
+            recs = self.get_recommendations(self._params.k)
+            self.evaluator.eval(recs)
 
-            self.evaluator.eval(self.get_recommendations(self._params.k))
+            if not (it+1) % 10:
+                store_recommendation(recs, self._config["path_output_rec_result"] + f"{self.name}_{it+1}.tsv")
 
     def predict(self, u: int, i: int):
         return self._datamodel.predict(u, i)

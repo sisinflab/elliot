@@ -42,4 +42,4 @@ def store_recommendation(recommendations, path=""):
     with open(path, 'w') as out:
         for u, recs in recommendations.items():
             for i, value in recs:
-                out.write(str(u) + '\t' + i + '\t' + value + '\n')
+                out.write(str(u) + '\t' + str(i) + '\t' + str(value) + '\n')
