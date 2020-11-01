@@ -23,7 +23,21 @@ _metric_dictionary = {
     "ItemCoverage": ItemCoverage
 }
 
+
 def parse_metrics(strings):
+    """
+    This function parse the string provided by the user and creates a list of classes for the metrics' computation.
+
+    Available strings:
+    *
+    Precision,
+    Recall,
+    ItemCoverage
+    *
+
+    :param strings: a string containing the names of the metrics in the form '[Precision,...]'
+    :return: a list of metric classes
+    """
     if (strings[0] != "[") | (strings[-1] != "]"):
         raise SyntaxError("Not a valid list")
     temp = strings[1:-1]
