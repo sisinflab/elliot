@@ -110,7 +110,7 @@ class Evaluator:
         if len(epoch_text) != '':
             results[epoch] = {'hr': hr, 'ndcg': ndcg, 'auc': auc[0]}
 
-    def store_recommendation(self, attack_name="", path=""):
+    def store_recommendation(self, path=""):
         """
         Store recommendation list (top-k) in order to be used for the ranksys framework (anonymized)
         attack_name: The name for the attack stored file

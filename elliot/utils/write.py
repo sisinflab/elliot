@@ -31,3 +31,15 @@ def save_np(npy, filename):
         filename (str): filename
     """
     np.save(filename, npy)
+
+
+def store_recommendation(recommendations, path=""):
+    """
+    Store recommendation list (top-k)
+    :return:
+    """
+
+    with open(path, 'w') as out:
+        for u, recs in recommendations.items():
+            for i, value in recs:
+                out.write(str(u) + '\t' + i + '\t' + value + '\n')

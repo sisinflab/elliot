@@ -14,9 +14,9 @@ class Evaluator(object):
         self.rel_threshold = rel_threshold
         self.metrics = [metrics.Precision]
         self.test = data.get_test()
-        self.relevant_items = self.relevance_filter()
+        self.relevant_items = self.binary_relevance_filter()
 
-    def relevance_filter(self):
+    def binary_relevance_filter(self):
         return {u: [i for i,r in test_items.items() if r >= self.rel_threshold] for u, test_items in self.test.items()}
 
     def eval(self, recommendations):
