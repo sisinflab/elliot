@@ -3,7 +3,7 @@ from . import metrics
 import dataset.dataset as ds
 
 class Evaluator(object):
-    def __init__(self, data: ds.DataSet, k, rel_threshold):
+    def __init__(self, data: ds.DataSet):
         """
         Class to manage all the evaluation methods and operation
         :param data: dataset object
@@ -13,8 +13,7 @@ class Evaluator(object):
         self.k = data.params.k
         # self.model = model
         self.rel_threshold = data.params.rel
-        #TODO
-        self.metrics = [metrics.Precision]
+        self.metrics = metrics.parse_metrics(data.params.metrics)
         self.test = data.get_test()
         self.relevant_items = self.binary_relevance_filter()
 
