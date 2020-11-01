@@ -14,8 +14,8 @@ class DataSet(object):
         :param path_train_data: relative path for train file
         :param path_test_data: relative path for test file
         """
-        path_train_data = config["path_train_data"]
-        path_test_data = config["path_test_data"]
+        path_train_data = config.path_train_data
+        path_test_data = config.path_test_data
         self.config = config
         self.column_names = ['userId', 'itemId', 'rating']
         self.train_dataframe = pd.read_csv(path_train_data, sep="\t", header=None, names=self.column_names)

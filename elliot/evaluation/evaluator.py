@@ -1,4 +1,5 @@
 from time import time
+
 from . import metrics
 import dataset.dataset as ds
 
@@ -11,11 +12,10 @@ class Evaluator(object):
         """
         self._data = data
         self._k = data.params.k
-        # self.model = model
         self._rel_threshold = data.params.rel
         self._metrics = metrics.parse_metrics(data.params.metrics)
         self._test = data.get_test()
-        self._relevant_items = self._binary_relevance_filter()
+        self._data.params.relevant_items = self._binary_relevance_filter()
 
     def _binary_relevance_filter(self):
         """
@@ -34,7 +34,7 @@ class Evaluator(object):
         eval_start_time = time()
 
         results = {
-            m.name(): str(round(m(recommendations, self._k, self._relevant_items).eval(), rounding_factor))
+            m.name(): str(round(m(recommendations, self._data.params).eval(), rounding_factor))
             for m in self._metrics
         }
 

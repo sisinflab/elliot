@@ -195,7 +195,7 @@ class BPRMF(BaseRecommenderModel):
             self.evaluator.eval(recs)
 
             if not (it+1) % 10:
-                store_recommendation(recs, self._config["path_output_rec_result"] + f"{self.name}_{it+1}.tsv")
+                store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}_{it+1}.tsv")
 
     def predict(self, u: int, i: int):
         return self._datamodel.predict(u, i)
