@@ -3,7 +3,7 @@ from abc import abstractmethod
 
 
 class BaseRecommenderModel(ABC):
-    def __init__(self, config, *args, **kwargs):
+    def __init__(self, config, params, *args, **kwargs):
         """
         This class represents a recommender model. You can load a pretrained model
         by specifying its checkpoint path and use it for training/testing purposes.
@@ -13,7 +13,7 @@ class BaseRecommenderModel(ABC):
             params: dictionary with all parameters
         """
         self.config = config
-        self.params = args
+        self.params = params
 
     @abstractmethod
     def train(self):

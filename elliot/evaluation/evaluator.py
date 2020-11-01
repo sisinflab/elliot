@@ -1,4 +1,4 @@
-import time
+from time import time
 from . import metrics
 import dataset.dataset as ds
 
@@ -9,26 +9,34 @@ class Evaluator(object):
         :param data: dataset object
         :param k: top-k evaluation
         """
-        self.data = data
-        self.k = data.params.k
+        self._data = data
+        self._k = data.params.k
         # self.model = model
-        self.rel_threshold = data.params.rel
-        self.metrics = metrics.parse_metrics(data.params.metrics)
-        self.test = data.get_test()
-        self.relevant_items = self.binary_relevance_filter()
+        self._rel_threshold = data.params.rel
+        self._metrics = metrics.parse_metrics(data.params.metrics)
+        self._test = data.get_test()
+        self._relevant_items = self._binary_relevance_filter()
 
-    def binary_relevance_filter(self):
-        return {u: [i for i,r in test_items.items() if r >= self.rel_threshold] for u, test_items in self.test.items()}
+    def _binary_relevance_filter(self):
+        """
+        Binary Relevance filtering for the test items
+        :return:
+        """
+        return {u: [i for i, r in test_items.items() if r >= self._rel_threshold] for u, test_items in self._test.items()}
 
     def eval(self, recommendations):
         """
         Runtime Evaluation of Accuracy Performance (top-k)
         :return:
         """
-
+        recommendations = {u: recs for u, recs in recommendations.items() if self._test[u]}
+        rounding_factor = 5
         eval_start_time = time()
 
-        results = {m.name(): m(recommendations, self.cutoff, self.relevant_items).eval() for m in self.metrics}
+        results = {
+            m.name(): str(round(m(recommendations, self._k, self._relevant_items).eval(), rounding_factor))
+            for m in self._metrics
+        }
 
         print(f"Eval Time: {time() - eval_start_time}")
 

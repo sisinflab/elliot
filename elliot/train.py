@@ -3,7 +3,8 @@ import os
 import shutil
 
 from recommender.adversarial.APR.APR import APR
-from recommender.latent_factor_models.NNBPRMF.NNBPRMF import BPRMF
+from recommender.latent_factor_models import BPRMF
+from recommender.latent_factor_models.NNBPRMF.NNBPRMF import BPRMF as NNBPRMF
 from recommender.unpersonalized.random_recommender.Random import Random
 from recommender.visual_recommenders.VBPR.VBPR import VBPR
 from utils.read import read_config
@@ -12,8 +13,8 @@ from utils.read import read_config
 def parse_args():
     parser = argparse.ArgumentParser(description="Run train of the Recommender Model.")
     parser.add_argument('--gpu', type=int, default=-1)
-    parser.add_argument('--dataset', nargs='?', default='tradesy', help='dataset name: movielens, lastfm')
-    parser.add_argument('--rec', nargs='?', default="vbpr", help="bprmf, apr, random")
+    parser.add_argument('--dataset', nargs='?', default='example', help='dataset name: tradesy, movielens, lastfm')
+    parser.add_argument('--rec', nargs='?', default="bprmf", help="bprmf, apr, random")
     parser.add_argument('--batch_size', type=int, default=512, help='batch_size')
     parser.add_argument('--k', type=int, default=50, help='top-k of recommendation.')
     parser.add_argument('--epochs', type=int, default=200, help='Number of epochs.')
@@ -23,7 +24,7 @@ def parse_args():
     parser.add_argument('--restore_epochs', type=int, default=1, help='Default is 1: The restore epochs (Must be lower than the epochs)')
     parser.add_argument('--best', type=int, default=0, help='Parameter useful for attack scenario. Leave at 0 here.')
     parser.add_argument('--rel', type=int, default=0, help='Relevance Threshold to filter test items.')
-    parser.add_argument('--metrics', type=str, default="[]", help='List of the metrics to evaluate.')
+    parser.add_argument('--metrics', type=str, default="[Precision,Recall]", help='List of the metrics to evaluate.')
 
     # Parameters useful during the adv. training
     parser.add_argument('--adv_type', nargs='?', default="fgsm", help="fgsm, future work other techniques...")
@@ -120,6 +121,8 @@ def train():
     os.environ['CUDA_VISIBLE_DEVICES'] = str(args.gpu)
 
     if args.rec == 'bprmf':
+        model = BPRMF(config, args)
+    elif args.rec == 'nnbprmf':
         model = BPRMF(config, args)
     elif args.rec == 'vbpr':
         model = VBPR(config, args)

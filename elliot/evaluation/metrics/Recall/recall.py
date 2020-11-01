@@ -1,5 +1,6 @@
 import numpy as np
 
+
 class Recall:
     def __init__(self, recommendations, cutoff, relevant_items):
         self.recommendations, self.cutoff, self.relevant_items = recommendations, cutoff, relevant_items
@@ -16,6 +17,6 @@ class Recall:
 
     def eval(self):
         return np.average(
-            Recall.__user_recall(u_r, self.cutoff, self.relevant_items[u])
-            for u, u_r in self.recommendations.items()
+            [Recall.__user_recall(u_r, self.cutoff, self.relevant_items[u])
+            for u, u_r in self.recommendations.items()]
         )

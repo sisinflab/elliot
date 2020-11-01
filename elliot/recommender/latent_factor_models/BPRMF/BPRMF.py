@@ -4,6 +4,7 @@ import numpy as np
 from recommender.base_recommender_model import BaseRecommenderModel
 from dataset.dataset import DataSet
 from dataset.samplers import pairwise_sampler as ps
+from evaluation.evaluator import Evaluator
 
 
 class MF(object):
@@ -109,17 +110,19 @@ class MF(object):
         self._item_factors[self._public_items[item]] = v
 
 
-class BPR(BaseRecommenderModel):
+class BPRMF(BaseRecommenderModel):
 
     def __init__(self, config, params, *args, **kwargs):
         super().__init__(config, params, *args, **kwargs)
         np.random.seed(42)
 
         self._data = DataSet(config, params)
+        self._params = params
         self._num_items = self._data.num_items
         self._num_users = self._data.num_users
         self._random = np.random
         self._sample_negative_items_empirically = True
+        print(self.params)
         self._factors = self.params.embed_k
         self._learning_rate = self.params.lr
         self._bias_regularization = self.params.l_b
@@ -136,6 +139,8 @@ class BPR(BaseRecommenderModel):
         self._sampler = ps.Sampler(self._ratings, self._random, self._sample_negative_items_empirically)
 
         self._iteration = 0
+
+        self.evaluator = Evaluator(self._data)
 
     def get_recommendations(self, k: int = 100):
         return {u: self._datamodel.get_user_recs(u, k) for u in self._ratings.keys()}
@@ -184,6 +189,8 @@ class BPR(BaseRecommenderModel):
             self._iteration = it
 
             self.train_step()
+
+            self.evaluator.eval(self.get_recommendations(self._params.k))
 
     def predict(self, u: int, i: int):
         return self._datamodel.predict(u, i)

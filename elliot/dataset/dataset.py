@@ -8,7 +8,7 @@ class DataSet(object):
     Load train and test dataset
     """
 
-    def __init__(self, config, *params, **kwargs):
+    def __init__(self, config, params, *args, **kwargs):
         """
         Constructor of DataSet
         :param path_train_data: relative path for train file
@@ -33,6 +33,7 @@ class DataSet(object):
 
         print('{0} - Loaded'.format(path_train_data))
         self.params = params
+        self.args = args
         self.kwargs = kwargs
 
     def build_dict(self, dataframe, users):
@@ -75,4 +76,4 @@ class DataSet(object):
         return dataframe[["userId","itemId"]].values
 
     def get_test(self):
-        return self.build_dict(self.test_dataframe)
+        return self.build_dict(self.test_dataframe, self.users)
