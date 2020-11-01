@@ -115,7 +115,7 @@ class BPR(BaseRecommenderModel):
         super().__init__(config, params, *args, **kwargs)
         np.random.seed(42)
 
-        self._data = DataSet(config)
+        self._data = DataSet(config, params)
         self._num_items = self._data.num_items
         self._num_users = self._data.num_users
         self._random = np.random

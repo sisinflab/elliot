@@ -1,17 +1,19 @@
 import time
 from . import metrics
+import dataset.dataset as ds
 
 class Evaluator(object):
-    def __init__(self, model, data, k, rel_threshold):
+    def __init__(self, data: ds.DataSet, k, rel_threshold):
         """
         Class to manage all the evaluation methods and operation
         :param data: dataset object
         :param k: top-k evaluation
         """
         self.data = data
-        self.k = k
-        self.model = model
-        self.rel_threshold = rel_threshold
+        self.k = data.params.k
+        # self.model = model
+        self.rel_threshold = data.params.rel
+        #TODO
         self.metrics = [metrics.Precision]
         self.test = data.get_test()
         self.relevant_items = self.binary_relevance_filter()
