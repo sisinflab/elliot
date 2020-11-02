@@ -3,7 +3,7 @@ import configparser
 import pickle
 import numpy as np
 import os
-
+from types import SimpleNamespace
 
 def read_csv(filename):
     """
@@ -51,6 +51,25 @@ def read_config(sections_fields):
     configs = []
     for s, f in sections_fields:
         configs.append(config[s][f])
+    return configs
+
+
+def read_multi_config():
+    """
+    It reads a config file that contains the configuration parameters for the recommendation systems.
+
+    Return:
+         A list of configuration settings.
+    """
+    config = configparser.ConfigParser()
+    config.read('./config/multi.ini')
+    configs = []
+    for section in config.sections():
+        single_config = SimpleNamespace()
+        single_config.name = section
+        for field, value in config.items(section):
+            single_config.field = value
+        configs.append(single_config)
     return configs
 
 

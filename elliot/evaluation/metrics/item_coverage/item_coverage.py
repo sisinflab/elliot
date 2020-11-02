@@ -36,4 +36,4 @@ class ItemCoverage:
         Evaluation function
         :return: the overall averaged value of Item Coverage
         """
-        return len({i for u_r in self.recommendations.values() for i in u_r[:self.cutoff]})
+        return len({i[0] for u_r in self.recommendations.values() for i in u_r[:self.cutoff]})
