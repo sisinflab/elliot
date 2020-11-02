@@ -1,11 +1,9 @@
+import importlib
 from types import SimpleNamespace
 
-import recommender
-import dataset
-import evaluation
-import importlib
-from yaml import load, dump
-from yaml import CLoader as Loader, CDumper as Dumper, FullLoader as FullLoader
+from yaml import FullLoader as FullLoader
+from yaml import load
+
 from utils.folder import manage_directories
 
 if __name__ == '__main__':
