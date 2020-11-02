@@ -43,7 +43,7 @@ class Recall:
         :param user_relevant_items: list of user relevant items in the form [item1,...]
         :return: the value of the Recall metric for the specific user
         """
-        #TODO check formula
+        # TODO check formula
         return sum([1 for i in user_recommendations if i[0] in user_relevant_items]) / \
                min(len(user_relevant_items), cutoff)
 
@@ -54,5 +54,5 @@ class Recall:
         """
         return np.average(
             [Recall.__user_recall(u_r, self.cutoff, self.relevant_items[u])
-            for u, u_r in self.recommendations.items()]
+             for u, u_r in self.recommendations.items()]
         )

@@ -164,23 +164,23 @@ class BPRMF(BaseRecommenderModel):
         return "BPR" + self._datamodel.name
 
     def train_step(self):
-            start_it = time.perf_counter()
-            print()
-            print("Sampling...")
-            samples = self._sampler.step(self.num_pos_events)
-            start = time.perf_counter()
-            print(f"Sampled in {round(start-start_it, 2)} seconds")
-            # print(f"Training samples: {len(samples)}")
-            start = time.perf_counter()
-            print("Computing..")
-            for u, i, j in samples:
-                self.update_factors(u, i, j)
-            t2 = time.perf_counter()
-            print(f"Computed and updated in {round(t2-start, 2)} seconds")
-            # if (it + 1) % 1 == 0:
-            #     name = f"BPRMF_F{self._factors}_I{it+1}_L{str(self._learning_rate).replace('.','-')}"
-            #     print("Printing..")
-            #     self.print_recs("../recs/" + name + ".tsv", 10)
+        start_it = time.perf_counter()
+        print()
+        print("Sampling...")
+        samples = self._sampler.step(self.num_pos_events)
+        start = time.perf_counter()
+        print(f"Sampled in {round(start-start_it, 2)} seconds")
+        # print(f"Training samples: {len(samples)}")
+        start = time.perf_counter()
+        print("Computing..")
+        for u, i, j in samples:
+            self.update_factors(u, i, j)
+        t2 = time.perf_counter()
+        print(f"Computed and updated in {round(t2-start, 2)} seconds")
+        # if (it + 1) % 1 == 0:
+        #     name = f"BPRMF_F{self._factors}_I{it+1}_L{str(self._learning_rate).replace('.','-')}"
+        #     print("Printing..")
+        #     self.print_recs("../recs/" + name + ".tsv", 10)
 
     def train(self, num_iters: int = 10):
         self.num_pos_events = self._datamodel.get_transactions()
@@ -196,9 +196,6 @@ class BPRMF(BaseRecommenderModel):
 
             if not (it+1) % 10:
                 store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}_{it+1}.tsv")
-
-    def predict(self, u: int, i: int):
-        return self._datamodel.predict(u, i)
 
     def update_factors(self, u: int, i: int, j: int):
         user_factors = self._datamodel.get_user_factors(u)

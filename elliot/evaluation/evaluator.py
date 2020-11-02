@@ -3,6 +3,7 @@ from time import time
 from . import metrics
 import dataset.dataset as ds
 
+
 class Evaluator(object):
     def __init__(self, data: ds.DataSet):
         """

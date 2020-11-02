@@ -52,5 +52,5 @@ class Precision:
         """
         return np.average(
             [Precision.__user_precision(u_r, self.cutoff, self.relevant_items[u])
-            for u, u_r in self.recommendations.items()]
+             for u, u_r in self.recommendations.items()]
         )
