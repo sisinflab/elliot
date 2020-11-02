@@ -1,10 +1,10 @@
+import logging
+import os
 from copy import deepcopy
 from time import time
 
-import tensorflow as tf
 import numpy as np
-import os
-import logging
+import tensorflow as tf
 
 from config.configs import *
 from evaluation.Evaluator_old import Evaluator

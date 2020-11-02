@@ -3,13 +3,14 @@ Created on April 4, 2020
 Tensorflow 2.1.0 implementation of APR.
 @author Anonymized
 """
-import numpy as np
-from elliot.evaluation.Evaluator_old import Evaluator
-import os
 import logging
-import tensorflow as tf
-from recommender.keras_base_recommender_model import RecommenderModel
+import os
 
+import numpy as np
+import tensorflow as tf
+
+from elliot.evaluation.Evaluator_old import Evaluator
+from recommender.keras_base_recommender_model import RecommenderModel
 
 np.random.seed(0)
 logging.disable(logging.WARNING)

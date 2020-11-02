@@ -12,9 +12,9 @@ class Evaluator(object):
         :param k: top-k evaluation
         """
         self._data = data
-        self._k = data.params.k
-        self._rel_threshold = data.params.rel
-        self._metrics = metrics.parse_metrics(data.params.metrics)
+        self._k = data.config.top_k
+        self._rel_threshold = data.config.relevance
+        self._metrics = metrics.parse_metrics(data.config.metrics)
         self._test = data.get_test()
         self._data.params.relevant_items = self._binary_relevance_filter()
 
@@ -35,7 +35,7 @@ class Evaluator(object):
         eval_start_time = time()
 
         results = {
-            m.name(): str(round(m(recommendations, self._data.params).eval(), rounding_factor))
+            m.name(): str(round(m(recommendations, self._data.config, self._data.params).eval(), rounding_factor))
             for m in self._metrics
         }
 

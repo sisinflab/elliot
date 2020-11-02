@@ -3,17 +3,18 @@ Created on April 4, 2020
 Tensorflow 2.1.0 implementation of APR.
 @author Anonymized
 """
-import numpy as np
-from time import time
-import os
 import logging
-from utils.write import save_obj
-from utils.read import find_checkpoint
+import os
 from copy import deepcopy
+from time import time
 
+import numpy as np
 import tensorflow as tf
+
 from evaluation.Evaluator_old import Evaluator
 from recommender.keras_base_recommender_model import RecommenderModel
+from utils.read import find_checkpoint
+from utils.write import save_obj
 
 np.random.seed(0)
 logging.disable(logging.WARNING)

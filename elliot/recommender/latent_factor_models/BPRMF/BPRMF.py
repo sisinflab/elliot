@@ -1,10 +1,9 @@
 import time
-import typing as t
 import numpy as np
-from recommender.base_recommender_model import BaseRecommenderModel
 from dataset.dataset import DataSet
 from dataset.samplers import pairwise_sampler as ps
 from evaluation.evaluator import Evaluator
+from recommender.base_recommender_model import BaseRecommenderModel
 from utils.write import store_recommendation
 
 
@@ -127,14 +126,14 @@ class BPRMF(BaseRecommenderModel):
         print(self.params)
         self._factors = self.params.embed_k
         self._learning_rate = self.params.lr
-        self._bias_regularization = self.params.l_b
-        self._user_regularization = self.params.lr / 20
-        self._positive_item_regularization = self.params.lr / 20
-        self._negative_item_regularization = self.params.lr / 200
-        self._update_negative_item_factors = True
-        self._update_users = True
-        self._update_items = True
-        self._update_bias = True
+        self._bias_regularization = self.params.bias_regularization
+        self._user_regularization = self.params.user_regularization
+        self._positive_item_regularization = self.params.positive_item_regularization
+        self._negative_item_regularization = self.params.negative_item_regularization
+        self._update_negative_item_factors = self.params.update_negative_item_factors
+        self._update_users = self.params.update_users
+        self._update_items = self.params.update_items
+        self._update_bias = self.params.update_bias
 
         self._ratings = self._data.train_dataframe_dict
         self._datamodel = MF(self._factors, self._ratings, self._random)
@@ -191,7 +190,7 @@ class BPRMF(BaseRecommenderModel):
             self._iteration = it
 
             self.train_step()
-            recs = self.get_recommendations(self._params.k)
+            recs = self.get_recommendations(self._config.top_k)
             self.evaluator.eval(recs)
 
             if not (it+1) % 10:

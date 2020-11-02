@@ -15,7 +15,7 @@ class Recall:
     Passing 'Recall' to the metrics list will enable the computation of the metric.
     """
 
-    def __init__(self, recommendations, params):
+    def __init__(self, recommendations, config, params):
         """
         Constructor
         :param recommendations: list of recommendations in the form {user: [(item1,value1),...]}
@@ -23,7 +23,7 @@ class Recall:
         :param relevant_items: list of relevant items (binary) per user in the form {user: [item1,...]}
         """
         self.recommendations = recommendations
-        self.cutoff = params.k
+        self.cutoff = config.top_k
         self.relevant_items = params.relevant_items
 
     @staticmethod
