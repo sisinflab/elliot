@@ -216,8 +216,8 @@ class BPRMF(BaseRecommenderModel):
 
         # update user factors
         d_u = ((item_factors_i - item_factors_j)*z - self._user_regularization*user_factors)
-        self._datamodel.set_user_factors(u, user_factors +
-                                    (self._learning_rate * d_u))
+        self._datamodel.set_user_factors(u, user_factors
+                                         + (self._learning_rate * d_u))
 
         # update item i factors
         d_i = (user_factors*z - self._positive_item_regularization*item_factors_i)
