@@ -9,7 +9,8 @@ from yaml import load
 
 from hyperopt import hp, tpe, fmin, Trials
 
-from hyperoptimization import ModelCoordinator
+# from hyperoptimization import ModelCoordinator
+import hyperoptimization as ho
 
 from utils.folder import manage_directories
 
@@ -101,17 +102,18 @@ if __name__ == '__main__':
             #                       ])
             _SPACE = OrderedDict(space_list)
             _max_evals = config[_experiment][_models][key]["hyper_max_evals"]
+            _opt_alg = ho.parse_algorithms(config[_experiment][_models][key]["hyper_opt_alg"])
             # import hyperopt.pyll.stochastic
             # print(hyperopt.pyll.stochastic.sample(SPACE))
 
             model_class: t.ClassVar = getattr(importlib.import_module(_recommender), key)
 
-            model_placeholder = ModelCoordinator(base, SimpleNamespace(**config[_experiment][_models][key]),
+            model_placeholder = ho.ModelCoordinator(base, SimpleNamespace(**config[_experiment][_models][key]),
                                                  model_class)
             trials = Trials()
             best = fmin(model_placeholder.objective,
                         space=_SPACE,
-                        algo=tpe.suggest,
+                        algo=_opt_alg,
                         trials=trials,
                         rstate=_rstate,
                         max_evals=_max_evals)

@@ -25,3 +25,4 @@ experiment:
       update_items: True
       update_bias: True
       hyper_max_evals: 2
+      hyper_opt_alg: tpe
