@@ -4,15 +4,15 @@ experiment:
   test_set: ../data/{0}/testset.tsv
   features: ../data/{0}/features.tsv
   recs: ../results/recs/{0}/
-  wights: ../results/wights/{0}/
-  dataset: movielens
+  weights: ../results/weights/{0}/
+  dataset: example
   top_k: 50
   metrics: [Precision, Recall, ItemCoverage]
   relevance: 1
   models:
     BPRMF:
       lr: 0.01
-      epochs: 100
+      epochs: 2
       embed_k: 20
       batch_size: 512
       bias_regularization: 1

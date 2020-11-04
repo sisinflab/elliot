@@ -35,14 +35,14 @@ class Evaluator(object):
         eval_start_time = time()
 
         results = {
-            m.name(): str(round(m(recommendations, self._data.config, self._data.params).eval(), rounding_factor))
+            m.name(): m(recommendations, self._data.config, self._data.params).eval()
             for m in self._metrics
         }
+        str_results = {k: str(round(v, rounding_factor)) for k, v in results.items()}
+        print(f"\nEval Time: {time() - eval_start_time}")
 
-        print(f"Eval Time: {time() - eval_start_time}")
+        res_print = "\n".join(["\t".join(e) for e in str_results.items()])
 
-        res_print = "\n".join(["\t".join(e) for e in results.items()])
-
-        print(f"*** Results ***\n{res_print}\n***************")
+        print(f"*** Results ***\n{res_print}\n***************\n")
 
         return results

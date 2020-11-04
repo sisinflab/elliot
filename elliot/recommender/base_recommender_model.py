@@ -22,3 +22,15 @@ class BaseRecommenderModel(ABC):
     @abstractmethod
     def get_recommendations(self, *args):
         pass
+
+    @abstractmethod
+    def get_loss(self):
+        pass
+
+    @abstractmethod
+    def get_params(self):
+        pass
+
+    @abstractmethod
+    def get_results(self):
+        pass

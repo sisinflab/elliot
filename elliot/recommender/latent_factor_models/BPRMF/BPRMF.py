@@ -124,6 +124,7 @@ class BPRMF(BaseRecommenderModel):
         self._random = np.random
         self._sample_negative_items_empirically = True
         print(self.params)
+        self._num_iters = self.params.epochs
         self._factors = self.params.embed_k
         self._learning_rate = self.params.lr
         self._bias_regularization = self.params.bias_regularization
@@ -142,6 +143,7 @@ class BPRMF(BaseRecommenderModel):
         self._iteration = 0
 
         self.evaluator = Evaluator(self._data)
+        self._results = []
 
     def get_recommendations(self, k: int = 100):
         return {u: self._datamodel.get_user_recs(u, k) for u in self._ratings.keys()}
@@ -181,17 +183,17 @@ class BPRMF(BaseRecommenderModel):
         #     print("Printing..")
         #     self.print_recs("../recs/" + name + ".tsv", 10)
 
-    def train(self, num_iters: int = 10):
+    def train(self):
         self.num_pos_events = self._datamodel.get_transactions()
         print(f"Transactions: {self.num_pos_events}")
-        for it in range(num_iters):
+        for it in range(self._num_iters):
             print()
             print(f"********** Iteration: {it + 1}")
             self._iteration = it
 
             self.train_step()
             recs = self.get_recommendations(self._config.top_k)
-            self.evaluator.eval(recs)
+            self._results.append(self.evaluator.eval(recs))
 
             if not (it+1) % 10:
                 store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}_{it+1}.tsv")
@@ -206,25 +208,30 @@ class BPRMF(BaseRecommenderModel):
         z = 1/(1 + np.exp(self.predict(u, i)-self.predict(u, j)))
         # update bias i
         d_bi = (z - self._bias_regularization*item_bias_i)
-        self._datamodel.set_item_bias(i, item_bias_i
-                                 + (self._learning_rate * d_bi))
+        self._datamodel.set_item_bias(i, item_bias_i + (self._learning_rate * d_bi))
 
         # update bias j
         d_bj = (-z - self._bias_regularization*item_bias_j)
-        self._datamodel.set_item_bias(j, item_bias_j
-                                 + (self._learning_rate * d_bj))
+        self._datamodel.set_item_bias(j, item_bias_j + (self._learning_rate * d_bj))
 
         # update user factors
         d_u = ((item_factors_i - item_factors_j)*z - self._user_regularization*user_factors)
-        self._datamodel.set_user_factors(u, user_factors
-                                         + (self._learning_rate * d_u))
+        self._datamodel.set_user_factors(u, user_factors + (self._learning_rate * d_u))
 
         # update item i factors
         d_i = (user_factors*z - self._positive_item_regularization*item_factors_i)
-        self._datamodel.set_item_factors(i, item_factors_i
-                                    + (self._learning_rate * d_i))
+        self._datamodel.set_item_factors(i, item_factors_i + (self._learning_rate * d_i))
 
         # update item j factors
         d_j = (-user_factors*z - self._negative_item_regularization*item_factors_j)
-        self._datamodel.set_item_factors(j, item_factors_j
-                                    + (self._learning_rate * d_j))
+        self._datamodel.set_item_factors(j, item_factors_j + (self._learning_rate * d_j))
+
+    def get_loss(self):
+        return max([r["Precision"] for r in self._results])
+
+    def get_params(self):
+        return self._params.__dict__
+
+    def get_results(self):
+        val_max = np.argmax([r["Precision"] for r in self._results])
+        return self._results[val_max]
