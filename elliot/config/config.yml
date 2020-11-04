@@ -3,8 +3,9 @@ experiment:
   validation_set: ../data/{0}/validation.tsv
   test_set: ../data/{0}/testset.tsv
   features: ../data/{0}/features.tsv
-  recs: ../results/recs/{0}/
-  weights: ../results/weights/{0}/
+  recs: ../results/{0}/recs/
+  weights: ../results/{0}/weights/
+  performance: ../results/{0}/performance/
   dataset: example
   top_k: 50
   metrics: [Precision, Recall, ItemCoverage]

@@ -19,6 +19,7 @@ _validation_set = 'validation_set'
 _dataset = 'dataset'
 _test_set = 'test_set'
 _weights = 'weights'
+_performance = 'performance'
 _recs = 'recs'
 _features = 'features'
 _top_k = 'top_k'
@@ -45,8 +46,10 @@ if __name__ == '__main__':
         .format(config[_experiment][_dataset])
     config[_experiment][_weights] = config[_experiment][_weights] \
         .format(config[_experiment][_dataset])
+    config[_experiment][_performance] = config[_experiment][_performance] \
+        .format(config[_experiment][_dataset])
 
-    manage_directories(config[_experiment][_recs], config[_experiment][_weights])
+    manage_directories(config[_experiment][_recs], config[_experiment][_weights], config[_experiment][_performance])
 
     base = SimpleNamespace(
         path_train_data=config[_experiment][_training_set],
@@ -87,7 +90,7 @@ if __name__ == '__main__':
                 if isinstance(value, list):
                     print(k)
                     print(value)
-                    space_list.append((k,hp.choice(k, value)))
+                    space_list.append((k, hp.choice(k, value)))
 
             # _SPACE = OrderedDict([('lr', hp.loguniform('lr', np.log(0.01), np.log(0.5))),
             #                       # ('max_depth', hp.choice('max_depth', range(1, 30, 1))),
