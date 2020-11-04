@@ -76,38 +76,67 @@ if __name__ == '__main__':
         #     update_items=True,
         #     update_bias=True
         # )
-        _SPACE = OrderedDict([('lr', hp.loguniform('lr', np.log(0.01), np.log(0.5))),
-                             # ('max_depth', hp.choice('max_depth', range(1, 30, 1))),
-                             ('embed_k', hp.choice('embed_k', range(20, 50, 10))),
-                             # ('min_data_in_leaf', hp.choice('min_data_in_leaf', range(10, 1000, 1))),
-                             # ('feature_fraction', hp.uniform('feature_fraction', 0.1, 1.0)),
-                             # ('subsample', hp.uniform('subsample', 0.1, 1.0))
-                             ])
-        _max_evals = 2
-        # import hyperopt.pyll.stochastic
-        # print(hyperopt.pyll.stochastic.sample(SPACE))
 
-        model_class: t.ClassVar = getattr(importlib.import_module(_recommender), key)
+        if any(isinstance(value, list) for value in config[_experiment][_models][key].values()):
 
-        model_placeholder = ModelCoordinator(base, SimpleNamespace(**config[_experiment][_models][key]), model_class)
-        trials = Trials()
-        best = fmin(model_placeholder.objective,
-                    space=_SPACE,
-                    algo=tpe.suggest,
-                    trials=trials,
-                    rstate=_rstate,
-                    max_evals=_max_evals)
+            print("\n*********************")
+            print("Hyperparameter Optimization needed")
+            print("*********************\n")
+            space_list = []
+            for k, value in config[_experiment][_models][key].items():
+                if isinstance(value, list):
+                    print(k)
+                    print(value)
+                    space_list.append((k,hp.choice(k, value)))
 
-        print(best)
-        min_val = np.argmin([i["result"]["loss"] for i in trials._trials])
-        best_model_loss = trials._trials[min_val]["result"]["loss"]
-        best_model_params = trials._trials[min_val]["result"]["params"]
-        best_model_results = trials._trials[min_val]["result"]["results"]
+            _SPACE = OrderedDict([('lr', hp.loguniform('lr', np.log(0.01), np.log(0.5))),
+                                  # ('max_depth', hp.choice('max_depth', range(1, 30, 1))),
+                                  ('embed_k', hp.choice('embed_k', range(20, 50, 10))),
+                                  # ('min_data_in_leaf', hp.choice('min_data_in_leaf', range(10, 1000, 1))),
+                                  # ('feature_fraction', hp.uniform('feature_fraction', 0.1, 1.0)),
+                                  # ('subsample', hp.uniform('subsample', 0.1, 1.0))
+                                  ])
+            _SPACE = OrderedDict(space_list)
+            _max_evals = 2
+            # import hyperopt.pyll.stochastic
+            # print(hyperopt.pyll.stochastic.sample(SPACE))
+
+            model_class: t.ClassVar = getattr(importlib.import_module(_recommender), key)
+
+            model_placeholder = ModelCoordinator(base, SimpleNamespace(**config[_experiment][_models][key]),
+                                                 model_class)
+            trials = Trials()
+            best = fmin(model_placeholder.objective,
+                        space=_SPACE,
+                        algo=tpe.suggest,
+                        trials=trials,
+                        rstate=_rstate,
+                        max_evals=_max_evals)
+
+            print(best)
+            min_val = np.argmin([i["result"]["loss"] for i in trials._trials])
+            best_model_loss = trials._trials[min_val]["result"]["loss"]
+            best_model_params = trials._trials[min_val]["result"]["params"]
+            best_model_results = trials._trials[min_val]["result"]["results"]
+        else:
+
+            print("\n*********************")
+            print("Hyperparameter Optimization not requested")
+            print("*********************\n")
+
+            model_class = getattr(importlib.import_module(_recommender), key)
+            model = model_class(config=base, params=SimpleNamespace(**config[_experiment][_models][key]))
+            model.train()
+            best_model_loss = model.get_loss()
+            best_model_params = model.get_params()
+            best_model_results = model.get_results()
+
         print(f"Loss: {best_model_loss}")
         print(f"Best Model params: {best_model_params}")
         print(f"Best Model results: {best_model_results}")
         print(f"\nHyperparameter tuning ended for {model_class.__name__}")
         print("********************************\n")
+
 
 
 

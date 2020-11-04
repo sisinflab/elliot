@@ -13,7 +13,7 @@ experiment:
     BPRMF:
       lr: 0.01
       epochs: 2
-      embed_k: 20
+      embed_k: [20, 40]
       batch_size: 512
       bias_regularization: 1
       user_regularization: 1
@@ -23,3 +23,4 @@ experiment:
       update_users: True
       update_items: True
       update_bias: True
+      hyper_max_evals: 2
