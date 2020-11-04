@@ -11,7 +11,7 @@ experiment:
   relevance: 1
   models:
     BPRMF:
-      lr: 0.01
+      lr: [0.01, 0.05]
       epochs: 2
       embed_k: [20, 40]
       batch_size: 512

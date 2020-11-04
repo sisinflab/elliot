@@ -89,15 +89,15 @@ if __name__ == '__main__':
                     print(value)
                     space_list.append((k,hp.choice(k, value)))
 
-            _SPACE = OrderedDict([('lr', hp.loguniform('lr', np.log(0.01), np.log(0.5))),
-                                  # ('max_depth', hp.choice('max_depth', range(1, 30, 1))),
-                                  ('embed_k', hp.choice('embed_k', range(20, 50, 10))),
-                                  # ('min_data_in_leaf', hp.choice('min_data_in_leaf', range(10, 1000, 1))),
-                                  # ('feature_fraction', hp.uniform('feature_fraction', 0.1, 1.0)),
-                                  # ('subsample', hp.uniform('subsample', 0.1, 1.0))
-                                  ])
+            # _SPACE = OrderedDict([('lr', hp.loguniform('lr', np.log(0.01), np.log(0.5))),
+            #                       # ('max_depth', hp.choice('max_depth', range(1, 30, 1))),
+            #                       ('embed_k', hp.choice('embed_k', range(20, 50, 10))),
+            #                       # ('min_data_in_leaf', hp.choice('min_data_in_leaf', range(10, 1000, 1))),
+            #                       # ('feature_fraction', hp.uniform('feature_fraction', 0.1, 1.0)),
+            #                       # ('subsample', hp.uniform('subsample', 0.1, 1.0))
+            #                       ])
             _SPACE = OrderedDict(space_list)
-            _max_evals = 2
+            _max_evals = config[_experiment][_models][key]["hyper_max_evals"]
             # import hyperopt.pyll.stochastic
             # print(hyperopt.pyll.stochastic.sample(SPACE))
 
