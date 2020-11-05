@@ -7,7 +7,9 @@ import numpy as np
 import tensorflow as tf
 
 from config.configs import *
-from evaluation.Evaluator_old import Evaluator
+from dataset.dataset import DataSet
+from dataset.samplers import custom_sampler as cs
+from evaluation.evaluator import Evaluator
 from recommender.keras_base_recommender_model import RecommenderModel
 from utils.read import find_checkpoint
 from utils.write import save_obj
@@ -20,7 +22,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 class BPRMF(RecommenderModel):
 
-    def __init__(self, data, params):
+    def __init__(self, config, params, *args, **kwargs):
         """
         Create a BPR-MF instance.
         (see https://arxiv.org/pdf/1205.2618 for details about the algorithm design choices).
@@ -31,21 +33,41 @@ class BPRMF(RecommenderModel):
                                       [l_w, l_b]: regularization,
                                       lr: learning rate}
         """
-        super(BPRMF, self).__init__(data, params)
-        self.embed_k = self.params.embed_k
-        self.learning_rate = self.params.lr
+        super().__init__(config, params, *args, **kwargs)
+        np.random.seed(42)
+
+        self._data = DataSet(config, params)
+        self._config = config
+        self._params = params
+        self._num_items = self._data.num_items
+        self._num_users = self._data.num_users
+        self._random = np.random
+        self._sample_negative_items_empirically = True
+        self._num_iters = self.params.epochs
+        self._factors = self.params.embed_k
+        self._learning_rate = self.params.lr
         self.l_w = self.params.l_w
         self.l_b = self.params.l_b
 
-        self.evaluator = Evaluator(self, data, params.k)
+        self._restore_epochs = 0
+
+        self._ratings = self._data.train_dataframe_dict
+
+        self._sampler = cs.Sampler(self._ratings, self._random, self._sample_negative_items_empirically)
+
+        self._iteration = 0
+
+        self.evaluator = Evaluator(self._data)
+        self._results = []
+
 
         # Initialize Model Parameters
         self.initializer = tf.initializers.GlorotUniform()
-        self.Bi = tf.Variable(tf.zeros(self.num_items), name='Bi', dtype=tf.float32)
-        self.Gu = tf.Variable(self.initializer(shape=[self.num_users, self.embed_k]), name='Gu', dtype=tf.float32)
-        self.Gi = tf.Variable(self.initializer(shape=[self.num_items, self.embed_k]), name='Gi', dtype=tf.float32)
+        self.Bi = tf.Variable(tf.zeros(self._num_items), name='Bi', dtype=tf.float32)
+        self.Gu = tf.Variable(self.initializer(shape=[self._num_users, self._factors]), name='Gu', dtype=tf.float32)
+        self.Gi = tf.Variable(self.initializer(shape=[self._num_items, self._factors]), name='Gi', dtype=tf.float32)
 
-        self.optimizer = tf.optimizers.Adam(self.learning_rate)
+        self.optimizer = tf.optimizers.Adam(self._learning_rate)
         self.saver_ckpt = tf.train.Checkpoint(optimizer=self.optimizer, model=self)
 
     def call(self, inputs, training=None, mask=None):
@@ -133,19 +155,19 @@ class BPRMF(RecommenderModel):
 
     def train(self):
         if self.restore():
-            self.restore_epochs += 1
+            self._restore_epochs += 1
         else:
             print("Training from scratch...")
 
         # initialize the max_ndcg to memorize the best result
         max_hr = 0
         best_model = self
-        best_epoch = self.restore_epochs
+        best_epoch = self._restore_epochs
         results = {}
 
-        for self.epoch in range(self.restore_epochs, self.epochs + 1):
+        for self.epoch in range(self._restore_epochs, self._num_iters + 1):
             start_ep = time()
-            batches = self.data.shuffle(self.batch_size)
+            batches = self._sampler.step(self._data.transactions, self.params.batch_size)
             loss = self.one_epoch(batches)
             epoch_text = 'Epoch {0}/{1} loss {2:.3f}'.format(self.epoch, self.epochs, loss)
             self.evaluator.eval(self.epoch, results, epoch_text, start_ep)
@@ -169,7 +191,7 @@ class BPRMF(RecommenderModel):
         best_model.evaluator.store_recommendation(path=f'''{results_dir}/{self.params.dataset}/best-recs-{best_epoch}-{self.learning_rate}-{self.__class__.__name__}.tsv''')
 
     def restore(self):
-        if self.restore_epochs > 1:
+        if self._restore_epochs > 1:
             try:
                 checkpoint_file = find_checkpoint(weight_dir, self.restore_epochs, self.epochs,
                                                   self.rec)
@@ -181,3 +203,15 @@ class BPRMF(RecommenderModel):
         else:
             print("Restore Epochs Not Specified")
         return False
+
+    def get_recommendations(self, *args):
+        pass
+
+    def get_loss(self):
+        pass
+
+    def get_params(self):
+        pass
+
+    def get_results(self):
+        pass
