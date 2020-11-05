@@ -1,106 +1,57 @@
-import scipy.sparse as sp
 import numpy as np
-from multiprocessing import Pool
-from multiprocessing import cpu_count
 import pandas as pd
-from scipy.sparse import dok_matrix
-from time import time
-
-np.random.seed(0)
-
-_user_input = None
-_item_input_pos = None
-_batch_size = None
-_index = None
-_model = None
-_train = None
-_test = None
-_num_items = None
+import scipy.sparse as sp
 
 
-def _get_train_batch(i):
-    """
-    Generation of a batch in multiprocessing
-    :param i: index to control the batch generayion
-    :return:
-    """
-    user_batch, item_pos_batch, item_neg_batch = [], [], []
-    begin = i * _batch_size
-    for idx in range(begin, begin + _batch_size):
-        user_batch.append(_user_input[_index[idx]])
-        item_pos_batch.append(_item_input_pos[_index[idx]])
-        j = np.random.randint(_num_items)
-        while j in _train[_user_input[_index[idx]]]:
-            j = np.random.randint(_num_items)
-        item_neg_batch.append(j)
-    return np.array(user_batch)[:, None], np.array(item_pos_batch)[:, None], np.array(item_neg_batch)[:, None]
-
-
-class DataLoader(object):
+class DataSet(object):
     """
     Load train and test dataset
     """
 
-    def __init__(self, path_train_data, path_test_data, *args, **kwargs):
+    def __init__(self, config, params, *args, **kwargs):
         """
-        Constructor of DataLoader
+        Constructor of DataSet
         :param path_train_data: relative path for train file
         :param path_test_data: relative path for test file
         """
-        self.num_users, self.num_items = self.get_length(path_train_data, path_test_data)
-        self.load_train_file(path_train_data)
-        self.load_train_file_as_list(path_train_data)
-        self.load_test_file(path_test_data)
-        self._user_input, self._item_input_pos = self.sampling()
+        path_train_data = config.path_train_data
+        path_test_data = config.path_test_data
+        self.config = config
+        self.column_names = ['userId', 'itemId', 'rating']
+        self.train_dataframe = pd.read_csv(path_train_data, sep="\t", header=None, names=self.column_names)
+        #ATTENZIONE USERS E NUMERI SONO CALCOLATI SUL TRAIN MENTRE PRIMA SU ENTRAMBI, VERIFICARE
+        self.users = list(self.train_dataframe['userId'].unique())
+        self.num_users = len(self.users)
+        self.num_items = self.train_dataframe['itemId'].nunique()
+        self.transactions = len(self.train_dataframe)
+
+        self.train_dataframe_dict = self.build_dict(self.train_dataframe, self.users)
+        self.train = self.build_sparse(self.train_dataframe_dict, self.num_users, self.num_items)
+
+        self.test_dataframe = pd.read_csv(path_test_data, sep="\t", header=None, names=self.column_names)
+        self.test = self.prepare_test(self.test_dataframe)
+
         print('{0} - Loaded'.format(path_train_data))
+        self.params = params
         self.args = args
         self.kwargs = kwargs
 
-    def get_length(self, train_name, test_name):
-        train = pd.read_csv(train_name, sep='\t', header=None)
-        test = pd.read_csv(test_name, sep='\t', header=None)
-        try:
-            train.columns = ['user', 'item', 'r', 't']
-            test.columns = ['user', 'item', 'r', 't']
-            data = train.copy()
-            data = data.append(test, ignore_index=True)
-        except:
-            train.columns = ['user', 'item', 'r']
-            test.columns = ['user', 'item', 'r']
-            data = train.copy()
-            data = data.append(test, ignore_index=True)
+    def build_dict(self, dataframe, users):
+        ratings = {}
+        for u in users:
+            sel_ = dataframe[dataframe['userId'] == u]
+            ratings[u] = dict(zip(sel_['itemId'], sel_['rating']))
+        return ratings
 
-        return data['user'].nunique(), data['item'].nunique()
-
-    def load_train_file(self, filename):
-        """
-        Read /data/dataset_name/train file and Return the matrix.
-        """
-        # Get number of users and items
-        # self.num_users, self.num_items = 0, 0
-        with open(filename, "r") as f:
-            line = f.readline()
-            while line is not None and line != "":
-                arr = line.split("\t")
-                u, i = int(arr[0]), int(arr[1])
-                # self.num_users = max(self.num_users, u)
-                # self.num_items = max(self.num_items, i)
-                line = f.readline()
-
-        # Construct URM
-        self.train = sp.dok_matrix((self.num_users + 1, self.num_items + 1), dtype=np.float32)
-        with open(filename, "r") as f:
-            line = f.readline()
-            while line is not None and line != "":
-                arr = line.split("\t")
-                user, item, rating = int(arr[0]), int(arr[1]), float(arr[2])
+    def build_sparse(self, dataframe_dict, num_users, num_items):
+        train = sp.dok_matrix((num_users + 1, num_items + 1), dtype=np.float32)
+        for user, user_items in dataframe_dict.items():
+            for item, rating in user_items.items():
                 if rating > 0:
-                    self.train[user, item] = 1.0
-                line = f.readline()
+                    train[user, item] = 1.0
+        return train
 
-        # self.num_users = self.train.shape[0]
-        # self.num_items = self.train.shape[1]
-
+    #non capisco bene cosa faccia
     def load_train_file_as_list(self, filename):
         # Get number of users and items
         u_ = 0
@@ -121,53 +72,8 @@ class DataLoader(object):
                 line = f.readline()
         self.train_list.append(items)
 
-    def load_test_file(self, filename):
-        self.test = []
-        with open(filename, "r") as f:
-            line = f.readline()
-            while line != None and line != "":
-                arr = line.split("\t")
-                user, item = int(arr[0]), int(arr[1])
-                self.test.append([user, item])
-                line = f.readline()
+    def prepare_test(self, dataframe):
+        return dataframe[["userId","itemId"]].values
 
-    def sampling(self):
-        _user_input, _item_input_pos = [], []
-        for (u, i) in self.train.keys():
-            # positive instance
-            _user_input.append(u)
-            _item_input_pos.append(i)
-        return _user_input, _item_input_pos
-
-    def shuffle(self, batch_size=512):
-        """
-        Shuffle dataset to create batch with batch size
-        Variable are global to be faster!
-        :param batch_size: default 512
-        :return: set of all generated random batches
-        """
-        global _user_input
-        global _item_input_pos
-        global _batch_size
-        global _index
-        global _model
-        global _train
-        global _num_items
-
-        _user_input, _item_input_pos = self._user_input, self._item_input_pos
-        _batch_size = batch_size
-        _index = list(range(len(_user_input)))
-        _train = self.train_list
-        _num_items = self.num_items
-
-        np.random.shuffle(_index)
-        _num_batches = len(_user_input) // _batch_size
-        pool = Pool(cpu_count())
-        res = pool.map(_get_train_batch, range(_num_batches))
-        pool.close()
-        pool.join()
-
-        user_input = [r[0] for r in res]
-        item_input_pos = [r[1] for r in res]
-        item_input_neg = [r[2] for r in res]
-        return user_input, item_input_pos, item_input_neg
+    def get_test(self):
+        return self.build_dict(self.test_dataframe, self.users)

@@ -1,0 +1,212 @@
+../data/tradesy/trainingset.tsv - Loaded
+RUNNING vbpr Training on DATASET tradesy
+- PARAMETERS:
+	- gpu = 0
+	- dataset = tradesy
+	- rec = vbpr
+	- batch_size = 512
+	- k = 50
+	- epochs = 200
+	- verbose = 50
+	- embed_k = 64
+	- lr = 0.01
+	- restore_epochs = 1
+	- best = 0
+	- adv_type = fgsm
+	- adv_iteration = 2
+	- adv_step_size = 4
+	- adv_reg = 0.1
+	- adv_eps = 1
+	- embed_d = 20
+	- l_w = 0.01
+	- l_b = 0.01
+	- l_e = 0
+
+
+staring eval
+Process ForkPoolWorker-8:
+Traceback (most recent call last):
+  File "/usr/lib/python3.6/multiprocessing/process.py", line 258, in _bootstrap
+    self.run()
+  File "/usr/lib/python3.6/multiprocessing/process.py", line 93, in run
+    self._target(*self._args, **self._kwargs)
+  File "/usr/lib/python3.6/multiprocessing/pool.py", line 108, in worker
+    task = get()
+  File "/usr/lib/python3.6/multiprocessing/queues.py", line 334, in get
+    with self._rlock:
+  File "/usr/lib/python3.6/multiprocessing/synchronize.py", line 95, in __enter__
+    return self._semlock.__enter__()
+KeyboardInterrupt
+Process ForkPoolWorker-5:
+Traceback (most recent call last):
+  File "/usr/lib/python3.6/multiprocessing/process.py", line 258, in _bootstrap
+    self.run()
+  File "/usr/lib/python3.6/multiprocessing/process.py", line 93, in run
+    self._target(*self._args, **self._kwargs)
+  File "/usr/lib/python3.6/multiprocessing/pool.py", line 108, in worker
+    task = get()
+  File "/usr/lib/python3.6/multiprocessing/queues.py", line 334, in get
+    with self._rlock:
+  File "/usr/lib/python3.6/multiprocessing/synchronize.py", line 95, in __enter__
+    return self._semlock.__enter__()
+KeyboardInterrupt
+Process ForkPoolWorker-3:
+Traceback (most recent call last):
+  File "/usr/lib/python3.6/multiprocessing/process.py", line 258, in _bootstrap
+    self.run()
+  File "/usr/lib/python3.6/multiprocessing/process.py", line 93, in run
+    self._target(*self._args, **self._kwargs)
+  File "/usr/lib/python3.6/multiprocessing/pool.py", line 108, in worker
+    task = get()
+  File "/usr/lib/python3.6/multiprocessing/queues.py", line 334, in get
+    with self._rlock:
+  File "/usr/lib/python3.6/multiprocessing/synchronize.py", line 95, in __enter__
+    return self._semlock.__enter__()
+KeyboardInterrupt
+Process ForkPoolWorker-10:
+Traceback (most recent call last):
+  File "/usr/lib/python3.6/multiprocessing/process.py", line 258, in _bootstrap
+    self.run()
+  File "/usr/lib/python3.6/multiprocessing/process.py", line 93, in run
+    self._target(*self._args, **self._kwargs)
+  File "/usr/lib/python3.6/multiprocessing/pool.py", line 108, in worker
+    task = get()
+  File "/usr/lib/python3.6/multiprocessing/queues.py", line 334, in get
+    with self._rlock:
+  File "/usr/lib/python3.6/multiprocessing/synchronize.py", line 95, in __enter__
+    return self._semlock.__enter__()
+KeyboardInterrupt
+Process ForkPoolWorker-4:
+Traceback (most recent call last):
+  File "/usr/lib/python3.6/multiprocessing/process.py", line 258, in _bootstrap
+    self.run()
+  File "/usr/lib/python3.6/multiprocessing/process.py", line 93, in run
+    self._target(*self._args, **self._kwargs)
+  File "/usr/lib/python3.6/multiprocessing/pool.py", line 108, in worker
+    task = get()
+  File "/usr/lib/python3.6/multiprocessing/queues.py", line 334, in get
+    with self._rlock:
+  File "/usr/lib/python3.6/multiprocessing/synchronize.py", line 95, in __enter__
+    return self._semlock.__enter__()
+KeyboardInterrupt
+Process ForkPoolWorker-2:
+Traceback (most recent call last):
+  File "/usr/lib/python3.6/multiprocessing/process.py", line 258, in _bootstrap
+    self.run()
+  File "/usr/lib/python3.6/multiprocessing/process.py", line 93, in run
+    self._target(*self._args, **self._kwargs)
+  File "/usr/lib/python3.6/multiprocessing/pool.py", line 108, in worker
+    task = get()
+  File "/usr/lib/python3.6/multiprocessing/queues.py", line 334, in get
+    with self._rlock:
+  File "/usr/lib/python3.6/multiprocessing/synchronize.py", line 95, in __enter__
+    return self._semlock.__enter__()
+KeyboardInterrupt
+Process ForkPoolWorker-9:
+Traceback (most recent call last):
+  File "/usr/lib/python3.6/multiprocessing/process.py", line 258, in _bootstrap
+    self.run()
+  File "/usr/lib/python3.6/multiprocessing/process.py", line 93, in run
+    self._target(*self._args, **self._kwargs)
+  File "/usr/lib/python3.6/multiprocessing/pool.py", line 108, in worker
+    task = get()
+  File "/usr/lib/python3.6/multiprocessing/queues.py", line 334, in get
+    with self._rlock:
+  File "/usr/lib/python3.6/multiprocessing/synchronize.py", line 95, in __enter__
+    return self._semlock.__enter__()
+KeyboardInterrupt
+Process ForkPoolWorker-7:
+Traceback (most recent call last):
+  File "/usr/lib/python3.6/multiprocessing/process.py", line 258, in _bootstrap
+    self.run()
+  File "/usr/lib/python3.6/multiprocessing/process.py", line 93, in run
+    self._target(*self._args, **self._kwargs)
+  File "/usr/lib/python3.6/multiprocessing/pool.py", line 108, in worker
+    task = get()
+  File "/usr/lib/python3.6/multiprocessing/queues.py", line 334, in get
+    with self._rlock:
+  File "/usr/lib/python3.6/multiprocessing/synchronize.py", line 95, in __enter__
+    return self._semlock.__enter__()
+KeyboardInterrupt
+Process ForkPoolWorker-13:
+Traceback (most recent call last):
+  File "/usr/lib/python3.6/multiprocessing/process.py", line 258, in _bootstrap
+    self.run()
+  File "/usr/lib/python3.6/multiprocessing/process.py", line 93, in run
+    self._target(*self._args, **self._kwargs)
+  File "/usr/lib/python3.6/multiprocessing/pool.py", line 108, in worker
+    task = get()
+  File "/usr/lib/python3.6/multiprocessing/queues.py", line 334, in get
+    with self._rlock:
+  File "/usr/lib/python3.6/multiprocessing/synchronize.py", line 95, in __enter__
+    return self._semlock.__enter__()
+KeyboardInterrupt
+Process ForkPoolWorker-11:
+Traceback (most recent call last):
+  File "/usr/lib/python3.6/multiprocessing/process.py", line 258, in _bootstrap
+    self.run()
+  File "/usr/lib/python3.6/multiprocessing/process.py", line 93, in run
+    self._target(*self._args, **self._kwargs)
+  File "/usr/lib/python3.6/multiprocessing/pool.py", line 108, in worker
+    task = get()
+  File "/usr/lib/python3.6/multiprocessing/queues.py", line 334, in get
+    with self._rlock:
+  File "/usr/lib/python3.6/multiprocessing/synchronize.py", line 95, in __enter__
+    return self._semlock.__enter__()
+KeyboardInterrupt
+Process ForkPoolWorker-1:
+Traceback (most recent call last):
+  File "/usr/lib/python3.6/multiprocessing/process.py", line 258, in _bootstrap
+    self.run()
+  File "/usr/lib/python3.6/multiprocessing/process.py", line 93, in run
+    self._target(*self._args, **self._kwargs)
+  File "/usr/lib/python3.6/multiprocessing/pool.py", line 108, in worker
+    task = get()
+  File "/usr/lib/python3.6/multiprocessing/queues.py", line 335, in get
+    res = self._reader.recv_bytes()
+  File "/usr/lib/python3.6/multiprocessing/connection.py", line 216, in recv_bytes
+    buf = self._recv_bytes(maxlength)
+  File "/usr/lib/python3.6/multiprocessing/connection.py", line 407, in _recv_bytes
+    buf = self._recv(4)
+  File "/usr/lib/python3.6/multiprocessing/connection.py", line 379, in _recv
+    chunk = read(handle, remaining)
+KeyboardInterrupt
+Traceback (most recent call last):
+  File "train.py", line 134, in <module>
+    train()
+  File "train.py", line 123, in train
+    model = VBPR(data, args)
+  File "/home/claudio/Projects/elliot/elliot/recommender/VBPR.py", line 30, in __init__
+    super(VBPR, self).__init__(data, params)
+  File "/home/claudio/Projects/elliot/elliot/recommender/BPRMF.py", line 40, in __init__
+    self.evaluator = Evaluator(self, data, params.k)
+  File "/home/claudio/Projects/elliot/elliot/recommender/Evaluator.py", line 73, in __init__
+    self.eval_feed_dicts = _init_eval_model(data)
+  File "/home/claudio/Projects/elliot/elliot/recommender/Evaluator.py", line 20, in _init_eval_model
+    feed_dicts = pool.map(_evaluate_input, range(_dataset.num_users))
+  File "/usr/lib/python3.6/multiprocessing/pool.py", line 266, in map
+    return self._map_async(func, iterable, mapstar, chunksize).get()
+  File "/usr/lib/python3.6/multiprocessing/pool.py", line 638, in get
+    self.wait(timeout)
+  File "/usr/lib/python3.6/multiprocessing/pool.py", line 635, in wait
+    self._event.wait(timeout)
+  File "/usr/lib/python3.6/threading.py", line 551, in wait
+    signaled = self._cond.wait(timeout)
+  File "/usr/lib/python3.6/threading.py", line 295, in wait
+    waiter.acquire()
+KeyboardInterrupt
+Error in atexit._run_exitfuncs:
+Traceback (most recent call last):
+  File "/usr/lib/python3.6/multiprocessing/util.py", line 262, in _run_finalizers
+    finalizer()
+  File "/usr/lib/python3.6/multiprocessing/util.py", line 186, in __call__
+    res = self._callback(*self._args, **self._kwargs)
+  File "/usr/lib/python3.6/multiprocessing/pool.py", line 605, in _terminate_pool
+    p.join()
+  File "/usr/lib/python3.6/multiprocessing/process.py", line 124, in join
+    res = self._popen.wait(timeout)
+  File "/usr/lib/python3.6/multiprocessing/popen_fork.py", line 50, in wait
+    return self.poll(os.WNOHANG if timeout == 0.0 else 0)
+  File "/usr/lib/python3.6/multiprocessing/popen_fork.py", line 28, in poll
+    pid, sts = os.waitpid(self.pid, flag)
+KeyboardInterrupt

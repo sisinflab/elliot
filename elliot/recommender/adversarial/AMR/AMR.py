@@ -4,7 +4,7 @@ import os
 import numpy as np
 import tensorflow as tf
 
-from recommender.VBPR import VBPR
+from recommender.visual_recommenders.VBPR.VBPR import VBPR
 
 np.random.seed(0)
 logging.disable(logging.WARNING)

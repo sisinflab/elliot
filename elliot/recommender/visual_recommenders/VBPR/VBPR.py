@@ -4,9 +4,9 @@ import os
 import numpy as np
 import tensorflow as tf
 
-from dataset.visual_loader_mixin import VisualLoader
-from recommender.BPRMF import BPRMF
+from dataset.datatype_mixins.visual_loader_mixin import VisualLoader
 from recommender.attack.attack_visual_feature_mixin import AttackVisualFeature
+from recommender.latent_factor_models.NNBPRMF.NNBPRMF import BPRMF
 
 np.random.seed(0)
 tf.random.set_seed(0)

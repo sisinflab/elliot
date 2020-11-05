@@ -1,20 +1,21 @@
 import argparse
 import os
 import shutil
+from types import SimpleNamespace
 
-from dataset.dataset import DataLoader
-from recommender.APR import APR
-from recommender.BPRMF import BPRMF
-from recommender.Random import Random
-from recommender.VBPR import VBPR
+from recommender.adversarial.APR.APR import APR
+from recommender.latent_factor_models import BPRMF
+from recommender.latent_factor_models.NNBPRMF.NNBPRMF import BPRMF as NNBPRMF
+from recommender.unpersonalized.random_recommender.Random import Random
+from recommender.visual_recommenders.VBPR.VBPR import VBPR
 from utils.read import read_config
 
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Run train of the Recommender Model.")
     parser.add_argument('--gpu', type=int, default=-1)
-    parser.add_argument('--dataset', nargs='?', default='tradesy', help='dataset name: movielens, lastfm')
-    parser.add_argument('--rec', nargs='?', default="vbpr", help="bprmf, apr, random")
+    parser.add_argument('--dataset', nargs='?', default='example', help='dataset name: tradesy, movielens, lastfm')
+    parser.add_argument('--rec', nargs='?', default="bprmf", help="bprmf, apr, random")
     parser.add_argument('--batch_size', type=int, default=512, help='batch_size')
     parser.add_argument('--k', type=int, default=50, help='top-k of recommendation.')
     parser.add_argument('--epochs', type=int, default=200, help='Number of epochs.')
@@ -23,6 +24,8 @@ def parse_args():
     parser.add_argument('--lr', type=float, default=0.01, help='Learning rate.')
     parser.add_argument('--restore_epochs', type=int, default=1, help='Default is 1: The restore epochs (Must be lower than the epochs)')
     parser.add_argument('--best', type=int, default=0, help='Parameter useful for attack scenario. Leave at 0 here.')
+    parser.add_argument('--rel', type=int, default=0, help='Relevance Threshold to filter test items.')
+    parser.add_argument('--metrics', type=str, default="[Precision,Recall,ItemCoverage]", help='List of the metrics to evaluate.')
 
     # Parameters useful during the adv. training
     parser.add_argument('--adv_type', nargs='?', default="fgsm", help="fgsm, future work other techniques...")
@@ -105,9 +108,20 @@ def train():
 
     # Create directories to Store Results and Rec Models
     manage_directories(path_output_rec_result, path_output_rec_weight)
-
-    data = DataLoader(path_train_data=path_train_data
-                      , path_test_data=path_test_data, visual_features=path_feature_data)
+    config = SimpleNamespace(
+        path_train_data=path_train_data,
+        path_test_data=path_test_data,
+        path_feature_data=path_feature_data,
+        path_output_rec_result=path_output_rec_result,
+        path_output_rec_weight=path_output_rec_weight
+    )
+    # config = {"path_train_data": path_train_data,
+    #           "path_test_data": path_test_data,
+    #           "path_feature_data": path_feature_data,
+    #           "path_output_rec_result": path_output_rec_result,
+    #           "path_output_rec_weight": path_output_rec_weight}
+    # data = DataLoader(path_train_data=path_train_data
+    #                   , path_test_data=path_test_data, visual_features=path_feature_data)
 
     print("RUNNING {0} Training on DATASET {1}".format(args.rec, args.dataset))
     print("- PARAMETERS:")
@@ -118,13 +132,15 @@ def train():
     os.environ['CUDA_VISIBLE_DEVICES'] = str(args.gpu)
 
     if args.rec == 'bprmf':
-        model = BPRMF(data, args)
+        model = BPRMF(config, args)
+    elif args.rec == 'nnbprmf':
+        model = BPRMF(config, args)
     elif args.rec == 'vbpr':
-        model = VBPR(data, args)
+        model = VBPR(config, args)
     elif args.rec == 'apr':
-        model = APR(data, args)
+        model = APR(config, args)
     elif args.rec == 'random':
-        model = Random(data, args)
+        model = Random(config, args)
     else:
         raise NotImplementedError('Unknown Recommender Model.')
     model.train()
