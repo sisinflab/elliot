@@ -11,13 +11,13 @@ See the implementation of Item Coverage for creating new cross-user metrics.
 __version__ = '0.1'
 __author__ = 'XXX'
 
-
+from .ndcg import NDCG
 from .precision import Precision
 from .recall import Recall
 from .item_coverage import ItemCoverage
-import re
 
 _metric_dictionary = {
+    "nDCG": NDCG,
     "Precision": Precision,
     "Recall": Recall,
     "ItemCoverage": ItemCoverage

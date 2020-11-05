@@ -1,4 +1,5 @@
 from time import time
+import typing as t
 
 from . import metrics
 import dataset.dataset as ds
@@ -17,6 +18,20 @@ class Evaluator(object):
         self._metrics = metrics.parse_metrics(data.config.metrics)
         self._test = data.get_test()
         self._data.params.relevant_items = self._binary_relevance_filter()
+        self._data.params.gain_relevance_map = self._compute_user_gain_map()
+
+    def _compute_user_gain_map(self) -> t.Dict:
+        """
+        Method to compute the Gain Map:
+        rel = 2**(score - threshold + 1) - 1
+        :param sorted_item_predictions:
+        :param sorted_item_scores:
+        :param threshold:
+        :return:
+        """
+        return {u: {i: 0 if score < self.rel_threshold else 2 ** (score - self.rel_threshold + 1) - 1
+                    for i, score in test_items.items()}
+                for u, test_items in self._test.items()}
 
     def _binary_relevance_filter(self):
         """
