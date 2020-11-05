@@ -12,7 +12,7 @@ from dataset.samplers import custom_sampler as cs
 from evaluation.evaluator import Evaluator
 from recommender.keras_base_recommender_model import RecommenderModel
 from utils.read import find_checkpoint
-from utils.write import save_obj
+from utils.write import save_obj, store_recommendation
 
 np.random.seed(0)
 tf.random.set_seed(0)
@@ -132,12 +132,11 @@ class BPRMF(RecommenderModel):
         with tf.GradientTape() as tape:
 
             # Clean Inference
-            xu_pos, beta_pos, gamma_u, gamma_pos = self(inputs=(user, pos), training=True)
-            xu_neg, beta_neg, gamma_u, gamma_neg = self(inputs=(user, neg), training=True)
+            xu_pos, beta_pos, gamma_u, gamma_pos = self.call(inputs=(user, pos), training=True)
+            xu_neg, beta_neg, gamma_u, gamma_neg = self.call(inputs=(user, neg), training=True)
 
             difference = tf.clip_by_value(xu_pos - xu_neg, -80.0, 1e8)
             loss = tf.reduce_sum(tf.nn.softplus(-difference))
-
             # Regularization Component
             reg_loss = self.l_w * tf.reduce_sum([tf.nn.l2_loss(gamma_u),
                                                  tf.nn.l2_loss(gamma_pos),
@@ -159,36 +158,17 @@ class BPRMF(RecommenderModel):
         else:
             print("Training from scratch...")
 
-        # initialize the max_ndcg to memorize the best result
-        max_hr = 0
-        best_model = self
-        best_epoch = self._restore_epochs
-        results = {}
-
-        for self.epoch in range(self._restore_epochs, self._num_iters + 1):
-            start_ep = time()
+        for it in range(self._restore_epochs, self._num_iters + 1):
             batches = self._sampler.step(self._data.transactions, self.params.batch_size)
             loss = self.one_epoch(batches)
-            epoch_text = 'Epoch {0}/{1} loss {2:.3f}'.format(self.epoch, self.epochs, loss)
-            self.evaluator.eval(self.epoch, results, epoch_text, start_ep)
 
-            # print and log the best result (HR@10)
-            if max_hr < results[self.epoch]['hr'][self.evaluator.k - 1]:
-                max_hr = results[self.epoch]['hr'][self.evaluator.k - 1]
-                best_epoch = self.epoch
-                best_model = deepcopy(self)
+            recs = self.get_recommendations(self._config.top_k)
+            self._results.append(self.evaluator.eval(recs))
 
-            if self.epoch % self.verbose == 0 or self.epoch == 1:
-                self.saver_ckpt.save(f'''{weight_dir}/{self.params.dataset}/weights-{self.epoch}-{self.learning_rate}-{self.__class__.__name__}''')
+            print('Epoch {0}/{1} loss {2:.3f}'.format(it, self._num_iters, loss))
 
-        self.evaluator.store_recommendation(path=f'''{results_dir}/{self.params.dataset}/recs-{self.epoch}-{self.learning_rate}-{self.__class__.__name__}.tsv''')
-        save_obj(results, f'''{results_dir}/{self.params.dataset}/results-metrics-{self.learning_rate}''')
-
-        # Store the best model
-        print("Store Best Model at Epoch {0}".format(best_epoch))
-        saver_ckpt = tf.train.Checkpoint(optimizer=self.optimizer, model=best_model)
-        saver_ckpt.save(f'''{weight_dir}/{self.params.dataset}/best-weights-{best_epoch}-{self.learning_rate}-{self.__class__.__name__}''')
-        best_model.evaluator.store_recommendation(path=f'''{results_dir}/{self.params.dataset}/best-recs-{best_epoch}-{self.learning_rate}-{self.__class__.__name__}.tsv''')
+            if not (it + 1) % 10:
+                store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}_{it + 1}.tsv")
 
     def restore(self):
         if self._restore_epochs > 1:
@@ -204,8 +184,12 @@ class BPRMF(RecommenderModel):
             print("Restore Epochs Not Specified")
         return False
 
-    def get_recommendations(self, *args):
-        pass
+    def get_recommendations(self, k: int = 100):
+        predictions = (self.Bi + tf.matmul(self.Gu, self.Gi, transpose_b=True)).numpy()
+        return {u: list(zip(np.vectorize(self._sampler.private_items.get)(predictions[u, :].argsort()[::-1][:k]),
+                predictions[u, np.argsort(predictions[u, :])[:k]])) for
+                u in range(0, len(predictions))}
+
 
     def get_loss(self):
         pass

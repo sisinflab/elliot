@@ -1,8 +1,10 @@
 import importlib
+import os
 from types import SimpleNamespace
 
 from yaml import FullLoader as FullLoader
 from yaml import load
+from recommender.latent_factor_models.NNBPRMF.NNBPRMF import BPRMF as NNBPRMF
 
 from utils.folder import manage_directories
 
@@ -20,10 +22,13 @@ _metrics = 'metrics'
 _relevance = 'relevance'
 _models = 'models'
 _recommender = 'recommender'
+_gpu = 'gpu'
 
 if __name__ == '__main__':
     config_file = open('./config/config.yml')
     config = load(config_file, Loader=FullLoader)
+
+    os.environ['CUDA_VISIBLE_DEVICES'] = str(config[_experiment][_gpu])
 
     config[_experiment][_training_set] = config[_experiment][_training_set]\
         .format(config[_experiment][_dataset])
@@ -58,5 +63,5 @@ if __name__ == '__main__':
 
     for key in config[_experiment][_models]:
         model_class = getattr(importlib.import_module(_recommender), key)
-        model = model_class(config=base, params=SimpleNamespace(**config[_experiment][_models][key]))
+        model = NNBPRMF(config=base, params=SimpleNamespace(**config[_experiment][_models][key]))
         model.train()

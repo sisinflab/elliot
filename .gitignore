@@ -21,3 +21,5 @@ pip-selfcheck.json
 /rec_model_weight/tradesy/
 /rec_result/tradesy/
 /results/
+/data/example/
+/share/

@@ -10,6 +10,7 @@ experiment:
   top_k: 50
   metrics: [Precision, Recall, ItemCoverage]
   relevance: 1
+  gpu: 1
   models:
     BPRMF:
       lr: [0.01, 0.05]

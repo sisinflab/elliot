@@ -13,12 +13,12 @@ class Sampler:
         self._users = list(self._ratings.keys())
         self._items = list({k for a in self._ratings.values() for k in a.keys()})
 
-        self._private_users = {p: u for p, u in enumerate(self._users)}
-        self._public_users = {v: k for k, v in self._private_users.items()}
-        self._private_items = {p: i for p, i in enumerate(self._items)}
-        self._public_items = {v: k for k, v in self._private_items.items()}
+        self.private_users = {p: u for p, u in enumerate(self._users)}
+        self.public_users = {v: k for k, v in self.private_users.items()}
+        self.private_items = {p: i for p, i in enumerate(self._items)}
+        self.public_items = {v: k for k, v in self.private_items.items()}
 
-        self._indexed_ratings = {self._public_users[user]: [self._public_items[i] for i in items.keys()]
+        self._indexed_ratings = {self.public_users[user]: [self.public_items[i] for i in items.keys()]
                                  for user, items in self._ratings.items()}
 
     def step(self, events: int, batch_size: int):
