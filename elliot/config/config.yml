@@ -8,7 +8,7 @@ experiment:
   performance: ../results/{0}/performance/
   dataset: example
   top_k: 50
-  metrics: [Precision, Recall, ItemCoverage]
+  metrics: [nDCG,Precision, Recall, ItemCoverage]
   relevance: 1
   gpu: 1
   models:
@@ -27,10 +27,10 @@ experiment:
       update_bias: True
       hyper_max_evals: 2
       hyper_opt_alg: tpe
-    NNBPRMF:
-      lr: 0.01
-      epochs: 2
-      embed_k: 20
-      batch_size: 512
-      l_w: 1
-      l_b: 1
+#    NNBPRMF:
+#      lr: 0.01
+#      epochs: 2
+#      embed_k: 20
+#      batch_size: 512
+#      l_w: 1
+#      l_b: 1

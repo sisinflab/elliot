@@ -18,7 +18,7 @@ class Evaluator(object):
         self._metrics = metrics.parse_metrics(data.config.metrics)
         self._test = data.get_test()
         self._data.params.relevant_items = self._binary_relevance_filter()
-        # self._data.params.gain_relevance_map = self._compute_user_gain_map()
+        self._data.params.gain_relevance_map = self._compute_user_gain_map()
 
     def _compute_user_gain_map(self) -> t.Dict:
         """
@@ -29,7 +29,7 @@ class Evaluator(object):
         :param threshold:
         :return:
         """
-        return {u: {i: 0 if score < self.rel_threshold else 2 ** (score - self.rel_threshold + 1) - 1
+        return {u: {i: 0 if score < self._rel_threshold else 2 ** (score - self._rel_threshold + 1) - 1
                     for i, score in test_items.items()}
                 for u, test_items in self._test.items()}
 

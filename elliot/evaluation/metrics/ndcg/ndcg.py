@@ -70,7 +70,7 @@ class NDCG:
         idcg: float = NDCG.compute_idcg(user_gain_map, cutoff)
         dcg: float = sum(
             [user_gain_map.get(x, 0) * NDCG.compute_discount(r)
-             for r, x in enumerate([item[0] for item, _ in user_recommendations]) if r < cutoff])
+             for r, x in enumerate([item for item, _ in user_recommendations]) if r < cutoff])
         return dcg / idcg if dcg > 0 else 0
 
     @staticmethod
@@ -83,7 +83,7 @@ class NDCG:
         :return: the value of the nDCG metric for the specific user
         """
 
-        ndcg: float = NDCG.compute_ndcg(user_recommendations, user_gain_map, cutoff)
+        ndcg: float = NDCG.compute_user_ndcg(user_recommendations, user_gain_map, cutoff)
 
         return ndcg
 
