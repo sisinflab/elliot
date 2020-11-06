@@ -10,23 +10,25 @@ import typing as t
 import numpy as np
 import math
 
-class NDCG:
+from ..base_metric import BaseMetric
+
+class NDCG(BaseMetric):
     """
     This class represents the implementation of the nDCG recommendation metric.
     Passing 'nDCG' to the metrics list will enable the computation of the metric.
     """
 
-    def __init__(self, recommendations, config, params):
+    def __init__(self, recommendations, config, params, eval_objects):
         """
         Constructor
         :param recommendations: list of recommendations in the form {user: [(item1,value1),...]}
         :param cutoff: numerical threshold to limit the recommendation list
         :param relevant_items: list of relevant items (binary) per user in the form {user: [item1,...]}
         """
-        self.recommendations: t.List[t.Tuple[int, float]] = recommendations
-        self.cutoff = config.top_k
-        self.rel_threshold = config.relevance
-        self.relevance_map = params.gain_relevance_map
+        super().__init__(recommendations, config, params, eval_objects)
+        self._cutoff = self._config.top_k
+        self._relevance_map = self._evaluation_objects.relevance.get_discounted_relevance()
+        self.rel_threshold = self._config.relevance
 
     @staticmethod
     def name():
@@ -94,8 +96,8 @@ class NDCG:
         """
 
         return np.average(
-            [NDCG.__user_ndcg(u_r, self.relevance_map[u], self.cutoff)
-             for u, u_r in self.recommendations.items()]
+            [NDCG.__user_ndcg(u_r, self._relevance_map[u], self._cutoff)
+             for u, u_r in self._recommendations.items()]
         )
 
 

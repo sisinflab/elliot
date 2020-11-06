@@ -7,24 +7,25 @@ __version__ = '0.1'
 __author__ = 'XXX'
 
 import numpy as np
+from ..base_metric import BaseMetric
 
 
-class Recall:
+class Recall(BaseMetric):
     """
     This class represents the implementation of the Recall recommendation metric.
     Passing 'Recall' to the metrics list will enable the computation of the metric.
     """
 
-    def __init__(self, recommendations, config, params):
+    def __init__(self, recommendations, config, params, eval_objects):
         """
         Constructor
         :param recommendations: list of recommendations in the form {user: [(item1,value1),...]}
         :param cutoff: numerical threshold to limit the recommendation list
         :param relevant_items: list of relevant items (binary) per user in the form {user: [item1,...]}
         """
-        self.recommendations = recommendations
-        self.cutoff = config.top_k
-        self.relevant_items = params.relevant_items
+        super().__init__(recommendations, config, params, eval_objects)
+        self._cutoff = self._config.top_k
+        self._relevant_items = self._evaluation_objects.relevance.get_binary_relevance()
 
     @staticmethod
     def name():
@@ -53,6 +54,6 @@ class Recall:
         :return: the overall averaged value of Recall
         """
         return np.average(
-            [Recall.__user_recall(u_r, self.cutoff, self.relevant_items[u])
-             for u, u_r in self.recommendations.items()]
+            [Recall.__user_recall(u_r, self._cutoff, self._relevant_items[u])
+             for u, u_r in self._recommendations.items()]
         )

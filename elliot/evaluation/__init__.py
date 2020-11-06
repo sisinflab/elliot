@@ -10,3 +10,4 @@ __version__ = '0.1'
 __author__ = 'XXX'
 
 from . import metrics
+from . import relevance
