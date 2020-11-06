@@ -4,7 +4,6 @@ from types import SimpleNamespace
 
 from yaml import FullLoader as FullLoader
 from yaml import load
-from recommender.latent_factor_models.NNBPRMF.NNBPRMF import BPRMF as NNBPRMF
 
 from utils.folder import manage_directories
 
@@ -63,5 +62,5 @@ if __name__ == '__main__':
 
     for key in config[_experiment][_models]:
         model_class = getattr(importlib.import_module(_recommender), key)
-        model = NNBPRMF(config=base, params=SimpleNamespace(**config[_experiment][_models][key]))
+        model = model_class(config=base, params=SimpleNamespace(**config[_experiment][_models][key]))
         model.train()
