@@ -44,7 +44,7 @@ class NameSpaceModel:
             .format(self.config[_experiment][_dataset])
         self.config[_experiment][_test_set] = self.config[_experiment][_test_set] \
             .format(self.config[_experiment][_dataset])
-        self.config[_experiment][_features] = self.config[_experiment][_features] \
+        self.config[_experiment][_features] = self.config[_experiment][_features]\
             .format(self.config[_experiment][_dataset])
 
         self.config[_experiment][_recs] = self.config[_experiment][_recs] \
