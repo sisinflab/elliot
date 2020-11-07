@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod, abstractproperty
 
-from utils.namespace_model import NameSpaceModel
+from namespace.namespace_model import NameSpaceModel
 
 
 class Builder(ABC):

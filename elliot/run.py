@@ -2,7 +2,7 @@ import importlib
 
 from hyperopt import Trials, fmin
 
-from utils.namespace_model_builder import NameSpaceBuilder
+from namespace.namespace_model_builder import NameSpaceBuilder
 import hyperoptimization as ho
 import numpy as np
 
