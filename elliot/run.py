@@ -1,66 +1,35 @@
 import importlib
-import os
-from types import SimpleNamespace
 
-from yaml import FullLoader as FullLoader
-from yaml import load
+from hyperopt import Trials, fmin
 
-from utils.folder import manage_directories
+from utils.namespace_model_builder import NameSpaceBuilder
+import hyperoptimization as ho
+import numpy as np
 
-_experiment = 'experiment'
-_training_set = 'training_set'
-_validation_set = 'validation_set'
-_dataset = 'dataset'
-_test_set = 'test_set'
-_weights = 'weights'
-_performance = 'performance'
-_recs = 'recs'
-_features = 'features'
-_top_k = 'top_k'
-_metrics = 'metrics'
-_relevance = 'relevance'
-_models = 'models'
-_recommender = 'recommender'
-_gpu = 'gpu'
+_rstate = np.random.RandomState(42)
 
 if __name__ == '__main__':
-    config_file = open('./config/config.yml')
-    config = load(config_file, Loader=FullLoader)
 
-    os.environ['CUDA_VISIBLE_DEVICES'] = str(config[_experiment][_gpu])
+    builder = NameSpaceBuilder('./config/config.yml')
+    base = builder.base
 
-    config[_experiment][_training_set] = config[_experiment][_training_set]\
-        .format(config[_experiment][_dataset])
-    config[_experiment][_validation_set] = config[_experiment][_validation_set] \
-        .format(config[_experiment][_dataset])
-    config[_experiment][_test_set] = config[_experiment][_test_set] \
-        .format(config[_experiment][_dataset])
-    config[_experiment][_features] = config[_experiment][_features] \
-        .format(config[_experiment][_dataset])
+    for key, model_base in builder.models():
+        model_class = getattr(importlib.import_module("recommender"), key)
+        if isinstance(model_base, tuple):
+            model_placeholder = ho.ModelCoordinator(base.base_namespace, model_base[0], model_class)
+            trials = Trials()
+            best = fmin(model_placeholder.objective,
+                        space=model_base[1],
+                        algo=model_base[3],
+                        trials=trials,
+                        rstate=_rstate,
+                        max_evals=model_base[2])
 
-    config[_experiment][_recs] = config[_experiment][_recs] \
-        .format(config[_experiment][_dataset])
-    config[_experiment][_weights] = config[_experiment][_weights] \
-        .format(config[_experiment][_dataset])
-    config[_experiment][_performance] = config[_experiment][_performance] \
-        .format(config[_experiment][_dataset])
-
-    manage_directories(config[_experiment][_recs], config[_experiment][_weights], config[_experiment][_performance])
-
-    base = SimpleNamespace(
-        path_train_data=config[_experiment][_training_set],
-        path_validation_data=config[_experiment][_validation_set],
-        path_test_data=config[_experiment][_test_set],
-        path_feature_data=config[_experiment][_features],
-        path_output_rec_result=config[_experiment][_recs],
-        path_output_rec_weight=config[_experiment][_weights],
-        dataset=config[_experiment][_dataset],
-        top_k=config[_experiment][_top_k],
-        metrics=config[_experiment][_metrics],
-        relevance=config[_experiment][_relevance],
-    )
-
-    for key in config[_experiment][_models]:
-        model_class = getattr(importlib.import_module(_recommender), key)
-        model = model_class(config=base, params=SimpleNamespace(**config[_experiment][_models][key]))
-        model.train()
+            print(best)
+            min_val = np.argmin([i["result"]["loss"] for i in trials._trials])
+            best_model_loss = trials._trials[min_val]["result"]["loss"]
+            best_model_params = trials._trials[min_val]["result"]["params"]
+            best_model_results = trials._trials[min_val]["result"]["results"]
+        else:
+            model = model_class(config=base.base_namespace, params=model_base)
+            model.train()
