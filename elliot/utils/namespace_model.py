@@ -23,6 +23,8 @@ _relevance = 'relevance'
 _models = 'models'
 _recommender = 'recommender'
 _gpu = 'gpu'
+_hyper_max_evals = 'hyper_max_evals'
+_hyper_opt_alg = 'hyper_opt_alg'
 
 
 class NameSpaceModel:
@@ -67,8 +69,8 @@ class NameSpaceModel:
                     if isinstance(value, list):
                         space_list.append((k, hp.choice(k, value)))
                 _SPACE = OrderedDict(space_list)
-                _max_evals = self.config[_experiment][_models][key]["hyper_max_evals"]
-                _opt_alg = ho.parse_algorithms(self.config[_experiment][_models][key]["hyper_opt_alg"])
+                _max_evals = self.config[_experiment][_models][key][_hyper_max_evals]
+                _opt_alg = ho.parse_algorithms(self.config[_experiment][_models][key][_hyper_opt_alg])
                 yield key, (SimpleNamespace(**self.config[_experiment][_models][key]), _SPACE, _max_evals, _opt_alg)
             else:
                 yield key, SimpleNamespace(**self.config[_experiment][_models][key])
