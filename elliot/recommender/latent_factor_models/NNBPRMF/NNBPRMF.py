@@ -195,12 +195,12 @@ class BPRMF(RecommenderModel):
             predictions_top_k.update(dict(zip(range(offset, offset + self.params.batch_size), items_ratings_pair)))
         return predictions_top_k
 
-
     def get_loss(self):
-        pass
+        return max([r["Precision"] for r in self._results])
 
     def get_params(self):
-        pass
+        return self._params.__dict__
 
     def get_results(self):
-        pass
+        val_max = np.argmax([r["Precision"] for r in self._results])
+        return self._results[val_max]
