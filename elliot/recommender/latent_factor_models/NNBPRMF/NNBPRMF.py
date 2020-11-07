@@ -185,10 +185,15 @@ class BPRMF(RecommenderModel):
         return False
 
     def get_recommendations(self, k: int = 100):
-        predictions = (self.Bi + tf.matmul(self.Gu, self.Gi, transpose_b=True)).numpy()
-        return {u: list(zip(np.vectorize(self._sampler.private_items.get)(predictions[u, :].argsort()[::-1][:k]),
-                predictions[u, np.argsort(predictions[u, :])[:k]])) for
-                u in range(0, len(predictions))}
+        predictions_top_k = {}
+        for index, offset in enumerate(range(0, self.Gu.shape[0], self.params.batch_size)):
+            predictions = (self.Bi + tf.matmul(self.Gu[offset: offset + self.params.batch_size],
+                                               self.Gi, transpose_b=True))
+            v, i = tf.nn.top_k(predictions, k=k, sorted=True)
+            items_ratings_pair = [list(zip(map(self._sampler.private_items.get, u_list[0]), u_list[1]))
+                                  for u_list in list(zip(i.numpy(), v.numpy()))]
+            predictions_top_k.update(dict(zip(range(offset, offset + self.params.batch_size), items_ratings_pair)))
+        return predictions_top_k
 
 
     def get_loss(self):
