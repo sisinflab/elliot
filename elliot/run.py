@@ -33,3 +33,13 @@ if __name__ == '__main__':
         else:
             model = model_class(config=base.base_namespace, params=model_base)
             model.train()
+            best_model_loss = model.get_loss()
+            best_model_params = model.get_params()
+            best_model_results = model.get_results()
+
+        print(f"Loss: {best_model_loss}")
+        print(f"Best Model params: {best_model_params}")
+        print(f"Best Model results: {best_model_results}")
+        print(f"\nHyperparameter tuning ended for {model_class.__name__}")
+        print("********************************\n")
+
