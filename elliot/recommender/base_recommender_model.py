@@ -1,5 +1,7 @@
 from abc import ABC
 from abc import abstractmethod
+import numpy as np
+import random
 
 
 class BaseRecommenderModel(ABC):
@@ -12,8 +14,8 @@ class BaseRecommenderModel(ABC):
             data: data loader object
             params: dictionary with all parameters
         """
-        self.config = config
-        self.params = params
+        self._config = config
+        self._params = params
 
     @abstractmethod
     def train(self):

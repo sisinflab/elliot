@@ -12,25 +12,32 @@ experiment:
   relevance: 1
   gpu: -1 # -1 is not use GPU
   models:
-    BPRMF:
-      lr: [0.01, 0.05]
-      epochs: 2
-      embed_k: [20, 40]
-      batch_size: 512
-      bias_regularization: 1
-      user_regularization: 1
-      positive_item_regularization: 1
-      negative_item_regularization: 1
-      update_negative_item_factors: True
-      update_users: True
-      update_items: True
-      update_bias: True
-      hyper_max_evals: 2
-      hyper_opt_alg: tpe
-    NNBPRMF:
-      lr: 0.01
-      epochs: 2
-      embed_k: 20
-      batch_size: 512
-      l_w: 1
-      l_b: 1
+    MultiDAE:
+      lr: 0.001
+      epochs: 100
+      intermediate_dim: 600
+      latent_dim: 200
+      batch_size: 500
+      dropout_pkeep: 1
+      reg_lambda: 0.01
+#    BPRMF:
+#      lr: 0.05
+#      epochs: 10
+#      embed_k: [10,50,100,125,150,200]
+#      bias_regularization: 0
+#      user_regularization: [0.0025,0.005,0.01]
+#      positive_item_regularization: [0.0025,0.005,0.01]
+#      negative_item_regularization: [0.00025,0.0005,0.001]
+#      update_negative_item_factors: True
+#      update_users: True
+#      update_items: True
+#      update_bias: True
+#      hyper_max_evals: 5
+#      hyper_opt_alg: tpe
+#    NNBPRMF:
+#      lr: 0.01
+#      epochs: 2
+#      embed_k: 20
+#      batch_size: 512
+#      l_w: 1
+#      l_b: 1

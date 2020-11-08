@@ -168,7 +168,7 @@ class BPRMF(BaseRecommenderModel):
         start_it = time.perf_counter()
         print()
         print("Sampling...")
-        samples = self._sampler.step(self.num_pos_events)
+        samples = self._sampler.step(self._data.transactions)
         start = time.perf_counter()
         print(f"Sampled in {round(start-start_it, 2)} seconds")
         # print(f"Training samples: {len(samples)}")
@@ -184,11 +184,10 @@ class BPRMF(BaseRecommenderModel):
         #     self.print_recs("../recs/" + name + ".tsv", 10)
 
     def train(self):
-        self.num_pos_events = self._datamodel.get_transactions()
-        print(f"Transactions: {self.num_pos_events}")
+        # self.num_pos_events = self._datamodel.get_transactions()
+        print(f"Transactions: {self._data.transactions}")
         for it in range(self._num_iters):
-            print()
-            print(f"********** Iteration: {it + 1}")
+            print(f"\n********** Iteration: {it + 1}")
             self._iteration = it
 
             self.train_step()
@@ -227,11 +226,11 @@ class BPRMF(BaseRecommenderModel):
         self._datamodel.set_item_factors(j, item_factors_j + (self._learning_rate * d_j))
 
     def get_loss(self):
-        return max([r["Precision"] for r in self._results])
+        return max([r["nDCG"] for r in self._results])
 
     def get_params(self):
         return self._params.__dict__
 
     def get_results(self):
-        val_max = np.argmax([r["Precision"] for r in self._results])
+        val_max = np.argmax([r["nDCG"] for r in self._results])
         return self._results[val_max]
