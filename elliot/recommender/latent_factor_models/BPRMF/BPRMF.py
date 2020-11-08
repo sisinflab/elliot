@@ -117,24 +117,22 @@ class BPRMF(BaseRecommenderModel):
         np.random.seed(42)
 
         self._data = DataSet(config, params)
-        self._config = config
-        self._params = params
         self._num_items = self._data.num_items
         self._num_users = self._data.num_users
         self._random = np.random
         self._sample_negative_items_empirically = True
-        print(self.params)
-        self._num_iters = self.params.epochs
-        self._factors = self.params.embed_k
-        self._learning_rate = self.params.lr
-        self._bias_regularization = self.params.bias_regularization
-        self._user_regularization = self.params.user_regularization
-        self._positive_item_regularization = self.params.positive_item_regularization
-        self._negative_item_regularization = self.params.negative_item_regularization
-        self._update_negative_item_factors = self.params.update_negative_item_factors
-        self._update_users = self.params.update_users
-        self._update_items = self.params.update_items
-        self._update_bias = self.params.update_bias
+
+        self._num_iters = self._params.epochs
+        self._factors = self._params.embed_k
+        self._learning_rate = self._params.lr
+        self._bias_regularization = self._params.bias_regularization
+        self._user_regularization = self._params.user_regularization
+        self._positive_item_regularization = self._params.positive_item_regularization
+        self._negative_item_regularization = self._params.negative_item_regularization
+        self._update_negative_item_factors = self._params.update_negative_item_factors
+        self._update_users = self._params.update_users
+        self._update_items = self._params.update_items
+        self._update_bias = self._params.update_bias
 
         self._ratings = self._data.train_dataframe_dict
         self._datamodel = MF(self._factors, self._ratings, self._random)
@@ -226,7 +224,7 @@ class BPRMF(BaseRecommenderModel):
         self._datamodel.set_item_factors(j, item_factors_j + (self._learning_rate * d_j))
 
     def get_loss(self):
-        return max([r["nDCG"] for r in self._results])
+        return -max([r["nDCG"] for r in self._results])
 
     def get_params(self):
         return self._params.__dict__

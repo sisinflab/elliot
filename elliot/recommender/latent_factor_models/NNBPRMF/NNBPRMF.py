@@ -196,7 +196,7 @@ class BPRMF(RecommenderModel):
         return predictions_top_k
 
     def get_loss(self):
-        return max([r["Precision"] for r in self._results])
+        return -max([r["Precision"] for r in self._results])
 
     def get_params(self):
         return self._params.__dict__

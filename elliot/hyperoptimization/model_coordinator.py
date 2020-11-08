@@ -41,7 +41,7 @@ class ModelCoordinator(object):
         model = self.model_class(config=self.base, params=model_params)
         model.train()
         return {
-            'loss': -model.get_loss(),
+            'loss': model.get_loss(),
             'status': STATUS_OK,
             'params': model.get_params(),
             'results': model.get_results()
