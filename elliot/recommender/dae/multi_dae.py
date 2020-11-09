@@ -2,7 +2,6 @@ import logging
 import os
 
 import numpy as np
-import tensorflow as tf
 
 from config.configs import *
 from dataset.dataset import DataSet
@@ -28,7 +27,6 @@ class MultiDAE(BaseRecommenderModel):
         super().__init__(config, params, *args, **kwargs)
         np.random.seed(42)
         random.seed(0)
-        tf.random.set_seed(0)
 
         self._data = DataSet(config, params)
         self._config = config
@@ -103,7 +101,7 @@ class MultiDAE(BaseRecommenderModel):
     def get_recommendations(self, k: int = 100):
         predictions_top_k = {}
         preds = self._model.predict(self._datamodel.sp_train.toarray())
-        v, i = tf.nn.top_k(preds, k=k, sorted=True)
+        v, i = self._model.get_top_k(preds, k=k)
         items_ratings_pair = [list(zip(map(self._datamodel.private_items.get, u_list[0]), u_list[1]))
                               for u_list in list(zip(i.numpy(), v.numpy()))]
         predictions_top_k.update(dict(zip(map(self._datamodel.private_users.get, range(self._datamodel.sp_train.shape[0])), items_ratings_pair)))

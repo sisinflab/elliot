@@ -113,3 +113,7 @@ class DenoisingAutoEncoder(keras.Model):
         logits = self.call(inputs=inputs, training=True)
         log_softmax_var = tf.nn.log_softmax(logits)
         return log_softmax_var
+
+    @tf.function
+    def get_top_k(self, preds, k=100):
+        return tf.nn.top_k(preds, k=k, sorted=True)
