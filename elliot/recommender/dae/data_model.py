@@ -22,7 +22,6 @@ class DataModel(object):
     def build_sparse(self):
 
         rows, cols = self.dataframe['userId'], self.dataframe['itemId']
-        data = sp.csr_matrix((np.ones_like(rows),
-                                  (rows, cols)), dtype='float32',
-                                 shape=(len(self.users), len(self.items)))
+        data = sp.csr_matrix((np.ones_like(rows), (rows, cols)), dtype='float32',
+                             shape=(len(self.users), len(self.items)))
         return data

@@ -104,7 +104,8 @@ class MultiDAE(BaseRecommenderModel):
         v, i = self._model.get_top_k(preds, k=k)
         items_ratings_pair = [list(zip(map(self._datamodel.private_items.get, u_list[0]), u_list[1]))
                               for u_list in list(zip(i.numpy(), v.numpy()))]
-        predictions_top_k.update(dict(zip(map(self._datamodel.private_users.get, range(self._datamodel.sp_train.shape[0])), items_ratings_pair)))
+        predictions_top_k.update(dict(zip(map(self._datamodel.private_users.get,
+                                              range(self._datamodel.sp_train.shape[0])), items_ratings_pair)))
         return predictions_top_k
 
     def get_loss(self):
