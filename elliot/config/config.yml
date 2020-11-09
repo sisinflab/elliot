@@ -6,6 +6,7 @@ experiment:
   path_output_rec_result: ../results/{0}/recs/
   path_output_rec_weight: ../results/{0}/weights/
   path_output_rec_performance: ../results/{0}/performance/
+  verbose_validation: 1
   dataset: example
   top_k: 50
   metrics: [nDCG,Precision, Recall, ItemCoverage]
@@ -22,20 +23,20 @@ experiment:
 #      reg_lambda: [0.01,0.1,0.001]
 #      hyper_max_evals: 10
 #      hyper_opt_alg: tpe
-    BPRMF:
-      lr: 0.05
-      epochs: 1
-      embed_k: [10,50,100,125,150,200]
-      bias_regularization: 0
-      user_regularization: [0.0025,0.005,0.01]
-      positive_item_regularization: [0.0025,0.005,0.01]
-      negative_item_regularization: [0.00025,0.0005,0.001]
-      update_negative_item_factors: True
-      update_users: True
-      update_items: True
-      update_bias: True
-      hyper_max_evals: 2
-      hyper_opt_alg: tpe
+#    BPRMF:
+#      lr: 0.05
+#      epochs: 1
+#      embed_k: [10,50,100,125,150,200]
+#      bias_regularization: 0
+#      user_regularization: [0.0025,0.005,0.01]
+#      positive_item_regularization: [0.0025,0.005,0.01]
+#      negative_item_regularization: [0.00025,0.0005,0.001]
+#      update_negative_item_factors: True
+#      update_users: True
+#      update_items: True
+#      update_bias: True
+#      hyper_max_evals: 2
+#      hyper_opt_alg: tpe
     NNBPRMF:
       lr: 0.01
       epochs: 1

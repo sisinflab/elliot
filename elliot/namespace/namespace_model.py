@@ -15,6 +15,7 @@ _dataset = 'dataset'
 _test_set = 'path_test_data'
 _weights = 'path_output_rec_weight'
 _performance = 'path_output_rec_performance'
+_verbose_validation = 'verbose_validation'
 _recs = 'path_output_rec_result'
 _features = 'path_feature_data'
 _top_k = 'top_k'
@@ -58,7 +59,7 @@ class NameSpaceModel:
                            self.config[_experiment][_performance])
 
         for p in [_training_set, _validation_set, _test_set, _weights, _features, _recs, _dataset, _top_k, _metrics,
-                  _relevance, _performance]:
+                  _relevance, _performance, _verbose_validation]:
             setattr(self.base_namespace, p, self.config[_experiment][p])
 
     def fill_model(self):

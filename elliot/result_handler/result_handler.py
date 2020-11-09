@@ -30,7 +30,8 @@ class ResultHandler:
         return bests
 
     def save_results(self, output='../results/', best=False):
-        global_results = dict(self.oneshot_recommenders, **self.get_best_result() if best else self.multishot_recommenders)
+        global_results = dict(self.oneshot_recommenders,
+                              **self.get_best_result() if best else self.multishot_recommenders)
         for rec in global_results.keys():
             results = {}
             for result in global_results[rec]:

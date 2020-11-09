@@ -6,7 +6,6 @@ from time import time
 import numpy as np
 import tensorflow as tf
 
-from config.configs import *
 from dataset.dataset import DataSet
 from dataset.samplers import custom_sampler as cs
 from evaluation.evaluator import Evaluator
@@ -78,7 +77,7 @@ class BPRMF(RecommenderModel):
                + "-e:" + str(self._params.epochs) \
                + "-factors:" + str(self._params.embed_k) \
                + "-br:" + str(self._params.l_b) \
-               + "-wr:" + str(self._params.l_w) \
+               + "-wr:" + str(self._params.l_w)
 
 
     def call(self, inputs, training=None, mask=None):
@@ -169,22 +168,28 @@ class BPRMF(RecommenderModel):
         else:
             print("Training from scratch...")
 
+        best_ndcg = 0
+        best_epoch = self._restore_epochs
+
         for it in range(self._restore_epochs, self._num_iters + 1):
             batches = self._sampler.step(self._data.transactions, self.params.batch_size)
             loss = self.one_epoch(batches)
 
             recs = self.get_recommendations(self._config.top_k)
-            self._results.append(self.evaluator.eval(recs))
 
-            print('Epoch {0}/{1} loss {2:.3f}'.format(it, self._num_iters, loss))
+            if not (it + 1) % self._config.verbose_validation:
+                self._results.append(self.evaluator.eval(recs))
+                print('Epoch {0}/{1} loss {2:.3f}'.format(it, self._num_iters, loss))
 
-            if not (it + 1) % 10:
-                store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}_{it + 1}.tsv")
+                if self._results[-1]['nDCG'] > best_ndcg:
+                    best_ndcg = self._results[-1]['nDCG']
+                    self.saver_ckpt.save(f'''{self._config.path_output_rec_weight}best-weights-{best_epoch}-{self._learning_rate}-{self.__class__.__name__}''')
+                    store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}_{it + 1}.tsv")
 
     def restore(self):
         if self._restore_epochs > 1:
             try:
-                checkpoint_file = find_checkpoint(weight_dir, self.restore_epochs, self.epochs,
+                checkpoint_file = find_checkpoint(self._config.path_output_rec_weight, self.restore_epochs, self.epochs,
                                                   self.rec)
                 self.saver_ckpt.restore(checkpoint_file)
                 print("Model correctly Restored at Epoch: {0}".format(self.restore_epochs))
