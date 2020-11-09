@@ -24,3 +24,4 @@ pip-selfcheck.json
 /data/example/
 /share/
 **/__pycache__/**
+*.log
