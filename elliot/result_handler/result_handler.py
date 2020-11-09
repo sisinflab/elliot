@@ -37,5 +37,14 @@ class ResultHandler:
                 results.update({result['params']['name']: result['results']})
             info = pd.DataFrame.from_dict(results, orient='index')
             info.insert(0, 'model', info.index)
-            info.reset_index()
             info.to_csv(f'{output}rec_{rec}_{datetime.now().strftime("%Y_%m_%d_%H_%M_%S")}.tsv', sep='\t', index=False)
+
+    def save_best_results(self, output='../results/'):
+        global_results = dict(self.oneshot_recommenders, **self.get_best_result())
+        results = {}
+        for rec in global_results.keys():
+            for result in global_results[rec]:
+                results.update({result['params']['name']: result['results']})
+        info = pd.DataFrame.from_dict(results, orient='index')
+        info.insert(0, 'model', info.index)
+        info.to_csv(f'{output}rec_{datetime.now().strftime("%Y_%m_%d_%H_%M_%S")}.tsv', sep='\t', index=False)
