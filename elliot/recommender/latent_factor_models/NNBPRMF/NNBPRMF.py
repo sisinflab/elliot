@@ -60,6 +60,7 @@ class BPRMF(RecommenderModel):
         self.evaluator = Evaluator(self._data)
         self._results = []
 
+        self._params.name = self.name
 
         # Initialize Model Parameters
         self.initializer = tf.initializers.GlorotUniform()
@@ -69,6 +70,16 @@ class BPRMF(RecommenderModel):
 
         self.optimizer = tf.optimizers.Adam(self._learning_rate)
         self.saver_ckpt = tf.train.Checkpoint(optimizer=self.optimizer, model=self)
+
+    @property
+    def name(self):
+        return "BPR" \
+               + "_lr:" + str(self._params.lr) \
+               + "-e:" + str(self._params.epochs) \
+               + "-factors:" + str(self._params.embed_k) \
+               + "-br:" + str(self._params.l_b) \
+               + "-wr:" + str(self._params.l_w) \
+
 
     def call(self, inputs, training=None, mask=None):
         """

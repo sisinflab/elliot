@@ -44,5 +44,6 @@ class ModelCoordinator(object):
             'loss': model.get_loss(),
             'status': STATUS_OK,
             'params': model.get_params(),
-            'results': model.get_results()
+            'results': model.get_results(),
+            'name': model.name
         }
