@@ -53,6 +53,8 @@ class MultiDAE(BaseRecommenderModel):
         self._learning_rate = self._params.lr
         self._dropout_rate = 1. - self._params.dropout_pkeep
 
+        self._verbose = self._params.verbose
+
         self._model = DenoisingAutoEncoder(self._num_items,
                                            self._intermediate_dim,
                                            self._latent_dim,
@@ -70,6 +72,8 @@ class MultiDAE(BaseRecommenderModel):
         else:
             print("Training from scratch...")
 
+        best_ndcg = 0
+
         for it in range(self._restore_epochs, self._num_iters + 1):
             loss = 0
             steps = 0
@@ -77,12 +81,17 @@ class MultiDAE(BaseRecommenderModel):
                 steps += 1
                 loss += self._model.train_step(batch.toarray())
 
-            recs = self.get_recommendations(self._config.top_k)
-            self._results.append(self.evaluator.eval(recs))
-            print(f'Epoch {it}/{self._num_iters} loss {loss:.3f}')
+            if not (it + 1) % self._params.verbose:
+                recs = self.get_recommendations(self._config.top_k)
+                self._results.append(self.evaluator.eval(recs))
+                print('Epoch {0}/{1} loss {2:.3f}'.format(it, self._num_iters, loss))
 
-            if not (it + 1) % 10:
-                store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}_{it + 1}.tsv")
+                if self._results[-1]['nDCG'] > best_ndcg:
+                    print("******************************************")
+                    best_ndcg = self._results[-1]['nDCG']
+                    best_epoch = it
+                    self._model.saver_ckpt.save(f'''{self._config.path_output_rec_weight}best-weights-{best_epoch}-{self._learning_rate}-{self.__class__.__name__}''')
+                    store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}_{it + 1}.tsv")
 
     def restore(self):
         if self._restore_epochs > 1:

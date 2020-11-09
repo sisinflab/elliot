@@ -6,23 +6,23 @@ experiment:
   path_output_rec_result: ../results/{0}/recs/
   path_output_rec_weight: ../results/{0}/weights/
   path_output_rec_performance: ../results/{0}/performance/
-  verbose_validation: 1
   dataset: example
   top_k: 50
   metrics: [nDCG,Precision, Recall, ItemCoverage]
   relevance: 1
   gpu: -1 # -1 is not use GPU
   models:
-#    MultiDAE:
-#      lr: [0.001,0.01,0.0001]
-#      epochs: 200
-#      intermediate_dim: [600,300,100]
-#      latent_dim: [200,100,50]
-#      batch_size: 6040
-#      dropout_pkeep: [1,0.8,0.7]
-#      reg_lambda: [0.01,0.1,0.001]
-#      hyper_max_evals: 10
-#      hyper_opt_alg: tpe
+    MultiDAE:
+      lr: [0.001,0.01,0.0001]
+      epochs: 200
+      intermediate_dim: [600,300,100]
+      latent_dim: [200,100,50]
+      batch_size: 6040
+      dropout_pkeep: [1,0.8,0.7]
+      reg_lambda: [0.01,0.1,0.001]
+      hyper_max_evals: 10
+      hyper_opt_alg: tpe
+      verbose: 5
 #    BPRMF:
 #      lr: 0.05
 #      epochs: 1
@@ -37,10 +37,10 @@ experiment:
 #      update_bias: True
 #      hyper_max_evals: 2
 #      hyper_opt_alg: tpe
-    NNBPRMF:
-      lr: 0.01
-      epochs: 1
-      embed_k: 20
-      batch_size: 512
-      l_w: 1
-      l_b: 1
+#    NNBPRMF:
+#      lr: 0.01
+#      epochs: 1
+#      embed_k: 20
+#      batch_size: 512
+#      l_w: 1
+#      l_b: 1

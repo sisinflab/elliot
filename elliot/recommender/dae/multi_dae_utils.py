@@ -79,6 +79,9 @@ class DenoisingAutoEncoder(keras.Model):
                                regularization_lambda=regularization_lambda)
         self.optimizer = tf.optimizers.Adam(learning_rate)
 
+
+        self.saver_ckpt = tf.train.Checkpoint(optimizer=self.optimizer, model=self)
+
     def call(self, inputs, training=None):
         z_mean = self.encoder(inputs, training=training)
         reconstructed = self.decoder(z_mean)

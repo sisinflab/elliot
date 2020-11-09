@@ -59,7 +59,7 @@ class NameSpaceModel:
                            self.config[_experiment][_performance])
 
         for p in [_training_set, _validation_set, _test_set, _weights, _features, _recs, _dataset, _top_k, _metrics,
-                  _relevance, _performance, _verbose_validation]:
+                  _relevance, _performance]:
             setattr(self.base_namespace, p, self.config[_experiment][p])
 
     def fill_model(self):
