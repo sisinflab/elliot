@@ -32,4 +32,4 @@ if __name__ == '__main__':
             model = model_class(config=base.base_namespace, params=model_base)
             model.train()
             res_handler.add_oneshot_recommender(model.name, model.get_loss(), model.get_params(), model.get_results())
-    res_handler.save_results(output=base.base_namespace.path_output_rec_performance)
+    res_handler.save_best_results(output=base.base_namespace.path_output_rec_performance)

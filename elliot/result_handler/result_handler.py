@@ -26,7 +26,7 @@ class ResultHandler:
             best_model_loss = self.multishot_recommenders[recommender][min_val]["loss"]
             best_model_params = self.multishot_recommenders[recommender][min_val]["params"]
             best_model_results = self.multishot_recommenders[recommender][min_val]["results"]
-            bests[recommender] = {"loss": best_model_loss, "params": best_model_params, "results": best_model_results}
+            bests[recommender] = [{"loss": best_model_loss, "params": best_model_params, "results": best_model_results}]
         return bests
 
     def save_results(self, output='../results/', best=False):
