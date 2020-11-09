@@ -143,6 +143,8 @@ class BPRMF(BaseRecommenderModel):
         self.evaluator = Evaluator(self._data)
         self._results = []
 
+        self._params.name = self.name
+
     def get_recommendations(self, k: int = 100):
         return {u: self._datamodel.get_user_recs(u, k) for u in self._ratings.keys()}
 
@@ -160,7 +162,15 @@ class BPRMF(BaseRecommenderModel):
 
     @property
     def name(self):
-        return "BPR" + self._datamodel.name
+        return "BPR" \
+               + self._datamodel.name \
+               + "_lr:" + str(self._params.lr) \
+               + "-e:" + str(self._params.epochs) \
+               + "-factors:" + str(self._params.embed_k) \
+               + "-br:" + str(self._params.bias_regularization) \
+               + "-ur:" + str(self._params.user_regularization) \
+               + "-pir:" + str(self._params.positive_item_regularization) \
+               + "-nir" + str(self._params.negative_item_regularization)
 
     def train_step(self):
         start_it = time.perf_counter()
@@ -193,7 +203,7 @@ class BPRMF(BaseRecommenderModel):
             self._results.append(self.evaluator.eval(recs))
 
             if not (it+1) % 10:
-                store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}_{it+1}.tsv")
+                store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}-i:{it+1}.tsv")
 
     def update_factors(self, u: int, i: int, j: int):
         user_factors = self._datamodel.get_user_factors(u)

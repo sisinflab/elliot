@@ -12,19 +12,19 @@ experiment:
   relevance: 1
   gpu: -1 # -1 is not use GPU
   models:
-    MultiDAE:
-      lr: [0.001,0.01,0.0001]
-      epochs: 20
-      intermediate_dim: [600,300,100]
-      latent_dim: [200,100,50]
-      batch_size: 500
-      dropout_pkeep: [1,0.8,0.7]
-      reg_lambda: [0.01,0.1,0.001]
-      hyper_max_evals: 10
-      hyper_opt_alg: tpe
+#    MultiDAE:
+#      lr: [0.001,0.01,0.0001]
+#      epochs: 200
+#      intermediate_dim: [600,300,100]
+#      latent_dim: [200,100,50]
+#      batch_size: 6040
+#      dropout_pkeep: [1,0.8,0.7]
+#      reg_lambda: [0.01,0.1,0.001]
+#      hyper_max_evals: 10
+#      hyper_opt_alg: tpe
     BPRMF:
       lr: 0.05
-      epochs: 10
+      epochs: 1
       embed_k: [10,50,100,125,150,200]
       bias_regularization: 0
       user_regularization: [0.0025,0.005,0.01]
@@ -34,7 +34,7 @@ experiment:
       update_users: True
       update_items: True
       update_bias: True
-      hyper_max_evals: 5
+      hyper_max_evals: 1
       hyper_opt_alg: tpe
 #    NNBPRMF:
 #      lr: 0.01

@@ -3,6 +3,7 @@ import importlib
 from hyperopt import Trials, fmin
 
 from namespace.namespace_model_builder import NameSpaceBuilder
+from result_handler import ResultHandler
 import hyperoptimization as ho
 import numpy as np
 
@@ -12,7 +13,7 @@ if __name__ == '__main__':
 
     builder = NameSpaceBuilder('./config/config.yml')
     base = builder.base
-
+    res_handler = ResultHandler()
     for key, model_base in builder.models():
         model_class = getattr(importlib.import_module("recommender"), key)
         if isinstance(model_base, tuple):
@@ -30,12 +31,14 @@ if __name__ == '__main__':
             best_model_loss = trials._trials[min_val]["result"]["loss"]
             best_model_params = trials._trials[min_val]["result"]["params"]
             best_model_results = trials._trials[min_val]["result"]["results"]
+            res_handler.add_multishot_recommender(trials)
         else:
             model = model_class(config=base.base_namespace, params=model_base)
             model.train()
             best_model_loss = model.get_loss()
             best_model_params = model.get_params()
             best_model_results = model.get_results()
+            res_handler.add_oneshot_recommender(model.name, model.get_loss(), model.get_params(), model.get_results())
 
         print(f"Loss: {best_model_loss}")
         print(f"Best Model params: {best_model_params}")
