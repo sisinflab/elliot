@@ -44,7 +44,7 @@ class DataSet(object):
         return ratings
 
     def build_sparse(self, dataframe_dict, num_users, num_items):
-        train = sp.dok_matrix((num_users + 1, num_items + 1), dtype=np.float32)
+        train = sp.dok_matrix((num_users, num_items), dtype=np.float32)
         for user, user_items in dataframe_dict.items():
             for item, rating in user_items.items():
                 if rating > 0:

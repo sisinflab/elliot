@@ -68,7 +68,7 @@ class MultiDAE(BaseRecommenderModel):
                                            self._lambda)
 
         self._saving_filepath = f'{self._config.path_output_rec_weight}best-weights-{self.name}'
-        self._train_mask = np.where((self._datamodel.sp_train.toarray()==0), True, False)
+        self._train_mask = np.where((self._datamodel.sp_train.toarray() == 0), True, False)
 
     @property
     def name(self):

@@ -24,6 +24,7 @@ class Encoder(layers.Layer):
                                        activation="tanh",
                                        kernel_initializer=keras.initializers.GlorotNormal(),
                                        kernel_regularizer=keras.regularizers.l2(regularization_lambda))
+
     @tf.function
     def call(self, inputs, training=None):
         i_normalized = self.l2_normalizer(inputs, 1)
