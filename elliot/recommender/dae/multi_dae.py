@@ -51,6 +51,8 @@ class MultiDAE(BaseRecommenderModel):
 
         ######################################
 
+        self._params.name = self.name
+
         self._intermediate_dim = self._params.intermediate_dim
         self._latent_dim = self._params.latent_dim
 
