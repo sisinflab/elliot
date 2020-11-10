@@ -95,7 +95,7 @@ class MultiDAE(BaseRecommenderModel):
             if not (it + 1) % self._params.verbose:
                 recs = self.get_recommendations(self._config.top_k)
                 self._results.append(self.evaluator.eval(recs))
-                print(f'Epoch {it}/{self._num_iters} loss {loss:.3f}')
+                print(f'Epoch {(it + 1)}/{self._num_iters} loss {loss:.3f}')
 
                 if self._results[-1]['nDCG'] > best_ndcg:
                     print("******************************************")
