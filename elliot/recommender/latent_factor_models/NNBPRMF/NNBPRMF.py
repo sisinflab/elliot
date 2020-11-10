@@ -19,7 +19,7 @@ logging.disable(logging.WARNING)
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 
-class BPRMF(BaseRecommenderModel):
+class NNBPRMF(BaseRecommenderModel):
 
     def __init__(self, config, params, *args, **kwargs):
         """
@@ -59,8 +59,8 @@ class BPRMF(BaseRecommenderModel):
 
         self._factors = self._params.embed_k
         self._learning_rate = self._params.lr
-        self.l_w = self._params.l_w
-        self.l_b = self._params.l_b
+        self._l_w = self._params.l_w
+        self._l_b = self._params.l_b
 
         self._model = NNBPRMF_model(self._params.embed_k,
                                     self._params.lr,

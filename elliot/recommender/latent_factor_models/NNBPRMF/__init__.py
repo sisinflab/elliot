@@ -1,1 +1,1 @@
-from .NNBPRMF import BPRMF
+from .NNBPRMF import NNBPRMF
