@@ -125,7 +125,8 @@ class MultiDAE(BaseRecommenderModel):
     #     local_k = k + self._maxtpu
     #     predictions_top_k = {}
     #     preds = self._model.predict(self._datamodel.sp_train.toarray())
-    #     v, i = self._model.get_top_k(preds, k=local_k)
+    #     used_mask = np.where((self._datamodel.sp_train.toarray()==0), 1, -np.inf)
+    #     v, i = self._model.get_top_k(preds * used_mask, k=local_k)
     #     items_ratings_pair = [
     #         list(
     #         zip(
