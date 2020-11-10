@@ -121,23 +121,22 @@ class MultiDAE(BaseRecommenderModel):
                 print(f"Error in model restoring operation! {ex}")
         return False
 
-    # def get_recommendations(self, k: int = 100):
-    #     local_k = k + self._maxtpu
-    #     predictions_top_k = {}
-    #     preds = self._model.predict(self._datamodel.sp_train.toarray())
-    #     used_mask = np.where((self._datamodel.sp_train.toarray()==0), 1, -np.inf)
-    #     v, i = self._model.get_top_k(preds * used_mask, k=local_k)
-    #     items_ratings_pair = [
-    #         list(
-    #         zip(
-    #             map(self._datamodel.private_items.get, u_list[0]), u_list[1]
-    #         )
-    #     )
-    #                           for u_list in list(zip(i.numpy(), v.numpy()))
-    #     ]
-    #     predictions_top_k.update(dict(zip(map(self._datamodel.private_users.get,
-    #                                           range(self._datamodel.sp_train.shape[0])), items_ratings_pair)))
-    #     return predictions_top_k
+    def get_recommendations(self, k: int = 100):
+        predictions_top_k = {}
+        preds = self._model.predict(self._datamodel.sp_train.toarray())
+        used_mask = np.where((self._datamodel.sp_train.toarray()==0), 1, -np.inf)
+        v, i = self._model.get_top_k(preds * used_mask, k=k)
+        items_ratings_pair = [
+            list(
+            zip(
+                map(self._datamodel.private_items.get, u_list[0]), u_list[1]
+            )
+        )
+                              for u_list in list(zip(i.numpy(), v.numpy()))
+        ]
+        predictions_top_k.update(dict(zip(map(self._datamodel.private_users.get,
+                                              range(self._datamodel.sp_train.shape[0])), items_ratings_pair)))
+        return predictions_top_k
 
     def get_recommendations(self, k: int = 100):
         local_k = k + self._maxtpu
