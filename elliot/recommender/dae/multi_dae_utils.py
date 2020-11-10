@@ -82,6 +82,7 @@ class DenoisingAutoEncoder(keras.Model):
 
         self.saver_ckpt = tf.train.Checkpoint(optimizer=self.optimizer, model=self)
 
+    @tf.function
     def call(self, inputs, training=None):
         z_mean = self.encoder(inputs, training=training)
         reconstructed = self.decoder(z_mean)
@@ -120,3 +121,4 @@ class DenoisingAutoEncoder(keras.Model):
     @tf.function
     def get_top_k(self, preds, k=100):
         return tf.nn.top_k(preds, k=k, sorted=True)
+

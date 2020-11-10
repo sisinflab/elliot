@@ -36,13 +36,18 @@ class MultiDAE(BaseRecommenderModel):
         self._random = np.random
         self._random_p = random
         self._num_iters = self._params.epochs
-        self._restore_epochs = 0
+        self._save_weights = self._params.save_weights
+        self._save_recs = self._params.save_recs
+
+        self._restore_epochs = -1
         self._ratings = self._data.train_dataframe_dict
         self._datamodel = DataModel(self._data.train_dataframe, self._ratings, self._random)
         self._sampler = sp.Sampler(self._datamodel.sp_train, self._random_p)
         self._iteration = 0
         self.evaluator = Evaluator(self._data)
         self._results = []
+
+        self._maxtpu = max([len(items) for items in self._data.train_dataframe_dict.values()])
 
         ######################################
 
@@ -62,19 +67,25 @@ class MultiDAE(BaseRecommenderModel):
                                            self._dropout_rate,
                                            self._lambda)
 
+        self._saving_filepath = f'{self._config.path_output_rec_weight}best-weights-{self.name}'
+
     @property
     def name(self):
-        return "MultiDAE"
+        return "MultiDAE" \
+               + "_lr:" + str(self._params.lr) \
+               + "-e:" + str(self._params.epochs) \
+               + "-idim:" + str(self._params.intermediate_dim) \
+               + "-ldim:" + str(self._params.latent_dim) \
+               + "-bs:" + str(self._params.batch_size) \
+               + "-dpk:" + str(self._params.dropout_pkeep) \
+               + "-lmb" + str(self._params.reg_lambda)
 
     def train(self):
-        if self.restore():
-            self._restore_epochs += 1
-        else:
-            print("Training from scratch...")
 
         best_ndcg = 0
 
-        for it in range(self._restore_epochs, self._num_iters + 1):
+        for it in range(self._num_iters):
+            self.restore_weights(it)
             loss = 0
             steps = 0
             for batch in self._sampler.step(self._num_users, self._params.batch_size):
@@ -84,35 +95,62 @@ class MultiDAE(BaseRecommenderModel):
             if not (it + 1) % self._params.verbose:
                 recs = self.get_recommendations(self._config.top_k)
                 self._results.append(self.evaluator.eval(recs))
-                print('Epoch {0}/{1} loss {2:.3f}'.format(it, self._num_iters, loss))
+                print(f'Epoch {it}/{self._num_iters} loss {loss:.3f}')
 
                 if self._results[-1]['nDCG'] > best_ndcg:
                     print("******************************************")
                     best_ndcg = self._results[-1]['nDCG']
-                    best_epoch = it
-                    self._model.saver_ckpt.save(f'''{self._config.path_output_rec_weight}best-weights-{best_epoch}-{self._learning_rate}-{self.__class__.__name__}''')
-                    store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}_{it + 1}.tsv")
+                    # best_epoch = it
+                    # self._model.saver_ckpt.save(f'''{self._config.path_output_rec_weight}best-weights-{best_epoch}-{self._learning_rate}-{self.__class__.__name__}''')
+                    if self._save_weights:
+                        self._model.save_weights(self._saving_filepath)
+                    if self._save_recs:
+                        store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}-it:{it + 1}.tsv")
 
-    def restore(self):
-        if self._restore_epochs > 1:
+    def restore_weights(self, it):
+        if self._restore_epochs == it:
             try:
-                checkpoint_file = find_checkpoint(weight_dir, self.restore_epochs, self.epochs,
-                                                  self.rec)
-                self.saver_ckpt.restore(checkpoint_file)
-                print("Model correctly Restored at Epoch: {0}".format(self.restore_epochs))
+                # checkpoint_file = find_checkpoint(weight_dir, self.restore_epochs, self.epochs,
+                #                                   self.rec)
+                self._model.load_weights(self._saving_filepath)
+                # self.saver_ckpt.restore(checkpoint_file)
+
+                print(f"Model correctly Restored at Epoch: {self._restore_epochs}")
                 return True
             except Exception as ex:
-                print("Error in model restoring operation! {0}".format(ex))
-        else:
-            print("Restore Epochs Not Specified")
+                print(f"Error in model restoring operation! {ex}")
         return False
 
+    # def get_recommendations(self, k: int = 100):
+    #     local_k = k + self._maxtpu
+    #     predictions_top_k = {}
+    #     preds = self._model.predict(self._datamodel.sp_train.toarray())
+    #     v, i = self._model.get_top_k(preds, k=local_k)
+    #     items_ratings_pair = [
+    #         list(
+    #         zip(
+    #             map(self._datamodel.private_items.get, u_list[0]), u_list[1]
+    #         )
+    #     )
+    #                           for u_list in list(zip(i.numpy(), v.numpy()))
+    #     ]
+    #     predictions_top_k.update(dict(zip(map(self._datamodel.private_users.get,
+    #                                           range(self._datamodel.sp_train.shape[0])), items_ratings_pair)))
+    #     return predictions_top_k
+
     def get_recommendations(self, k: int = 100):
+        local_k = k + self._maxtpu
         predictions_top_k = {}
         preds = self._model.predict(self._datamodel.sp_train.toarray())
-        v, i = self._model.get_top_k(preds, k=k)
-        items_ratings_pair = [list(zip(map(self._datamodel.private_items.get, u_list[0]), u_list[1]))
-                              for u_list in list(zip(i.numpy(), v.numpy()))]
+        v, i = self._model.get_top_k(preds, k=local_k)
+        items_ratings_pair = [
+            [(item, value) for item, value in
+            zip(
+                map(self._datamodel.private_items.get, u_list[0]), u_list[1]
+            ) if item not in self._data.train_dataframe_dict.get(self._datamodel.private_users.get(u_index)).keys()
+        ][:k]
+                              for u_index, u_list in enumerate(list(zip(i.numpy(), v.numpy())))
+        ]
         predictions_top_k.update(dict(zip(map(self._datamodel.private_users.get,
                                               range(self._datamodel.sp_train.shape[0])), items_ratings_pair)))
         return predictions_top_k
