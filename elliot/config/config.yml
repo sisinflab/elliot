@@ -2,7 +2,7 @@ experiment:
   path_train_data: ../data/{0}/trainingset.tsv
   path_validation_data: ../data/{0}/validation.tsv
   path_test_data: ../data/{0}/testset.tsv
-  path_feature_data: ../data/{0}/features.tsv
+  path_feature_data: ../data/{0}/original/features.npy
   path_output_rec_result: ../results/{0}/recs/
   path_output_rec_weight: ../results/{0}/weights/
   path_output_rec_performance: ../results/{0}/performance/
@@ -10,7 +10,7 @@ experiment:
   top_k: 50
   metrics: [nDCG,Precision, Recall, ItemCoverage]
   relevance: 1
-  gpu: -1 # -1 is not use GPU
+  gpu: 0 # -1 is not use GPU
   models:
     MultiDAE:
       lr: 0.001
@@ -25,24 +25,39 @@ experiment:
       verbose: 5
       save_weights: True
       save_recs: True
-#    BPRMF:
-#      lr: 0.05
-#      epochs: 1
-#      embed_k: [10,50,100,125,150,200]
-#      bias_regularization: 0
-#      user_regularization: [0.0025,0.005,0.01]
-#      positive_item_regularization: [0.0025,0.005,0.01]
-#      negative_item_regularization: [0.00025,0.0005,0.001]
-#      update_negative_item_factors: True
-#      update_users: True
-#      update_items: True
-#      update_bias: True
-#      hyper_max_evals: 2
-#      hyper_opt_alg: tpe
-#    NNBPRMF:
-#      lr: 0.01
-#      epochs: 1
-#      embed_k: 20
-#      batch_size: 512
-#      l_w: 1
-#      l_b: 1
+    BPRMF:
+      lr: 0.05
+      epochs: 1
+      embed_k: [10,50,100,125,150,200]
+      bias_regularization: 0
+      user_regularization: [0.0025,0.005,0.01]
+      positive_item_regularization: [0.0025,0.005,0.01]
+      negative_item_regularization: [0.00025,0.0005,0.001]
+      update_negative_item_factors: True
+      update_users: True
+      update_items: True
+      update_bias: True
+      hyper_max_evals: 2
+      hyper_opt_alg: tpe
+    NNBPRMF:
+      lr: 0.005
+      epochs: 20
+      embed_k: 100
+      batch_size: 512
+      l_w: 0.000025
+      l_b: 0
+      verbose: 1
+      save_weights: False
+      save_recs: False
+    VBPR:
+      lr: 0.005
+      epochs: 20
+      embed_k: 100
+      embed_d: 20
+      batch_size: 128
+      l_w: 0.000025
+      l_b: 0
+      l_e: 0.002
+      verbose: 1
+      save_weights: False
+      save_recs: False
