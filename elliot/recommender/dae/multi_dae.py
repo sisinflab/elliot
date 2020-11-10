@@ -68,6 +68,7 @@ class MultiDAE(BaseRecommenderModel):
                                            self._lambda)
 
         self._saving_filepath = f'{self._config.path_output_rec_weight}best-weights-{self.name}'
+        self._train_mask = np.where((self._datamodel.sp_train.toarray()==0), True, False)
 
     @property
     def name(self):
@@ -124,8 +125,7 @@ class MultiDAE(BaseRecommenderModel):
     def get_recommendations(self, k: int = 100):
         predictions_top_k = {}
         preds = self._model.predict(self._datamodel.sp_train.toarray())
-        used_mask = np.where((self._datamodel.sp_train.toarray()==0), 1, -np.inf)
-        v, i = self._model.get_top_k(preds * used_mask, k=k)
+        v, i = self._model.get_top_k(preds, self._train_mask, k=k)
         items_ratings_pair = [
             list(
             zip(
@@ -138,22 +138,22 @@ class MultiDAE(BaseRecommenderModel):
                                               range(self._datamodel.sp_train.shape[0])), items_ratings_pair)))
         return predictions_top_k
 
-    def get_recommendations(self, k: int = 100):
-        local_k = k + self._maxtpu
-        predictions_top_k = {}
-        preds = self._model.predict(self._datamodel.sp_train.toarray())
-        v, i = self._model.get_top_k(preds, k=local_k)
-        items_ratings_pair = [
-            [(item, value) for item, value in
-            zip(
-                map(self._datamodel.private_items.get, u_list[0]), u_list[1]
-            ) if item not in self._data.train_dataframe_dict.get(self._datamodel.private_users.get(u_index)).keys()
-        ][:k]
-                              for u_index, u_list in enumerate(list(zip(i.numpy(), v.numpy())))
-        ]
-        predictions_top_k.update(dict(zip(map(self._datamodel.private_users.get,
-                                              range(self._datamodel.sp_train.shape[0])), items_ratings_pair)))
-        return predictions_top_k
+    # def get_recommendations(self, k: int = 100):
+    #     local_k = k + self._maxtpu
+    #     predictions_top_k = {}
+    #     preds = self._model.predict(self._datamodel.sp_train.toarray())
+    #     v, i = self._model.get_top_k(preds, k=local_k)
+    #     items_ratings_pair = [
+    #         [(item, value) for item, value in
+    #         zip(
+    #             map(self._datamodel.private_items.get, u_list[0]), u_list[1]
+    #         ) if item not in self._data.train_dataframe_dict.get(self._datamodel.private_users.get(u_index)).keys()
+    #     ][:k]
+    #                           for u_index, u_list in enumerate(list(zip(i.numpy(), v.numpy())))
+    #     ]
+    #     predictions_top_k.update(dict(zip(map(self._datamodel.private_users.get,
+    #                                           range(self._datamodel.sp_train.shape[0])), items_ratings_pair)))
+    #     return predictions_top_k
 
     def get_loss(self):
         return -max([r["nDCG"] for r in self._results])

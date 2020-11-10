@@ -1,6 +1,7 @@
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers
+import numpy as np
 
 
 class Encoder(layers.Layer):
@@ -119,6 +120,6 @@ class DenoisingAutoEncoder(keras.Model):
         return log_softmax_var
 
     @tf.function
-    def get_top_k(self, preds, k=100):
-        return tf.nn.top_k(preds, k=k, sorted=True)
+    def get_top_k(self, preds, train_mask, k=100):
+        return tf.nn.top_k(tf.where(train_mask, preds, -np.inf), k=k, sorted=True)
 
