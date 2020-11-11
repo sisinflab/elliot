@@ -25,39 +25,44 @@ experiment:
       verbose: 5
       save_weights: True
       save_recs: True
-    BPRMF:
-      lr: 0.05
-      epochs: 1
-      embed_k: [10,50,100,125,150,200]
-      bias_regularization: 0
-      user_regularization: [0.0025,0.005,0.01]
-      positive_item_regularization: [0.0025,0.005,0.01]
-      negative_item_regularization: [0.00025,0.0005,0.001]
-      update_negative_item_factors: True
-      update_users: True
-      update_items: True
-      update_bias: True
-      hyper_max_evals: 2
-      hyper_opt_alg: tpe
-    NNBPRMF:
-      lr: 0.005
-      epochs: 20
-      embed_k: 100
-      batch_size: 512
-      l_w: 0.000025
-      l_b: 0
-      verbose: 1
-      save_weights: False
-      save_recs: False
-    VBPR:
-      lr: 0.005
-      epochs: 20
-      embed_k: 100
-      embed_d: 20
-      batch_size: 128
-      l_w: 0.000025
-      l_b: 0
-      l_e: 0.002
-      verbose: 1
-      save_weights: False
-      save_recs: False
+#    BPRMF:
+#      lr: 0.05
+#      epochs: 10
+#      embed_k: [10,50,100,125,150,200]
+#      bias_regularization: 0
+#      user_regularization: [0.0025,0.005,0.01]
+#      positive_item_regularization: [0.0025,0.005,0.01]
+#      negative_item_regularization: [0.00025,0.0005,0.001]
+#      update_negative_item_factors: True
+#      update_users: True
+#      update_items: True
+#      update_bias: True
+#      hyper_max_evals: 2
+#      hyper_opt_alg: tpe
+#      verbose: 1
+#      save_weights: True
+#      save_recs: True
+#      validation_metric: nDCG
+#      restore_epoch: 2
+#    NNBPRMF:
+#      lr: 0.005
+#      epochs: 20
+#      embed_k: 100
+#      batch_size: 512
+#      l_w: 0.000025
+#      l_b: 0
+#      verbose: 1
+#      save_weights: False
+#      save_recs: False
+#    VBPR:
+#      lr: 0.005
+#      epochs: 20
+#      embed_k: 100
+#      embed_d: 20
+#      batch_size: 128
+#      l_w: 0.000025
+#      l_b: 0
+#      l_e: 0.002
+#      verbose: 1
+#      save_weights: False
+#      save_recs: False

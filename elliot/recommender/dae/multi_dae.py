@@ -29,23 +29,17 @@ class MultiDAE(BaseRecommenderModel):
         random.seed(0)
 
         self._data = DataSet(config, params)
-        self._config = config
-        self._params = params
         self._num_items = self._data.num_items
         self._num_users = self._data.num_users
         self._random = np.random
         self._random_p = random
         self._num_iters = self._params.epochs
-        self._save_weights = self._params.save_weights
-        self._save_recs = self._params.save_recs
 
-        self._restore_epochs = -1
         self._ratings = self._data.train_dataframe_dict
         self._datamodel = DataModel(self._data.train_dataframe, self._ratings, self._random)
         self._sampler = sp.Sampler(self._datamodel.sp_train, self._random_p)
         self._iteration = 0
         self.evaluator = Evaluator(self._data)
-        self._results = []
 
         self._maxtpu = max([len(items) for items in self._data.train_dataframe_dict.values()])
 
@@ -59,8 +53,6 @@ class MultiDAE(BaseRecommenderModel):
         self._lambda = self._params.reg_lambda
         self._learning_rate = self._params.lr
         self._dropout_rate = 1. - self._params.dropout_pkeep
-
-        self._verbose = self._params.verbose
 
         self._model = DenoisingAutoEncoder(self._num_items,
                                            self._intermediate_dim,
@@ -85,7 +77,7 @@ class MultiDAE(BaseRecommenderModel):
 
     def train(self):
 
-        best_ndcg = 0
+        best_metric_value = 0
 
         for it in range(self._num_iters):
             self.restore_weights(it)
@@ -100,11 +92,9 @@ class MultiDAE(BaseRecommenderModel):
                 self._results.append(self.evaluator.eval(recs))
                 print(f'Epoch {(it + 1)}/{self._num_iters} loss {loss:.3f}')
 
-                if self._results[-1]['nDCG'] > best_ndcg:
+                if self._results[-1][self._validation_metric] > best_metric_value:
                     print("******************************************")
-                    best_ndcg = self._results[-1]['nDCG']
-                    # best_epoch = it
-                    # self._model.saver_ckpt.save(f'''{self._config.path_output_rec_weight}best-weights-{best_epoch}-{self._learning_rate}-{self.__class__.__name__}''')
+                    best_metric_value = self._results[-1][self._validation_metric]
                     if self._save_weights:
                         self._model.save_weights(self._saving_filepath)
                     if self._save_recs:
@@ -158,11 +148,11 @@ class MultiDAE(BaseRecommenderModel):
     #     return predictions_top_k
 
     def get_loss(self):
-        return -max([r["nDCG"] for r in self._results])
+        return -max([r[self._validation_metric] for r in self._results])
 
     def get_params(self):
         return self._params.__dict__
 
     def get_results(self):
-        val_max = np.argmax([r["nDCG"] for r in self._results])
+        val_max = np.argmax([r[self._validation_metric] for r in self._results])
         return self._results[val_max]

@@ -17,6 +17,13 @@ class BaseRecommenderModel(ABC):
         self._config = config
         self._params = params
 
+        self._restore_epochs = getattr(self._params, "restore_epoch", -1)
+        self._validation_metric = getattr(self._params, "validation_metric", "nDCG")
+        self._save_weights = getattr(self._params, "save_weights", False)
+        self._save_recs = getattr(self._params, "save_recs", False)
+        self._verbose = getattr(self._params, "verbose", 1)
+        self._results = []
+
     @abstractmethod
     def train(self):
         pass

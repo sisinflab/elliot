@@ -5,6 +5,7 @@ from dataset.samplers import pairwise_sampler as ps
 from evaluation.evaluator import Evaluator
 from recommender.base_recommender_model import BaseRecommenderModel
 from utils.write import store_recommendation
+import pickle
 
 
 class MF(object):
@@ -141,9 +142,10 @@ class BPRMF(BaseRecommenderModel):
         self._iteration = 0
 
         self.evaluator = Evaluator(self._data)
-        self._results = []
 
         self._params.name = self.name
+
+        self._saving_filepath = f'{self._config.path_output_rec_weight}best-weights-{self.name}'
 
     def get_recommendations(self, k: int = 100):
         return {u: self._datamodel.get_user_recs(u, k) for u in self._ratings.keys()}
@@ -156,9 +158,6 @@ class BPRMF(BaseRecommenderModel):
             A single float vaue.
         """
         return self._datamodel.predict(u, i)
-
-    def _get_parameters(self):
-        return f"_F{self._factors}_I{self._iteration+1}_L{str(self._learning_rate).replace('.','-')}"
 
     @property
     def name(self):
@@ -179,31 +178,35 @@ class BPRMF(BaseRecommenderModel):
         samples = self._sampler.step(self._data.transactions)
         start = time.perf_counter()
         print(f"Sampled in {round(start-start_it, 2)} seconds")
-        # print(f"Training samples: {len(samples)}")
         start = time.perf_counter()
         print("Computing..")
         for u, i, j in samples:
             self.update_factors(u, i, j)
         t2 = time.perf_counter()
         print(f"Computed and updated in {round(t2-start, 2)} seconds")
-        # if (it + 1) % 1 == 0:
-        #     name = f"BPRMF_F{self._factors}_I{it+1}_L{str(self._learning_rate).replace('.','-')}"
-        #     print("Printing..")
-        #     self.print_recs("../recs/" + name + ".tsv", 10)
 
     def train(self):
-        # self.num_pos_events = self._datamodel.get_transactions()
         print(f"Transactions: {self._data.transactions}")
+        best_ndcg = -np.inf
         for it in range(self._num_iters):
+            self.restore_weights(it)
             print(f"\n********** Iteration: {it + 1}")
             self._iteration = it
 
             self.train_step()
-            recs = self.get_recommendations(self._config.top_k)
-            self._results.append(self.evaluator.eval(recs))
 
-            if not (it+1) % 10:
-                store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}-i:{it+1}.tsv")
+            if not (it + 1) % self._params.verbose:
+                recs = self.get_recommendations(self._config.top_k)
+                self._results.append(self.evaluator.eval(recs))
+
+                if self._results[-1][self._validation_metric] > best_ndcg:
+                    print("******************************************")
+                    best_ndcg = self._results[-1][self._validation_metric]
+                    if self._params.save_weights:
+                        with open(self._saving_filepath, "wb") as f:
+                            pickle.dump(self.get_model_state(), f)
+                    if self._params.save_recs:
+                        store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}-it:{it + 1}.tsv")
 
     def update_factors(self, u: int, i: int, j: int):
         user_factors = self._datamodel.get_user_factors(u)
@@ -234,11 +237,43 @@ class BPRMF(BaseRecommenderModel):
         self._datamodel.set_item_factors(j, item_factors_j + (self._learning_rate * d_j))
 
     def get_loss(self):
-        return -max([r["nDCG"] for r in self._results])
+        return -max([r[self._validation_metric] for r in self._results])
 
     def get_params(self):
         return self._params.__dict__
 
     def get_results(self):
-        val_max = np.argmax([r["nDCG"] for r in self._results])
+        val_max = np.argmax([r[self._validation_metric] for r in self._results])
         return self._results[val_max]
+
+    def restore_weights(self, it):
+        if self._restore_epochs == it:
+            try:
+                # checkpoint_file = find_checkpoint(weight_dir, self.restore_epochs, self.epochs,
+                #                                   self.rec)
+                with open(self._saving_filepath, "rb") as f:
+                    self.set_model_state(pickle.load(f))
+                # self.saver_ckpt.restore(checkpoint_file)
+
+                print(f"Model correctly Restored at Epoch: {self._restore_epochs}")
+                return True
+            except Exception as ex:
+                print(f"Error in model restoring operation! {ex}")
+        return False
+
+    def get_model_state(self):
+
+        saving_dict = {}
+
+        saving_dict['_user_bias'] = self._datamodel._user_bias
+        saving_dict['_item_bias'] = self._datamodel._item_bias
+        saving_dict['_user_factors'] = self._datamodel._user_factors
+        saving_dict['_item_factors'] = self._datamodel._item_factors
+        return saving_dict
+
+    def set_model_state(self, saving_dict):
+
+        self._datamodel._user_bias = saving_dict['_user_bias']
+        self._datamodel._item_bias = saving_dict['_item_bias']
+        self._datamodel._user_factors = saving_dict['_user_factors']
+        self._datamodel._item_factors = saving_dict['_item_factors']
