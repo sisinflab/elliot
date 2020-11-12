@@ -10,7 +10,6 @@ from evaluation.evaluator import Evaluator
 from recommender import BaseRecommenderModel
 from recommender.latent_factor_models.NNBPRMF.NNBPRMF_model import NNBPRMF_model
 from recommender.latent_factor_models.NNBPRMF.data_model import DataModel
-from utils.read import find_checkpoint
 from utils.write import store_recommendation
 
 np.random.seed(0)
@@ -51,7 +50,6 @@ class NNBPRMF(BaseRecommenderModel):
         self._sampler = cs.Sampler(self._ratings, self._random, self._sample_negative_items_empirically)
         self._iteration = 0
         self.evaluator = Evaluator(self._data)
-        self._results = []
         self._datamodel = DataModel(self._data.train_dataframe, self._ratings, self._random)
         self._params.name = self.name
 
@@ -90,22 +88,20 @@ class NNBPRMF(BaseRecommenderModel):
         return loss/steps
 
     def train(self):
-        best_ndcg = 0
-        for it in range(self._restore_epochs, self._num_iters + 1):
-            # self.restore_weights(it)
+        best_metric_value = 0
+        for it in range(self._num_iters):
+            self.restore_weights(it)
             batches = self._sampler.step(self._data.transactions, self._params.batch_size)
             loss = self.one_epoch(batches)
 
-            if not (it + 1) % self._params.verbose:
+            if not (it + 1) % self._verbose:
                 recs = self.get_recommendations(self._config.top_k)
                 self._results.append(self.evaluator.eval(recs))
                 print(f'Epoch {(it + 1)}/{self._num_iters} loss {loss:.3f}')
 
-                if self._results[-1]['nDCG'] > best_ndcg:
+                if self._results[-1][self._validation_metric] > best_metric_value:
                     print("******************************************")
-                    best_ndcg = self._results[-1]['nDCG']
-                    # best_epoch = it
-                    # self._model.saver_ckpt.save(f'''{self._config.path_output_rec_weight}best-weights-{best_epoch}-{self._learning_rate}-{self.__class__.__name__}''')
+                    best_metric_value = self._results[-1][self._validation_metric]
                     if self._save_weights:
                         self._model.save_weights(self._saving_filepath)
                     if self._save_recs:
@@ -114,10 +110,7 @@ class NNBPRMF(BaseRecommenderModel):
     def restore_weights(self, it):
         if self._restore_epochs == it:
             try:
-                # checkpoint_file = find_checkpoint(weight_dir, self.restore_epochs, self.epochs,
-                #                                   self.rec)
                 self._model.load_weights(self._saving_filepath)
-                # self.saver_ckpt.restore(checkpoint_file)
                 print(f"Model correctly Restored at Epoch: {self._restore_epochs}")
                 return True
             except Exception as ex:
@@ -139,11 +132,11 @@ class NNBPRMF(BaseRecommenderModel):
         return np.where((self._datamodel.sp_train[range(start, stop)].toarray() == 0), True, False)
 
     def get_loss(self):
-        return -max([r["nDCG"] for r in self._results])
+        return -max([r[self._validation_metric] for r in self._results])
 
     def get_params(self):
         return self._params.__dict__
 
     def get_results(self):
-        val_max = np.argmax([r["nDCG"] for r in self._results])
+        val_max = np.argmax([r[self._validation_metric] for r in self._results])
         return self._results[val_max]

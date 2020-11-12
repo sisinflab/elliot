@@ -79,7 +79,7 @@ class MultiDAE(BaseRecommenderModel):
                 steps += 1
                 loss += self._model.train_step(batch.toarray())
 
-            if not (it + 1) % self._params.verbose:
+            if not (it + 1) % self._verbose:
                 recs = self.get_recommendations(self._config.top_k)
                 self._results.append(self.evaluator.eval(recs))
                 print(f'Epoch {(it + 1)}/{self._num_iters} loss {loss:.3f}')

@@ -83,3 +83,6 @@ class NNBPRMF_model(keras.Model):
     @tf.function
     def get_top_k(self, preds, train_mask, k=100):
         return tf.nn.top_k(tf.where(train_mask, preds, -np.inf), k=k, sorted=True)
+
+    def get_config(self):
+        raise NotImplementedError

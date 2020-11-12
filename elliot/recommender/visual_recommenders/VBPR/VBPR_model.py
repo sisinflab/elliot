@@ -107,3 +107,6 @@ class VBPR_model(NNBPRMF_model):
     def predict(self, inputs, training=False):
         logits, _ = self.call(inputs=inputs, training=True)
         return logits
+
+    def get_config(self):
+        raise NotImplementedError
