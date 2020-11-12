@@ -22,6 +22,7 @@ class BaseRecommenderModel(ABC):
         self._save_weights = getattr(self._params, "save_weights", False)
         self._save_recs = getattr(self._params, "save_recs", False)
         self._verbose = getattr(self._params, "verbose", 1)
+        self._batch_size = getattr(self._params, "batch_size", -1)
         self._results = []
 
     @abstractmethod
