@@ -1,20 +1,14 @@
-import logging
-import os
-
 import numpy as np
+import random
 
 from dataset.dataset import DataSet
 from dataset.samplers import sparse_sampler as sp
 from evaluation.evaluator import Evaluator
 from recommender import BaseRecommenderModel
 from utils.write import store_recommendation
-import random
 
 from .multi_dae_utils import DenoisingAutoEncoder
 from .data_model import DataModel
-
-logging.disable(logging.WARNING)
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 
 class MultiDAE(BaseRecommenderModel):

@@ -1,7 +1,12 @@
+import logging
+import os
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers
 import numpy as np
+
+logging.disable(logging.WARNING)
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 
 class Encoder(layers.Layer):
@@ -31,8 +36,6 @@ class Encoder(layers.Layer):
         i_drop = self.input_dropout(i_normalized, training=training)
         x = self.dense_proj(i_drop)
         z_mean = self.dense_mean(x)
-        # z_log_var = self.dense_log_var(x)
-        # z = self.sampling((z_mean, z_log_var))
         return z_mean
 
 
@@ -46,11 +49,11 @@ class Decoder(layers.Layer):
                                        kernel_initializer=keras.initializers.GlorotNormal(),
                                        kernel_regularizer=keras.regularizers.l2(regularization_lambda))
         self.dense_output = layers.Dense(original_dim,
-                                       kernel_initializer=keras.initializers.GlorotNormal(),
-                                       kernel_regularizer=keras.regularizers.l2(regularization_lambda))
+                                         kernel_initializer=keras.initializers.GlorotNormal(),
+                                         kernel_regularizer=keras.regularizers.l2(regularization_lambda))
 
     @tf.function
-    def call(self, inputs):
+    def call(self, inputs, **kwargs):
         x = self.dense_proj(inputs)
         return self.dense_output(x)
 
@@ -81,11 +84,11 @@ class DenoisingAutoEncoder(keras.Model):
                                regularization_lambda=regularization_lambda)
         self.optimizer = tf.optimizers.Adam(learning_rate)
 
-
-        self.saver_ckpt = tf.train.Checkpoint(optimizer=self.optimizer, model=self)
+    def get_config(self):
+        raise NotImplementedError
 
     @tf.function
-    def call(self, inputs, training=None):
+    def call(self, inputs, training=None, **kwargs):
         z_mean = self.encoder(inputs, training=training)
         reconstructed = self.decoder(z_mean)
         return reconstructed
@@ -108,7 +111,7 @@ class DenoisingAutoEncoder(keras.Model):
         return loss
 
     @tf.function
-    def predict(self, inputs, training=False):
+    def predict(self, inputs, training=False, **kwargs):
         """
         Get full predictions on the whole users/items matrix.
 
