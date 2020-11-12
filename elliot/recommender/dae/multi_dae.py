@@ -3,13 +3,11 @@ import os
 
 import numpy as np
 
-from config.configs import *
 from dataset.dataset import DataSet
 from dataset.samplers import sparse_sampler as sp
 from evaluation.evaluator import Evaluator
 from recommender import BaseRecommenderModel
-from utils.read import find_checkpoint
-from utils.write import save_obj, store_recommendation
+from utils.write import store_recommendation
 import random
 
 from .multi_dae_utils import DenoisingAutoEncoder
@@ -103,11 +101,7 @@ class MultiDAE(BaseRecommenderModel):
     def restore_weights(self, it):
         if self._restore_epochs == it:
             try:
-                # checkpoint_file = find_checkpoint(weight_dir, self.restore_epochs, self.epochs,
-                #                                   self.rec)
                 self._model.load_weights(self._saving_filepath)
-                # self.saver_ckpt.restore(checkpoint_file)
-
                 print(f"Model correctly Restored at Epoch: {self._restore_epochs}")
                 return True
             except Exception as ex:
@@ -129,23 +123,6 @@ class MultiDAE(BaseRecommenderModel):
         predictions_top_k.update(dict(zip(map(self._datamodel.private_users.get,
                                               range(self._datamodel.sp_train.shape[0])), items_ratings_pair)))
         return predictions_top_k
-
-    # def get_recommendations(self, k: int = 100):
-    #     local_k = k + self._maxtpu
-    #     predictions_top_k = {}
-    #     preds = self._model.predict(self._datamodel.sp_train.toarray())
-    #     v, i = self._model.get_top_k(preds, k=local_k)
-    #     items_ratings_pair = [
-    #         [(item, value) for item, value in
-    #         zip(
-    #             map(self._datamodel.private_items.get, u_list[0]), u_list[1]
-    #         ) if item not in self._data.train_dataframe_dict.get(self._datamodel.private_users.get(u_index)).keys()
-    #     ][:k]
-    #                           for u_index, u_list in enumerate(list(zip(i.numpy(), v.numpy())))
-    #     ]
-    #     predictions_top_k.update(dict(zip(map(self._datamodel.private_users.get,
-    #                                           range(self._datamodel.sp_train.shape[0])), items_ratings_pair)))
-    #     return predictions_top_k
 
     def get_loss(self):
         return -max([r[self._validation_metric] for r in self._results])

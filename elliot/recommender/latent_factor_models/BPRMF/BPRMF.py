@@ -77,6 +77,19 @@ class MF(object):
         top_k_2 = top_k_2[:k]
         return top_k_2
 
+    def get_model_state(self):
+        saving_dict = {}
+        saving_dict['_user_bias'] = self._user_bias
+        saving_dict['_item_bias'] = self._item_bias
+        saving_dict['_user_factors'] = self._user_factors
+        saving_dict['_item_factors'] = self._item_factors
+        return saving_dict
+
+    def set_model_state(self, saving_dict):
+        self._user_bias = saving_dict['_user_bias']
+        self._item_bias = saving_dict['_item_bias']
+        self._user_factors = saving_dict['_user_factors']
+        self._item_factors = saving_dict['_item_factors']
 
     def get_user_bias(self, user: int):
 
@@ -195,7 +208,7 @@ class BPRMF(BaseRecommenderModel):
 
             self.train_step()
 
-            if not (it + 1) % self._params.verbose:
+            if not (it + 1) % self._verbose:
                 recs = self.get_recommendations(self._config.top_k)
                 self._results.append(self.evaluator.eval(recs))
 
@@ -204,7 +217,7 @@ class BPRMF(BaseRecommenderModel):
                     best_ndcg = self._results[-1][self._validation_metric]
                     if self._params.save_weights:
                         with open(self._saving_filepath, "wb") as f:
-                            pickle.dump(self.get_model_state(), f)
+                            pickle.dump(self._datamodel.get_model_state(), f)
                     if self._params.save_recs:
                         store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}-it:{it + 1}.tsv")
 
@@ -249,31 +262,12 @@ class BPRMF(BaseRecommenderModel):
     def restore_weights(self, it):
         if self._restore_epochs == it:
             try:
-                # checkpoint_file = find_checkpoint(weight_dir, self.restore_epochs, self.epochs,
-                #                                   self.rec)
                 with open(self._saving_filepath, "rb") as f:
-                    self.set_model_state(pickle.load(f))
-                # self.saver_ckpt.restore(checkpoint_file)
-
+                    self._datamodel.set_model_state(pickle.load(f))
                 print(f"Model correctly Restored at Epoch: {self._restore_epochs}")
                 return True
             except Exception as ex:
                 print(f"Error in model restoring operation! {ex}")
         return False
 
-    def get_model_state(self):
 
-        saving_dict = {}
-
-        saving_dict['_user_bias'] = self._datamodel._user_bias
-        saving_dict['_item_bias'] = self._datamodel._item_bias
-        saving_dict['_user_factors'] = self._datamodel._user_factors
-        saving_dict['_item_factors'] = self._datamodel._item_factors
-        return saving_dict
-
-    def set_model_state(self, saving_dict):
-
-        self._datamodel._user_bias = saving_dict['_user_bias']
-        self._datamodel._item_bias = saving_dict['_item_bias']
-        self._datamodel._user_factors = saving_dict['_user_factors']
-        self._datamodel._item_factors = saving_dict['_item_factors']
