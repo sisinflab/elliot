@@ -10,8 +10,10 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malite
 import logging
 import os
 
+from tqdm import tqdm
 import numpy as np
 import tensorflow as tf
+
 
 from dataset.dataset import DataSet
 from dataset.samplers import custom_sampler as cs
@@ -87,21 +89,18 @@ class NNBPRMF(BaseRecommenderModel):
                + "-br:" + str(self._params.l_b) \
                + "-wr:" + str(self._params.l_w)
 
-
-    def one_epoch(self, batches):
-        loss = 0
-        steps = 0
-        for batch in zip(*batches):
-            steps += 1
-            loss += self._model.train_step(batch)
-        return loss/steps
-
     def train(self):
         best_metric_value = 0
         for it in range(self._num_iters):
             self.restore_weights(it)
-            batches = self._sampler.step(self._data.transactions, self._params.batch_size)
-            loss = self.one_epoch(batches)
+            loss = 0
+            steps = 0
+            with tqdm(total=int(self._num_users // self._batch_size), disable=not self._verbose) as t:
+                for batch in zip(*self._sampler.step(self._num_users, self._batch_size)):
+                    steps += 1
+                    loss += self._model.train_step(batch)
+                    t.set_postfix({'loss': f'{loss.numpy() / steps:.5f}'})
+                    t.update()
 
             if not (it + 1) % self._verbose:
                 recs = self.get_recommendations(self._config.top_k)
