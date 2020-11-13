@@ -28,7 +28,8 @@ class BaseRecommenderModel(ABC):
         self._validation_metric = getattr(self._params, "validation_metric", "nDCG")
         self._save_weights = getattr(self._params, "save_weights", False)
         self._save_recs = getattr(self._params, "save_recs", False)
-        self._verbose = getattr(self._params, "verbose", 1)
+        self._verbose = getattr(self._params, "verbose", None)
+        self._validation_rate = getattr(self._params, "validation_rate", 1)
         self._batch_size = getattr(self._params, "batch_size", -1)
         self._results = []
 

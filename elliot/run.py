@@ -35,9 +35,22 @@ if __name__ == '__main__':
                         rstate=_rstate,
                         max_evals=model_base[2])
             res_handler.add_multishot_recommender(trials)
+            min_val = np.argmin([i["result"]["loss"] for i in trials._trials])
+            best_model_loss = trials._trials[min_val]["result"]["loss"]
+            best_model_params = trials._trials[min_val]["result"]["params"]
+            best_model_results = trials._trials[min_val]["result"]["results"]
         else:
             model = model_class(config=base.base_namespace, params=model_base)
             model.train()
             res_handler.add_oneshot_recommender(model.name, model.get_loss(), model.get_params(), model.get_results())
+            best_model_loss = model.get_loss()
+            best_model_params = model.get_params()
+            best_model_results = model.get_results()
+        print(f"Loss: {best_model_loss}")
+        print(f"Best Model params: {best_model_params}")
+        print(f"Best Model results: {best_model_results}")
+        print(f"\nHyperparameter tuning ended for {model_class.__name__}")
+        print("********************************\n")
     res_handler.save_results(output=base.base_namespace.path_output_rec_performance)
     res_handler.save_best_results(output=base.base_namespace.path_output_rec_performance)
+

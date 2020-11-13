@@ -89,14 +89,14 @@ class MultiDAE(BaseRecommenderModel):
             self.restore_weights(it)
             loss = 0
             steps = 0
-            with tqdm(total=int(self._num_users // self._batch_size)) as t:
+            with tqdm(total=int(self._num_users // self._batch_size), disable=not self._verbose) as t:
                 for batch in self._sampler.step(self._num_users, self._batch_size):
                     steps += 1
                     loss += self._model.train_step(batch.toarray())
                     t.set_postfix({'loss': f'{loss.numpy()/steps:.5f}'})
                     t.update()
 
-            if not (it + 1) % self._verbose:
+            if not (it + 1) % self._validation_rate:
                 recs = self.get_recommendations(self._config.top_k)
                 self._results.append(self.evaluator.eval(recs))
                 print(f'Epoch {(it + 1)}/{self._num_iters} loss {loss/steps:.5f}')

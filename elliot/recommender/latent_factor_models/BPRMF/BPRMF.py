@@ -219,7 +219,7 @@ class BPRMF(BaseRecommenderModel):
 
             self.train_step()
 
-            if not (it + 1) % self._verbose:
+            if not (it + 1) % self._validation_rate:
                 recs = self.get_recommendations(self._config.top_k)
                 self._results.append(self.evaluator.eval(recs))
 

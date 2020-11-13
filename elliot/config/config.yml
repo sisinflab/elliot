@@ -22,7 +22,8 @@ experiment:
       reg_lambda: 0.01
       hyper_max_evals: 1
       hyper_opt_alg: tpe
-      verbose: 10
+      validation_rate: 10
+      verbose: False
       save_weights: True
       save_recs: True
 #    BPRMF:
