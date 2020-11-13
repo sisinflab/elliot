@@ -1,3 +1,12 @@
+"""
+Module description:
+
+"""
+
+__version__ = '0.1'
+__author__ = 'Vito Walter Anelli, Claudio Pomo'
+__email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
+
 import time
 import numpy as np
 from dataset.dataset import DataSet
@@ -269,5 +278,3 @@ class BPRMF(BaseRecommenderModel):
             except Exception as ex:
                 print(f"Error in model restoring operation! {ex}")
         return False
-
-

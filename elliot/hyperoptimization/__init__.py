@@ -1,9 +1,11 @@
 """
+Module description:
+
 """
 
 __version__ = '0.1'
-__author__ = 'XXX'
-
+__author__ = 'Vito Walter Anelli, Claudio Pomo'
+__email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
 from .model_coordinator import ModelCoordinator
 from hyperopt import tpe, atpe, mix, rand, anneal

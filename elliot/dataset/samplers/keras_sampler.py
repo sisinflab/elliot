@@ -1,10 +1,15 @@
-import scipy.sparse as sp
+"""
+Module description:
+
+"""
+
+__version__ = '0.1'
+__author__ = 'Vito Walter Anelli, Claudio Pomo'
+__email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
+
 import numpy as np
 from multiprocessing import Pool
 from multiprocessing import cpu_count
-import pandas as pd
-from scipy.sparse import dok_matrix
-from time import time
 
 np.random.seed(0)
 
@@ -16,6 +21,7 @@ _model = None
 _train = None
 _test = None
 _num_items = None
+
 
 def _get_train_batch(i):
     """

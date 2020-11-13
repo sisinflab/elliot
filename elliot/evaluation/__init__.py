@@ -1,13 +1,11 @@
 """
-This is the evaluation module.
+Module description:
 
-This module contains and expose the recommendation metrics.
-It contains the evaluator object that should be initialized in the __init__ of the recommendation system,
-and called at the end of each training step.
 """
 
 __version__ = '0.1'
-__author__ = 'XXX'
+__author__ = 'Vito Walter Anelli, Claudio Pomo'
+__email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
 from . import metrics
 from . import relevance

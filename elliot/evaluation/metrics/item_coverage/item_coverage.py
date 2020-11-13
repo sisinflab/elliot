@@ -4,7 +4,8 @@ It directly proceeds from a system-wise computation, and it considers all the us
 """
 
 __version__ = '0.1'
-__author__ = 'XXX'
+__author__ = 'Vito Walter Anelli, Claudio Pomo'
+__email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
 from ..base_metric import BaseMetric
 

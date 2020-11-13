@@ -1,6 +1,13 @@
-import numpy as np
+"""
+Module description:
+
+"""
+
+__version__ = '0.1'
+__author__ = 'Vito Walter Anelli, Claudio Pomo'
+__email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
+
 import tensorflow as tf
-from tensorflow import keras
 
 from recommender.latent_factor_models.NNBPRMF.NNBPRMF_model import NNBPRMF_model
 

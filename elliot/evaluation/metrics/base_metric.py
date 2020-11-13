@@ -4,7 +4,8 @@ It proceeds from a user-wise computation, and average the values over the users.
 """
 
 __version__ = '0.1'
-__author__ = 'XXX'
+__author__ = 'Vito Walter Anelli, Claudio Pomo'
+__email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
 import typing as t
 from abc import ABC, abstractmethod

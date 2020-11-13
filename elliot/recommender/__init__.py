@@ -1,11 +1,11 @@
 """
-This is the metrics' module.
+Module description:
 
-This module contains and expose the recommendation metrics.
 """
 
 __version__ = '0.1'
-__author__ = 'XXX'
+__author__ = 'Vito Walter Anelli, Claudio Pomo'
+__email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
 from .base_recommender_model import BaseRecommenderModel
 from .keras_base_recommender_model import RecommenderModel
