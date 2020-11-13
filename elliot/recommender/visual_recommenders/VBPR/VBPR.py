@@ -4,8 +4,8 @@ Module description:
 """
 
 __version__ = '0.1'
-__author__ = 'Vito Walter Anelli, Claudio Pomo'
-__email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
+__author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta'
+__email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malitesta@poliba.it'
 
 import logging
 import os
@@ -13,8 +13,7 @@ import os
 import numpy as np
 import tensorflow as tf
 
-from ..visual_mixins.visual_loader_mixin import VisualLoader
-# from recommender.attack.attack_visual_feature_mixin import AttackVisualFeature
+from recommender.visual_recommenders.visual_mixins.visual_loader_mixin import VisualLoader
 from recommender.latent_factor_models.NNBPRMF.NNBPRMF import NNBPRMF
 from recommender.visual_recommenders.VBPR.VBPR_model import VBPR_model
 
