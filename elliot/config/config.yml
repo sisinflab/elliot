@@ -13,16 +13,16 @@ experiment:
   gpu: -1 # -1 is not use GPU
   models:
     MultiDAE:
-      lr: [0.001,0.0001]
+      lr: [0.001]
       epochs: 50
-      intermediate_dim: [600,300,100]
-      latent_dim: [200,100,50]
-      batch_size: [-1,512,1024]
+      intermediate_dim: 600
+      latent_dim: 200
+      batch_size: -1
       dropout_pkeep: 1
       reg_lambda: 0.01
-      hyper_max_evals: 10
+      hyper_max_evals: 1
       hyper_opt_alg: tpe
-      verbose: 1
+      verbose: 10
       save_weights: True
       save_recs: True
 #    BPRMF:

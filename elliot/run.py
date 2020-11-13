@@ -34,8 +34,6 @@ if __name__ == '__main__':
                         trials=trials,
                         rstate=_rstate,
                         max_evals=model_base[2])
-
-            print(best)
             res_handler.add_multishot_recommender(trials)
         else:
             model = model_class(config=base.base_namespace, params=model_base)
