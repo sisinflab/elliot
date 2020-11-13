@@ -14,4 +14,4 @@ from .latent_factor_models import BPRMF, NNBPRMF
 from .unpersonalized import Random
 from .visual_recommenders import VBPR
 from .adversarial import APR, AMR
-from .dae.multi_dae import MultiDAE
+from .autoencoders import MultiDAE

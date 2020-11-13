@@ -9,7 +9,7 @@ import os
 import numpy as np
 import tensorflow as tf
 
-from elliot.evaluation.Evaluator_old import Evaluator
+# from elliot.evaluation.Evaluator_old import Evaluator
 from recommender.keras_base_recommender_model import RecommenderModel
 
 np.random.seed(0)
@@ -28,7 +28,7 @@ class Random(RecommenderModel):
         :param args: parameters
         """
         super(Random, self).__init__(data, path_output_rec_result, path_output_rec_weight, args.rec)
-        self.evaluator = Evaluator(self, data, args.k)
+        # self.evaluator = Evaluator(self, data, args.k)
         self.best = 0
 
     def get_full_inference(self):

@@ -11,7 +11,7 @@ from time import time
 import numpy as np
 import tensorflow as tf
 
-from evaluation.Evaluator_old import Evaluator
+# from evaluation.Evaluator_old import Evaluator
 from recommender.keras_base_recommender_model import RecommenderModel
 from utils.read import find_checkpoint
 from utils.write import save_obj
@@ -41,7 +41,7 @@ class APR(RecommenderModel):
         self.batch_size = args.batch_size
         self.verbose = args.verbose
         self.restore_epochs = args.restore_epochs
-        self.evaluator = Evaluator(self, data, args.k)
+        # self.evaluator = Evaluator(self, data, args.k)
         self.adv_type = args.adv_type
         self.adv_reg = args.adv_reg
         self.adv_iteration = args.adv_iteration

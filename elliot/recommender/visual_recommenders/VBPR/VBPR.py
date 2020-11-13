@@ -13,8 +13,8 @@ import os
 import numpy as np
 import tensorflow as tf
 
-from dataset.datatype_mixins.visual_loader_mixin import VisualLoader
-from recommender.attack.attack_visual_feature_mixin import AttackVisualFeature
+from ..visual_mixins.visual_loader_mixin import VisualLoader
+# from recommender.attack.attack_visual_feature_mixin import AttackVisualFeature
 from recommender.latent_factor_models.NNBPRMF.NNBPRMF import NNBPRMF
 from recommender.visual_recommenders.VBPR.VBPR_model import VBPR_model
 
@@ -24,7 +24,7 @@ logging.disable(logging.WARNING)
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 
-class VBPR(NNBPRMF, VisualLoader, AttackVisualFeature):
+class VBPR(NNBPRMF, VisualLoader):
 
     def __init__(self, config, params, *args, **kwargs):
         """
