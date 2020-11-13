@@ -9,11 +9,13 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
 import numpy as np
 import random
+from tqdm import tqdm
 
 from dataset.dataset import DataSet
 from dataset.samplers import sparse_sampler as sp
 from evaluation.evaluator import Evaluator
 from recommender import BaseRecommenderModel
+from utils.folder import build_model_folder
 from utils.write import store_recommendation
 
 from .multi_dae_utils import DenoisingAutoEncoder
@@ -64,7 +66,8 @@ class MultiDAE(BaseRecommenderModel):
                                            self._dropout_rate,
                                            self._lambda)
 
-        self._saving_filepath = f'{self._config.path_output_rec_weight}best-weights-{self.name}'
+        build_model_folder(self._config.path_output_rec_weight, self.name)
+        self._saving_filepath = f'{self._config.path_output_rec_weight}{self.name}/best-weights-{self.name}'
         # self._train_mask = np.where((self._datamodel.sp_train.toarray() == 0), True, False)
 
     @property
@@ -86,14 +89,17 @@ class MultiDAE(BaseRecommenderModel):
             self.restore_weights(it)
             loss = 0
             steps = 0
-            for batch in self._sampler.step(self._num_users, self._batch_size):
-                steps += 1
-                loss += self._model.train_step(batch.toarray())
+            with tqdm(total=int(self._num_users // self._batch_size)) as t:
+                for batch in self._sampler.step(self._num_users, self._batch_size):
+                    steps += 1
+                    loss += self._model.train_step(batch.toarray())
+                    t.set_postfix({'loss': f'{loss.numpy()/steps:.5f}'})
+                    t.update()
 
             if not (it + 1) % self._verbose:
                 recs = self.get_recommendations(self._config.top_k)
                 self._results.append(self.evaluator.eval(recs))
-                print(f'Epoch {(it + 1)}/{self._num_iters} loss {loss:.3f}')
+                print(f'Epoch {(it + 1)}/{self._num_iters} loss {loss/steps:.5f}')
 
                 if self._results[-1][self._validation_metric] > best_metric_value:
                     print("******************************************")

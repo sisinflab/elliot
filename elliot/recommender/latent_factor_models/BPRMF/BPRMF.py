@@ -13,6 +13,7 @@ from dataset.dataset import DataSet
 from dataset.samplers import pairwise_sampler as ps
 from evaluation.evaluator import Evaluator
 from recommender.base_recommender_model import BaseRecommenderModel
+from utils.folder import build_model_folder
 from utils.write import store_recommendation
 import pickle
 
@@ -167,7 +168,8 @@ class BPRMF(BaseRecommenderModel):
 
         self._params.name = self.name
 
-        self._saving_filepath = f'{self._config.path_output_rec_weight}best-weights-{self.name}'
+        build_model_folder(self._config.path_output_rec_weight, self.name)
+        self._saving_filepath = f'{self._config.path_output_rec_weight}{self.name}best-weights-{self.name}'
 
     def get_recommendations(self, k: int = 100):
         return {u: self._datamodel.get_user_recs(u, k) for u in self._ratings.keys()}
