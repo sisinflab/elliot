@@ -1,8 +1,9 @@
 experiment:
-  path_train_data: ../data/{0}/trainingset.tsv
-  path_validation_data: ../data/{0}/validation.tsv
-  path_test_data: ../data/{0}/testset.tsv
-  path_feature_data: ../data/{0}/original/features.npy
+  data_paths:
+    train_data: ../data/{0}/trainingset.tsv
+    validation_data: ../data/{0}/validation.tsv
+    test_data: ../data/{0}/testset.tsv
+    feature_data: ../data/{0}/original/features.npy
   path_output_rec_result: ../results/{0}/recs/
   path_output_rec_weight: ../results/{0}/weights/
   path_output_rec_performance: ../results/{0}/performance/
@@ -13,7 +14,7 @@ experiment:
   gpu: -1 # -1 is not use GPU
   models:
     MultiDAE:
-      lr: [0.001]
+      lr: 0.001
       epochs: 50
       intermediate_dim: 600
       latent_dim: 200
