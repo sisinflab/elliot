@@ -34,6 +34,7 @@ _gpu = 'gpu'
 _hyper_max_evals = 'hyper_max_evals'
 _hyper_opt_alg = 'hyper_opt_alg'
 _data_paths = 'data_paths'
+_meta = 'meta'
 
 
 class NameSpaceModel:
@@ -70,14 +71,17 @@ class NameSpaceModel:
 
     def fill_model(self):
         for key in self.config[_experiment][_models]:
+            meta_model = self.config[_experiment][_models][key][_meta]
+            model_name_space = SimpleNamespace(**self.config[_experiment][_models][key])
+            setattr(model_name_space, _meta, SimpleNamespace(**meta_model))
             if any(isinstance(value, list) for value in self.config[_experiment][_models][key].values()):
                 space_list = []
                 for k, value in self.config[_experiment][_models][key].items():
                     if isinstance(value, list):
                         space_list.append((k, hp.choice(k, value)))
                 _SPACE = OrderedDict(space_list)
-                _max_evals = self.config[_experiment][_models][key][_hyper_max_evals]
-                _opt_alg = ho.parse_algorithms(self.config[_experiment][_models][key][_hyper_opt_alg])
-                yield key, (SimpleNamespace(**self.config[_experiment][_models][key]), _SPACE, _max_evals, _opt_alg)
+                _max_evals = meta_model[_hyper_max_evals]
+                _opt_alg = ho.parse_algorithms(meta_model[_hyper_opt_alg])
+                yield key, (model_name_space, _SPACE, _max_evals, _opt_alg)
             else:
-                yield key, SimpleNamespace(**self.config[_experiment][_models][key])
+                yield key, model_name_space
