@@ -1,0 +1,52 @@
+version: 1
+objects:
+  queue:
+    class: queue.Queue
+    maxsize: 1000
+formatters:
+  simple:
+    format: '[%(levelname)s] - %(asctime)s - %(name)s - : %(message)s in %(pathname)s:%(lineno)d'
+handlers:
+  console:
+    class: logging.StreamHandler
+    level: WARNING
+    formatter: simple
+    stream: ext://sys.stdout
+  file:
+    class: logging.FileHandler
+    level: WARNING
+    filename: !CUSTOM ${log_path_exp}
+    formatter: simple
+  queue_listener:
+    class: utils.logger_util.QueueListenerHandler
+    handlers:
+      - cfg://handlers.console
+      - cfg://handlers.file
+    queue: cfg://objects.queue
+loggers:
+  'recommender':
+    level: WARNING
+    handlers:
+      - queue_listener
+    propagate: false
+  'dataloader':
+    level: WARNING
+    handlers:
+      - queue_listener
+  'evaluator':
+    level: WARNING
+    handlers:
+      - queue_listener
+  'hyperparam':
+    level: WARNING
+    handlers:
+      - queue_listener
+  __main__:
+    level: WARNING
+    handlers:
+      - queue_listener
+    propagate: false
+root:
+  level: WARNING
+  handlers:
+    - console

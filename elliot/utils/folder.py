@@ -28,3 +28,8 @@ def manage_directories(path_output_rec_result, path_output_rec_weight, path_outp
 def build_model_folder(path_output_rec_weight, model):
     if not os.path.exists(os.path.dirname(f'{path_output_rec_weight}{model}/')):
         os.makedirs(os.path.dirname(f'{path_output_rec_weight}{model}/'))
+
+
+def build_log_folder(path_log_folder):
+    if not os.path.exists(os.path.dirname(f'{path_log_folder}')):
+        os.makedirs(os.path.dirname(f'{path_log_folder}'))

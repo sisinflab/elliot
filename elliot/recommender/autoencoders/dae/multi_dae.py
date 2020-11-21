@@ -10,6 +10,7 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 import numpy as np
 import random
 from tqdm import tqdm
+from utils import logging
 
 from dataset.dataset import DataSet
 from dataset.samplers import sparse_sampler as sp
@@ -20,6 +21,8 @@ from utils.write import store_recommendation
 
 from .multi_dae_utils import DenoisingAutoEncoder
 from .data_model import DataModel
+
+logger = logging.getLogger('recommender')
 
 
 class MultiDAE(BaseRecommenderModel):
@@ -79,10 +82,10 @@ class MultiDAE(BaseRecommenderModel):
                + "-ldim:" + str(self._params.latent_dim) \
                + "-bs:" + str(self._params.batch_size) \
                + "-dpk:" + str(self._params.dropout_pkeep) \
-               + "-lmb" + str(self._params.reg_lambda)
+               + "-lmb:" + str(self._params.reg_lambda)
 
     def train(self):
-
+        logger.critical("Test2")
         best_metric_value = 0
 
         for it in range(self._num_iters):

@@ -193,7 +193,7 @@ class BPRMF(BaseRecommenderModel):
                + "-br:" + str(self._params.bias_regularization) \
                + "-ur:" + str(self._params.user_regularization) \
                + "-pir:" + str(self._params.positive_item_regularization) \
-               + "-nir" + str(self._params.negative_item_regularization)
+               + "-nir:" + str(self._params.negative_item_regularization)
 
     def train_step(self):
         start_it = time.perf_counter()

@@ -15,13 +15,16 @@ from namespace.namespace_model_builder import NameSpaceBuilder
 from result_handler import ResultHandler
 import hyperoptimization as ho
 import numpy as np
+from utils import logging as logging_project
 
 _rstate = np.random.RandomState(42)
 
 if __name__ == '__main__':
-
     builder = NameSpaceBuilder('./config/config.yml')
     base = builder.base
+    logging_project.init(base.base_namespace.path_logger_config, base.base_namespace.path_log_folder)
+    logger = logging_project.getLogger(__name__)
+    logger.warning("Test")
     res_handler = ResultHandler()
     for key, model_base in builder.models():
         model_class = getattr(importlib.import_module("recommender"), key)
