@@ -14,7 +14,7 @@ import scipy.sparse as sp
 from dataset.abstract_dataset import AbstractDataset
 
 
-class DataSet(AbstractDataset):
+class DataSet(object):
     """
     Load train and test dataset
     """
