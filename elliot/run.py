@@ -26,11 +26,15 @@ if __name__ == '__main__':
     logger = logging_project.get_logger(__name__)
     logger.warning("Test")
     res_handler = ResultHandler()
+    dataloader_class = getattr(importlib.import_module("dataset"), base.base_namespace.dataloader)
+    dataloader = dataloader_class(config=base.base_namespace)
     for key, model_base in builder.models():
         logging_project.prepare_logger(key, base.base_namespace.path_log_folder)
         model_class = getattr(importlib.import_module("recommender"), key)
+        print("\n********************************")
+        print(f"Hyperparameter tuning begun for {model_class.__name__}\n")
         if isinstance(model_base, tuple):
-            model_placeholder = ho.ModelCoordinator(base.base_namespace, model_base[0], model_class)
+            model_placeholder = ho.ModelCoordinator(dataloader, base.base_namespace, model_base[0], model_class)
             trials = Trials()
             best = fmin(model_placeholder.objective,
                         space=model_base[1],
@@ -44,7 +48,7 @@ if __name__ == '__main__':
             best_model_params = trials._trials[min_val]["result"]["params"]
             best_model_results = trials._trials[min_val]["result"]["results"]
         else:
-            model = model_class(config=base.base_namespace, params=model_base)
+            model = model_class(data=dataloader, config=base.base_namespace, params=model_base)
             model.train()
             res_handler.add_oneshot_recommender(model.name, model.get_loss(), model.get_params(), model.get_results(), model.get_statistical_results())
             best_model_loss = model.get_loss()

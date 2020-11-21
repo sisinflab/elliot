@@ -18,7 +18,7 @@ class ModelCoordinator(object):
     This class handles the selection of hyperparameters for the hyperparameter tuning realized with HyperOpt.
     """
 
-    def __init__(self, base: SimpleNamespace, params: SimpleNamespace, model_class: t.ClassVar):
+    def __init__(self, data, base: SimpleNamespace, params: SimpleNamespace, model_class: t.ClassVar):
         """
         The constructor creates a Placeholder of the recommender model.
 
@@ -26,6 +26,7 @@ class ModelCoordinator(object):
         :param params: a SimpleNamespace that contains the hyper-parameters of the model
         :param model_class: the class of the recommendation model
         """
+        self.data = data
         self.base = base
         self.params = params
         self.model_class = model_class
@@ -47,7 +48,7 @@ class ModelCoordinator(object):
             print(f"{k} set to {model_params.__getattribute__(k)}")
         print("************\n")
 
-        model = self.model_class(config=self.base, params=model_params)
+        model = self.model_class(data=self.data, config=self.base, params=model_params)
         model.train()
         return {
             'loss': model.get_loss(),

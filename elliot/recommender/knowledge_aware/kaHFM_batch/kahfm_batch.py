@@ -15,7 +15,7 @@ import numpy as np
 import tensorflow as tf
 
 
-from recommender.knowledge_aware.kaHFM_batch.data_manager import KnowledgeAwareDataSet
+# from recommender.knowledge_aware.kaHFM_batch.data_manager import KnowledgeAwareDataSet
 from dataset.samplers import custom_sampler as cs
 from evaluation.evaluator import Evaluator
 from recommender import BaseRecommenderModel
@@ -23,16 +23,14 @@ from recommender.knowledge_aware.kaHFM_batch.kahfm_batch_model import KaHFM_mode
 # from recommender.knowledge_aware.kaHFM_batch.data_model import DataModel
 from utils.write import store_recommendation
 from recommender.knowledge_aware.kaHFM_batch.tfidf_utils import TFIDF
+# from dataset.samplers.custom_sampler import Sampler
 
 np.random.seed(0)
-tf.random.set_seed(0)
-logging.disable(logging.WARNING)
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 
 class KaHFMBatch(BaseRecommenderModel):
 
-    def __init__(self, config, params, *args, **kwargs):
+    def __init__(self, data, config, params, *args, **kwargs):
         """
         Create a BPR-MF instance.
         (see https://arxiv.org/pdf/1205.2618 for details about the algorithm design choices).
@@ -43,12 +41,13 @@ class KaHFMBatch(BaseRecommenderModel):
                                       [l_w, l_b]: regularization,
                                       lr: learning rate}
         """
-        super().__init__(config, params, *args, **kwargs)
-        np.random.seed(42)
-
-        self._data = KnowledgeAwareDataSet(config,
-                                           params,
-                                           random=np.random)
+        super().__init__(data, config, params, *args, **kwargs)
+        # np.random.seed(42)
+        #
+        # self._data = KnowledgeAwareDataSet(config,
+        #                                    params,
+        #                                    random=np.random)
+        self._data = data
         self._config = config
         self._params = params
         self._num_items = self._data.num_items
@@ -57,8 +56,8 @@ class KaHFMBatch(BaseRecommenderModel):
         self._sample_negative_items_empirically = True
         self._num_iters = self._params.epochs
 
-        self._ratings = self._data.train_dataframe_dict
-        # self._sampler = cs.Sampler(self._ratings, self._random, self._sample_negative_items_empirically)
+        self._ratings = self._data.train_dict
+        self._sampler = cs.Sampler(self._data.i_train_dict)
 
         self._tfidf_obj = TFIDF(self._data.feature_map)
         self._tfidf = self._tfidf_obj.tfidf()
@@ -79,7 +78,7 @@ class KaHFMBatch(BaseRecommenderModel):
                 self._user_factors[self._data.public_users[u]][self._data.public_features[f]] = v
 
         self._iteration = 0
-        self.evaluator = Evaluator(self._data)
+        self.evaluator = Evaluator(self._data, self._params)
         if self._batch_size < 1:
             self._batch_size = self._num_users
         # self._datamodel = DataModel(self._data.train_dataframe, self._ratings, self._random)
@@ -102,7 +101,7 @@ class KaHFMBatch(BaseRecommenderModel):
 
     @property
     def name(self):
-        return "BPR" \
+        return "KaHFMBatch" \
                + "_lr:" + str(self._params.lr) \
                + "-e:" + str(self._params.epochs) \
                + "-br:" + str(self._params.l_b) \
@@ -115,7 +114,7 @@ class KaHFMBatch(BaseRecommenderModel):
             loss = 0
             steps = 0
             with tqdm(total=int(self._num_users // self._batch_size), disable=not self._verbose) as t:
-                for batch in zip(*self._data.step(self._num_users, self._batch_size)):
+                for batch in zip(*self._sampler.step(self._num_users, self._batch_size)):
                     steps += 1
                     loss += self._model.train_step(batch)
                     t.set_postfix({'loss': f'{loss.numpy() / steps:.5f}'})
@@ -158,7 +157,7 @@ class KaHFMBatch(BaseRecommenderModel):
         return predictions_top_k
 
     def get_train_mask(self, start, stop):
-        return np.where((self._data.sp_train[range(start, stop)].toarray() == 0), True, False)
+        return np.where((self._data.sp_i_train[range(start, stop)].toarray() == 0), True, False)
 
     def get_loss(self):
         return -max([r[self._validation_metric] for r in self._results])

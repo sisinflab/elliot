@@ -8,29 +8,31 @@ __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
 import numpy as np
+np.random.seed(42)
 
 
 class Sampler:
-    def __init__(self, ratings,
-                 random,
-                 sample_negative_items_empirically: bool = True
-                 ):
-        self._ratings = ratings
-        self._random = random
-        self._sample_negative_items_empirically: bool = sample_negative_items_empirically
-        self._users = list(self._ratings.keys())
-        self._items = list({k for a in self._ratings.values() for k in a.keys()})
+    def __init__(self, indexed_ratings):
+        self._indexed_ratings = indexed_ratings
+        self._users = list(self._indexed_ratings.keys())
+        self._items = list({k for a in self._indexed_ratings.values() for k in a.keys()})
 
-        self.private_users = {p: u for p, u in enumerate(self._users)}
-        self.public_users = {v: k for k, v in self.private_users.items()}
-        self.private_items = {p: i for p, i in enumerate(self._items)}
-        self.public_items = {v: k for k, v in self.private_items.items()}
-
-        self._indexed_ratings = {self.public_users[user]: [self.public_items[i] for i in items.keys()]
-                                 for user, items in self._ratings.items()}
+        # self._ratings = ratings
+        # self._random = random
+        # self._sample_negative_items_empirically: bool = sample_negative_items_empirically
+        # self._users = list(self._ratings.keys())
+        # self._items = list({k for a in self._ratings.values() for k in a.keys()})
+        #
+        # self.private_users = {p: u for p, u in enumerate(self._users)}
+        # self.public_users = {v: k for k, v in self.private_users.items()}
+        # self.private_items = {p: i for p, i in enumerate(self._items)}
+        # self.public_items = {v: k for k, v in self.private_items.items()}
+        #
+        # self._indexed_ratings = {self.public_users[user]: [self.public_items[i] for i in items.keys()]
+        #                          for user, items in self._ratings.items()}
 
     def step(self, events: int, batch_size: int):
-        r_int = self._random.randint
+        r_int = np.random.randint
         n_users = len(self._users)
         n_items = len(self._items)
         n_batch = events // batch_size

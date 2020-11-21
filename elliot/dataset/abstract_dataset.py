@@ -22,7 +22,6 @@ class AbstractDataset(metaclass=ForceRequiredAttributeDefinitionMeta):
 
     required_attributes = [
         "config",  # comment
-        "params",  # comment
         "args",  # comment
         "kwargs",  # comment
         "users",  # comment
@@ -46,10 +45,6 @@ class AbstractDataset(metaclass=ForceRequiredAttributeDefinitionMeta):
 
     @abstractmethod
     def build_sparse(self, *args):
-        raise NotImplementedError
-
-    @abstractmethod
-    def prepare_test(self, *args):
         raise NotImplementedError
 
     @abstractmethod

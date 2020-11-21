@@ -31,7 +31,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 class NNBPRMF(BaseRecommenderModel):
 
-    def __init__(self, config, params, *args, **kwargs):
+    def __init__(self, data, config, params, *args, **kwargs):
         """
         Create a BPR-MF instance.
         (see https://arxiv.org/pdf/1205.2618 for details about the algorithm design choices).
@@ -42,12 +42,13 @@ class NNBPRMF(BaseRecommenderModel):
                                       [l_w, l_b]: regularization,
                                       lr: learning rate}
         """
-        super().__init__(config, params, *args, **kwargs)
+        super().__init__(data, config, params, *args, **kwargs)
         np.random.seed(42)
 
-        self._data = DataSet(config, params)
-        self._config = config
-        self._params = params
+        # self._data = DataSet(config, params)
+        # self._data = data
+        # self._config = config
+        # self._params = params
         self._num_items = self._data.num_items
         self._num_users = self._data.num_users
         self._random = np.random
@@ -57,11 +58,11 @@ class NNBPRMF(BaseRecommenderModel):
         # self._save_recs = self._params.save_recs
         # self._restore_epochs = -1
 
-        self._ratings = self._data.train_dataframe_dict
-        self._sampler = cs.Sampler(self._ratings, self._random, self._sample_negative_items_empirically)
+        self._ratings = self._data.train_dict
+        self._sampler = cs.Sampler(self._data.i_train_dict)
         self._iteration = 0
-        self.evaluator = Evaluator(self._data)
-        self._datamodel = DataModel(self._data.train_dataframe, self._ratings, self._random)
+        self.evaluator = Evaluator(self._data, self._params)
+        # self._datamodel = DataModel(self._data.train_dataframe, self._ratings, self._random)
         self._params.name = self.name
 
         ######################################
@@ -133,13 +134,13 @@ class NNBPRMF(BaseRecommenderModel):
             offset_stop = min(offset+self._params.batch_size, self._num_users)
             predictions = self._model.predict_batch(offset, offset_stop)
             v, i = self._model.get_top_k(predictions, self.get_train_mask(offset, offset_stop), k=k)
-            items_ratings_pair = [list(zip(map(self._sampler.private_items.get, u_list[0]), u_list[1]))
+            items_ratings_pair = [list(zip(map(self._data.private_items.get, u_list[0]), u_list[1]))
                                   for u_list in list(zip(i.numpy(), v.numpy()))]
             predictions_top_k.update(dict(zip(range(offset, offset_stop), items_ratings_pair)))
         return predictions_top_k
 
     def get_train_mask(self, start, stop):
-        return np.where((self._datamodel.sp_train[range(start, stop)].toarray() == 0), True, False)
+        return np.where((self._data.sp_i_train[range(start, stop)].toarray() == 0), True, False)
 
     def get_loss(self):
         return -max([r[self._validation_metric] for r in self._results])

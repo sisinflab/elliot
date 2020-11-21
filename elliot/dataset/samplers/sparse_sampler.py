@@ -7,17 +7,18 @@ __version__ = '0.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
+import random
+random.seed(42)
+
 
 class Sampler:
-    def __init__(self, train,
-                 random
+    def __init__(self, sp_i_train
                  ):
-        self._train = train
-        self._random = random
+        self._train = sp_i_train
 
     def step(self, users: int, batch_size: int):
         train = self._train
-        shuffled_list = self._random.sample(range(users), users)
+        shuffled_list = random.sample(range(users), users)
 
         for start_idx in range(0, users, batch_size):
             end_idx = min(start_idx + batch_size, users)

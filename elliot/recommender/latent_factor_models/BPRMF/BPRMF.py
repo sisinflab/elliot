@@ -136,11 +136,11 @@ class MF(object):
 
 class BPRMF(BaseRecommenderModel):
 
-    def __init__(self, config, params, *args, **kwargs):
-        super().__init__(config, params, *args, **kwargs)
+    def __init__(self, data, config, params, *args, **kwargs):
+        super().__init__(data, config, params, *args, **kwargs)
         np.random.seed(42)
 
-        self._data = DataSet(config, params)
+        # self._data = DataSet(config, params)
         self._num_items = self._data.num_items
         self._num_users = self._data.num_users
         self._random = np.random
@@ -158,13 +158,13 @@ class BPRMF(BaseRecommenderModel):
         self._update_items = self._params.update_items
         self._update_bias = self._params.update_bias
 
-        self._ratings = self._data.train_dataframe_dict
+        self._ratings = self._data.train_dict
         self._datamodel = MF(self._factors, self._ratings, self._random)
-        self._sampler = ps.Sampler(self._ratings, self._random, self._sample_negative_items_empirically)
+        self._sampler = ps.Sampler(self._ratings, self._data.users, self._data.items)
 
         self._iteration = 0
 
-        self.evaluator = Evaluator(self._data)
+        self.evaluator = Evaluator(self._data, self._params)
 
         self._params.name = self.name
 

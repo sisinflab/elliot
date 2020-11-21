@@ -16,13 +16,14 @@ import dataset.dataset as ds
 
 
 class Evaluator(object):
-    def __init__(self, data: ds.DataSet):
+    def __init__(self, data: ds.DataSet, params: SimpleNamespace):
         """
         Class to manage all the evaluation methods and operation
         :param data: dataset object
         :param k: top-k evaluation
         """
         self._data = data
+        self._params = params
         self._k = data.config.top_k
         self._rel_threshold = data.config.relevance
         self._paired_ttest = self._data.config.paired_ttest
@@ -63,7 +64,7 @@ class Evaluator(object):
         eval_start_time = time()
 
         results = {
-            m.name(): m(recommendations, self._data.config, self._data.params, self._evaluation_objects).eval()
+            m.name(): m(recommendations, self._data.config, self._params, self._evaluation_objects).eval()
             for m in self._metrics
         }
 
@@ -78,7 +79,7 @@ class Evaluator(object):
         if self._paired_ttest:
             statistical_results = {metric_object.name(): metric_object.eval_user_metric()
                                    for metric_object in
-                                   [m(recommendations, self._data.config, self._data.params, self._evaluation_objects) for m in self._metrics]
+                                   [m(recommendations, self._data.config, self._params, self._evaluation_objects) for m in self._metrics]
                                    if isinstance(metric_object, metrics.StatisticalMetric)}
 
         return results, statistical_results

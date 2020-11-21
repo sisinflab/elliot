@@ -7,20 +7,23 @@ __version__ = '0.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
+import numpy as np
+np.random.seed(42)
 
 class Sampler:
-    def __init__(self, ratings,
-                 random,
-                 sample_negative_items_empirically: bool = True
+    def __init__(self,
+                 ratings,
+                 users,
+                 items
                  ):
         self._ratings = ratings
-        self._random = random
-        self._sample_negative_items_empirically: bool = sample_negative_items_empirically
-        self._users = list(self._ratings.keys())
-        self._items = list({k for a in self._ratings.values() for k in a.keys()})
+        # self._random = random
+        # self._sample_negative_items_empirically: bool = sample_negative_items_empirically
+        self._users = users
+        self._items = items
 
     def step(self, events: int):
-        r_int = self._random.randint
+        r_int = np.random.randint
         n_users = len(self._users)
         n_items = len(self._items)
         users = self._users

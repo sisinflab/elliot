@@ -19,6 +19,7 @@ import hyperoptimization as ho
 
 _experiment = 'experiment'
 _dataset = 'dataset'
+_dataloader = 'dataloader'
 _weights = 'path_output_rec_weight'
 _performance = 'path_output_rec_performance'
 _logger_config = 'path_logger_config'
@@ -61,12 +62,13 @@ class NameSpaceModel:
             .format(self.config[_experiment][_dataset])
 
         self.config[_experiment][_paired_ttest] = self.config[_experiment].get(_paired_ttest, False)
+        self.config[_experiment][_dataloader] = self.config[_experiment].get(_dataloader, "DataSet")
 
         manage_directories(self.config[_experiment][_recs], self.config[_experiment][_weights],
                            self.config[_experiment][_performance])
 
         for p in [_data_paths, _weights, _recs, _dataset, _top_k, _metrics, _relevance, _paired_ttest, _performance, _logger_config,
-                  _log_folder]:
+                  _log_folder, _dataloader]:
             if p == _data_paths:
                 setattr(self.base_namespace, p, SimpleNamespace(**self.config[_experiment][p]))
             else:
