@@ -53,9 +53,9 @@ class NNBPRMF(BaseRecommenderModel):
         self._random = np.random
         self._sample_negative_items_empirically = True
         self._num_iters = self._params.epochs
-        self._save_weights = self._params.save_weights
-        self._save_recs = self._params.save_recs
-        self._restore_epochs = -1
+        # self._save_weights = self._params.save_weights
+        # self._save_recs = self._params.save_recs
+        # self._restore_epochs = -1
 
         self._ratings = self._data.train_dataframe_dict
         self._sampler = cs.Sampler(self._ratings, self._random, self._sample_negative_items_empirically)

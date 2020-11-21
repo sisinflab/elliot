@@ -228,10 +228,10 @@ class BPRMF(BaseRecommenderModel):
                 if self._results[-1][self._validation_metric] > best_ndcg:
                     print("******************************************")
                     best_ndcg = self._results[-1][self._validation_metric]
-                    if self._params.save_weights:
+                    if self._save_weights:
                         with open(self._saving_filepath, "wb") as f:
                             pickle.dump(self._datamodel.get_model_state(), f)
-                    if self._params.save_recs:
+                    if self._save_recs:
                         store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}-it:{it + 1}.tsv")
 
     def update_factors(self, u: int, i: int, j: int):
