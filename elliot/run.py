@@ -23,10 +23,11 @@ if __name__ == '__main__':
     builder = NameSpaceBuilder('./config/config.yml')
     base = builder.base
     logging_project.init(base.base_namespace.path_logger_config, base.base_namespace.path_log_folder)
-    logger = logging_project.getLogger(__name__)
+    logger = logging_project.get_logger(__name__)
     logger.warning("Test")
     res_handler = ResultHandler()
     for key, model_base in builder.models():
+        logging_project.prepare_logger(key, base.base_namespace.path_log_folder)
         model_class = getattr(importlib.import_module("recommender"), key)
         if isinstance(model_base, tuple):
             model_placeholder = ho.ModelCoordinator(base.base_namespace, model_base[0], model_class)

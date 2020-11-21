@@ -22,8 +22,6 @@ from utils.write import store_recommendation
 from .multi_dae_utils import DenoisingAutoEncoder
 from .data_model import DataModel
 
-logger = logging.getLogger('recommender')
-
 
 class MultiDAE(BaseRecommenderModel):
 
@@ -73,6 +71,8 @@ class MultiDAE(BaseRecommenderModel):
         self._saving_filepath = f'{self._config.path_output_rec_weight}{self.name}/best-weights-{self.name}'
         # self._train_mask = np.where((self._datamodel.sp_train.toarray() == 0), True, False)
 
+        self.logger = logging.get_logger(self.__class__.__name__)
+
     @property
     def name(self):
         return "MultiDAE" \
@@ -85,7 +85,7 @@ class MultiDAE(BaseRecommenderModel):
                + "-lmb:" + str(self._params.reg_lambda)
 
     def train(self):
-        logger.critical("Test2")
+        self.logger.critical("Test2")
         best_metric_value = 0
 
         for it in range(self._num_iters):

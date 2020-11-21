@@ -61,7 +61,8 @@ class NameSpaceModel:
         manage_directories(self.config[_experiment][_recs], self.config[_experiment][_weights],
                            self.config[_experiment][_performance])
 
-        for p in [_data_paths, _weights, _recs, _dataset, _top_k, _metrics, _relevance, _performance]:
+        for p in [_data_paths, _weights, _recs, _dataset, _top_k, _metrics, _relevance, _performance, _logger_config,
+                  _log_folder]:
             if p == _data_paths:
                 setattr(self.base_namespace, p, SimpleNamespace(**self.config[_experiment][p]))
             else:

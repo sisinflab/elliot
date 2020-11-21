@@ -55,5 +55,18 @@ def init(path_config, folder_log, log_level=logging.WARNING):
         log.setLevel(log_level)
 
 
-def getLogger(name):
-    return logging.root.manager.loggerDict[name]
+def get_logger(name, log_level=logging.WARNING):
+    logger = logging.root.manager.loggerDict[name]
+    logger.setLevel(log_level)
+    return logger
+
+
+def prepare_logger(name, path, log_level=logging.WARNING):
+    logger = logging.getLogger(name)
+    logger.setLevel(log_level)
+    fh = logging.FileHandler(f'{path}/{name}.log')
+    fh.setLevel(log_level)
+    formatter = logging.Formatter('[%(levelname)s] - %(asctime)s - %(name)s - : %(message)s in %(pathname)s:%(lineno)d')
+    fh.setFormatter(formatter)
+    logger.addHandler(fh)
+    return logger
