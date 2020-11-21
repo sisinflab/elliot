@@ -101,6 +101,15 @@ class NDCG(BaseMetric):
              for u, u_r in self._recommendations.items()]
         )
 
+    def eval_user_metric(self):
+        """
+        Evaluation function
+        :return: the overall averaged value of nDCG
+        """
+
+        return {u: NDCG.__user_ndcg(u_r, self._relevance_map[u], self._cutoff)
+             for u, u_r in self._recommendations.items()}
+
 
 
 

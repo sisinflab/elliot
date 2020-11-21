@@ -15,13 +15,14 @@ import numpy as np
 import tensorflow as tf
 
 
-from dataset.dataset import DataSet
+from recommender.knowledge_aware.kaHFM_batch.data_manager import KnowledgeAwareDataSet
 from dataset.samplers import custom_sampler as cs
 from evaluation.evaluator import Evaluator
 from recommender import BaseRecommenderModel
-from recommender.latent_factor_models.NNBPRMF.NNBPRMF_model import NNBPRMF_model
-from recommender.latent_factor_models.NNBPRMF.data_model import DataModel
+from recommender.knowledge_aware.kaHFM_batch.kahfm_batch_model import KaHFM_model
+# from recommender.knowledge_aware.kaHFM_batch.data_model import DataModel
 from utils.write import store_recommendation
+from recommender.knowledge_aware.kaHFM_batch.tfidf_utils import TFIDF
 
 np.random.seed(0)
 tf.random.set_seed(0)
@@ -29,7 +30,7 @@ logging.disable(logging.WARNING)
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 
-class NNBPRMF(BaseRecommenderModel):
+class KaHFMBatch(BaseRecommenderModel):
 
     def __init__(self, config, params, *args, **kwargs):
         """
@@ -45,7 +46,9 @@ class NNBPRMF(BaseRecommenderModel):
         super().__init__(config, params, *args, **kwargs)
         np.random.seed(42)
 
-        self._data = DataSet(config, params)
+        self._data = KnowledgeAwareDataSet(config,
+                                           params,
+                                           random=np.random)
         self._config = config
         self._params = params
         self._num_items = self._data.num_items
@@ -58,25 +61,45 @@ class NNBPRMF(BaseRecommenderModel):
         self._restore_epochs = -1
 
         self._ratings = self._data.train_dataframe_dict
-        self._sampler = cs.Sampler(self._ratings, self._random, self._sample_negative_items_empirically)
+        # self._sampler = cs.Sampler(self._ratings, self._random, self._sample_negative_items_empirically)
+
+        self._tfidf_obj = TFIDF(self._data.feature_map)
+        self._tfidf = self._tfidf_obj.tfidf()
+        self._user_profiles = self._tfidf_obj.get_profiles(self._ratings)
+
+        self._user_factors = \
+            np.zeros(shape=(len(self._data.users), len(self._data.features)))
+        self._item_factors = \
+            np.zeros(shape=(len(self._data.items), len(self._data.features)))
+
+        for i, f_dict in self._tfidf.items():
+            if i in self._data.items:
+                for f, v in f_dict.items():
+                    self._item_factors[self._data.public_items[i]][self._data.public_features[f]] = v
+
+        for u, f_dict in self._user_profiles.items():
+            for f, v in f_dict.items():
+                self._user_factors[self._data.public_users[u]][self._data.public_features[f]] = v
+
         self._iteration = 0
         self.evaluator = Evaluator(self._data)
-        self._datamodel = DataModel(self._data.train_dataframe, self._ratings, self._random)
+        if self._batch_size < 1:
+            self._batch_size = self._num_users
+        # self._datamodel = DataModel(self._data.train_dataframe, self._ratings, self._random)
         self._params.name = self.name
 
         ######################################
 
-        self._factors = self._params.embed_k
+        self._factors = self._data.factors
         self._learning_rate = self._params.lr
         self._l_w = self._params.l_w
         self._l_b = self._params.l_b
 
-        self._model = NNBPRMF_model(self._params.embed_k,
-                                    self._params.lr,
-                                    self._params.l_w,
-                                    self._params.l_b,
-                                    self._num_users,
-                                    self._num_items)
+        self._model = KaHFM_model(self._user_factors,
+                                  self._item_factors,
+                                  self._params.lr,
+                                  self._params.l_w,
+                                  self._params.l_b)
 
         self._saving_filepath = f'{self._config.path_output_rec_weight}best-weights-{self.name}'
 
@@ -85,7 +108,6 @@ class NNBPRMF(BaseRecommenderModel):
         return "BPR" \
                + "_lr:" + str(self._params.lr) \
                + "-e:" + str(self._params.epochs) \
-               + "-factors:" + str(self._params.embed_k) \
                + "-br:" + str(self._params.l_b) \
                + "-wr:" + str(self._params.l_w)
 
@@ -96,13 +118,13 @@ class NNBPRMF(BaseRecommenderModel):
             loss = 0
             steps = 0
             with tqdm(total=int(self._num_users // self._batch_size), disable=not self._verbose) as t:
-                for batch in zip(*self._sampler.step(self._num_users, self._batch_size)):
+                for batch in zip(*self._data.step(self._num_users, self._batch_size)):
                     steps += 1
                     loss += self._model.train_step(batch)
                     t.set_postfix({'loss': f'{loss.numpy() / steps:.5f}'})
                     t.update()
 
-            if not (it + 1) % self._verbose:
+            if not (it + 1) % self._validation_rate:
                 recs = self.get_recommendations(self._config.top_k)
                 results, statistical_results = self.evaluator.eval(recs)
                 self._results.append(results)
@@ -129,17 +151,17 @@ class NNBPRMF(BaseRecommenderModel):
 
     def get_recommendations(self, k: int = 100):
         predictions_top_k = {}
-        for index, offset in enumerate(range(0, self._num_users, self._params.batch_size)):
-            offset_stop = min(offset+self._params.batch_size, self._num_users)
+        for index, offset in enumerate(range(0, self._num_users, self._batch_size)):
+            offset_stop = min(offset+self._batch_size, self._num_users)
             predictions = self._model.predict_batch(offset, offset_stop)
             v, i = self._model.get_top_k(predictions, self.get_train_mask(offset, offset_stop), k=k)
-            items_ratings_pair = [list(zip(map(self._sampler.private_items.get, u_list[0]), u_list[1]))
+            items_ratings_pair = [list(zip(map(self._data.private_items.get, u_list[0]), u_list[1]))
                                   for u_list in list(zip(i.numpy(), v.numpy()))]
             predictions_top_k.update(dict(zip(range(offset, offset_stop), items_ratings_pair)))
         return predictions_top_k
 
     def get_train_mask(self, start, stop):
-        return np.where((self._datamodel.sp_train[range(start, stop)].toarray() == 0), True, False)
+        return np.where((self._data.sp_train[range(start, stop)].toarray() == 0), True, False)
 
     def get_loss(self):
         return -max([r[self._validation_metric] for r in self._results])

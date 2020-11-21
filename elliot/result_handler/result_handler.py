@@ -11,6 +11,8 @@ import numpy as np
 import pandas as pd
 from datetime import datetime
 
+from evaluation.statistical_significance import PairedTTest
+
 
 class ResultHandler:
     def __init__(self):
@@ -21,12 +23,13 @@ class ResultHandler:
         name = obj.results[0]["params"]["name"].split("_")[0]
         self.multishot_recommenders[name] = obj.results
 
-    def add_oneshot_recommender(self, name, loss, params, results):
+    def add_oneshot_recommender(self, name, loss, params, results, statistical_results):
         rec = {}
         rec["name"] = name
         rec["loss"] = loss
         rec["params"] = params
         rec["results"] = results
+        rec["statistical_results"] = statistical_results
         self.oneshot_recommenders[name.split("_")[0]] = [rec]
 
     def get_best_result(self):
@@ -36,7 +39,11 @@ class ResultHandler:
             best_model_loss = self.multishot_recommenders[recommender][min_val]["loss"]
             best_model_params = self.multishot_recommenders[recommender][min_val]["params"]
             best_model_results = self.multishot_recommenders[recommender][min_val]["results"]
-            bests[recommender] = [{"loss": best_model_loss, "params": best_model_params, "results": best_model_results}]
+            best_model_statistical_results = self.multishot_recommenders[recommender][min_val]["statistical_results"]
+            bests[recommender] = [{"loss": best_model_loss,
+                                   "params": best_model_params,
+                                   "results": best_model_results,
+                                   "statistical_results": best_model_statistical_results}]
         return bests
 
     def save_results(self, output='../results/', best=False):
@@ -59,3 +66,39 @@ class ResultHandler:
         info = pd.DataFrame.from_dict(results, orient='index')
         info.insert(0, 'model', info.index)
         info.to_csv(f'{output}rec_{datetime.now().strftime("%Y_%m_%d_%H_%M_%S")}.tsv', sep='\t', index=False)
+
+    def save_best_statistical_results(self, output='../results/'):
+        global_results = dict(self.oneshot_recommenders, **self.get_best_result())
+        results = []
+        paired_list = []
+        for rec_0, rec_0_model in global_results.items():
+            for rec_1, rec_1_model in global_results.items():
+                if (rec_0 != rec_1) & ((rec_0, rec_1) not in paired_list):
+                    paired_list.append((rec_0, rec_1))
+                    paired_list.append((rec_1, rec_0))
+
+                    metrics = rec_0_model[0]["statistical_results"].keys()
+
+                    common_users = []
+                    for metric_name in metrics:
+                        array_0 = rec_0_model[0]["statistical_results"][metric_name]
+                        array_1 = rec_1_model[0]["statistical_results"][metric_name]
+
+                        if not common_users:
+                            common_users = PairedTTest.common_users(array_0, array_1)
+
+                        p_value = PairedTTest.compare(array_0, array_1, common_users)
+
+                        results.append((rec_0_model[0]['params']['name'],
+                                        rec_1_model[0]['params']['name'],
+                                        metric_name,
+                                        p_value))
+                        results.append((rec_1_model[0]['params']['name'],
+                                        rec_0_model[0]['params']['name'],
+                                        metric_name,
+                                        p_value))
+
+        with open(f'{output}stat_{datetime.now().strftime("%Y_%m_%d_%H_%M_%S")}.tsv', "w") as f:
+            for tup in results:
+                f.write(f"{tup[0]}\t{tup[1]}\t{tup[2]}\t{tup[3]}\n")
+

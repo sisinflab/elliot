@@ -11,8 +11,10 @@ import numpy as np
 import pandas as pd
 import scipy.sparse as sp
 
+from dataset.abstract_dataset import AbstractDataset
 
-class DataSet(object):
+
+class DataSet(AbstractDataset):
     """
     Load train and test dataset
     """

@@ -10,7 +10,7 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 import numpy as np
 import random
 from tqdm import tqdm
-from utils import logging
+import sys
 
 from dataset.dataset import DataSet
 from dataset.samplers import sparse_sampler as sp
@@ -19,11 +19,11 @@ from recommender import BaseRecommenderModel
 from utils.folder import build_model_folder
 from utils.write import store_recommendation
 
-from .multi_dae_utils import DenoisingAutoEncoder
+from .multi_vae_utils import VariationalAutoEncoder
 from .data_model import DataModel
 
 
-class MultiDAE(BaseRecommenderModel):
+class MultiVAE(BaseRecommenderModel):
 
     def __init__(self, config, params, *args, **kwargs):
         """
@@ -60,33 +60,36 @@ class MultiDAE(BaseRecommenderModel):
         self._learning_rate = self._params.lr
         self._dropout_rate = 1. - self._params.dropout_pkeep
 
-        self._model = DenoisingAutoEncoder(self._num_items,
+        self._model = VariationalAutoEncoder(self._num_items,
                                            self._intermediate_dim,
                                            self._latent_dim,
                                            self._learning_rate,
                                            self._dropout_rate,
                                            self._lambda)
 
+        # the total number of gradient updates for annealing
+        self._total_anneal_steps = 200000
+        # largest annealing parameter
+        self._anneal_cap = 0.2
+
         build_model_folder(self._config.path_output_rec_weight, self.name)
         self._saving_filepath = f'{self._config.path_output_rec_weight}{self.name}/best-weights-{self.name}'
-        # self._train_mask = np.where((self._datamodel.sp_train.toarray() == 0), True, False)
-
-        self.logger = logging.get_logger(self.__class__.__name__)
 
     @property
     def name(self):
-        return "MultiDAE" \
+        return "MultiVAE" \
                + "_lr:" + str(self._params.lr) \
                + "-e:" + str(self._params.epochs) \
                + "-idim:" + str(self._params.intermediate_dim) \
                + "-ldim:" + str(self._params.latent_dim) \
                + "-bs:" + str(self._params.batch_size) \
                + "-dpk:" + str(self._params.dropout_pkeep) \
-               + "-lmb:" + str(self._params.reg_lambda)
+               + "-lmb" + str(self._params.reg_lambda)
 
     def train(self):
-        self.logger.critical("Test2")
+
         best_metric_value = 0
+        self._update_count = 0
 
         for it in range(self._num_iters):
             self.restore_weights(it)
@@ -95,9 +98,16 @@ class MultiDAE(BaseRecommenderModel):
             with tqdm(total=int(self._num_users // self._batch_size), disable=not self._verbose) as t:
                 for batch in self._sampler.step(self._num_users, self._batch_size):
                     steps += 1
-                    loss += self._model.train_step(batch.toarray())
+
+                    if self._total_anneal_steps > 0:
+                        anneal = min(self._anneal_cap, 1. * self._update_count / self._total_anneal_steps)
+                    else:
+                        anneal = self._anneal_cap
+
+                    loss += self._model.train_step(batch.toarray(), anneal)
                     t.set_postfix({'loss': f'{loss.numpy()/steps:.5f}'})
                     t.update()
+                    self._update_count += 1
 
             if not (it + 1) % self._validation_rate:
                 recs = self.get_recommendations(self._config.top_k)

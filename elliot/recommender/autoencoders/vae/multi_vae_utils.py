@@ -18,6 +18,18 @@ logging.disable(logging.WARNING)
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 
+class Sampling(layers.Layer):
+    """Uses (z_mean, z_log_var) to sample z, the vector encoding a digit."""
+
+    @tf.function
+    def call(self, inputs):
+        z_mean, z_log_var = inputs
+        batch = tf.shape(z_mean)[0]
+        dim = tf.shape(z_mean)[1]
+        epsilon = tf.keras.backend.random_normal(shape=(batch, dim))
+        return z_mean + tf.exp(0.5 * z_log_var) * epsilon
+
+
 class Encoder(layers.Layer):
     """Maps MNIST digits to a triplet (z_mean, z_log_var, z)."""
 
@@ -35,9 +47,12 @@ class Encoder(layers.Layer):
                                        kernel_initializer=keras.initializers.GlorotNormal(),
                                        kernel_regularizer=keras.regularizers.l2(regularization_lambda))
         self.dense_mean = layers.Dense(latent_dim,
-                                       activation="tanh",
                                        kernel_initializer=keras.initializers.GlorotNormal(),
                                        kernel_regularizer=keras.regularizers.l2(regularization_lambda))
+        self.dense_log_var = layers.Dense(latent_dim,
+                                       kernel_initializer=keras.initializers.GlorotNormal(),
+                                       kernel_regularizer=keras.regularizers.l2(regularization_lambda))
+        self.sampling = Sampling()
 
     @tf.function
     def call(self, inputs, training=None):
@@ -45,7 +60,9 @@ class Encoder(layers.Layer):
         i_drop = self.input_dropout(i_normalized, training=training)
         x = self.dense_proj(i_drop)
         z_mean = self.dense_mean(x)
-        return z_mean
+        z_log_var = self.dense_log_var(x)
+        z = self.sampling((z_mean, z_log_var))
+        return z_mean, z_log_var, z
 
 
 class Decoder(layers.Layer):
@@ -58,8 +75,8 @@ class Decoder(layers.Layer):
                                        kernel_initializer=keras.initializers.GlorotNormal(),
                                        kernel_regularizer=keras.regularizers.l2(regularization_lambda))
         self.dense_output = layers.Dense(original_dim,
-                                         kernel_initializer=keras.initializers.GlorotNormal(),
-                                         kernel_regularizer=keras.regularizers.l2(regularization_lambda))
+                                       kernel_initializer=keras.initializers.GlorotNormal(),
+                                       kernel_regularizer=keras.regularizers.l2(regularization_lambda))
 
     @tf.function
     def call(self, inputs, **kwargs):
@@ -67,7 +84,7 @@ class Decoder(layers.Layer):
         return self.dense_output(x)
 
 
-class DenoisingAutoEncoder(keras.Model):
+class VariationalAutoEncoder(keras.Model):
     """Combines the encoder and decoder into an end-to-end model for training."""
 
     def __init__(self,
@@ -77,9 +94,8 @@ class DenoisingAutoEncoder(keras.Model):
                  learning_rate=0.001,
                  dropout_rate=0,
                  regularization_lambda=0.01,
-                 name="DenoisingAutoEncoder",
-                 **kwargs
-    ):
+                 name="VariationalAutoEncoder",
+                 **kwargs):
         super().__init__(name=name, **kwargs)
         tf.random.set_seed(42)
         self.original_dim = original_dim
@@ -97,21 +113,28 @@ class DenoisingAutoEncoder(keras.Model):
 
     @tf.function
     def call(self, inputs, training=None, **kwargs):
-        z_mean = self.encoder(inputs, training=training)
-        reconstructed = self.decoder(z_mean)
-        return reconstructed
+        z_mean, z_log_var, z = self.encoder(inputs, training=training)
+        reconstructed = self.decoder(z)
+        # Add KL divergence regularization loss.
+        kl_loss = -0.5 * tf.reduce_mean(
+            z_log_var - tf.square(z_mean) - tf.exp(z_log_var) + 1
+        )
+        # self.add_loss(kl_loss)
+        return reconstructed, kl_loss
 
     @tf.function
-    def train_step(self, batch):
+    def train_step(self, batch, anneal_ph=0.0, **kwargs):
         with tf.GradientTape() as tape:
 
             # Clean Inference
-            logits = self.call(inputs=batch, training=True)
+            logits, KL = self.call(inputs=batch, training=True)
             log_softmax_var = tf.nn.log_softmax(logits)
 
             # per-user average negative log-likelihood
-            loss = -tf.reduce_mean(tf.reduce_sum(
-                log_softmax_var * batch, axis=1))
+            neg_ll = -tf.reduce_mean(tf.reduce_sum(
+                log_softmax_var * batch, axis=-1))
+
+            loss = neg_ll + anneal_ph * KL
 
         grads = tape.gradient(loss, self.trainable_weights)
         self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
@@ -127,7 +150,7 @@ class DenoisingAutoEncoder(keras.Model):
             The matrix of predicted values.
         """
 
-        logits = self.call(inputs=inputs, training=training)
+        logits, _ = self.call(inputs=inputs, training=training)
         log_softmax_var = tf.nn.log_softmax(logits)
         return log_softmax_var
 
@@ -135,3 +158,64 @@ class DenoisingAutoEncoder(keras.Model):
     def get_top_k(self, preds, train_mask, k=100):
         return tf.nn.top_k(tf.where(train_mask, preds, -np.inf), k=k, sorted=True)
 
+
+# class DenoisingAutoEncoder(keras.Model):
+#     """Combines the encoder and decoder into an end-to-end model for training."""
+#
+#     def __init__(
+#         self,
+#         original_dim,
+#         intermediate_dim=600,
+#         latent_dim=200,
+#         learning_rate=0.001,
+#         dropout_rate=0,
+#         regularization_lambda=0.01,
+#         name="DenoisingAutoEncoder",
+#         **kwargs
+#     ):
+#         super().__init__(name=name, **kwargs)
+#         tf.random.set_seed(42)
+#         self.original_dim = original_dim
+#         self.encoder = Encoder(latent_dim=latent_dim,
+#                                intermediate_dim=intermediate_dim,
+#                                dropout_rate=dropout_rate,
+#                                regularization_lambda=regularization_lambda)
+#         self.decoder = Decoder(original_dim,
+#                                intermediate_dim=intermediate_dim,
+#                                regularization_lambda=regularization_lambda)
+#         self.optimizer = tf.optimizers.Adam(learning_rate)
+#
+#     def call(self, inputs, training=None):
+#         z_mean = self.encoder(inputs, training=training)
+#         reconstructed = self.decoder(z_mean)
+#         return reconstructed
+#
+#     @tf.function
+#     def train_step(self, batch):
+#         with tf.GradientTape() as tape:
+#
+#             # Clean Inference
+#             logits = self.call(inputs=batch, training=True)
+#             log_softmax_var = tf.nn.log_softmax(logits)
+#
+#             # per-user average negative log-likelihood
+#             loss = -tf.reduce_mean(tf.reduce_sum(
+#                 log_softmax_var * batch, axis=1))
+#
+#         grads = tape.gradient(loss, self.trainable_weights)
+#         self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
+#
+#         return loss
+#
+#     @tf.function
+#     def predict(self, inputs, training=False):
+#         """
+#         Get full predictions on the whole users/items matrix.
+#
+#         Returns:
+#             The matrix of predicted values.
+#         """
+#
+#         logits = self.call(inputs=inputs, training=True)
+#         log_softmax_var = tf.nn.log_softmax(logits)
+#         return log_softmax_var

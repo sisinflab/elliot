@@ -16,6 +16,7 @@ from .ndcg import NDCG
 from .precision import Precision
 from .recall import Recall
 from .item_coverage import ItemCoverage
+from .statistical_array_metric import StatisticalMetric
 
 _metric_dictionary = {
     "nDCG": NDCG,

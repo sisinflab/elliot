@@ -54,5 +54,6 @@ class ModelCoordinator(object):
             'status': STATUS_OK,
             'params': model.get_params(),
             'results': model.get_results(),
+            'statistical_results': model.get_statistical_results(),
             'name': model.name
         }

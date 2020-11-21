@@ -10,8 +10,11 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 from .base_recommender_model import BaseRecommenderModel
 from .keras_base_recommender_model import RecommenderModel
 
-from .latent_factor_models import BPRMF, NNBPRMF
+from .latent_factor_models import BPRMF, NNBPRMF, KBPRMF
 from .unpersonalized import Random
 from .visual_recommenders import VBPR
 from .adversarial import APR, AMR
 from .autoencoders import MultiDAE
+from .autoencoders import MultiVAE
+from .knowledge_aware import KaHFM
+from .knowledge_aware import KaHFMBatch

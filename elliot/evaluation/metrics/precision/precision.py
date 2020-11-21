@@ -56,3 +56,12 @@ class Precision(BaseMetric):
             [Precision.__user_precision(u_r, self._cutoff, self._relevant_items[u])
              for u, u_r in self._recommendations.items()]
         )
+
+    def eval_user_metric(self):
+        """
+        Evaluation function
+        :return: the overall averaged value of Precision
+        """
+        return {u: Precision.__user_precision(u_r, self._cutoff, self._relevant_items[u])
+             for u, u_r in self._recommendations.items()}
+

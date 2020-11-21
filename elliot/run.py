@@ -46,7 +46,7 @@ if __name__ == '__main__':
         else:
             model = model_class(config=base.base_namespace, params=model_base)
             model.train()
-            res_handler.add_oneshot_recommender(model.name, model.get_loss(), model.get_params(), model.get_results())
+            res_handler.add_oneshot_recommender(model.name, model.get_loss(), model.get_params(), model.get_results(), model.get_statistical_results())
             best_model_loss = model.get_loss()
             best_model_params = model.get_params()
             best_model_results = model.get_results()
@@ -57,4 +57,6 @@ if __name__ == '__main__':
         print("********************************\n")
     res_handler.save_results(output=base.base_namespace.path_output_rec_performance)
     res_handler.save_best_results(output=base.base_namespace.path_output_rec_performance)
+    if base.base_namespace.paired_ttest:
+        res_handler.save_best_statistical_results(output=base.base_namespace.path_output_rec_performance)
 

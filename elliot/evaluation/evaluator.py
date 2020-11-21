@@ -25,6 +25,7 @@ class Evaluator(object):
         self._data = data
         self._k = data.config.top_k
         self._rel_threshold = data.config.relevance
+        self._paired_ttest = self._data.config.paired_ttest
         self._metrics = metrics.parse_metrics(data.config.metrics)
         self._test = data.get_test()
 
@@ -65,6 +66,7 @@ class Evaluator(object):
             m.name(): m(recommendations, self._data.config, self._data.params, self._evaluation_objects).eval()
             for m in self._metrics
         }
+
         str_results = {k: str(round(v, rounding_factor)) for k, v in results.items()}
         print(f"\nEval Time: {time() - eval_start_time}")
 
@@ -72,4 +74,11 @@ class Evaluator(object):
 
         print(f"*** Results ***\n{res_print}\n***************\n")
 
-        return results
+        statistical_results = {}
+        if self._paired_ttest:
+            statistical_results = {metric_object.name(): metric_object.eval_user_metric()
+                                   for metric_object in
+                                   [m(recommendations, self._data.config, self._data.params, self._evaluation_objects) for m in self._metrics]
+                                   if isinstance(metric_object, metrics.StatisticalMetric)}
+
+        return results, statistical_results

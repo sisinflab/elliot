@@ -58,3 +58,11 @@ class Recall(BaseMetric):
             [Recall.__user_recall(u_r, self._cutoff, self._relevant_items[u])
              for u, u_r in self._recommendations.items()]
         )
+
+    def eval_user_metric(self):
+        """
+        Evaluation Function
+        :return: the overall averaged value of Recall
+        """
+        return {u: Recall.__user_recall(u_r, self._cutoff, self._relevant_items[u])
+             for u, u_r in self._recommendations.items()}
