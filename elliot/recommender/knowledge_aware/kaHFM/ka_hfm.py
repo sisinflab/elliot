@@ -1,14 +1,16 @@
 import time
 import numpy as np
+import pickle
+import typing as t
+
+
 from dataset.samplers import pairwise_sampler as ps
 from evaluation.evaluator import Evaluator
 from recommender.base_recommender_model import BaseRecommenderModel
 from utils.folder import build_model_folder
 from utils.write import store_recommendation
-import pickle
-import typing as t
-from .data_manager import KnowledgeAwareDataSet
-from .tfidf_utils import TFIDF
+# from .data_manager import KnowledgeAwareDataSet
+from recommender.knowledge_aware.kaHFM.tfidf_utils import TFIDF
 
 
 class MF(object):

@@ -15,12 +15,12 @@ import numpy as np
 import tensorflow as tf
 
 
-from dataset.dataset import DataSet
+# from dataset.dataset import DataSet
 from dataset.samplers import custom_sampler as cs
 from evaluation.evaluator import Evaluator
 from recommender import BaseRecommenderModel
 from recommender.latent_factor_models.NNBPRMF.NNBPRMF_model import NNBPRMF_model
-from recommender.latent_factor_models.NNBPRMF.data_model import DataModel
+# from recommender.latent_factor_models.NNBPRMF.data_model import DataModel
 from utils.write import store_recommendation
 
 np.random.seed(0)
