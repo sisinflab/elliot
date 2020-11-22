@@ -9,8 +9,9 @@ from evaluation.evaluator import Evaluator
 from recommender.base_recommender_model import BaseRecommenderModel
 from utils.folder import build_model_folder
 from utils.write import store_recommendation
-# from .data_manager import KnowledgeAwareDataSet
 from recommender.knowledge_aware.kaHFM.tfidf_utils import TFIDF
+
+np.random.seed(42)
 
 
 class MF(object):
@@ -148,55 +149,50 @@ class MF(object):
         self._item_factors[self._public_items[item]] = v
 
 
-class Sampler:
-    def __init__(self, ratings: t.Dict,
-                 random: t.Any,
-                 sample_negative_items_empirically: bool = True
-                 ):
-        self._ratings: t.Dict = ratings
-        self._random: t.Any = random
-        self._sample_negative_items_empirically: bool = sample_negative_items_empirically
-        self._users: t.List = list(self._ratings.keys())
-        self._items: t.List = list({k for a in self._ratings.values() for k in a.keys()})
-
-    def sample(self, events: int):
-        r_int = self._random.randint
-        n_users = len(self._users)
-        n_items = len(self._items)
-        users = self._users
-        items = self._items
-        ratings = self._ratings
-
-        for _ in range(events):
-            u = users[r_int(n_users)]
-            ui = set(ratings[u].keys())
-            lui = len(ui)
-            if lui == n_items: continue
-            i = list(ui)[r_int(lui)]
-
-            j = items[r_int(n_items)]
-            while j in ui:
-                j = items[r_int(n_items)]
-
-            yield u, i, j
+# class Sampler:
+#     def __init__(self, ratings: t.Dict,
+#                  random: t.Any,
+#                  sample_negative_items_empirically: bool = True
+#                  ):
+#         self._ratings: t.Dict = ratings
+#         self._random: t.Any = random
+#         self._sample_negative_items_empirically: bool = sample_negative_items_empirically
+#         self._users: t.List = list(self._ratings.keys())
+#         self._items: t.List = list({k for a in self._ratings.values() for k in a.keys()})
+#
+#     def sample(self, events: int):
+#         r_int = self._random.randint
+#         n_users = len(self._users)
+#         n_items = len(self._items)
+#         users = self._users
+#         items = self._items
+#         ratings = self._ratings
+#
+#         for _ in range(events):
+#             u = users[r_int(n_users)]
+#             ui = set(ratings[u].keys())
+#             lui = len(ui)
+#             if lui == n_items: continue
+#             i = list(ui)[r_int(lui)]
+#
+#             j = items[r_int(n_items)]
+#             while j in ui:
+#                 j = items[r_int(n_items)]
+#
+#             yield u, i, j
 
 
 class KaHFM(BaseRecommenderModel):
 
     def __init__(self, data, config, params, *args, **kwargs):
         super().__init__(data, config, params, *args, **kwargs)
-        # np.random.seed(42)
-        #
-        # self._data = KnowledgeAwareDataSet(config,
-        #                                    params)
-        self._data = data
+
         self._num_items = self._data.num_items
         self._num_users = self._data.num_users
         self._random = np.random
         self._sample_negative_items_empirically = True
 
         self._num_iters = self._params.epochs
-        # self._factors = self._params.embed_k
         self._learning_rate = self._params.lr
         self._bias_regularization = self._params.bias_regularization
         self._user_regularization = self._params.user_regularization

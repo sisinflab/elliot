@@ -9,13 +9,16 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
 import time
 import numpy as np
-from dataset.dataset import DataSet
+import pickle
+
 from dataset.samplers import pairwise_sampler as ps
 from evaluation.evaluator import Evaluator
-from recommender.base_recommender_model import BaseRecommenderModel
 from utils.folder import build_model_folder
 from utils.write import store_recommendation
-import pickle
+
+from recommender.base_recommender_model import BaseRecommenderModel
+
+np.random.seed(42)
 
 
 class MF(object):
@@ -138,9 +141,7 @@ class BPRMF(BaseRecommenderModel):
 
     def __init__(self, data, config, params, *args, **kwargs):
         super().__init__(data, config, params, *args, **kwargs)
-        np.random.seed(42)
 
-        # self._data = DataSet(config, params)
         self._num_items = self._data.num_items
         self._num_users = self._data.num_users
         self._random = np.random

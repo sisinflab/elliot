@@ -7,9 +7,13 @@ __version__ = '0.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malitesta@poliba.it'
 
+import os
 import numpy as np
 import tensorflow as tf
 from tensorflow import keras
+
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+tf.random.set_seed(0)
 
 
 class NNBPRMF_model(keras.Model):

@@ -7,28 +7,21 @@ __version__ = '0.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malitesta@poliba.it'
 
-import logging
-import os
-
 from tqdm import tqdm
 import numpy as np
-import tensorflow as tf
 
-
-# from recommender.knowledge_aware.kaHFM_batch.data_manager import KnowledgeAwareDataSet
 from dataset.samplers import custom_sampler as cs
 from evaluation.evaluator import Evaluator
 from recommender import BaseRecommenderModel
 from recommender.knowledge_aware.kaHFM_batch.kahfm_batch_model import KaHFM_model
-# from recommender.knowledge_aware.kaHFM_batch.data_model import DataModel
 from utils.write import store_recommendation
 from recommender.knowledge_aware.kaHFM_batch.tfidf_utils import TFIDF
-# from dataset.samplers.custom_sampler import Sampler
+from recommender.recommender_utils_mixin import RecMixin
 
-np.random.seed(0)
+np.random.seed(42)
 
 
-class KaHFMBatch(BaseRecommenderModel):
+class KaHFMBatch(RecMixin, BaseRecommenderModel):
 
     def __init__(self, data, config, params, *args, **kwargs):
         """
@@ -42,14 +35,7 @@ class KaHFMBatch(BaseRecommenderModel):
                                       lr: learning rate}
         """
         super().__init__(data, config, params, *args, **kwargs)
-        # np.random.seed(42)
-        #
-        # self._data = KnowledgeAwareDataSet(config,
-        #                                    params,
-        #                                    random=np.random)
-        self._data = data
-        self._config = config
-        self._params = params
+
         self._num_items = self._data.num_items
         self._num_users = self._data.num_users
         self._random = np.random
@@ -81,7 +67,6 @@ class KaHFMBatch(BaseRecommenderModel):
         self.evaluator = Evaluator(self._data, self._params)
         if self._batch_size < 1:
             self._batch_size = self._num_users
-        # self._datamodel = DataModel(self._data.train_dataframe, self._ratings, self._random)
         self._params.name = self.name
 
         ######################################
@@ -135,15 +120,15 @@ class KaHFMBatch(BaseRecommenderModel):
                     if self._save_recs:
                         store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}-it:{it + 1}.tsv")
 
-    def restore_weights(self, it):
-        if self._restore_epochs == it:
-            try:
-                self._model.load_weights(self._saving_filepath)
-                print(f"Model correctly Restored at Epoch: {self._restore_epochs}")
-                return True
-            except Exception as ex:
-                print(f"Error in model restoring operation! {ex}")
-        return False
+    # def restore_weights(self, it):
+    #     if self._restore_epochs == it:
+    #         try:
+    #             self._model.load_weights(self._saving_filepath)
+    #             print(f"Model correctly Restored at Epoch: {self._restore_epochs}")
+    #             return True
+    #         except Exception as ex:
+    #             print(f"Error in model restoring operation! {ex}")
+    #     return False
 
     def get_recommendations(self, k: int = 100):
         predictions_top_k = {}
@@ -156,19 +141,19 @@ class KaHFMBatch(BaseRecommenderModel):
             predictions_top_k.update(dict(zip(range(offset, offset_stop), items_ratings_pair)))
         return predictions_top_k
 
-    def get_train_mask(self, start, stop):
-        return np.where((self._data.sp_i_train[range(start, stop)].toarray() == 0), True, False)
-
-    def get_loss(self):
-        return -max([r[self._validation_metric] for r in self._results])
-
-    def get_params(self):
-        return self._params.__dict__
-
-    def get_results(self):
-        val_max = np.argmax([r[self._validation_metric] for r in self._results])
-        return self._results[val_max]
-
-    def get_statistical_results(self):
-        val_max = np.argmax([r[self._validation_metric] for r in self._results])
-        return self._statistical_results[val_max]
+    # def get_train_mask(self, start, stop):
+    #     return np.where((self._data.sp_i_train[range(start, stop)].toarray() == 0), True, False)
+    #
+    # def get_loss(self):
+    #     return -max([r[self._validation_metric] for r in self._results])
+    #
+    # def get_params(self):
+    #     return self._params.__dict__
+    #
+    # def get_results(self):
+    #     val_max = np.argmax([r[self._validation_metric] for r in self._results])
+    #     return self._results[val_max]
+    #
+    # def get_statistical_results(self):
+    #     val_max = np.argmax([r[self._validation_metric] for r in self._results])
+    #     return self._statistical_results[val_max]
