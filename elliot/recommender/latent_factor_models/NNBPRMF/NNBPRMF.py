@@ -107,7 +107,7 @@ class NNBPRMF(RecMixin, BaseRecommenderModel):
         predictions_top_k = {}
         for index, offset in enumerate(range(0, self._num_users, self._params.batch_size)):
             offset_stop = min(offset+self._params.batch_size, self._num_users)
-            predictions = self._model.predict_batch(offset, offset_stop)
+            predictions = self._model.predict(offset, offset_stop)
             v, i = self._model.get_top_k(predictions, self.get_train_mask(offset, offset_stop), k=k)
             items_ratings_pair = [list(zip(map(self._data.private_items.get, u_list[0]), u_list[1]))
                                   for u_list in list(zip(i.numpy(), v.numpy()))]

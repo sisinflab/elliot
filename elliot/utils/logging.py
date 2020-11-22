@@ -1,3 +1,4 @@
+import datetime
 import logging
 import logging.config as cfg
 import os
@@ -64,9 +65,12 @@ def get_logger(name, log_level=logging.WARNING):
 def prepare_logger(name, path, log_level=logging.WARNING):
     logger = logging.getLogger(name)
     logger.setLevel(log_level)
-    fh = logging.FileHandler(f'{path}/{name}.log')
+    logfilepath = f'''{path}/{name}-{datetime.datetime.now().strftime('%b-%d-%Y_%H-%M-%S')}.log'''
+    fh = logging.FileHandler(logfilepath)
     fh.setLevel(log_level)
-    formatter = logging.Formatter('[%(levelname)s] - %(asctime)s - %(name)s - : %(message)s in %(pathname)s:%(lineno)d')
+    filefmt = "%(asctime)-15s %(levelname)s %(message)s"
+    filedatefmt = "%a %d %b %Y %H:%M:%S"
+    formatter = logging.Formatter(filefmt, filedatefmt)
     fh.setFormatter(formatter)
     logger.addHandler(fh)
     return logger

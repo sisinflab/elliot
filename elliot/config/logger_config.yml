@@ -2,10 +2,11 @@ version: 1
 objects:
   queue:
     class: queue.Queue
-    maxsize: 1000
+    maxsize: 10000
 formatters:
   simple:
-    format: '[%(levelname)s] - %(asctime)s - %(name)s - : %(message)s in %(pathname)s:%(lineno)d'
+    format: '%(asctime)-15s %(levelname)s %(message)s'
+    datefmt: '%a %d %b %Y %H:%M:%S'
 handlers:
   console:
     class: logging.StreamHandler

@@ -9,4 +9,3 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
 from .NNBPRMF import NNBPRMF
 from .BPRMF import BPRMF
-from .KBPRMF import KBPRMF

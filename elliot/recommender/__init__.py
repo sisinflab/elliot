@@ -10,7 +10,7 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 from .base_recommender_model import BaseRecommenderModel
 
 from .latent_factor_models import BPRMF, NNBPRMF
-# from .unpersonalized import Random
+from .unpersonalized import Random
 from .visual_recommenders import VBPR
 # from .adversarial import APR, AMR
 from .autoencoders import MultiDAE

@@ -13,13 +13,16 @@ experiment:
   path_logger_config: ./config/logger_config.yml
   path_log_folder: ../log/
   dataset: example
-  dataloader: KnowledgeChains
+#  dataloader: KnowledgeChains
   top_k: 50
   metrics: [nDCG, Precision, Recall, ItemCoverage]
   relevance: 1
   paired_ttest: True
   gpu: -1 # -1 is not use GPU
   models:
+    Random:
+      meta:
+        save_recs: True
 #    MultiDAE:
 #      meta:
 #        hyper_max_evals: 1
@@ -35,21 +38,21 @@ experiment:
 #      batch_size: -1
 #      dropout_pkeep: 1
 #      reg_lambda: 0.01
-    MultiVAE:
-      meta:
-        hyper_max_evals: 1
-        hyper_opt_alg: tpe
-        validation_rate: 10
-        verbose: False
-        save_weights: False
-        save_recs: True
-      lr: 0.01
-      epochs: 50
-      intermediate_dim: 300
-      latent_dim: 100
-      batch_size: -1
-      dropout_pkeep: 1
-      reg_lambda: 0.01
+#    MultiVAE:
+#      meta:
+#        hyper_max_evals: 1
+#        hyper_opt_alg: tpe
+#        validation_rate: 10
+#        verbose: False
+#        save_weights: False
+#        save_recs: True
+#      lr: 0.01
+#      epochs: 50
+#      intermediate_dim: 300
+#      latent_dim: 100
+#      batch_size: -1
+#      dropout_pkeep: 1
+#      reg_lambda: 0.01
 #    BPRMF:
 #      meta:
 #        hyper_max_evals: 1

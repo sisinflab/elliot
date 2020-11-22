@@ -32,7 +32,7 @@ if __name__ == '__main__':
         logging_project.prepare_logger(key, base.base_namespace.path_log_folder)
         model_class = getattr(importlib.import_module("recommender"), key)
         print("\n********************************")
-        print(f"Hyperparameter tuning begun for {model_class.__name__}\n")
+        print(f"Tuning begun for {model_class.__name__}\n")
         if isinstance(model_base, tuple):
             model_placeholder = ho.ModelCoordinator(dataloader, base.base_namespace, model_base[0], model_class)
             trials = Trials()
@@ -57,7 +57,7 @@ if __name__ == '__main__':
         print(f"Loss: {best_model_loss}")
         print(f"Best Model params: {best_model_params}")
         print(f"Best Model results: {best_model_results}")
-        print(f"\nHyperparameter tuning ended for {model_class.__name__}")
+        print(f"\nTuning ended for {model_class.__name__}")
         print("********************************\n")
     res_handler.save_results(output=base.base_namespace.path_output_rec_performance)
     res_handler.save_best_results(output=base.base_namespace.path_output_rec_performance)

@@ -15,6 +15,8 @@ from tensorflow import keras
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 tf.random.set_seed(0)
 
+tf.random.set_seed(0)
+
 
 class NNBPRMF_model(keras.Model):
 
@@ -81,21 +83,12 @@ class NNBPRMF_model(keras.Model):
         return loss
 
     @tf.function
-    def predict_all(self):
-        return self.Bi + tf.matmul(self.Gu, self.Gi, transpose_b=True)
-
-    @tf.function
-    def predict_batch(self, start, stop):
+    def predict(self, start, stop,  **kwargs):
         return self.Bi + tf.matmul(self.Gu[start:stop], self.Gi, transpose_b=True)
 
     @tf.function
-    def predict(self, inputs, training=False):
-        logits, _ = self.call(inputs=inputs, training=True)
-        return logits
-
-    @tf.function
-    def get_top_k(self, preds, train_mask, k=100):
-        return tf.nn.top_k(tf.where(train_mask, preds, -np.inf), k=k, sorted=True)
+    def get_top_k(self, predictions, train_mask, k=100):
+        return tf.nn.top_k(tf.where(train_mask, predictions, -np.inf), k=k, sorted=True)
 
     def get_config(self):
         raise NotImplementedError
