@@ -20,9 +20,9 @@ experiment:
   paired_ttest: True
   gpu: -1 # -1 is not use GPU
   models:
-    Random:
-      meta:
-        save_recs: True
+#    Random:
+#      meta:
+#        save_recs: True
 #    MultiDAE:
 #      meta:
 #        hyper_max_evals: 1
@@ -140,3 +140,20 @@ experiment:
 #      batch_size: 512
 #      l_w: 0.000025
 #      l_b: 0
+    NGCF:
+      meta:
+        hyper_max_evals: 1
+        hyper_opt_alg: tpe
+        validation_rate: 10
+        verbose: True
+        save_weights: True
+        save_recs: True
+      learning_rate: 0.1
+      epochs: 100
+      embed_k: 64
+      l_w: 0.001
+      weight_size: (64,)
+      batch_size: 128
+      node_dropout: ()
+      message_dropout: (0.1,)
+      n_fold: 5
