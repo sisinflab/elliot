@@ -30,7 +30,7 @@ class VBPR_model(NNBPRMF_model):
         self._learning_rate = learning_rate
         self.l_w = l_w
         self.l_b = l_b
-        self.l_e = l_e,
+        self.l_e = l_e
         self.emb_image = emb_image
         self.num_image_feature = num_image_feature
         self._num_items = num_items
