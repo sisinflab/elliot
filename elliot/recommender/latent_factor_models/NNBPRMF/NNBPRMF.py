@@ -121,7 +121,7 @@ class NNBPRMF(RecMixin, BaseRecommenderModel):
                                                    test_user_ok))
                 inner_test_user_true_mask = [i - offset for i in inner_test_user_true]
                 ii = [list(d.keys())[0] for d in list(itemgetter(*inner_test_user_true)(test))]
-                auc += self._model.get_positions(predictions, mask, ii, inner_test_user_true_mask)
+                auc += self._model.get_positions(predictions, mask, ii, inner_test_user_true_mask).numpy()
             items_ratings_pair = [list(zip(map(self._data.private_items.get, u_list[0]), u_list[1]))
                                   for u_list in list(zip(i.numpy(), v.numpy()))]
             predictions_top_k.update(dict(zip(range(offset, offset_stop), items_ratings_pair)))
