@@ -74,22 +74,22 @@ experiment:
 #      update_users: True
 #      update_items: True
 #      update_bias: True
-#    NNBPRMF:
-#      meta:
-#        hyper_max_evals: 1
-#        hyper_opt_alg: tpe
-#        validation_rate: 10
-#        verbose: True
-#        save_weights: False
-#        save_recs: True
-#        validation_metric: nDCG
-#        restore_epoch: -1
-#      lr: [0.005,0.05,0.0005]
-#      epochs: 50
-#      embed_k: [10,50,100,125,150,200]
-#      batch_size: 512
-#      l_w: 0.000025
-#      l_b: 0
+    NNBPRMF:
+      meta:
+        hyper_max_evals: 1
+        hyper_opt_alg: tpe
+        validation_rate: 10
+        verbose: True
+        save_weights: False
+        save_recs: True
+        validation_metric: nDCG
+        restore_epoch: -1
+      lr: 0.005
+      epochs: 50
+      embed_k: 50
+      batch_size: 512
+      l_w: 0.0025
+      l_b: 0
 #    VBPR:
 #      meta:
 #        verbose: 1
@@ -140,20 +140,20 @@ experiment:
 #      batch_size: 512
 #      l_w: 0.000025
 #      l_b: 0
-    NGCF:
-      meta:
-        hyper_max_evals: 1
-        hyper_opt_alg: tpe
-        validation_rate: 10
-        verbose: True
-        save_weights: True
-        save_recs: True
-      learning_rate: 0.1
-      epochs: 100
-      embed_k: 64
-      l_w: 0.001
-      weight_size: (64,)
-      batch_size: 128
-      node_dropout: ()
-      message_dropout: (0.1,)
-      n_fold: 5
+#    NGCF:
+#      meta:
+#        hyper_max_evals: 1
+#        hyper_opt_alg: tpe
+#        validation_rate: 10
+#        verbose: True
+#        save_weights: True
+#        save_recs: True
+#      learning_rate: 0.1
+#      epochs: 100
+#      embed_k: 64
+#      l_w: 0.001
+#      weight_size: (64,)
+#      batch_size: 128
+#      node_dropout: ()
+#      message_dropout: (0.1,)
+#      n_fold: 5
