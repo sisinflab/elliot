@@ -90,7 +90,7 @@ class NNBPRMF(RecMixin, BaseRecommenderModel):
                     t.set_postfix({'loss': f'{loss.numpy() / steps:.5f}'})
                     t.update()
 
-            if not (it + 1) % self._verbose:
+            if not (it + 1) % self._validation_rate:
                 recs, auc = self.get_recommendations(self._config.top_k, self._compute_auc)
                 results, statistical_results = self.evaluator.eval(recs)
                 results.update({'AUC': auc})
