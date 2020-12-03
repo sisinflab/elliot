@@ -91,8 +91,9 @@ class NNBPRMF(RecMixin, BaseRecommenderModel):
                     t.update()
 
             if not (it + 1) % self._verbose:
-                recs, auc = self.get_recommendations(self._config.top_k)
+                recs, auc = self.get_recommendations(self._config.top_k, self._compute_auc)
                 results, statistical_results = self.evaluator.eval(recs)
+                results.update({'AUC': auc})
                 self._results.append(results)
                 self._statistical_results.append(statistical_results)
                 print(f'Epoch {(it + 1)}/{self._num_iters} loss {loss  / steps:.3f}')

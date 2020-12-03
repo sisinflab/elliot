@@ -84,6 +84,7 @@ experiment:
         save_recs: True
         validation_metric: nDCG
         restore_epoch: -1
+        compute_auc: True
       lr: 0.005
       epochs: 50
       embed_k: 50
