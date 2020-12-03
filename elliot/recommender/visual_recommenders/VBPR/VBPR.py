@@ -25,7 +25,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 class VBPR(NNBPRMF, VisualLoader):
 
-    def __init__(self, config, params, *args, **kwargs):
+    def __init__(self, data, config, params, *args, **kwargs):
         """
         Create a VBPR instance.
         (see https://arxiv.org/pdf/1510.01784.pdf for details about the algorithm design choices).
@@ -36,7 +36,7 @@ class VBPR(NNBPRMF, VisualLoader):
                                       [l_w, l_b]: regularization,
                                       lr: learning rate}
         """
-        super().__init__(config, params, *args, **kwargs)
+        super().__init__(data, config, params, *args, **kwargs)
         np.random.seed(42)
 
         self._embed_d = self._params.embed_d
@@ -53,5 +53,5 @@ class VBPR(NNBPRMF, VisualLoader):
                                  self._emb_image,
                                  self._num_image_feature,
                                  self._num_users,
-                                 self._num_image_feature)
+                                 self._num_items)
 
