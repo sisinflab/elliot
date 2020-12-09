@@ -70,7 +70,7 @@ class NNBPRMF(RecMixin, BaseRecommenderModel):
 
     @property
     def name(self):
-        return "BPR" \
+        return "BPR_NN" \
                + "_lr:" + str(self._params.lr) \
                + "-e:" + str(self._params.epochs) \
                + "-factors:" + str(self._params.embed_k) \

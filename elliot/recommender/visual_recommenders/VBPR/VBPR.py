@@ -43,6 +43,7 @@ class VBPR(NNBPRMF, VisualLoader):
         self._l_e = self._params.l_e
 
         self.process_visual_features(self._data)
+        self._params.name = self.name
 
         self._model = VBPR_model(self._params.embed_k,
                                  self._params.embed_d,
@@ -54,4 +55,16 @@ class VBPR(NNBPRMF, VisualLoader):
                                  self._num_image_feature,
                                  self._num_users,
                                  self._num_items)
+
+    @property
+    def name(self):
+        return "VBPR" \
+               + "_lr:" + str(self._params.lr) \
+               + "-e:" + str(self._params.epochs) \
+               + "-factors:" + str(self._params.embed_k) \
+               + "-factors_d:" + str(self._params.embed_d) \
+               + "-br:" + str(self._params.l_b) \
+               + "-wr:" + str(self._params.l_w) \
+               + "-er:" + str(self._params.l_e) \
+               + "-num_feature:" + str(self._num_image_feature)
 
