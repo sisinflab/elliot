@@ -65,6 +65,5 @@ class VBPR(NNBPRMF, VisualLoader):
                + "-factors_d:" + str(self._params.embed_d) \
                + "-br:" + str(self._params.l_b) \
                + "-wr:" + str(self._params.l_w) \
-               + "-er:" + str(self._params.l_e) \
-               + "-num_feature:" + str(self._num_image_feature)
+               + "-er:" + str(self._params.l_e)
 
