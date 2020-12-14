@@ -91,9 +91,10 @@ class NNBPRMF(RecMixin, BaseRecommenderModel):
                     t.update()
 
             if not (it + 1) % self._validation_rate:
-                recs, auc = self.get_recommendations(self._config.top_k, self._compute_auc)
+                recs, auc, auc_users = self.get_recommendations(self._config.top_k, self._compute_auc)
                 results, statistical_results = self.evaluator.eval(recs)
                 results.update({'AUC': auc})
+                statistical_results.update({'AUC': auc_users})
                 self._results.append(results)
                 self._statistical_results.append(statistical_results)
                 print(f'Epoch {(it + 1)}/{self._num_iters} loss {loss  / steps:.3f}')
@@ -111,18 +112,20 @@ class NNBPRMF(RecMixin, BaseRecommenderModel):
         test = self._data.test_dict
         test_user_ok = list(filter(test.get, test))
         auc = 0
+        auc_users = {}
         for index, offset in enumerate(range(0, self._num_users, self._params.batch_size)):
             offset_stop = min(offset+self._params.batch_size, self._num_users)
             predictions = self._model.predict(offset, offset_stop)
             mask = self.get_train_mask(offset, offset_stop)
             v, i = self._model.get_top_k(predictions, mask, k=k)
             if auc_compute:
-                inner_test_user_true = list(filter(lambda x: x if (x >= offset) & (x < offset_stop) else None,
-                                                   test_user_ok))
-                inner_test_user_true_mask = [i - offset for i in inner_test_user_true]
+                inner_test_user_true = [x for x in test_user_ok if (x >= offset) & (x < offset_stop)]
+                inner_test_user_true_mask = [u - offset for u in inner_test_user_true]
                 ii = [list(d.keys())[0] for d in list(itemgetter(*inner_test_user_true)(test))]
-                auc += self._model.get_positions(predictions, mask, ii, inner_test_user_true_mask).numpy()
+                auc_users_offset = self._model.get_positions(predictions, mask, ii, inner_test_user_true_mask).numpy()
+                auc_users.update(zip(inner_test_user_true, auc_users_offset))
+                auc += np.sum(auc_users_offset)
             items_ratings_pair = [list(zip(map(self._data.private_items.get, u_list[0]), u_list[1]))
                                   for u_list in list(zip(i.numpy(), v.numpy()))]
             predictions_top_k.update(dict(zip(range(offset, offset_stop), items_ratings_pair)))
-        return predictions_top_k, auc/len(test_user_ok)
+        return predictions_top_k, auc/len(test_user_ok), auc_users

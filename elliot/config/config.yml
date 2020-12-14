@@ -2,7 +2,7 @@ experiment:
   data_paths:
     train_data: ../data/{0}/trainingset.tsv
     validation_data: ../data/{0}/validation.tsv
-    test_data: ../data/{0}/testset.tsv
+    test_data: ../data/{0}/validationset.tsv
     feature_data: ../data/{0}/original/features.npy
     map: ../data/{0}/map.tsv
     features: ../data/{0}/features.tsv
@@ -12,7 +12,7 @@ experiment:
   path_output_rec_performance: ../results/{0}/performance/
   path_logger_config: ./config/logger_config.yml
   path_log_folder: ../log/
-  dataset: example
+  dataset: tradesy
 #  dataloader: KnowledgeChains
   top_k: 50
   metrics: [nDCG, Precision, Recall, ItemCoverage]
@@ -78,34 +78,36 @@ experiment:
       meta:
         hyper_max_evals: 1
         hyper_opt_alg: tpe
-        validation_rate: 10
+        validation_rate: 1
         verbose: True
         save_weights: False
-        save_recs: True
+        save_recs: False
         validation_metric: nDCG
         restore_epoch: -1
         compute_auc: True
       lr: 0.005
-      epochs: 50
+      epochs: 1
       embed_k: 50
       batch_size: 512
       l_w: 0.0025
       l_b: 0
-#    VBPR:
-#      meta:
-#        verbose: 1
-#        save_weights: True
-#        save_recs: True
-#        validation_metric: nDCG
-#        restore_epoch: -1
-#      lr: 0.005
-#      epochs: 20
-#      embed_k: 100
-#      embed_d: 20
-#      batch_size: 128
-#      l_w: 0.000025
-#      l_b: 0
-#      l_e: 0.002
+    VBPR:
+      meta:
+        verbose: 1
+        save_weights: False
+        validation_rate: 1
+        save_recs: False
+        validation_metric: nDCG
+        restore_epoch: -1
+        compute_auc: True
+      lr: 0.005
+      epochs: 1
+      embed_k: 100
+      embed_d: 20
+      batch_size: 128
+      l_w: 0.000025
+      l_b: 0
+      l_e: 0.002
 #    KaHFM:
 #      meta:
 #        hyper_max_evals: 1
