@@ -98,7 +98,7 @@ class NNBPRMF_model(keras.Model):
         i = tf.argsort(tf.where(train_mask, predictions, -np.inf), axis=-1,
                        direction='DESCENDING', stable=False, name=None)
         positions = tf.where(tf.equal(equal, i))[:, 1]
-        return 1 - (positions / tf.reduce_sum(tf.cast(train_mask, tf.int64)))
+        return 1 - (positions / tf.reduce_sum(tf.cast(train_mask, tf.int64), axis=1))
 
     def get_config(self):
         raise NotImplementedError
