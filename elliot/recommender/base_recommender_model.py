@@ -31,6 +31,7 @@ class BaseRecommenderModel(ABC):
         self._save_recs = getattr(self._params.meta, "save_recs", False)
         self._verbose = getattr(self._params.meta, "verbose", None)
         self._validation_rate = getattr(self._params.meta, "validation_rate", 1)
+        self._compute_auc = getattr(self._params.meta, "compute_auc", False)
         self._batch_size = getattr(self._params, "batch_size", -1)
         self._results = []
         self._statistical_results = []

@@ -30,7 +30,7 @@ class VBPR_model(NNBPRMF_model):
         self._learning_rate = learning_rate
         self.l_w = l_w
         self.l_b = l_b
-        self.l_e = l_e,
+        self.l_e = l_e
         self.emb_image = emb_image
         self.num_image_feature = num_image_feature
         self._num_items = num_items
@@ -72,8 +72,8 @@ class VBPR_model(NNBPRMF_model):
 
     @tf.function
     def train_step(self, batch):
+        user, pos, neg = batch
         with tf.GradientTape() as t:
-            user, pos, neg = batch
             xu_pos, gamma_u, gamma_pos, _, theta_u, beta_pos = \
                 self(inputs=(user, pos), training=True)
             xu_neg, _, gamma_neg, _, _, beta_neg = self(inputs=(user, neg), training=True)
@@ -99,21 +99,10 @@ class VBPR_model(NNBPRMF_model):
         return loss
 
     @tf.function
-    def predict_all(self):
-        return self.Bi + tf.matmul(self.Gu, self.Gi, transpose_b=True) \
-               + tf.matmul(self.Tu, tf.matmul(self.F, self.E), transpose_b=True) \
-               + tf.squeeze(tf.matmul(self.F, self.Bp))
-
-    @tf.function
-    def predict_batch(self, start, stop):
+    def predict(self, start, stop):
         return self.Bi + tf.matmul(self.Gu[start:stop], self.Gi, transpose_b=True) \
                + tf.matmul(self.Tu[start:stop], tf.matmul(self.F, self.E), transpose_b=True) \
                + tf.squeeze(tf.matmul(self.F, self.Bp))
-
-    @tf.function
-    def predict(self, inputs, training=False):
-        logits, _ = self.call(inputs=inputs, training=True)
-        return logits
 
     def get_config(self):
         raise NotImplementedError

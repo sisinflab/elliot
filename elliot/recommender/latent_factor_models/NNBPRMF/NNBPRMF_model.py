@@ -59,11 +59,11 @@ class NNBPRMF_model(keras.Model):
 
     @tf.function
     def train_step(self, batch):
+        user, pos, neg = batch
         with tf.GradientTape() as tape:
-            user, pos, neg = batch
             # Clean Inference
-            xu_pos, beta_pos, gamma_u, gamma_pos = self.call(inputs=(user, pos), training=True)
-            xu_neg, beta_neg, gamma_u, gamma_neg = self.call(inputs=(user, neg), training=True)
+            xu_pos, beta_pos, gamma_u, gamma_pos = self(inputs=(user, pos), training=True)
+            xu_neg, beta_neg, gamma_u, gamma_neg = self(inputs=(user, neg), training=True)
 
             difference = tf.clip_by_value(xu_pos - xu_neg, -80.0, 1e8)
             loss = tf.reduce_sum(tf.nn.softplus(-difference))
@@ -89,6 +89,16 @@ class NNBPRMF_model(keras.Model):
     @tf.function
     def get_top_k(self, predictions, train_mask, k=100):
         return tf.nn.top_k(tf.where(train_mask, predictions, -np.inf), k=k, sorted=True)
+
+    @tf.function
+    def get_positions(self, predictions, train_mask, items, inner_test_user_true_mask):
+        predictions = tf.gather(predictions, inner_test_user_true_mask)
+        train_mask = tf.gather(train_mask, inner_test_user_true_mask)
+        equal = tf.reshape(items, [len(items), 1])
+        i = tf.argsort(tf.where(train_mask, predictions, -np.inf), axis=-1,
+                       direction='DESCENDING', stable=False, name=None)
+        positions = tf.where(tf.equal(equal, i))[:, 1]
+        return 1 - (positions / tf.reduce_sum(tf.cast(train_mask, tf.int64), axis=1))
 
     def get_config(self):
         raise NotImplementedError
