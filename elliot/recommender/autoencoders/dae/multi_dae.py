@@ -10,6 +10,7 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 import numpy as np
 import random
 from utils import logging
+import tqdm
 
 from dataset.samplers import sparse_sampler as sp
 from evaluation.evaluator import Evaluator
@@ -17,6 +18,7 @@ from utils.folder import build_model_folder
 
 from recommender import BaseRecommenderModel
 from recommender.recommender_utils_mixin import RecMixin
+from utils.write import store_recommendation
 
 from recommender.autoencoders.dae.multi_dae_model import DenoisingAutoEncoder
 
@@ -77,3 +79,32 @@ class MultiDAE(RecMixin, BaseRecommenderModel):
                + "-dpk:" + str(self._params.dropout_pkeep) \
                + "-lmb:" + str(self._params.reg_lambda)
 
+    def train(self):
+        self.logger.critical("Test2")
+        best_metric_value = 0
+
+        for it in range(self._num_iters):
+            self.restore_weights(it)
+            loss = 0
+            steps = 0
+            with tqdm(total=int(self._num_users // self._batch_size), disable=not self._verbose) as t:
+                for batch in self._sampler.step(self._num_users, self._batch_size):
+                    steps += 1
+                    loss += self._model.train_step(batch)
+                    t.set_postfix({'loss': f'{loss.numpy()/steps:.5f}'})
+                    t.update()
+
+            if not (it + 1) % self._validation_rate:
+                recs = self.get_recommendations(self._config.top_k)
+                results, statistical_results = self.evaluator.eval(recs)
+                self._results.append(results)
+                self._statistical_results.append(statistical_results)
+                print(f'Epoch {(it + 1)}/{self._num_iters} loss {loss/steps:.5f}')
+
+                if self._results[-1][self._validation_metric] > best_metric_value:
+                    print("******************************************")
+                    best_metric_value = self._results[-1][self._validation_metric]
+                    if self._save_weights:
+                        self._model.save_weights(self._saving_filepath)
+                    if self._save_recs:
+                        store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}-it:{it + 1}.tsv")
