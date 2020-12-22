@@ -154,7 +154,7 @@ class KnowledgeChains(AbstractDataset):
         with open(properties_file) as file:
             for line in file:
                 if line[0] != '#':
-                    properties.append(line[:-1])
+                    properties.append(line.rstrip("\n"))
         return properties
 
     def reduce_attribute_map_property_selection(self, map, items, feature_names, properties, additive, threshold = 10):

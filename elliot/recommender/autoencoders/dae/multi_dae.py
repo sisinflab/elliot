@@ -18,7 +18,7 @@ from utils.folder import build_model_folder
 from recommender import BaseRecommenderModel
 from recommender.recommender_utils_mixin import RecMixin
 
-from recommender.autoencoders.dae.multi_dae_utils import DenoisingAutoEncoder
+from recommender.autoencoders.dae.multi_dae_model import DenoisingAutoEncoder
 
 np.random.seed(42)
 random.seed(0)

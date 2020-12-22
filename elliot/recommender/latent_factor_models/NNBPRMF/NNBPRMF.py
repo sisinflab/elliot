@@ -81,14 +81,14 @@ class NNBPRMF(RecMixin, BaseRecommenderModel):
             self.restore_weights(it)
             loss = 0
             steps = 0
-            with tqdm(total=int(self._num_users // self._batch_size), disable=not self._verbose) as t:
-                for batch in zip(*self._sampler.step(self._num_users, self._batch_size)):
+            with tqdm(total=int(self._data.transactions // self._batch_size), disable=not self._verbose) as t:
+                for batch in zip(*self._sampler.step(self._data.transactions, self._batch_size)):
                     steps += 1
                     loss += self._model.train_step(batch)
                     t.set_postfix({'loss': f'{loss.numpy() / steps:.5f}'})
                     t.update()
 
-            if not (it + 1) % self._verbose:
+            if not (it + 1) % self._validation_rate:
                 recs = self.get_recommendations(self._config.top_k)
                 results, statistical_results = self.evaluator.eval(recs)
                 self._results.append(results)

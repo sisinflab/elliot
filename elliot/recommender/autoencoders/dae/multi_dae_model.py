@@ -14,6 +14,7 @@ from tensorflow import keras
 from tensorflow.keras import layers
 import numpy as np
 
+tf.random.set_seed(42)
 logging.disable(logging.WARNING)
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
@@ -81,7 +82,6 @@ class DenoisingAutoEncoder(keras.Model):
                  **kwargs
     ):
         super().__init__(name=name, **kwargs)
-        tf.random.set_seed(42)
         self.original_dim = original_dim
         self.encoder = Encoder(latent_dim=latent_dim,
                                intermediate_dim=intermediate_dim,
