@@ -87,14 +87,14 @@ class Splitter:
             if valtest_splitting_ns.strategy == "fixed_timestamp":
                 if hasattr(valtest_splitting_ns, "timestamp"):
                     if valtest_splitting_ns.timestamp.isdigit():
-                        tuple_list = self.splitting_passed_timestamp(data, valtest_splitting_ns.timestamp)
+                        tuple_list = self.splitting_passed_timestamp(data, int(valtest_splitting_ns.timestamp))
                     elif valtest_splitting_ns.timestamp == "best":
                         print("Here")
                         kwargs = {}
                         if hasattr(valtest_splitting_ns, "min_below"):
-                            kwargs["min_below"] = valtest_splitting_ns.min_below
+                            kwargs["min_below"] = int(valtest_splitting_ns.min_below)
                         if hasattr(valtest_splitting_ns, "min_over"):
-                            kwargs["min_over"] = valtest_splitting_ns.min_over
+                            kwargs["min_over"] = int(valtest_splitting_ns.min_over)
                         tuple_list = self.splitting_best_timestamp(data, **kwargs)
 
                     else:
@@ -103,9 +103,9 @@ class Splitter:
                     raise Exception(f"Option timestamp missing for {valtest_splitting_ns.strategy} strategy")
             elif valtest_splitting_ns.strategy == "temporal_hold_out":
                 if hasattr(valtest_splitting_ns, "test_ratio"):
-                    tuple_list = self.splitting_temporal_holdout(data, valtest_splitting_ns.test_ratio)
+                    tuple_list = self.splitting_temporal_holdout(data, float(valtest_splitting_ns.test_ratio))
                 elif hasattr(valtest_splitting_ns, "leave_n_out"):
-                    tuple_list = self.splitting_temporal_holdout(data, valtest_splitting_ns.leave_n_out)
+                    tuple_list = self.splitting_temporal_holdout(data, int(valtest_splitting_ns.leave_n_out))
                 else:
                     raise Exception(f"Option missing for {valtest_splitting_ns.strategy} strategy")
             elif valtest_splitting_ns.strategy == "random_subsampling":
@@ -118,17 +118,17 @@ class Splitter:
                     raise Exception(f"Option missing for {valtest_splitting_ns.strategy} strategy")
 
                 if hasattr(valtest_splitting_ns, "test_ratio"):
-                    tuple_list = self.splitting_randomsubsampling_kfolds(data, valtest_splitting_ns.folds,
-                                                                         valtest_splitting_ns.test_ratio)
+                    tuple_list = self.splitting_randomsubsampling_kfolds(data, int(valtest_splitting_ns.folds),
+                                                                         float(valtest_splitting_ns.test_ratio))
                 elif hasattr(valtest_splitting_ns, "leave_n_out"):
-                    tuple_list = self.splitting_randomsubsampling_kfolds_leavenout(data, valtest_splitting_ns.folds,
-                                                                                   valtest_splitting_ns.leave_n_out)
+                    tuple_list = self.splitting_randomsubsampling_kfolds_leavenout(data, int(valtest_splitting_ns.folds),
+                                                                                   int(valtest_splitting_ns.leave_n_out))
                 else:
                     raise Exception(f"Option missing for {valtest_splitting_ns.strategy} strategy")
             elif valtest_splitting_ns.strategy == "random_cross_validation":
                 if hasattr(valtest_splitting_ns, "folds"):
                     if str(valtest_splitting_ns.folds).isdigit():
-                        tuple_list = self.splitting_kfolds(data, valtest_splitting_ns.folds)
+                        tuple_list = self.splitting_kfolds(data, int(valtest_splitting_ns.folds))
                     else:
                         raise Exception("Folds option value is not valid")
                 else:
@@ -196,8 +196,8 @@ class Splitter:
         tuple_list = []
         data = d.copy()
         data["test_flag"] = data.apply(lambda x: x["timestamp"] >= timestamp, axis=1)
-        test = data[data["test_flag"] == True].drop(columns=["rank_first", "test_flag"]).reset_index(drop=True)
-        train = data[data["test_flag"] == False].drop(columns=["rank_first", "test_flag"]).reset_index(drop=True)
+        test = data[data["test_flag"] == True].drop(columns=["test_flag"]).reset_index(drop=True)
+        train = data[data["test_flag"] == False].drop(columns=["test_flag"]).reset_index(drop=True)
         tuple_list.append((train, test))
         return tuple_list
 

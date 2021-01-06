@@ -17,7 +17,7 @@ splitting:
         folds: 5
     validation_splitting:
         strategy: fixed_timestamp|temporal_hold_out|random_subsampling|random_cross_validation
-        timestamp: best|1609786061
+        timestamp: best|1203300000
         test_ratio: 0.2
         leave_n_out: 1
         folds: 5
@@ -37,10 +37,11 @@ class SplitterTest(unittest.TestCase):
 
     def test_splitting(self):
         strategy = SimpleNamespace(**{"strategy": "fixed_timestamp",
-                                   "timestamp": "best"
+                                   "timestamp": "1203300000"
                                    })
         self.split_ns = SimpleNamespace(**{"test_splitting": strategy})
         splitter = Splitter(self.data, self.split_ns)
+        splitter.process_splitting()
 
     # def test_kfolds(self):
     #     strategy_test = SimpleNamespace(**{"strategy": "temporal_hold_out",
