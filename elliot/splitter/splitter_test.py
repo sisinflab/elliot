@@ -25,8 +25,8 @@ splitting:
 
 class SplitterTest(unittest.TestCase):
     def setUp(self):
-        self.column_names = ['userId', 'itemId', 'rating']
-        self.data = pd.read_csv("../../data/categorical_dbpedia_ml1m/trainingset.tsv", sep="\t", header=None, names=self.column_names)
+        self.column_names = ['userId', 'itemId', 'rating', 'timestamp']
+        self.data = pd.read_csv("../../data/dbpedia_ml20m/trainingset.tsv", sep="\t", header=None, names=self.column_names)
 
     def test_read_files(self):
         files = SimpleNamespace(**{"train_path": "../../data/categorical_dbpedia_ml1m/trainingset.tsv",
@@ -36,11 +36,21 @@ class SplitterTest(unittest.TestCase):
         splitter = Splitter(self.data, self.split_ns)
 
     def test_splitting(self):
-        strategy = SimpleNamespace(**{"strategy":"fixed_timestamp",
+        strategy = SimpleNamespace(**{"strategy": "fixed_timestamp",
                                    "timestamp": "best"
                                    })
-        self.split_ns =  SimpleNamespace(**{"test_splitting": strategy})
+        self.split_ns = SimpleNamespace(**{"test_splitting": strategy})
         splitter = Splitter(self.data, self.split_ns)
+
+    # def test_kfolds(self):
+    #     strategy_test = SimpleNamespace(**{"strategy": "temporal_hold_out",
+    #                                "test_ratio": 0.2
+    #                                })
+    #     strategy_val = SimpleNamespace(**{"strategy": "random_cross_validation",
+    #                                "folds": 5
+    #                                })
+    #     self.split_ns =  SimpleNamespace(**{"test_splitting": strategy_test, "validation_splitting": strategy_val})
+    #     splitter = Splitter(self.data, self.split_ns)
 
     # def test_fill_model(self):
     #     self.name_sapce_model.fill_base()
