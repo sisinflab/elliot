@@ -1,18 +1,41 @@
 experiment:
-  data_paths:
-    train_data: ../data/{0}/trainingset.tsv
-    validation_data: ../data/{0}/validation.tsv
-    test_data: ../data/{0}/validationset.tsv
-    feature_data: ../data/{0}/original/features.npy
-    map: ../data/{0}/map.tsv
-    features: ../data/{0}/features.tsv
-    properties: ../data/{0}/properties.conf
+#  data_paths:
+#    train_data: ../data/{0}/trainingset.tsv
+#    validation_data: ../data/{0}/validation.tsv
+#    test_data: ../data/{0}/testset.tsv
+#    feature_data: ../data/{0}/original/features.npy
+#    map: ../data/{0}/map.tsv
+#    features: ../data/{0}/features.tsv
+#    properties: ../data/{0}/properties.conf
+#  path_output_rec_result: ../results/{0}/recs/
+#  path_output_rec_weight: ../results/{0}/weights/
+#  path_output_rec_performance: ../results/{0}/performance/
+#  path_logger_config: ./config/logger_config.yml
+#  path_log_folder: ../log/
+##  dataset: categorical_dbpedia_ml1m
+#  dataset: example
+#  dataloader: KnowledgeChains
+  data_config:
+    strategy: fixed
+    dataloader: KnowledgeChainsLoader
+#    dataset_path: "path"
+#    root_folder: "path"
+    train_path: ../data/{0}/trainingset.tsv
+#    validation_path: ../data/{0}/trainingset.tsv
+    test_path: ../data/{0}/testset.tsv
+    side_information:
+        feature_data: ../data/{0}/original/features.npy
+        map: ../data/{0}/map.tsv
+        features: ../data/{0}/features.tsv
+        properties: ../data/{0}/properties.conf
+  dataset: example
   path_output_rec_result: ../results/{0}/recs/
   path_output_rec_weight: ../results/{0}/weights/
   path_output_rec_performance: ../results/{0}/performance/
   path_logger_config: ./config/logger_config.yml
   path_log_folder: ../log/
-  dataset: tradesy
+#  dataset: categorical_dbpedia_ml1m
+#  dataset: example
 #  dataloader: KnowledgeChains
   top_k: 50
   metrics: [nDCG, Precision, Recall, ItemCoverage]
@@ -38,33 +61,33 @@ experiment:
 #      batch_size: -1
 #      dropout_pkeep: 1
 #      reg_lambda: 0.01
-#    MultiVAE:
-#      meta:
-#        hyper_max_evals: 1
-#        hyper_opt_alg: tpe
-#        validation_rate: 10
-#        verbose: False
-#        save_weights: False
-#        save_recs: True
-#      lr: 0.01
-#      epochs: 50
-#      intermediate_dim: 300
-#      latent_dim: 100
-#      batch_size: -1
-#      dropout_pkeep: 1
-#      reg_lambda: 0.01
+    MultiVAE:
+      meta:
+        hyper_max_evals: 1
+        hyper_opt_alg: tpe
+        validation_rate: 10
+        verbose: False
+        save_weights: False
+        save_recs: False
+      lr: 0.01
+      epochs: [50,20]
+      intermediate_dim: 300
+      latent_dim: 100
+      batch_size: -1
+      dropout_pkeep: 1
+      reg_lambda: 0.01
 #    BPRMF:
 #      meta:
-#        hyper_max_evals: 1
+#        hyper_max_evals: 10
 #        hyper_opt_alg: tpe
-#        validation_rate: 1
+#        validation_rate: 10
 #        verbose: True
 #        save_weights: False
 #        save_recs: True
 #        validation_metric: nDCG
 #        restore_epoch: -1
 #      lr: 0.05
-#      epochs: 10
+#      epochs: 50
 #      embed_k: [10,50,100,125,150,200]
 #      bias_regularization: 0
 #      user_regularization: [0.0025,0.005,0.01]
@@ -74,40 +97,37 @@ experiment:
 #      update_users: True
 #      update_items: True
 #      update_bias: True
-    NNBPRMF:
-      meta:
-        hyper_max_evals: 1
-        hyper_opt_alg: tpe
-        validation_rate: 1
-        verbose: True
-        save_weights: False
-        save_recs: False
-        validation_metric: nDCG
-        restore_epoch: -1
-        compute_auc: True
-      lr: 0.005
-      epochs: 1
-      embed_k: 50
-      batch_size: 512
-      l_w: 0.0025
-      l_b: 0
-    VBPR:
-      meta:
-        verbose: 1
-        save_weights: False
-        validation_rate: 1
-        save_recs: False
-        validation_metric: nDCG
-        restore_epoch: -1
-        compute_auc: True
-      lr: 0.005
-      epochs: 1
-      embed_k: 100
-      embed_d: 20
-      batch_size: 128
-      l_w: 0.000025
-      l_b: 0
-      l_e: 0.002
+#    NNBPRMF:
+#      meta:
+#        hyper_max_evals: 10
+#        hyper_opt_alg: tpe
+#        validation_rate: 10
+#        verbose: True
+#        save_weights: False
+#        save_recs: True
+#        validation_metric: nDCG
+#        restore_epoch: -1
+#      lr: [0.001]
+#      epochs: 50
+#      embed_k: [50,100,125,150,200]
+#      batch_size: 512
+#      l_w: 0.0025
+#      l_b: 0
+#    VBPR:
+#      meta:
+#        verbose: 1
+#        save_weights: True
+#        save_recs: True
+#        validation_metric: nDCG
+#        restore_epoch: -1
+#      lr: 0.005
+#      epochs: 20
+#      embed_k: 100
+#      embed_d: 20
+#      batch_size: 128
+#      l_w: 0.000025
+#      l_b: 0
+#      l_e: 0.002
 #    KaHFM:
 #      meta:
 #        hyper_max_evals: 1
@@ -130,18 +150,18 @@ experiment:
 #      update_bias: True
 #    KaHFMBatch:
 #      meta:
-#        hyper_max_evals: 1
+#        hyper_max_evals: 5
 #        hyper_opt_alg: tpe
 #        validation_rate: 10
-#        verbose: True
-#        save_weights: True
-#        save_recs: True
+#        verbose: False
+#        save_weights: False
+#        save_recs: False
 #        validation_metric: nDCG
 #        restore_epoch: -1
-#      lr: 0.005
-#      epochs: 50
-#      batch_size: 512
-#      l_w: 0.000025
+#      lr: [0.001, 0.0005, 0.0001]
+#      epochs: 100
+#      batch_size: [512,1024, 2048]
+#      l_w: [0.0025, 0.005]
 #      l_b: 0
 #    NGCF:
 #      meta:

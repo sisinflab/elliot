@@ -23,14 +23,14 @@ class ResultHandler:
         name = obj.results[0]["params"]["name"].split("_")[0]
         self.multishot_recommenders[name] = obj.results
 
-    def add_oneshot_recommender(self, name, loss, params, results, statistical_results):
+    def add_oneshot_recommender(self, **kwargs):
         rec = {}
-        rec["name"] = name
-        rec["loss"] = loss
-        rec["params"] = params
-        rec["results"] = results
-        rec["statistical_results"] = statistical_results
-        self.oneshot_recommenders[name.split("_")[0]] = [rec]
+        rec["name"] = kwargs["name"]
+        rec["loss"] = kwargs["loss"]
+        rec["params"] = kwargs["params"]
+        rec["results"] = kwargs["results"]
+        rec["statistical_results"] = kwargs["statistical_results"]
+        self.oneshot_recommenders[kwargs["name"].split("_")[0]] = [rec]
 
     def get_best_result(self):
         bests = {}

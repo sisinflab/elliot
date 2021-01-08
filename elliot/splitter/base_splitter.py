@@ -8,10 +8,35 @@ from sklearn.model_selection import GroupShuffleSplit
 
 """
 splitting:
-    pre_split:
-        train_path: ""
-        validation_path: ""
-        test_path: ""
+    save_on_disk: True
+    output_path: "path"
+    input_paths:
+        strategy: dataset
+        dataset_path: "path"
+    test_splitting:
+        strategy: temporal_hold_out
+        test_ratio: 0.2
+        
+data_config:
+    strategy: dataset|hierarchy|fixed
+    dataset: example
+    dataloader: KnowledgeChains
+    dataset_path: "path"
+    root_folder: "path"
+    train_path: ""
+    validation_path: ""
+    test_path: ""
+    side_information:
+        feature_data: ../data/{0}/original/features.npy
+        map: ../data/{0}/map.tsv
+        features: ../data/{0}/features.tsv
+        properties: ../data/{0}/properties.conf
+    output_rec_result: ../results/{0}/recs/
+    output_rec_weight: ../results/{0}/weights/
+    output_rec_performance: ../results/{0}/performance/
+splitting:
+    save_on_disk: True
+    save_path: "path"
     test_splitting:
         strategy: fixed_timestamp|temporal_hold_out|random_subsampling|random_cross_validation
         timestamp: best|1609786061
