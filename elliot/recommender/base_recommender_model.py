@@ -35,6 +35,8 @@ class BaseRecommenderModel(ABC):
         self._batch_size = getattr(self._params, "batch_size", -1)
         self._results = []
         self._statistical_results = []
+        self._test_results = []
+        self._test_statistical_results = []
 
     @abstractmethod
     def train(self):
@@ -58,4 +60,12 @@ class BaseRecommenderModel(ABC):
 
     @abstractmethod
     def get_statistical_results(self):
+        pass
+
+    @abstractmethod
+    def get_test_results(self):
+        pass
+
+    @abstractmethod
+    def get_test_statistical_results(self):
         pass

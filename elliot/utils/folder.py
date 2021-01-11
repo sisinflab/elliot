@@ -33,3 +33,10 @@ def build_model_folder(path_output_rec_weight, model):
 def build_log_folder(path_log_folder):
     if not os.path.exists(os.path.dirname(f'{path_log_folder}')):
         os.makedirs(os.path.dirname(f'{path_log_folder}'))
+
+
+def create_folder_by_index(path, index):
+    if os.path.exists(os.path.dirname(f"{path}{index}/")):
+        shutil.rmtree(os.path.dirname(f"{path}{index}/"))
+    os.makedirs(os.path.dirname(f"{path}{index}/"))
+    return f"{path}{index}/"

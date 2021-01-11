@@ -31,6 +31,7 @@ if __name__ == '__main__':
     data_test_list = dataloader.generate_dataobjects()
     for key, model_base in builder.models():
         test_results = []
+        test_trials = []
         for data_test in data_test_list:
             logging_project.prepare_logger(key, base.base_namespace.path_log_folder)
             model_class = getattr(importlib.import_module("recommender"), key)
@@ -46,27 +47,39 @@ if __name__ == '__main__':
                             trials=trials,
                             rstate=_rstate,
                             max_evals=model_base[2])
-                res_handler.add_multishot_recommender(trials)
+                # res_handler.add_multishot_recommender(trials)
                 min_val = np.argmin([i["result"]["loss"] for i in trials._trials])
                 best_model_loss = trials._trials[min_val]["result"]["loss"]
                 best_model_params = trials._trials[min_val]["result"]["params"]
-                best_model_results = trials._trials[min_val]["result"]["results"]
+                best_model_results = trials._trials[min_val]["result"]["test_results"]
+
+                # aggiunta a lista performance test
+                test_results.append(trials._trials[min_val]["result"])
+                test_trials.append(trials)
             else:
                 single = model_placeholder.single()
-                res_handler.add_oneshot_recommender(**single)
+                # res_handler.add_oneshot_recommender(**single)
                 best_model_loss = single["loss"]
                 best_model_params = single["params"]
-                best_model_results = single["results"]
+                best_model_results = single["test_results"]
+
+                # aggiunta a lista performance test
+                test_results.append(single)
+
             print(f"Loss: {best_model_loss}")
             print(f"Best Model params: {best_model_params}")
             print(f"Best Model results: {best_model_results}")
             print(f"\nTuning ended for {model_class.__name__}")
             print("********************************\n")
 
-            # aggiunta a lista performance test
-
         # Media sui test, aggiunta a performance totali
-    res_handler.save_results(output=base.base_namespace.path_output_rec_performance)
+        min_val = np.argmin([i["loss"] for i in test_results])
+        res_handler.add_oneshot_recommender(**test_results[min_val])
+        if isinstance(model_base, tuple):
+            res_handler.add_trials(test_trials[min_val])
+
+    # res_handler.save_results(output=base.base_namespace.path_output_rec_performance)
+    res_handler.save_trials(output=base.base_namespace.path_output_rec_performance)
     res_handler.save_best_results(output=base.base_namespace.path_output_rec_performance)
     if base.base_namespace.paired_ttest:
         res_handler.save_best_statistical_results(output=base.base_namespace.path_output_rec_performance)

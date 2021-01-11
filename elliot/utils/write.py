@@ -11,15 +11,6 @@ import numpy as np
 import pickle
 
 
-def write_csv(df, filename):
-    """
-    Args:
-        df: pandas dataframe to write
-        filename (str): path to store the dataframe
-    """
-    df.to_csv(filename, index=False)
-
-
 def save_obj(obj, name):
     """
     Store the object in a pkl file

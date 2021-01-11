@@ -23,9 +23,11 @@ class RecMixin(object):
 
             if not (it + 1) % self._validation_rate:
                 recs = self.get_recommendations(self._config.top_k)
-                results, statistical_results = self.evaluator.eval(recs)
+                results, statistical_results, test_results, test_statistical_results = self.evaluator.eval(recs)
                 self._results.append(results)
                 self._statistical_results.append(statistical_results)
+                self._test_results.append(results)
+                self._test_statistical_results.append(statistical_results)
                 print(f'Epoch {(it + 1)}/{self._num_iters} loss {loss/steps:.5f}')
 
                 if self._results[-1][self._validation_metric] > best_metric_value:
@@ -71,6 +73,14 @@ class RecMixin(object):
         val_max = np.argmax([r[self._validation_metric] for r in self._results])
         return self._results[val_max]
 
+    def get_test_results(self):
+        val_max = np.argmax([r[self._validation_metric] for r in self._results])
+        return self._test_results[val_max]
+
     def get_statistical_results(self):
         val_max = np.argmax([r[self._validation_metric] for r in self._results])
         return self._statistical_results[val_max]
+
+    def get_test_statistical_results(self):
+        val_max = np.argmax([r[self._validation_metric] for r in self._results])
+        return self._test_statistical_results[val_max]

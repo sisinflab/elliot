@@ -28,7 +28,7 @@ class SplitterTest(unittest.TestCase):
     def setUp(self):
         # self.column_names = ['userId', 'itemId', 'rating', 'timestamp']
         self.column_names = ['userId', 'itemId', 'rating']
-        self.data = pd.read_csv("../../data/categorical_dbpedia_ml1m/trainingset.tsv", sep="\t", header=None, names=self.column_names)
+        self.data = pd.read_csv("../../data/example/trainingset.tsv", sep="\t", header=None, names=self.column_names)
 
     # def test_read_files(self):
     #     files = SimpleNamespace(**{"train_path": "../../data/categorical_dbpedia_ml1m/trainingset.tsv",
@@ -60,13 +60,16 @@ class SplitterTest(unittest.TestCase):
     def test_1(self):
         strategy_test = SimpleNamespace(**{"strategy": "random_subsampling",
                                            "test_ratio": 0.2,
-                                           "folds": 1
+                                           "folds": 2
                                            })
         strategy_val = SimpleNamespace(**{"strategy": "random_subsampling",
                                           "test_ratio": 0.2,
-                                           "folds": 1
+                                           "folds": 2
                                           })
-        self.split_ns = SimpleNamespace(**{"test_splitting": strategy_test, "validation_splitting": strategy_val})
+        self.split_ns = SimpleNamespace(**{"test_splitting": strategy_test,
+                                           "validation_splitting": strategy_val,
+                                           "save_on_disk": True,
+                                           "save_folder": "../../data/example/splitting/"})
         splitter = Splitter(self.data, self.split_ns)
         tuple_list = splitter.process_splitting()
         pass

@@ -3,8 +3,9 @@ import pandas as pd
 import numpy as np
 import math
 
+import os
 from types import SimpleNamespace
-from sklearn.model_selection import GroupShuffleSplit
+from utils.folder import create_folder_by_index
 
 """
 splitting:
@@ -71,40 +72,72 @@ class Splitter:
     def __init__(self, data: pd.DataFrame, splitting_ns: SimpleNamespace):
         self.data = data
         self.splitting_ns = splitting_ns
+        self.save_on_disk = False
+        self.save_folder = None
 
     def process_splitting(self):
         data = self.data
         splitting_ns = self.splitting_ns
 
-        if hasattr(splitting_ns, "pre_split"):
-            if hasattr(splitting_ns.pre_split, "train_path") and hasattr(splitting_ns.pre_split, "test_path"):
-                if hasattr(splitting_ns.pre_split, "validation_path"):
-                    print("Train\tValidation\tTest")
-                else:
-                    print("Train\tTest")
+        if hasattr(splitting_ns, "save_on_disk"):
+            if hasattr(splitting_ns, "save_folder"):
+                self.save_on_disk = True
+                self.save_folder = splitting_ns.save_folder
+
+                self.read_splitting(self.save_folder)
+
+
+                #TODO: if full remove data
+                if not os.path.exists(os.path.dirname(self.save_folder)):
+                    os.makedirs(os.path.dirname(self.save_folder))
             else:
                 raise Exception("Train or Test paths are missing")
-        else:
-            if hasattr(splitting_ns, "test_splitting"):
-                # [(train_0,test_0), (train_1,test_1), (train_2,test_2), (train_3,test_3), (train_4,test_4)]
-                tuple_list = self.handle_hierarchy(data, splitting_ns.test_splitting)
 
-                if hasattr(splitting_ns, "validation_splitting"):
-                    exploded_train_list = []
-                    for single_train, single_test in tuple_list:
-                        # [(train_0,test_0), (train_1,test_1), (train_2,test_2), (train_3,test_3), (train_4,test_4)]
-                        train_val_test_tuples_list = self.handle_hierarchy(single_train,
-                                                                           splitting_ns.validation_splitting)
-                        exploded_train_list.append(train_val_test_tuples_list)
-                    tuple_list = self.rearrange_data(tuple_list, exploded_train_list)
+        if hasattr(splitting_ns, "test_splitting"):
+            # [(train_0,test_0), (train_1,test_1), (train_2,test_2), (train_3,test_3), (train_4,test_4)]
+            tuple_list = self.handle_hierarchy(data, splitting_ns.test_splitting)
 
-                    print("Train\tValidation\tTest\tstrategies")
-                else:
-                    print("Train\tTest\tstrategies")
+            if hasattr(splitting_ns, "validation_splitting"):
+                exploded_train_list = []
+                for single_train, single_test in tuple_list:
+                    # [(train_0,test_0), (train_1,test_1), (train_2,test_2), (train_3,test_3), (train_4,test_4)]
+                    train_val_test_tuples_list = self.handle_hierarchy(single_train,
+                                                                       splitting_ns.validation_splitting)
+                    exploded_train_list.append(train_val_test_tuples_list)
+                tuple_list = self.rearrange_data(tuple_list, exploded_train_list)
+
+                print("Train\tValidation\tTest\tstrategies")
             else:
-                raise Exception("Test splitting strategy is not defined")
+                print("Train\tTest\tstrategies")
+        else:
+            raise Exception("Test splitting strategy is not defined")
+
+        if self.save_on_disk:
+            self.store_splitting(tuple_list)
 
         return tuple_list
+
+    def store_splitting(self, tuple_list):
+        for i, (train_val, test) in enumerate(tuple_list):
+            actual_test_folder = create_folder_by_index(self.save_folder, i)
+            test.to_csv(f"{actual_test_folder}test.tsv", sep='\t', index=False)
+            if isinstance(train_val, list):
+                for j, (train, val) in enumerate(train_val):
+                   actual_val_folder = create_folder_by_index(actual_test_folder, j)
+                   val.to_csv(f"{actual_val_folder}val.tsv", sep='\t', index=False)
+                   train.to_csv(f"{actual_val_folder}train.tsv", sep='\t', index=False)
+            else:
+                train_val.to_csv(f"{actual_test_folder}train.tsv", sep='\t', index=False)
+
+    def read_folder(self, folder_path):
+        for root, dirs, files in os.walk(folder_path):
+            if not dirs:
+                # leggi i due file
+
+                pass
+            else:
+                pass
+            pass
 
     def handle_hierarchy(self, data: pd.DataFrame, valtest_splitting_ns: SimpleNamespace) -> t.List[
         t.Tuple[pd.DataFrame, pd.DataFrame]]:

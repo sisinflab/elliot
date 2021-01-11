@@ -28,6 +28,19 @@ experiment:
         map: ../data/{0}/map.tsv
         features: ../data/{0}/features.tsv
         properties: ../data/{0}/properties.conf
+  splitting:
+    save_on_disk: True
+    save_folder: ../data/{0}/splitting/
+    test_splitting:
+        strategy: random_subsampling
+        test_ratio: 0.2
+        folds: 1
+#    validation_splitting:
+#        strategy: fixed_timestamp|temporal_hold_out|random_subsampling|random_cross_validation
+#        timestamp: best|1609786061
+#        test_ratio: 0.2
+#        leave_n_out: 1
+#        folds: 5
   dataset: example
   path_output_rec_result: ../results/{0}/recs/
   path_output_rec_weight: ../results/{0}/weights/
@@ -63,7 +76,7 @@ experiment:
 #      reg_lambda: 0.01
     MultiVAE:
       meta:
-        hyper_max_evals: 1
+        hyper_max_evals: 2
         hyper_opt_alg: tpe
         validation_rate: 10
         verbose: False
@@ -128,41 +141,41 @@ experiment:
 #      l_w: 0.000025
 #      l_b: 0
 #      l_e: 0.002
-#    KaHFM:
-#      meta:
-#        hyper_max_evals: 1
-#        hyper_opt_alg: tpe
-#        validation_rate: 1
-#        verbose: True
-#        save_weights: False
-#        save_recs: True
-#        validation_metric: nDCG
-#        restore_epoch: -1
-#      lr: 0.05
-#      epochs: 10
-#      bias_regularization: 0
-#      user_regularization: 0.0025
-#      positive_item_regularization: 0.0025
-#      negative_item_regularization: 0.00025
-#      update_negative_item_factors: True
-#      update_users: True
-#      update_items: True
-#      update_bias: True
-#    KaHFMBatch:
-#      meta:
-#        hyper_max_evals: 5
-#        hyper_opt_alg: tpe
-#        validation_rate: 10
-#        verbose: False
-#        save_weights: False
-#        save_recs: False
-#        validation_metric: nDCG
-#        restore_epoch: -1
-#      lr: [0.001, 0.0005, 0.0001]
-#      epochs: 100
-#      batch_size: [512,1024, 2048]
-#      l_w: [0.0025, 0.005]
-#      l_b: 0
+    KaHFM:
+      meta:
+        hyper_max_evals: 1
+        hyper_opt_alg: tpe
+        validation_rate: 1
+        verbose: True
+        save_weights: False
+        save_recs: True
+        validation_metric: nDCG
+        restore_epoch: -1
+      lr: 0.05
+      epochs: 10
+      bias_regularization: 0
+      user_regularization: 0.0025
+      positive_item_regularization: 0.0025
+      negative_item_regularization: 0.00025
+      update_negative_item_factors: True
+      update_users: True
+      update_items: True
+      update_bias: True
+    KaHFMBatch:
+      meta:
+        hyper_max_evals: 5
+        hyper_opt_alg: tpe
+        validation_rate: 10
+        verbose: False
+        save_weights: False
+        save_recs: False
+        validation_metric: nDCG
+        restore_epoch: -1
+      lr: [0.001, 0.0005, 0.0001]
+      epochs: 100
+      batch_size: [512,1024, 2048]
+      l_w: [0.0025, 0.005]
+      l_b: 0
 #    NGCF:
 #      meta:
 #        hyper_max_evals: 1

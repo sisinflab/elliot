@@ -205,11 +205,11 @@ class KaHFM(BaseRecommenderModel):
 
         self._ratings = self._data.train_dict
 
-        self._tfidf_obj = TFIDF(self._data.feature_map)
+        self._tfidf_obj = TFIDF(self._data.side_information_data.feature_map)
         self._tfidf = self._tfidf_obj.tfidf()
         self._user_profiles = self._tfidf_obj.get_profiles(self._ratings)
 
-        self._datamodel = MF(self._ratings, self._data.feature_map, self._tfidf, self._user_profiles, self._random)
+        self._datamodel = MF(self._ratings, self._data.side_information_data.feature_map, self._tfidf, self._user_profiles, self._random)
         self._embed_k = self._datamodel.get_factors()
         self._sampler = ps.Sampler(self._ratings, self._data.users, self._data.items)
 
@@ -271,9 +271,11 @@ class KaHFM(BaseRecommenderModel):
 
             if not (it + 1) % self._validation_rate:
                 recs = self.get_recommendations(self._config.top_k)
-                results, statistical_results = self.evaluator.eval(recs)
+                results, statistical_results, test_results, test_statistical_results = self.evaluator.eval(recs)
                 self._results.append(results)
                 self._statistical_results.append(statistical_results)
+                self._test_results.append(results)
+                self._test_statistical_results.append(statistical_results)
 
                 if self._results[-1][self._validation_metric] > best_ndcg:
                     print("******************************************")
@@ -337,3 +339,11 @@ class KaHFM(BaseRecommenderModel):
             except Exception as ex:
                 print(f"Error in model restoring operation! {ex}")
         return False
+
+    def get_test_results(self):
+        val_max = np.argmax([r[self._validation_metric] for r in self._results])
+        return self._test_results[val_max]
+
+    def get_test_statistical_results(self):
+        val_max = np.argmax([r[self._validation_metric] for r in self._results])
+        return self._test_statistical_results[val_max]

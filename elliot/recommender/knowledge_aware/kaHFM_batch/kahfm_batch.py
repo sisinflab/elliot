@@ -45,7 +45,7 @@ class KaHFMBatch(RecMixin, BaseRecommenderModel):
         self._ratings = self._data.train_dict
         self._sampler = cs.Sampler(self._data.i_train_dict)
 
-        self._tfidf_obj = TFIDF(self._data.feature_map)
+        self._tfidf_obj = TFIDF(self._data.side_information_data.feature_map)
         self._tfidf = self._tfidf_obj.tfidf()
         self._user_profiles = self._tfidf_obj.get_profiles(self._ratings)
 
@@ -107,9 +107,12 @@ class KaHFMBatch(RecMixin, BaseRecommenderModel):
 
             if not (it + 1) % self._validation_rate:
                 recs = self.get_recommendations(self._config.top_k)
-                results, statistical_results = self.evaluator.eval(recs)
+                results, statistical_results, test_results, test_statistical_results = self.evaluator.eval(recs)
                 self._results.append(results)
                 self._statistical_results.append(statistical_results)
+                self._test_results.append(results)
+                self._test_statistical_results.append(statistical_results)
+
                 print(f'Epoch {(it + 1)}/{self._num_iters} loss {loss:.3f}')
 
                 if self._results[-1][self._validation_metric] > best_metric_value:

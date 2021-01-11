@@ -105,3 +105,6 @@ class DataSet(AbstractDataset):
 
     def get_test(self):
         return self.test_dict
+
+    def get_validation(self):
+        return self.val_dict if hasattr(self, 'val_dict') else None

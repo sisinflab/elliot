@@ -31,55 +31,59 @@ class Evaluator(object):
         self._test = data.get_test()
 
         self._evaluation_objects = SimpleNamespace(relevance=relevance.Relevance(self._test, self._rel_threshold))
-        # self._data.params.relevant_items = self._binary_relevance_filter()
-        # self._data.params.gain_relevance_map = self._compute_user_gain_map()
-
-    # def _compute_user_gain_map(self) -> t.Dict:
-    #     """
-    #     Method to compute the Gain Map:
-    #     rel = 2**(score - threshold + 1) - 1
-    #     :param sorted_item_predictions:
-    #     :param sorted_item_scores:
-    #     :param threshold:
-    #     :return:
-    #     """
-    #     return {u: {i: 0 if score < self._rel_threshold else 2 ** (score - self._rel_threshold + 1) - 1
-    #                 for i, score in test_items.items()}
-    #             for u, test_items in self._test.items()}
-    #
-    # def _binary_relevance_filter(self):
-    #     """
-    #     Binary Relevance filtering for the test items
-    #     :return:
-    #     """
-    #     return {u: [i for i, r in test_items.items() if r >= self._rel_threshold] for u, test_items in self._test.items()}
+        if data.get_validation():
+            self._val = data.get_validation()
+            self._val_evaluation_objects = SimpleNamespace(relevance=relevance.Relevance(self._val, self._rel_threshold))
 
     def eval(self, recommendations):
         """
         Runtime Evaluation of Accuracy Performance (top-k)
         :return:
         """
-        recommendations = {u: recs for u, recs in recommendations.items() if self._test[u]}
-        rounding_factor = 5
-        eval_start_time = time()
+        result_list = []
+        for test_data, eval_objs in self.get_test_data():
+            results, statistical_results = self.process_test_data(recommendations, test_data, eval_objs)
+            result_list.append((results, statistical_results))
 
-        results = {
-            m.name(): m(recommendations, self._data.config, self._params, self._evaluation_objects).eval()
-            for m in self._metrics
-        }
+        if (not result_list[0][0]) or (not result_list[0][1]):
+            return result_list[1][0], result_list[1][1], result_list[1][0], result_list[1][1]
+        elif (not result_list[1][0]) or (not result_list[1][1]):
+            return result_list[0][0], result_list[0][1], result_list[0][0], result_list[0][1]
+        else:
+            return result_list[0][0], result_list[0][1], result_list[1][0], result_list[1][1]
 
-        str_results = {k: str(round(v, rounding_factor)) for k, v in results.items()}
-        print(f"\nEval Time: {time() - eval_start_time}")
+    def get_test_data(self):
+        return [(self._val if hasattr(self, '_val') else None,
+                 self._val_evaluation_objects if hasattr(self, '_val_evaluation_objects') else None),
+                (self._test if hasattr(self, '_test') else None,
+                 self._evaluation_objects if hasattr(self, '_evaluation_objects') else None)
+                ]
 
-        res_print = "\n".join(["\t".join(e) for e in str_results.items()])
+    def process_test_data(self, recommendations, test_data, eval_objs):
+        if (not test_data) or (not eval_objs):
+            return None, None
+        else:
+            recommendations = {u: recs for u, recs in recommendations.items() if test_data[u]}
+            rounding_factor = 5
+            eval_start_time = time()
 
-        print(f"*** Results ***\n{res_print}\n***************\n")
+            results = {
+                m.name(): m(recommendations, self._data.config, self._params, eval_objs).eval()
+                for m in self._metrics
+            }
 
-        statistical_results = {}
-        if self._paired_ttest:
-            statistical_results = {metric_object.name(): metric_object.eval_user_metric()
-                                   for metric_object in
-                                   [m(recommendations, self._data.config, self._params, self._evaluation_objects) for m in self._metrics]
-                                   if isinstance(metric_object, metrics.StatisticalMetric)}
+            str_results = {k: str(round(v, rounding_factor)) for k, v in results.items()}
+            print(f"\nEval Time: {time() - eval_start_time}")
 
-        return results, statistical_results
+            res_print = "\n".join(["\t".join(e) for e in str_results.items()])
+
+            print(f"*** Results ***\n{res_print}\n***************\n")
+
+            statistical_results = {}
+            if self._paired_ttest:
+                statistical_results = {metric_object.name(): metric_object.eval_user_metric()
+                                       for metric_object in
+                                       [m(recommendations, self._data.config, self._params, eval_objs) for m
+                                        in self._metrics]
+                                       if isinstance(metric_object, metrics.StatisticalMetric)}
+            return results, statistical_results

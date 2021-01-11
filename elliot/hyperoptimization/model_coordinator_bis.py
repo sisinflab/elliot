@@ -51,14 +51,17 @@ class ModelCoordinator(object):
 
         losses = []
         results = []
+        test_results = []
         for data_obj in self.data_objs:
             model = self.model_class(data=data_obj, config=self.base, params=model_params)
             model.train()
             losses.append(model.get_loss())
             results.append(model.get_results())
+            test_results.append(model.get_test_results())
 
         loss = np.average(losses)
         results = {metric: np.average([result[metric] for result in results]) for metric in model.get_results().keys()}
+        test_results = {metric: np.average([result[metric] for result in test_results]) for metric in model.get_results().keys()}
 
         return {
             'loss': loss,
@@ -66,6 +69,8 @@ class ModelCoordinator(object):
             'params': model.get_params(),
             'results': results,
             'statistical_results': model.get_statistical_results(),
+            'test_results': test_results,
+            'test_statistical_results': model.get_test_statistical_results(),
             'name': model.name
         }
 
@@ -79,14 +84,17 @@ class ModelCoordinator(object):
 
         losses = []
         results = []
+        test_results = []
         for data_obj in self.data_objs:
             model = self.model_class(data=data_obj, config=self.base, params=self.params)
             model.train()
             losses.append(model.get_loss())
             results.append(model.get_results())
+            test_results.append(model.get_test_results())
 
         loss = np.average(losses)
         results = {metric: np.average([result[metric] for result in results]) for metric in model.get_results().keys()}
+        test_results = {metric: np.average([result[metric] for result in test_results]) for metric in model.get_test_results().keys()}
 
         return {
             'loss': loss,
@@ -94,5 +102,7 @@ class ModelCoordinator(object):
             'params': model.get_params(),
             'results': results,
             'statistical_results': model.get_statistical_results(),
+            'test_results': test_results,
+            'test_statistical_results': model.get_test_statistical_results(),
             'name': model.name
         }
