@@ -23,7 +23,6 @@ from splitter.base_splitter import Splitter
 [([(train_0,val_0)],test_0)]
 [data_0]
 
-
 [([(train_0,val_0), (train_1,val_1), (train_2,val_2), (train_3,val_3), (train_4,val_4)],test_0),
 ([(train_0,val_0), (train_1,val_1), (train_2,val_2), (train_3,val_3), (train_4,val_4)],test_1),
 ([(train_0,val_0), (train_1,val_1), (train_2,val_2), (train_3,val_3), (train_4,val_4)],test_2),
@@ -36,13 +35,11 @@ from splitter.base_splitter import Splitter
 [data_0,data_1,data_2,data_3,data_4],
 [data_0,data_1,data_2,data_3,data_4]]
 
-
 [[data_0],[data_1],[data_2]]
 
 [[data_0,data_1,data_2]]
 
 [[data_0,data_1,data_2],[data_0,data_1,data_2],[data_0,data_1,data_2]]
-
 """
 
 
