@@ -18,6 +18,9 @@ from utils.folder import manage_directories
 import hyperoptimization as ho
 
 _experiment = 'experiment'
+
+_data_config = "data_config"
+_splitting = "splitting"
 _dataset = 'dataset'
 _dataloader = 'dataloader'
 _weights = 'path_output_rec_weight'
@@ -50,9 +53,9 @@ class NameSpaceModel:
 
     def fill_base(self):
 
-        for path in self.config[_experiment][_data_paths].keys():
-            self.config[_experiment][_data_paths][path] = \
-                self.config[_experiment][_data_paths][path].format(self.config[_experiment][_dataset])
+        # for path in self.config[_experiment][_data_paths].keys():
+        #     self.config[_experiment][_data_paths][path] = \
+        #         self.config[_experiment][_data_paths][path].format(self.config[_experiment][_dataset])
 
         self.config[_experiment][_recs] = self.config[_experiment][_recs] \
             .format(self.config[_experiment][_dataset])
@@ -67,10 +70,37 @@ class NameSpaceModel:
         manage_directories(self.config[_experiment][_recs], self.config[_experiment][_weights],
                            self.config[_experiment][_performance])
 
-        for p in [_data_paths, _weights, _recs, _dataset, _top_k, _metrics, _relevance, _paired_ttest, _performance, _logger_config,
-                  _log_folder, _dataloader]:
-            if p == _data_paths:
+        for p in [_data_config, _weights, _recs, _dataset, _top_k, _metrics, _relevance, _paired_ttest, _performance, _logger_config,
+                  _log_folder, _dataloader, _splitting]:
+            if p == _data_config:
+                side_information = self.config[_experiment][p].get("side_information", {})
+                side_information.update({k: v.format(self.config[_experiment][_dataset])
+                                               for k, v in side_information.items() if isinstance(v, str)})
+                side_information = SimpleNamespace(**side_information)
+                self.config[_experiment][p].update({k: v.format(self.config[_experiment][_dataset])
+                                               for k, v in self.config[_experiment][p].items() if isinstance(v, str)})
+                self.config[_experiment][p]["side_information"] = side_information
+
                 setattr(self.base_namespace, p, SimpleNamespace(**self.config[_experiment][p]))
+            elif p == _splitting:
+                if self.config[_experiment].get(p, {}):
+                    self.config[_experiment][p].update({k: v.format(self.config[_experiment][_dataset])
+                                                        for k, v in self.config[_experiment][p].items() if
+                                                        isinstance(v, str)})
+
+                    test_splitting = self.config[_experiment][p].get("test_splitting", {})
+                    validation_splitting = self.config[_experiment][p].get("validation_splitting", {})
+
+                    if test_splitting:
+                        test_splitting = SimpleNamespace(**test_splitting)
+                        self.config[_experiment][p]["test_splitting"] = test_splitting
+
+                    if validation_splitting:
+                        validation_splitting = SimpleNamespace(**validation_splitting)
+                        self.config[_experiment][p]["validation_splitting"] = validation_splitting
+
+                    setattr(self.base_namespace, p, SimpleNamespace(**self.config[_experiment][p]))
+
             else:
                 setattr(self.base_namespace, p, self.config[_experiment][p])
 

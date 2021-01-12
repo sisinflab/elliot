@@ -7,17 +7,7 @@ import os
 from types import SimpleNamespace
 from utils.folder import create_folder_by_index
 
-"""
-splitting:
-    save_on_disk: True
-    output_path: "path"
-    input_paths:
-        strategy: dataset
-        dataset_path: "path"
-    test_splitting:
-        strategy: temporal_hold_out
-        test_ratio: 0.2
-        
+"""        
 data_config:
     strategy: dataset|hierarchy|fixed
     dataset: example
@@ -83,9 +73,6 @@ class Splitter:
             if hasattr(splitting_ns, "save_folder"):
                 self.save_on_disk = True
                 self.save_folder = splitting_ns.save_folder
-
-                self.read_splitting(self.save_folder)
-
 
                 #TODO: if full remove data
                 if not os.path.exists(os.path.dirname(self.save_folder)):
