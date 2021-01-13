@@ -8,7 +8,6 @@ __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
 from .model_coordinator import ModelCoordinator
-from .model_coordinator_bis import ModelCoordinator as ModelCoordinator2
 from hyperopt import tpe, atpe, mix, rand, anneal
 
 _optimization_algorithms = {

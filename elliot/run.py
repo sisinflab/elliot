@@ -37,7 +37,7 @@ if __name__ == '__main__':
             model_class = getattr(importlib.import_module("recommender"), key)
             print("\n********************************")
             print(f"Tuning begun for {model_class.__name__}\n")
-            model_placeholder = ho.ModelCoordinator2(data_test, base.base_namespace, model_base, model_class)
+            model_placeholder = ho.ModelCoordinator(data_test, base.base_namespace, model_base, model_class)
             if isinstance(model_base, tuple):
                 # model_placeholder = ho.ModelCoordinator(dataloader, base.base_namespace, model_base[0], model_class)
                 trials = Trials()

@@ -2,9 +2,11 @@ import typing as t
 import pandas as pd
 import numpy as np
 import math
-
+import shutil
 import os
+
 from types import SimpleNamespace
+
 from utils.folder import create_folder_by_index
 
 """        
@@ -74,9 +76,10 @@ class Splitter:
                 self.save_on_disk = True
                 self.save_folder = splitting_ns.save_folder
 
-                #TODO: if full remove data
-                if not os.path.exists(os.path.dirname(self.save_folder)):
-                    os.makedirs(os.path.dirname(self.save_folder))
+                if os.path.exists(os.path.dirname(self.save_folder)):
+                    shutil.rmtree(os.path.dirname(self.save_folder), ignore_errors=True)
+
+                os.makedirs(os.path.dirname(self.save_folder))
             else:
                 raise Exception("Train or Test paths are missing")
 
@@ -93,9 +96,9 @@ class Splitter:
                     exploded_train_list.append(train_val_test_tuples_list)
                 tuple_list = self.rearrange_data(tuple_list, exploded_train_list)
 
-                print("Train\tValidation\tTest\tstrategies")
+                print("\nRealized a Train/Validation Test splitting strategy\n")
             else:
-                print("Train\tTest\tstrategies")
+                print("\nRealized a Train/Test splitting strategy\n")
         else:
             raise Exception("Test splitting strategy is not defined")
 

@@ -59,6 +59,7 @@ class KnowledgeChainsLoader:
         self.args = args
         self.kwargs = kwargs
         self.config = config
+        self.column_names = ['userId', 'itemId', 'rating', 'timestamp']
 
         if config.data_config.strategy == "fixed":
             path_train_data = config.data_config.train_path
@@ -69,19 +70,23 @@ class KnowledgeChainsLoader:
             path_properties = config.data_config.side_information.properties
 
             self.side_information_data = SimpleNamespace()
-            self.column_names = ['userId', 'itemId', 'rating']
 
             self.train_dataframe, self.side_information_data.feature_map = self.load_dataset_dataframe(path_train_data,
                                                                                                        "\t",
                                                                                                        path_map,
                                                                                                        path_features,
                                                                                                        path_properties)
+            self.train_dataframe = self.check_timestamp(self.train_dataframe)
+
             print('{0} - Loaded'.format(path_train_data))
 
             self.test_dataframe = pd.read_csv(path_test_data, sep="\t", header=None, names=self.column_names)
+            self.test_dataframe = self.check_timestamp(self.test_dataframe)
 
             if path_val_data:
                 self.validation_dataframe = pd.read_csv(path_val_data, sep="\t", header=None, names=self.column_names)
+                self.validation_dataframe = self.check_timestamp(self.validation_dataframe)
+
                 self.tuple_list = [([(self.train_dataframe, self.validation_dataframe)], self.test_dataframe)]
             else:
                 self.tuple_list = [(self.train_dataframe, self.test_dataframe)]
@@ -98,13 +103,14 @@ class KnowledgeChainsLoader:
             path_properties = config.data_config.side_information.properties
 
             self.side_information_data = SimpleNamespace()
-            self.column_names = ['userId', 'itemId', 'rating']
 
             self.dataframe, self.side_information_data.feature_map = self.load_dataset_dataframe(path_dataset,
                                                                                                  "\t",
                                                                                                  path_map,
                                                                                                  path_features,
-                                                                                                 path_properties)
+                                                                                                 path_properties,
+                                                                                                 self.column_names)
+            self.dataframe = self.check_timestamp(self.dataframe)
 
             print('{0} - Loaded'.format(path_dataset))
 
@@ -115,6 +121,11 @@ class KnowledgeChainsLoader:
 
         else:
             raise Exception("Strategy option not recognized")
+
+    def check_timestamp(self, d: pd.DataFrame) -> pd.DataFrame:
+        if all(d["timestamp"].isna()):
+            d = d.drop(columns=["timestamp"]).reset_index(drop=True)
+        return d
 
     def read_splitting(self, folder_path):
         tuple_list = []
@@ -182,9 +193,15 @@ class KnowledgeChainsLoader:
         print("********** ")
         return ratings, map
 
-    def load_dataset_dataframe(self, file_ratings, separator='\t', attribute_file=None, feature_file=None, properties_file=None,
-                          additive=True, threshold=10):
-        column_names = ['userId', 'itemId', 'rating']
+    def load_dataset_dataframe(self, file_ratings,
+                               separator='\t',
+                               attribute_file=None,
+                               feature_file=None,
+                               properties_file=None,
+                               column_names=['userId', 'itemId', 'rating', 'timestamp'],
+                               additive=True,
+                               threshold=10
+                               ):
         data = pd.read_csv(file_ratings, sep=separator, header=None, names=column_names)
         if (attribute_file is not None) & (feature_file is not None) & (properties_file is not None):
             map = self.load_attribute_file(attribute_file)

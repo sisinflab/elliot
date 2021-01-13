@@ -17,6 +17,7 @@ from dataset.abstract_dataset import AbstractDataset
 from splitter.base_splitter import Splitter
 from prefiltering.standard_prefilters import PreFilter
 
+
 class DataSetLoader:
     """
     Load train and test dataset
@@ -32,21 +33,27 @@ class DataSetLoader:
         self.args = args
         self.kwargs = kwargs
         self.config = config
+        self.column_names = ['userId', 'itemId', 'rating', 'timestamp']
 
         if config.data_config.strategy == "fixed":
             path_train_data = config.data_config.train_path
             path_val_data = getattr(config.data_config, "validation_path", None)
             path_test_data = config.data_config.test_path
 
-            self.column_names = ['userId', 'itemId', 'rating']
-
             self.train_dataframe = pd.read_csv(path_train_data, sep="\t", header=None, names=self.column_names)
+
+            self.train_dataframe = self.check_timestamp(self.train_dataframe)
+
             print('{0} - Loaded'.format(path_train_data))
 
             self.test_dataframe = pd.read_csv(path_test_data, sep="\t", header=None, names=self.column_names)
 
+            self.test_dataframe = self.check_timestamp(self.test_dataframe)
+
             if path_val_data:
                 self.validation_dataframe = pd.read_csv(path_val_data, sep="\t", header=None, names=self.column_names)
+                self.validation_dataframe = self.check_timestamp(self.validation_dataframe)
+
                 self.tuple_list = [([(self.train_dataframe, self.validation_dataframe)], self.test_dataframe)]
             else:
                 self.tuple_list = [(self.train_dataframe, self.test_dataframe)]
@@ -58,9 +65,9 @@ class DataSetLoader:
             print("There will be the splitting")
             path_dataset = config.data_config.dataset_path
 
-            self.column_names = ['userId', 'itemId', 'rating']
-
             self.dataframe = pd.read_csv(path_dataset, sep="\t", header=None, names=self.column_names)
+
+            self.dataframe = self.check_timestamp(self.dataframe)
 
             print('{0} - Loaded'.format(path_dataset))
 
@@ -71,6 +78,11 @@ class DataSetLoader:
 
         else:
             raise Exception("Strategy option not recognized")
+
+    def check_timestamp(self, d: pd.DataFrame) -> pd.DataFrame:
+        if all(d["timestamp"].isna()):
+            d = d.drop(columns=["timestamp"]).reset_index(drop=True)
+        return d
 
     def read_splitting(self, folder_path):
         tuple_list = []
