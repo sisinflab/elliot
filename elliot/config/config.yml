@@ -25,6 +25,11 @@ experiment:
 #        test_ratio: 0.2
 #        leave_n_out: 1
 #        folds: 5
+  prefiltering:
+    strategy: global_threshold
+#    threshold: 3|average
+#    core: 5
+#    rounds: 2
   dataset: example
   path_output_rec_result: ../results/{0}/recs/
   path_output_rec_weight: ../results/{0}/weights/

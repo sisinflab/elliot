@@ -21,6 +21,7 @@ _experiment = 'experiment'
 
 _data_config = "data_config"
 _splitting = "splitting"
+_prefiltering = "prefiltering"
 _dataset = 'dataset'
 _dataloader = 'dataloader'
 _weights = 'path_output_rec_weight'
@@ -71,7 +72,7 @@ class NameSpaceModel:
                            self.config[_experiment][_performance])
 
         for p in [_data_config, _weights, _recs, _dataset, _top_k, _metrics, _relevance, _paired_ttest, _performance, _logger_config,
-                  _log_folder, _dataloader, _splitting]:
+                  _log_folder, _dataloader, _splitting, _prefiltering]:
             if p == _data_config:
                 side_information = self.config[_experiment][p].get("side_information", {})
                 side_information.update({k: v.format(self.config[_experiment][_dataset])
@@ -100,7 +101,11 @@ class NameSpaceModel:
                         self.config[_experiment][p]["validation_splitting"] = validation_splitting
 
                     setattr(self.base_namespace, p, SimpleNamespace(**self.config[_experiment][p]))
-
+            elif p == _prefiltering:
+                if self.config[_experiment].get(p, {}):
+                    preprocessing_strategy = SimpleNamespace(**self.config[_experiment][p])
+                    self.config[_experiment][p] = preprocessing_strategy
+                    setattr(self.base_namespace, p, self.config[_experiment][p])
             else:
                 setattr(self.base_namespace, p, self.config[_experiment][p])
 
