@@ -92,7 +92,7 @@ class PreFilter:
     def filter_ratings_by_global_average(d: pd.DataFrame) -> pd.DataFrame:
         data = d.copy()
         threshold = data["rating"].mean()
-        print("Prefiltering with Global Average")
+        print("\nPrefiltering with Global Average")
         print(f"The rating average is {round(threshold, 1)}")
         print(f"The transactions above threshold are {data[data['rating'] >= threshold]['rating'].count()}")
         print(f"The transactions below threshold are {data[data['rating'] < threshold]['rating'].count()}")
