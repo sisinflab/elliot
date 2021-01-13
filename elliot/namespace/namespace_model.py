@@ -65,7 +65,7 @@ class NameSpaceModel:
             .format(self.config[_experiment][_dataset])
 
         self.config[_experiment][_paired_ttest] = self.config[_experiment].get(_paired_ttest, False)
-        self.config[_experiment][_dataloader] = self.config[_experiment].get(_dataloader, "DataSet")
+        self.config[_experiment][_dataloader] = self.config[_experiment].get(_dataloader, "DataSetLoader")
 
         manage_directories(self.config[_experiment][_recs], self.config[_experiment][_weights],
                            self.config[_experiment][_performance])
@@ -80,7 +80,7 @@ class NameSpaceModel:
                 self.config[_experiment][p].update({k: v.format(self.config[_experiment][_dataset])
                                                for k, v in self.config[_experiment][p].items() if isinstance(v, str)})
                 self.config[_experiment][p]["side_information"] = side_information
-
+                self.config[_experiment][p][_dataloader] = self.config[_experiment][p].get(_dataloader, "DataSetLoader")
                 setattr(self.base_namespace, p, SimpleNamespace(**self.config[_experiment][p]))
             elif p == _splitting:
                 if self.config[_experiment].get(p, {}):

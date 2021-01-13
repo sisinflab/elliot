@@ -1,7 +1,7 @@
 experiment:
   data_config:
     strategy: hierarchy
-    dataloader: DataSetLoader
+#    dataloader: DataSetLoader
 #    dataset_path: ../data/{0}/trainingset.tsv
     root_folder: ../data/{0}/splitting/
 #    train_path: ../data/{0}/trainingset.tsv
