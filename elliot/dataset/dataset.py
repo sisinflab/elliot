@@ -15,6 +15,7 @@ import typing as t
 
 from dataset.abstract_dataset import AbstractDataset
 from splitter.base_splitter import Splitter
+from prefiltering.standard_prefilters import PreFilter
 
 class DataSetLoader:
     """
@@ -52,6 +53,7 @@ class DataSetLoader:
 
         elif config.data_config.strategy == "hierarchy":
             self.tuple_list = self.read_splitting(config.data_config.root_folder)
+
         elif config.data_config.strategy == "dataset":
             print("There will be the splitting")
             path_dataset = config.data_config.dataset_path
@@ -62,7 +64,9 @@ class DataSetLoader:
 
             print('{0} - Loaded'.format(path_dataset))
 
-            splitter = Splitter(self.dataframe, config.splitting)
+            self.dataframe = PreFilter.filter(self.dataframe, self.config.prefiltering)
+
+            splitter = Splitter(self.dataframe, self.config.splitting)
             self.tuple_list = splitter.process_splitting()
 
         else:
