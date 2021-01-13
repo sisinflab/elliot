@@ -1,9 +1,16 @@
 
 import pandas as pd
 
+"""
+prefiltering:
+    strategy: global_threshold|user_average|user_k_core|item_k_core|iterative_k_core|n_rounds_k_core|cold_users
+    threshold: 3|average
+    core: 5
+    rounds: 2
+"""
+
 
 class PreFilter:
-
     @staticmethod
     def filter_ratings_by_global_average(d: pd.DataFrame) -> pd.DataFrame:
         data = d.copy()
@@ -105,36 +112,36 @@ class PreFilter:
         return data
 
 
-import unittest
-
-from namespace.namespace_model_builder import NameSpaceModel
-
-
-class NameSpaceModelTest(unittest.TestCase):
-    def setUp(self):
-        self.column_names = ['userId', 'itemId', 'rating']
-        self.data = pd.read_csv("../../data/example/trainingset.tsv", sep="\t", header=None, names=self.column_names)
-
-    def test_global_average(self):
-        data = PreFilter.filter_ratings_by_global_average(self.data)
-
-    def test_threshold(self):
-        data = PreFilter.filter_ratings_by_threshold(self.data, 3)
-
-    def test_user_average(self):
-        data = PreFilter.filter_ratings_by_user_average(self.data)
-
-    def test_user_k_core(self):
-        data = PreFilter.filter_users_by_profile_size(self.data, 10)
-
-    def test_item_k_core(self):
-        data = PreFilter.filter_items_by_popularity(self.data, 10)
-
-    def test_iterative_k_core(self):
-        data = PreFilter.filter_iterative_k_core(self.data, 10)
-
-    def test_rounds_k_core(self):
-        data = PreFilter.filter_rounds_k_core(self.data, 10, 2)
-
-    def test_cold_users(self):
-        data = PreFilter.filter_retain_cold_users(self.data, 10)
+# import unittest
+#
+# from namespace.namespace_model_builder import NameSpaceModel
+#
+#
+# class NameSpaceModelTest(unittest.TestCase):
+#     def setUp(self):
+#         self.column_names = ['userId', 'itemId', 'rating']
+#         self.data = pd.read_csv("../../data/example/trainingset.tsv", sep="\t", header=None, names=self.column_names)
+#
+#     def test_global_average(self):
+#         data = PreFilter.filter_ratings_by_global_average(self.data)
+#
+#     def test_threshold(self):
+#         data = PreFilter.filter_ratings_by_threshold(self.data, 3)
+#
+#     def test_user_average(self):
+#         data = PreFilter.filter_ratings_by_user_average(self.data)
+#
+#     def test_user_k_core(self):
+#         data = PreFilter.filter_users_by_profile_size(self.data, 10)
+#
+#     def test_item_k_core(self):
+#         data = PreFilter.filter_items_by_popularity(self.data, 10)
+#
+#     def test_iterative_k_core(self):
+#         data = PreFilter.filter_iterative_k_core(self.data, 10)
+#
+#     def test_rounds_k_core(self):
+#         data = PreFilter.filter_rounds_k_core(self.data, 10, 2)
+#
+#     def test_cold_users(self):
+#         data = PreFilter.filter_retain_cold_users(self.data, 10)
