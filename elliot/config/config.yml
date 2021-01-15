@@ -39,9 +39,18 @@ experiment:
   path_logger_config: ./config/logger_config.yml
   path_log_folder: ../log/
   top_k: 50
-  metrics: [nDCG, Precision, Recall, ItemCoverage]
-  relevance: 1
-  paired_ttest: True
+  evaluation:
+    base_metrics: [ nDCG, Precision, Recall, ItemCoverage ]
+#    cutoff: 50
+    relevance: 1
+    paired_ttest: True
+    additional_metrics:
+      - name: MAD
+        class_file: path
+      - name: alpha_ndcg
+        alpha: 0.2
+      - name: IELD
+        content_file: path
   gpu: -1 # -1 is not use GPU
   models:
 #    Random:

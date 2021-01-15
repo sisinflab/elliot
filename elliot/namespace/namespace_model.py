@@ -21,6 +21,7 @@ _experiment = 'experiment'
 
 _data_config = "data_config"
 _splitting = "splitting"
+_evaluation = "evaluation"
 _prefiltering = "prefiltering"
 _dataset = 'dataset'
 _dataloader = 'dataloader'
@@ -71,41 +72,41 @@ class NameSpaceModel:
         manage_directories(self.config[_experiment][_recs], self.config[_experiment][_weights],
                            self.config[_experiment][_performance])
 
-        for p in [_data_config, _weights, _recs, _dataset, _top_k, _metrics, _relevance, _paired_ttest, _performance, _logger_config,
-                  _log_folder, _dataloader, _splitting, _prefiltering]:
+        for p in [_data_config, _weights, _recs, _dataset, _top_k, _paired_ttest, _performance, _logger_config,
+                  _log_folder, _dataloader, _splitting, _prefiltering, _evaluation]:
             if p == _data_config:
                 side_information = self.config[_experiment][p].get("side_information", {})
                 side_information.update({k: v.format(self.config[_experiment][_dataset])
-                                               for k, v in side_information.items() if isinstance(v, str)})
+                                         for k, v in side_information.items() if isinstance(v, str)})
                 side_information = SimpleNamespace(**side_information)
                 self.config[_experiment][p].update({k: v.format(self.config[_experiment][_dataset])
-                                               for k, v in self.config[_experiment][p].items() if isinstance(v, str)})
+                                                    for k, v in self.config[_experiment][p].items() if isinstance(v, str)})
                 self.config[_experiment][p]["side_information"] = side_information
                 self.config[_experiment][p][_dataloader] = self.config[_experiment][p].get(_dataloader, "DataSetLoader")
                 setattr(self.base_namespace, p, SimpleNamespace(**self.config[_experiment][p]))
-            elif p == _splitting:
-                if self.config[_experiment].get(p, {}):
-                    self.config[_experiment][p].update({k: v.format(self.config[_experiment][_dataset])
-                                                        for k, v in self.config[_experiment][p].items() if
-                                                        isinstance(v, str)})
+            elif p == _splitting and self.config[_experiment].get(p, {}):
+                self.config[_experiment][p].update({k: v.format(self.config[_experiment][_dataset])
+                                                    for k, v in self.config[_experiment][p].items() if
+                                                    isinstance(v, str)})
 
-                    test_splitting = self.config[_experiment][p].get("test_splitting", {})
-                    validation_splitting = self.config[_experiment][p].get("validation_splitting", {})
+                test_splitting = self.config[_experiment][p].get("test_splitting", {})
+                validation_splitting = self.config[_experiment][p].get("validation_splitting", {})
 
-                    if test_splitting:
-                        test_splitting = SimpleNamespace(**test_splitting)
-                        self.config[_experiment][p]["test_splitting"] = test_splitting
+                if test_splitting:
+                    test_splitting = SimpleNamespace(**test_splitting)
+                    self.config[_experiment][p]["test_splitting"] = test_splitting
 
-                    if validation_splitting:
-                        validation_splitting = SimpleNamespace(**validation_splitting)
-                        self.config[_experiment][p]["validation_splitting"] = validation_splitting
+                if validation_splitting:
+                    validation_splitting = SimpleNamespace(**validation_splitting)
+                    self.config[_experiment][p]["validation_splitting"] = validation_splitting
 
-                    setattr(self.base_namespace, p, SimpleNamespace(**self.config[_experiment][p]))
-            elif p == _prefiltering:
-                if self.config[_experiment].get(p, {}):
-                    preprocessing_strategy = SimpleNamespace(**self.config[_experiment][p])
-                    self.config[_experiment][p] = preprocessing_strategy
-                    setattr(self.base_namespace, p, self.config[_experiment][p])
+                setattr(self.base_namespace, p, SimpleNamespace(**self.config[_experiment][p]))
+            elif p == _prefiltering and self.config[_experiment].get(p, {}):
+                preprocessing_strategy = SimpleNamespace(**self.config[_experiment][p])
+                self.config[_experiment][p] = preprocessing_strategy
+                setattr(self.base_namespace, p, self.config[_experiment][p])
+            elif p == _evaluation and self.config[_experiment].get(p, {}):
+                setattr(self.base_namespace, p, SimpleNamespace(**self.config[_experiment][p]))
             else:
                 setattr(self.base_namespace, p, self.config[_experiment][p])
 

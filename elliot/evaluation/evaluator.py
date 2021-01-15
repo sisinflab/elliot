@@ -38,10 +38,10 @@ class Evaluator(object):
         """
         self._data = data
         self._params = params
-        self._k = data.config.top_k
-        self._rel_threshold = data.config.relevance
-        self._paired_ttest = self._data.config.paired_ttest
-        self._metrics = metrics.parse_metrics(data.config.metrics)
+        self._k = getattr(data.config.evaluation, "cutoff", data.config.top_k)
+        self._rel_threshold = data.config.evaluation.relevance
+        self._paired_ttest = self._data.config.evaluation.paired_ttest
+        self._metrics = metrics.parse_metrics(data.config.evaluation.base_metrics)
         #TODO
         self._additional_metrics = data.config.evaluation.additional_metrics
         self._test = data.get_test()
