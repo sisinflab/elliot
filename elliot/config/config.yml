@@ -1,34 +1,34 @@
 experiment:
   data_config:
-    strategy: dataset
+    strategy: fixed
 #    dataloader: KnowledgeChainsLoader
 #    dataloader: DataSetLoader
-    dataset_path: ../data/{0}/trainingset.tsv
+#    dataset_path: ../data/{0}/trainingset.tsv
 #    root_folder: ../data/{0}/splitting/
-#    train_path: ../data/{0}/trainingset.tsv
+    train_path: ../data/{0}/trainingset.tsv
 #    validation_path: ../data/{0}/trainingset.tsv
-#    test_path: ../data/{0}/testset.tsv
+    test_path: ../data/{0}/testset.tsv
 #    side_information:
 #        feature_data: ../data/{0}/original/features.npy
 #        map: ../data/{0}/map.tsv
 #        features: ../data/{0}/features.tsv
 #        properties: ../data/{0}/properties.conf
-  splitting:
-    save_on_disk: True
-    save_folder: ../data/{0}/splitting/
-    test_splitting:
-        strategy: random_subsampling
-        leave_n_out: 1
-        folds: 1
+#  splitting:
+#    save_on_disk: True
+#    save_folder: ../data/{0}/splitting/
+#    test_splitting:
+#        strategy: random_subsampling
+#        leave_n_out: 1
+#        folds: 1
 #    validation_splitting:
 #        strategy: fixed_timestamp|temporal_hold_out|random_subsampling|random_cross_validation
 #        timestamp: best|1609786061
 #        test_ratio: 0.2
 #        leave_n_out: 1
 #        folds: 5
-  prefiltering:
-    strategy: global_threshold
-    threshold: 0
+#  prefiltering:
+#    strategy: global_threshold
+#    threshold: 0
 #    core: 5
 #    rounds: 2
 #  dataset: categorical_dbpedia_ml1m
@@ -40,17 +40,22 @@ experiment:
   path_log_folder: ../log/
   top_k: 50
   evaluation:
+    cutoff: 10
     base_metrics: [ nDCG, Precision, Recall, ItemCoverage ]
 #    cutoff: 50
     relevance: 1
     paired_ttest: True
     additional_metrics:
-      - name: MAD
-        class_file: path
-      - name: alpha_ndcg
-        alpha: 0.2
-      - name: IELD
-        content_file: path
+    - metric: UserMADrating
+      clustering_name: Happiness
+      clustering_file: /home/cheggynho/Documents/UMUAI2019FatRec/ml-1m-2020-03-08/Clusterings/UsersClusterings/user_clustering_happiness.tsv
+    - metric: UserMADrating
+      clustering_name: Happiness
+      clustering_file: /home/cheggynho/Documents/UMUAI2019FatRec/ml-1m-2020-03-08/Clusterings/UsersClusterings/user_clustering_happiness.tsv
+#    - name: alpha_ndcg
+#        alpha: 0.2
+#      - name: IELD
+#        content_file: path
   gpu: -1 # -1 is not use GPU
   models:
 #    Random:

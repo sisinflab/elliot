@@ -108,7 +108,8 @@ class NameSpaceModel:
             elif p == _evaluation and self.config[_experiment].get(p, {}):
                 setattr(self.base_namespace, p, SimpleNamespace(**self.config[_experiment][p]))
             else:
-                setattr(self.base_namespace, p, self.config[_experiment][p])
+                if self.config[_experiment].get(p):
+                    setattr(self.base_namespace, p, self.config[_experiment][p])
 
     def fill_model(self):
         for key in self.config[_experiment][_models]:

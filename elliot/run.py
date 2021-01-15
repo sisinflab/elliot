@@ -81,6 +81,6 @@ if __name__ == '__main__':
     # res_handler.save_results(output=base.base_namespace.path_output_rec_performance)
     res_handler.save_trials(output=base.base_namespace.path_output_rec_performance)
     res_handler.save_best_results(output=base.base_namespace.path_output_rec_performance)
-    if base.base_namespace.paired_ttest:
+    if base.base_namespace.evaluation.paired_ttest:
         res_handler.save_best_statistical_results(output=base.base_namespace.path_output_rec_performance)
 

@@ -17,7 +17,7 @@ class BaseMetric(ABC):
     Passing 'Precision' to the metrics list will enable the computation of the metric.
     """
 
-    def __init__(self, recommendations, config, params, evaluation_objects):
+    def __init__(self, recommendations, config, params, evaluation_objects, additional_data=None):
         """
         Constructor
         :param recommendations: list of recommendations in the form {user: [(item1,value1),...]}
@@ -28,6 +28,7 @@ class BaseMetric(ABC):
         self._config = config
         self._params = params
         self._evaluation_objects = evaluation_objects
+        self._additional_data = additional_data
 
     @abstractmethod
     def name(self):

@@ -17,12 +17,14 @@ from .precision import Precision
 from .recall import Recall
 from .item_coverage import ItemCoverage
 from .statistical_array_metric import StatisticalMetric
+from .MAD import UserMADrating
 
 _metric_dictionary = {
     "nDCG": NDCG,
     "Precision": Precision,
     "Recall": Recall,
-    "ItemCoverage": ItemCoverage
+    "ItemCoverage": ItemCoverage,
+    "UserMADrating": UserMADrating
 }
 
 

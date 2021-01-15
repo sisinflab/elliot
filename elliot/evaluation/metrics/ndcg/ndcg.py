@@ -29,7 +29,7 @@ class NDCG(BaseMetric):
         super().__init__(recommendations, config, params, eval_objects)
         self._cutoff = self._config.top_k
         self._relevance_map = self._evaluation_objects.relevance.get_discounted_relevance()
-        self.rel_threshold = self._config.relevance
+        self.rel_threshold = self._evaluation_objects.relevance._rel_threshold
 
     @staticmethod
     def name():

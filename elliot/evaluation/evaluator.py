@@ -10,11 +10,12 @@ evaluation:
   relevance: 1
   paired_ttest: True
   additional_metrics:
-    - name: MAD
-      class_file: path
-    - name: alpha_ndcg
+    - metric: MAD
+      clustering_name: Happiness
+      clustering_file: /home/cheggynho/Documents/UMUAI2019FatRec/ml-1m-2020-03-08/Clusterings/UsersClusterings/user_clustering_happiness.tsv
+    - metric: alpha_ndcg
       alpha: 0.2
-    - name: IELD
+    - metric: IELD
       content_file: path
 """
 __version__ = '0.1'
@@ -80,13 +81,13 @@ class Evaluator(object):
         if (not test_data) or (not eval_objs):
             return None, None
         else:
-            recommendations = {u: recs for u, recs in recommendations.items() if test_data[u]}
+            recommendations = {u: recs[:self._k] for u, recs in recommendations.items() if test_data[u]}
             rounding_factor = 5
             eval_start_time = time()
 
             metric_objects = [m(recommendations, self._data.config, self._params, eval_objs) for m in self._metrics]
             for metric in self._additional_metrics:
-                metric_objects.extend(metrics.parse_metric(metric.name)(recommendations, self._data.config, self._params, eval_objs).get())
+                metric_objects.extend(metrics.parse_metric(metric["metric"])(recommendations, self._data.config, self._params, eval_objs, metric).get())
             results = {m.name(): m.eval() for m in metric_objects}
 
             str_results = {k: str(round(v, rounding_factor)) for k, v in results.items()}
