@@ -2,7 +2,21 @@
 Module description:
 
 """
+"""
 
+evaluation:
+  basic_metrics: [nDCG, Precision, Recall, ItemCoverage]
+  cutoff: 50
+  relevance: 1
+  paired_ttest: True
+  additional_metrics:
+    - name: MAD
+      class_file: path
+    - name: alpha_ndcg
+      alpha: 0.2
+    - name: IELD
+      content_file: path
+"""
 __version__ = '0.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
