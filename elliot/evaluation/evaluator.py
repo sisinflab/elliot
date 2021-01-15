@@ -28,9 +28,12 @@ class Evaluator(object):
         self._rel_threshold = data.config.relevance
         self._paired_ttest = self._data.config.paired_ttest
         self._metrics = metrics.parse_metrics(data.config.metrics)
+        #TODO
+        self._additional_metrics = data.config.evaluation.additional_metrics
         self._test = data.get_test()
 
-        self._evaluation_objects = SimpleNamespace(relevance=relevance.Relevance(self._test, self._rel_threshold))
+        self._evaluation_objects = SimpleNamespace(relevance=relevance.Relevance(self._test, self._rel_threshold),
+                                                   additional_metrics=self._additional_metrics)
         if data.get_validation():
             self._val = data.get_validation()
             self._val_evaluation_objects = SimpleNamespace(relevance=relevance.Relevance(self._val, self._rel_threshold))
@@ -67,10 +70,10 @@ class Evaluator(object):
             rounding_factor = 5
             eval_start_time = time()
 
-            results = {
-                m.name(): m(recommendations, self._data.config, self._params, eval_objs).eval()
-                for m in self._metrics
-            }
+            metric_objects = [m(recommendations, self._data.config, self._params, eval_objs) for m in self._metrics]
+            for metric in self._additional_metrics:
+                metric_objects.extend(metrics.parse_metric(metric.name)(recommendations, self._data.config, self._params, eval_objs).get())
+            results = {m.name(): m.eval() for m in metric_objects}
 
             str_results = {k: str(round(v, rounding_factor)) for k, v in results.items()}
             print(f"\nEval Time: {time() - eval_start_time}")

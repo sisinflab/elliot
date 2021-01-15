@@ -28,3 +28,7 @@ _metric_dictionary = {
 
 def parse_metrics(metrics):
     return [_metric_dictionary[m] for m in metrics if m in _metric_dictionary.keys()]
+
+
+def parse_metric(metric):
+    return _metric_dictionary[metric] if metric in _metric_dictionary.keys() else None
