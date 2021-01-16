@@ -25,7 +25,7 @@ class Recall(BaseMetric):
         :param relevant_items: list of relevant items (binary) per user in the form {user: [item1,...]}
         """
         super().__init__(recommendations, config, params, eval_objects)
-        self._cutoff = self._config.top_k
+        self._cutoff = self._evaluation_objects.cutoff
         self._relevant_items = self._evaluation_objects.relevance.get_binary_relevance()
 
     @staticmethod
@@ -46,7 +46,7 @@ class Recall(BaseMetric):
         :return: the value of the Recall metric for the specific user
         """
         # TODO check formula
-        return sum([1 for i in user_recommendations if i[0] in user_relevant_items]) / \
+        return sum([1 for i in user_recommendations[:cutoff] if i[0] in user_relevant_items]) / \
                min(len(user_relevant_items), cutoff)
 
     def eval(self):

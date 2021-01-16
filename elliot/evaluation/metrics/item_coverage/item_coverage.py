@@ -24,7 +24,7 @@ class ItemCoverage(BaseMetric):
         :param relevant_items: list of relevant items (binary) per user in the form {user: [item1,...]}
         """
         super().__init__(recommendations, config, params, eval_objects)
-        self._cutoff = self._config.top_k
+        self._cutoff = self._evaluation_objects.cutoff
 
     @staticmethod
     def name():

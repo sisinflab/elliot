@@ -11,7 +11,7 @@ import numpy as np
 from ..base_metric import BaseMetric
 
 
-class Precision(BaseMetric):
+class MAP(BaseMetric):
     """
     This class represents the implementation of the Precision recommendation metric.
     Passing 'Precision' to the metrics list will enable the computation of the metric.
@@ -34,7 +34,18 @@ class Precision(BaseMetric):
         Metric Name Getter
         :return: returns the public name of the metric
         """
-        return "Precision"
+        return "MAP"
+
+    @staticmethod
+    def __user_ap(user_recommendations, cutoff, user_relevant_items):
+        """
+        Per User Precision
+        :param user_recommendations: list of user recommendation in the form [(item1,value1),...]
+        :param cutoff: numerical threshold to limit the recommendation list
+        :param user_relevant_items: list of user relevant items in the form [item1,...]
+        :return: the value of the Precision metric for the specific user
+        """
+        return np.average([MAP.__user_precision(user_recommendations[:cutoff], (n+1), user_relevant_items) for n in range(cutoff)])
 
     @staticmethod
     def __user_precision(user_recommendations, cutoff, user_relevant_items):
@@ -45,7 +56,7 @@ class Precision(BaseMetric):
         :param user_relevant_items: list of user relevant items in the form [item1,...]
         :return: the value of the Precision metric for the specific user
         """
-        return sum([1 for i in user_recommendations[:cutoff] if i[0] in user_relevant_items]) / cutoff
+        return sum([1 for i in user_recommendations if i[0] in user_relevant_items]) / min(len(user_relevant_items), cutoff)
 
     def eval(self):
         """
@@ -53,7 +64,7 @@ class Precision(BaseMetric):
         :return: the overall averaged value of Precision
         """
         return np.average(
-            [Precision.__user_precision(u_r, self._cutoff, self._relevant_items[u])
+            [MAP.__user_ap(u_r, self._cutoff, self._relevant_items[u])
              for u, u_r in self._recommendations.items()]
         )
 
@@ -62,6 +73,6 @@ class Precision(BaseMetric):
         Evaluation function
         :return: the overall averaged value of Precision
         """
-        return {u: Precision.__user_precision(u_r, self._cutoff, self._relevant_items[u])
+        return {u: MAP.__user_ap(u_r, self._cutoff, self._relevant_items[u])
              for u, u_r in self._recommendations.items()}
 

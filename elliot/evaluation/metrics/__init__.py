@@ -18,13 +18,19 @@ from .recall import Recall
 from .item_coverage import ItemCoverage
 from .statistical_array_metric import StatisticalMetric
 from .MAD import UserMADrating
+from .hit_rate import HR
+from .mrr import MRR
+from .map import MAP
 
 _metric_dictionary = {
     "nDCG": NDCG,
     "Precision": Precision,
     "Recall": Recall,
     "ItemCoverage": ItemCoverage,
-    "UserMADrating": UserMADrating
+    "UserMADrating": UserMADrating,
+    "HR": HR,
+    "MRR": MRR,
+    "MAP": MAP
 }
 
 

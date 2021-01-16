@@ -27,7 +27,7 @@ class NDCG(BaseMetric):
         :param relevant_items: list of relevant items (binary) per user in the form {user: [item1,...]}
         """
         super().__init__(recommendations, config, params, eval_objects)
-        self._cutoff = self._config.top_k
+        self._cutoff = self._evaluation_objects.cutoff
         self._relevance_map = self._evaluation_objects.relevance.get_discounted_relevance()
         self.rel_threshold = self._evaluation_objects.relevance._rel_threshold
 
@@ -86,7 +86,7 @@ class NDCG(BaseMetric):
         :return: the value of the nDCG metric for the specific user
         """
 
-        ndcg: float = NDCG.compute_user_ndcg(user_recommendations, user_gain_map, cutoff)
+        ndcg: float = NDCG.compute_user_ndcg(user_recommendations[:cutoff], user_gain_map, cutoff)
 
         return ndcg
 

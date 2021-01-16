@@ -1,5 +1,5 @@
 """
-This is the implementation of the Precision metric.
+This is the implementation of the HR metric.
 It proceeds from a user-wise computation, and average the values over the users.
 """
 
@@ -8,16 +8,17 @@ __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
 import numpy as np
+import typing as t
 from ..base_metric import BaseMetric
 
 
-class Precision(BaseMetric):
+class HR(BaseMetric):
     """
-    This class represents the implementation of the Precision recommendation metric.
+    This class represents the implementation of the HR recommendation metric.
     Passing 'Precision' to the metrics list will enable the computation of the metric.
     """
 
-    def __init__(self, recommendations, config, params, eval_objects):
+    def __init__(self, recommendations: t.Dict[int, t.List[t.Tuple[int, float]]], config, params, eval_objects):
         """
         Constructor
         :param recommendations: list of recommendations in the form {user: [(item1,value1),...]}
@@ -34,10 +35,10 @@ class Precision(BaseMetric):
         Metric Name Getter
         :return: returns the public name of the metric
         """
-        return "Precision"
+        return "HR"
 
     @staticmethod
-    def __user_precision(user_recommendations, cutoff, user_relevant_items):
+    def __user_HR(user_recommendations, cutoff, user_relevant_items):
         """
         Per User Precision
         :param user_recommendations: list of user recommendation in the form [(item1,value1),...]
@@ -45,7 +46,7 @@ class Precision(BaseMetric):
         :param user_relevant_items: list of user relevant items in the form [item1,...]
         :return: the value of the Precision metric for the specific user
         """
-        return sum([1 for i in user_recommendations[:cutoff] if i[0] in user_relevant_items]) / cutoff
+        return sum([1 for i in user_recommendations[:cutoff] if i[0] in user_relevant_items]) > 0
 
     def eval(self):
         """
@@ -53,7 +54,7 @@ class Precision(BaseMetric):
         :return: the overall averaged value of Precision
         """
         return np.average(
-            [Precision.__user_precision(u_r, self._cutoff, self._relevant_items[u])
+            [HR.__user_HR(u_r, self._cutoff, self._relevant_items[u])
              for u, u_r in self._recommendations.items()]
         )
 
@@ -62,6 +63,6 @@ class Precision(BaseMetric):
         Evaluation function
         :return: the overall averaged value of Precision
         """
-        return {u: Precision.__user_precision(u_r, self._cutoff, self._relevant_items[u])
+        return {u: HR.__user_HR(u_r, self._cutoff, self._relevant_items[u])
              for u, u_r in self._recommendations.items()}
 

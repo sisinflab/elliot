@@ -71,7 +71,7 @@ class DataSetLoader:
 
             print('{0} - Loaded'.format(path_dataset))
 
-            self.dataframe = PreFilter.filter(self.dataframe, self.config.prefiltering)
+            self.dataframe = PreFilter.filter(self.dataframe, self.config)
 
             splitter = Splitter(self.dataframe, self.config.splitting)
             self.tuple_list = splitter.process_splitting()

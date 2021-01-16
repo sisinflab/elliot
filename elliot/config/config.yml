@@ -14,8 +14,8 @@ experiment:
 #        features: ../data/{0}/features.tsv
 #        properties: ../data/{0}/properties.conf
 #  splitting:
-#    save_on_disk: True
-#    save_folder: ../data/{0}/splitting/
+##    save_on_disk: True
+##    save_folder: ../data/{0}/splitting/
 #    test_splitting:
 #        strategy: random_subsampling
 #        leave_n_out: 1
@@ -41,7 +41,7 @@ experiment:
   top_k: 50
   evaluation:
     cutoff: 10
-    base_metrics: [ nDCG, Precision, Recall, ItemCoverage ]
+    base_metrics: [ nDCG, Precision, Recall, ItemCoverage, HR, MRR, MAP ]
 #    cutoff: 50
     relevance: 1
     paired_ttest: True

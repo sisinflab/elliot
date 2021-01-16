@@ -24,7 +24,7 @@ class BaseMetric(ABC):
         :param cutoff: numerical threshold to limit the recommendation list
         :param relevant_items: list of relevant items (binary) per user in the form {user: [item1,...]}
         """
-        self._recommendations: t.List[t.Tuple[int, float]] = recommendations
+        self._recommendations: t.Dict[int, t.List[t.Tuple[int, float]]] = recommendations
         self._config = config
         self._params = params
         self._evaluation_objects = evaluation_objects

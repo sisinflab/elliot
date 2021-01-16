@@ -48,10 +48,13 @@ class Evaluator(object):
         self._test = data.get_test()
 
         self._evaluation_objects = SimpleNamespace(relevance=relevance.Relevance(self._test, self._rel_threshold),
+                                                   cutoff=self._k,
                                                    additional_metrics=self._additional_metrics)
         if data.get_validation():
             self._val = data.get_validation()
-            self._val_evaluation_objects = SimpleNamespace(relevance=relevance.Relevance(self._val, self._rel_threshold))
+            self._val_evaluation_objects = SimpleNamespace(relevance=relevance.Relevance(self._val, self._rel_threshold),
+                                                           cutoff=self._k,
+                                                           additional_metrics=self._additional_metrics)
 
     def eval(self, recommendations):
         """
@@ -81,7 +84,7 @@ class Evaluator(object):
         if (not test_data) or (not eval_objs):
             return None, None
         else:
-            recommendations = {u: recs[:self._k] for u, recs in recommendations.items() if test_data[u]}
+            recommendations = {u: recs for u, recs in recommendations.items() if test_data[u]}
             rounding_factor = 5
             eval_start_time = time()
 

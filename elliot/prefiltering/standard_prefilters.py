@@ -15,6 +15,11 @@ class PreFilter:
 
     @staticmethod
     def filter(d: pd.DataFrame, ns: SimpleNamespace) -> pd.DataFrame:
+
+        if not hasattr(ns, "prefiltering"):
+            return d
+        ns = ns.prefiltering
+
         strategy = getattr(ns, "strategy", None)
         data = d.copy()
         if strategy == "global_threshold":
