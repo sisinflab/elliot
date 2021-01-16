@@ -26,6 +26,8 @@ from .mse import MSE
 from .rmse import RMSE
 from .f1 import F1
 from .DSC import DSC
+from .gini_index import GiniIndex
+from .shannon_entropy import ShannonEntropy
 
 _metric_dictionary = {
     "nDCG": NDCG,
@@ -40,7 +42,9 @@ _metric_dictionary = {
     "MSE": MSE,
     "RMSE": RMSE,
     "F1": F1,
-    "DSC": DSC
+    "DSC": DSC,
+    "Gini": GiniIndex,
+    "SEntropy": ShannonEntropy
 }
 
 

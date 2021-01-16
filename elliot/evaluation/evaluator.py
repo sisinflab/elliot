@@ -50,11 +50,13 @@ class Evaluator(object):
 
         self._evaluation_objects = SimpleNamespace(relevance=relevance.Relevance(self._test, self._rel_threshold),
                                                    cutoff=self._k,
+                                                   num_items=self._data.num_items,
                                                    additional_metrics=self._additional_metrics)
         if data.get_validation():
             self._val = data.get_validation()
             self._val_evaluation_objects = SimpleNamespace(relevance=relevance.Relevance(self._val, self._rel_threshold),
                                                            cutoff=self._k,
+                                                           num_items=self._data.num_items,
                                                            additional_metrics=self._additional_metrics)
         self._needed_recommendations = self._compute_needed_recommendations()
 
