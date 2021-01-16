@@ -46,3 +46,6 @@ class Relevance(object):
         :return:
         """
         return {u: [i for i, r in test_items.items() if r >= self._rel_threshold] for u, test_items in self._test.items()}
+
+    def get_test(self):
+        return self._test

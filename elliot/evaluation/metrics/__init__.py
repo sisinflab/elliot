@@ -21,6 +21,9 @@ from .MAD import UserMADrating
 from .hit_rate import HR
 from .mrr import MRR
 from .map import MAP
+from .mae import MAE
+from .mse import MSE
+from .rmse import RMSE
 
 _metric_dictionary = {
     "nDCG": NDCG,
@@ -30,7 +33,10 @@ _metric_dictionary = {
     "UserMADrating": UserMADrating,
     "HR": HR,
     "MRR": MRR,
-    "MAP": MAP
+    "MAP": MAP,
+    "MAE": MAE,
+    "MSE": MSE,
+    "RMSE": RMSE
 }
 
 

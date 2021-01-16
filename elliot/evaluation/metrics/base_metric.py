@@ -37,3 +37,8 @@ class BaseMetric(ABC):
     @abstractmethod
     def eval(self):
         pass
+
+    @staticmethod
+    def needs_full_recommendations():
+        return False
+

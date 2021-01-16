@@ -22,6 +22,7 @@ __version__ = '0.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
+import warnings
 from time import time
 from types import SimpleNamespace
 
@@ -55,6 +56,7 @@ class Evaluator(object):
             self._val_evaluation_objects = SimpleNamespace(relevance=relevance.Relevance(self._val, self._rel_threshold),
                                                            cutoff=self._k,
                                                            additional_metrics=self._additional_metrics)
+        self._needed_recommendations = self._compute_needed_recommendations()
 
     def eval(self, recommendations):
         """
@@ -84,7 +86,7 @@ class Evaluator(object):
         if (not test_data) or (not eval_objs):
             return None, None
         else:
-            recommendations = {u: recs for u, recs in recommendations.items() if test_data[u]}
+            recommendations = {u: recs for u, recs in recommendations.items() if test_data.get(u, [])}
             rounding_factor = 5
             eval_start_time = time()
 
@@ -108,3 +110,18 @@ class Evaluator(object):
                                         in self._metrics]
                                        if isinstance(metric_object, metrics.StatisticalMetric)}
             return results, statistical_results
+
+    def _compute_needed_recommendations(self):
+        full_recommendations_metrics = any([m.needs_full_recommendations() for m in self._metrics])
+        full_recommendations_additional_metrics = any([metrics.parse_metric(metric["metric"]).needs_full_recommendations() for metric in self._additional_metrics])
+        if full_recommendations_metrics:
+            warnings.warn("*** WARNING: At least one basic metric requires full length recommendations")
+        if full_recommendations_additional_metrics:
+            warnings.warn("*** WARNING: At least one additional metric requires full length recommendations", None, 1, None)
+        if full_recommendations_metrics or full_recommendations_metrics:
+            return self._data.num_items
+        else:
+            return self._data.config.top_k
+
+    def get_needed_recommendations(self):
+        return self._needed_recommendations
