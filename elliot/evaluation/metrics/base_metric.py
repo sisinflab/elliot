@@ -42,3 +42,6 @@ class BaseMetric(ABC):
     def needs_full_recommendations():
         return False
 
+    def get(self):
+        return [self]
+

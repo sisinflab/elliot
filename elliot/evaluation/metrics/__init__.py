@@ -24,6 +24,8 @@ from .map import MAP
 from .mae import MAE
 from .mse import MSE
 from .rmse import RMSE
+from .f1 import F1
+from .DSC import DSC
 
 _metric_dictionary = {
     "nDCG": NDCG,
@@ -36,7 +38,9 @@ _metric_dictionary = {
     "MAP": MAP,
     "MAE": MAE,
     "MSE": MSE,
-    "RMSE": RMSE
+    "RMSE": RMSE,
+    "F1": F1,
+    "DSC": DSC
 }
 
 
