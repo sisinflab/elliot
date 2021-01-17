@@ -12,7 +12,7 @@ import numpy as np
 from ..base_metric import BaseMetric
 
 
-class EFD(BaseMetric):
+class EPC(BaseMetric):
     """
     This class represents the implementation of the Precision recommendation metric.
     Passing 'Precision' to the metrics list will enable the computation of the metric.
@@ -35,9 +35,9 @@ class EFD(BaseMetric):
         Metric Name Getter
         :return: returns the public name of the metric
         """
-        return "EFD"
+        return "EPC"
 
-    def __user_EFD(self, user_recommendations, cutoff, user_relevant_items):
+    def __user_EPC(self, user_recommendations, cutoff, user_relevant_items):
         """
         Per User EFD
         :param user_recommendations: list of user recommendation in the form [(item1,value1),...]
@@ -50,8 +50,8 @@ class EFD(BaseMetric):
         norm = 0
         for r, (i, _) in enumerate(user_recommendations[:cutoff]):
             if i in user_relevant_items:
-                nov += EFD.__discount_k(r) * self._item_novelty_dict.get(i, self._max_nov)
-            norm += EFD.__discount_k(r)
+                nov += EPC.__discount_k(r) * self._item_novelty_dict.get(i, 1)
+            norm += EPC.__discount_k(r)
 
         if norm > 0:
             nov /= norm
@@ -68,17 +68,15 @@ class EFD(BaseMetric):
         :return: the overall averaged value of Precision
         """
 
-        self._item_count = {}
+        item_count = {}
         for u_h in self._evaluation_objects.data.train_dict.values():
             for i in u_h.keys():
-                self._item_count[i] = self._item_count.get(i, 0) + 1
+                item_count[i] = item_count.get(i, 0) + 1
 
-        novelty_profile = self._item_count.values()
-        norm = sum(novelty_profile)
-        self._max_nov = -math.log(min(novelty_profile) / norm) / math.log(2)
-        self._item_novelty_dict = {i: -math.log(v / norm) / math.log(2) for i, v in self._item_count.items()}
+        num_users = len(self._evaluation_objects.data.train_dict)
+        self._item_novelty_dict = {i: 1 - (v / num_users) for i, v in item_count.items()}
 
-        a = [self.__user_EFD(u_r, self._cutoff, self._relevant_items[u])
+        a = [self.__user_EPC(u_r, self._cutoff, self._relevant_items[u])
              for u, u_r in self._recommendations.items()]
         return np.average(a)
 
@@ -88,16 +86,15 @@ class EFD(BaseMetric):
         :return: the overall averaged value of Precision
         """
 
-        self._item_count = {}
+
+        item_count = {}
         for u_h in self._evaluation_objects.data.train_dict.values():
             for i in u_h.keys():
-                self._item_count[i] = self._item_count.get(i, 0) + 1
+                item_count[i] = item_count.get(i, 0) + 1
 
-        novelty_profile = self._item_count.values()
-        norm = sum(novelty_profile)
-        self._max_nov = -math.log(min(novelty_profile) / norm) / math.log(2)
-        self._item_novelty_dict = {i: -math.log(v / norm) / math.log(2) for i, v in self._item_count.items()}
+        num_users = len(self._evaluation_objects.data.train_dict)
+        self._item_novelty_dict = {i: 1 - (v / num_users) for i, v in item_count.items()}
 
-        return {u: self.__user_EFD(u_r, self._cutoff, self._relevant_items[u])
+        return {u: self.__user_EPC(u_r, self._cutoff, self._relevant_items[u])
                 for u, u_r in self._recommendations.items()}
 

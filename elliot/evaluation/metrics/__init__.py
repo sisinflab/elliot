@@ -29,6 +29,7 @@ from .DSC import DSC
 from .gini_index import GiniIndex
 from .shannon_entropy import ShannonEntropy
 from .EFD import EFD
+from .EPC import EPC
 
 _metric_dictionary = {
     "nDCG": NDCG,
@@ -46,7 +47,8 @@ _metric_dictionary = {
     "DSC": DSC,
     "Gini": GiniIndex,
     "SEntropy": ShannonEntropy,
-    "EFD": EFD
+    "EFD": EFD,
+    "EPC": EPC
 }
 
 
