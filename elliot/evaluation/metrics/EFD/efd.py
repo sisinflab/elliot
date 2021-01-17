@@ -29,8 +29,8 @@ class EFD(BaseMetric):
         self._cutoff = self._evaluation_objects.cutoff
         self._relevant_items = self._evaluation_objects.relevance.get_binary_relevance()
         self._item_count = {}
-        for u, u_r in self._recommendations.items():
-            for i, _ in u_r[:self._cutoff]:
+        for u_h in self._evaluation_objects.data.train_dict.values():
+            for i in u_h.keys():
                 self._item_count[i] = self._item_count.get(i, 0) + 1
 
     @staticmethod
@@ -41,7 +41,7 @@ class EFD(BaseMetric):
         """
         return "EFD"
 
-    def __user_EFD(self, user_recommendations, cutoff, user_relevant_items):
+    def __user_EFD(self, user_recommendations, cutoff, user_relevant_items, user_train_data):
         """
         Per User EFD
         :param user_recommendations: list of user recommendation in the form [(item1,value1),...]
@@ -49,10 +49,10 @@ class EFD(BaseMetric):
         :param user_relevant_items: list of user relevant items in the form [item1,...]
         :return: the value of the Precision metric for the specific user
         """
-        user_novelty_profile = [self._item_count[i] for i, _ in user_recommendations[:cutoff]]
+        user_novelty_profile = [self._item_count[i] for i in user_train_data.keys()]
         norm = sum(user_novelty_profile)
         max_nov = -math.log(min(user_novelty_profile) / norm) / math.log(2)
-        item_novelty_dict = {i: -math.log(self._item_count.get(i, max_nov) / norm) / math.log(2) for i, _ in user_recommendations[:cutoff]}
+        item_novelty_dict = {i: -math.log(self._item_count.get(i) / norm) / math.log(2) for i in user_train_data.keys()}
 
         nov = 0
         norm = 0
@@ -76,7 +76,7 @@ class EFD(BaseMetric):
         :return: the overall averaged value of Precision
         """
         return np.average(
-            [self.__user_EFD(u_r, self._cutoff, self._relevant_items[u])
+            [self.__user_EFD(u_r, self._cutoff, self._relevant_items[u], self._evaluation_objects.data.train_dict[u])
              for u, u_r in self._recommendations.items()]
         )
 
@@ -85,6 +85,6 @@ class EFD(BaseMetric):
         Evaluation function
         :return: the overall averaged value of Precision
         """
-        return {u: self.__user_EFD(u_r, self._cutoff, self._relevant_items[u])
+        return {u: self.__user_EFD(u_r, self._cutoff, self._relevant_items[u], self._evaluation_objects.data.train_dict[u])
                 for u, u_r in self._recommendations.items()}
 
