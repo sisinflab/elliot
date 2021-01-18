@@ -12,25 +12,25 @@ __version__ = '0.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
-from .ndcg import NDCG
-from .precision import Precision
-from .recall import Recall
-from .item_coverage import ItemCoverage
-from .statistical_array_metric import StatisticalMetric
-from .MAD import UserMADrating
-from .hit_rate import HR
-from .mrr import MRR
-from .map import MAP
-from .mae import MAE
-from .mse import MSE
-from .rmse import RMSE
-from .f1 import F1
-from .DSC import DSC
-from .gini_index import GiniIndex
-from .shannon_entropy import ShannonEntropy
-from .EFD import EFD
-from .EPC import EPC
-from .AUC import LAUC, AUC, GAUC
+from evaluation.metrics.accuracy.ndcg import NDCG
+from evaluation.metrics.accuracy.precision import Precision
+from evaluation.metrics.accuracy.recall import Recall
+from evaluation.metrics.diversity.item_coverage import ItemCoverage
+from evaluation.metrics.statistical_array_metric import StatisticalMetric
+from evaluation.metrics.fairness.MAD import UserMADrating
+from evaluation.metrics.accuracy.hit_rate import HR
+from evaluation.metrics.accuracy.mrr import MRR
+from evaluation.metrics.accuracy.map import MAP
+from evaluation.metrics.rating.mae import MAE
+from evaluation.metrics.rating.mse import MSE
+from evaluation.metrics.rating.rmse import RMSE
+from evaluation.metrics.accuracy.f1 import F1
+from evaluation.metrics.accuracy.DSC import DSC
+from evaluation.metrics.diversity.gini_index import GiniIndex
+from evaluation.metrics.diversity.shannon_entropy import ShannonEntropy
+from evaluation.metrics.novelty.EFD import EFD
+from evaluation.metrics.novelty.EPC import EPC
+from evaluation.metrics.accuracy.AUC import LAUC, AUC, GAUC
 
 _metric_dictionary = {
     "nDCG": NDCG,

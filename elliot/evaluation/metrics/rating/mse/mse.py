@@ -7,12 +7,11 @@ __version__ = '0.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
-import math
 import numpy as np
-from ..base_metric import BaseMetric
+from evaluation.metrics.base_metric import BaseMetric
 
 
-class ShannonEntropy(BaseMetric):
+class MSE(BaseMetric):
     """
     This class represents the implementation of the Precision recommendation metric.
     Passing 'Precision' to the metrics list will enable the computation of the metric.
@@ -27,11 +26,9 @@ class ShannonEntropy(BaseMetric):
         """
         super().__init__(recommendations, config, params, eval_objects)
         self._cutoff = self._evaluation_objects.cutoff
-        self._num_items = self._evaluation_objects.num_items
-        self._item_count = {}
-        self._item_weights = {}
-        self._free_norm = 0
-        self._ln2 = math.log(2.0)
+        self._relevant_items = self._evaluation_objects.relevance.get_binary_relevance()
+        self._total_relevant_items = sum([len(self._relevant_items[u]) for u, _ in self._recommendations.items()])
+        self._test = self._evaluation_objects.relevance.get_test()
 
     @staticmethod
     def name():
@@ -39,9 +36,10 @@ class ShannonEntropy(BaseMetric):
         Metric Name Getter
         :return: returns the public name of the metric
         """
-        return "SEntropy"
+        return "MSE"
 
-    def __user_se(self, user_recommendations, cutoff):
+    @staticmethod
+    def __user_MSE(user_recommendations, user_test, user_relevant_items):
         """
         Per User Precision
         :param user_recommendations: list of user recommendation in the form [(item1,value1),...]
@@ -49,24 +47,26 @@ class ShannonEntropy(BaseMetric):
         :param user_relevant_items: list of user relevant items in the form [item1,...]
         :return: the value of the Precision metric for the specific user
         """
-        user_norm = len(user_recommendations[:cutoff])
-        self._free_norm += user_norm
-        for i, _ in user_recommendations[:cutoff]:
-            self._item_count[i] = self._item_count.get(i, 0) + 1
-            self._item_weights[i] = self._item_weights.get(i, 0) + (1 / user_norm)
-
-    def __sales_novelty(self, i):
-        return -math.log(self._item_count[i] / self._free_norm) / self._ln2
+        return sum([(v - user_test[i])**2 for i, v in user_recommendations if i in user_relevant_items])
 
     def eval(self):
         """
         Evaluation function
         :return: the overall averaged value of Precision
         """
+        return sum(
+            [MSE.__user_MSE(u_r, self._test[u], self._relevant_items[u])
+             for u, u_r in self._recommendations.items()]
+        ) / self._total_relevant_items
 
-        for u, u_r in self._recommendations.items():
-            self.__user_se(u_r, self._cutoff)
+    def eval_user_metric(self):
+        """
+        Evaluation function
+        :return: the overall averaged value of Precision
+        """
+        return {u: MSE.__user_MSE(u_r, self._test[u], self._relevant_items[u])/len(self._relevant_items[u])
+             for u, u_r in self._recommendations.items()}
 
-        return sum([w * self.__sales_novelty(i) for i, w in self._item_weights.items()])/len(self._recommendations)
-
-
+    @staticmethod
+    def needs_full_recommendations():
+        return True

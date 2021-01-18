@@ -9,10 +9,10 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
 import numpy as np
 import pandas as pd
-from ..base_metric import BaseMetric
+from evaluation.metrics.base_metric import BaseMetric
 
 
-class UserMADrating(BaseMetric):
+class ItemMADrating(BaseMetric):
     """
     This class represents the implementation of the Precision recommendation metric.
     Passing 'Precision' to the metrics list will enable the computation of the metric.
@@ -26,13 +26,13 @@ class UserMADrating(BaseMetric):
         :param relevant_items: list of relevant items (binary) per user in the form {user: [item1,...]}
         """
         super().__init__(recommendations, config, params, eval_objects, additional_data)
-        self._cutoff = self._evaluation_objects.cutoff
+        self._cutoff = self._config.top_k
         self._relevant_items = self._evaluation_objects.relevance.get_binary_relevance()
-        self._user_clustering = pd.read_csv(self._additional_data["clustering_file"], sep="\t", header=None)
-        self._n_clusters = self._user_clustering[1].nunique()
-        self._user_clustering = dict(zip(self._user_clustering[0], self._user_clustering[1]))
+        self._item_clustering = pd.read_csv(self._additional_data["clustering_file"], sep="\t", header=None)
+        self._n_clusters = self._item_clustering[1].nunique()
+        self._item_clustering = dict(zip(self._item_clustering[0], self._item_clustering[1]))
         self._sum = np.zeros(self._n_clusters)
-        self._n_users = np.zeros(self._n_clusters)
+        self._n_items = np.zeros(self._n_clusters)
 
     def name(self):
         """
@@ -42,7 +42,7 @@ class UserMADrating(BaseMetric):
         return f"UserMADrating_{self._additional_data['clustering_name']}"
 
     @staticmethod
-    def __user_mad(user_recommendations, cutoff, user_relevant_items):
+    def __user_mad(user_recommendations, user_relevant_items):
         """
         Per User Precision
         :param user_recommendations: list of user recommendation in the form [(item1,value1),...]
@@ -51,7 +51,7 @@ class UserMADrating(BaseMetric):
         :return: the value of the Precision metric for the specific user
         """
         # return np.average([i[1] for i in user_recommendations if i[0] in user_relevant_items])
-        return np.average([i[1] for i in user_recommendations[:cutoff]])
+        return np.average([i[1] for i in user_recommendations])
 
     def eval(self):
         """
@@ -59,7 +59,7 @@ class UserMADrating(BaseMetric):
         :return: the overall averaged value of Precision
         """
         for u, u_r in self._recommendations.items():
-            v = UserMADrating.__user_mad(u_r, self._cutoff, self._relevant_items[u])
+            v = ItemMADrating.__user_mad(u_r, self._relevant_items[u])
             cluster = self._user_clustering.get(u, None)
             if cluster is not None:
                 self._sum[cluster] += v

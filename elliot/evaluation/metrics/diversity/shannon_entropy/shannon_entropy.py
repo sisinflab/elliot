@@ -7,11 +7,12 @@ __version__ = '0.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
+import math
 import numpy as np
-from ..base_metric import BaseMetric
+from evaluation.metrics.base_metric import BaseMetric
 
 
-class GiniIndex(BaseMetric):
+class ShannonEntropy(BaseMetric):
     """
     This class represents the implementation of the Precision recommendation metric.
     Passing 'Precision' to the metrics list will enable the computation of the metric.
@@ -28,7 +29,9 @@ class GiniIndex(BaseMetric):
         self._cutoff = self._evaluation_objects.cutoff
         self._num_items = self._evaluation_objects.num_items
         self._item_count = {}
+        self._item_weights = {}
         self._free_norm = 0
+        self._ln2 = math.log(2.0)
 
     @staticmethod
     def name():
@@ -36,9 +39,9 @@ class GiniIndex(BaseMetric):
         Metric Name Getter
         :return: returns the public name of the metric
         """
-        return "Gini"
+        return "SEntropy"
 
-    def __user_gini(self, user_recommendations, cutoff):
+    def __user_se(self, user_recommendations, cutoff):
         """
         Per User Precision
         :param user_recommendations: list of user recommendation in the form [(item1,value1),...]
@@ -50,6 +53,10 @@ class GiniIndex(BaseMetric):
         self._free_norm += user_norm
         for i, _ in user_recommendations[:cutoff]:
             self._item_count[i] = self._item_count.get(i, 0) + 1
+            self._item_weights[i] = self._item_weights.get(i, 0) + (1 / user_norm)
+
+    def __sales_novelty(self, i):
+        return -math.log(self._item_count[i] / self._free_norm) / self._ln2
 
     def eval(self):
         """
@@ -58,14 +65,8 @@ class GiniIndex(BaseMetric):
         """
 
         for u, u_r in self._recommendations.items():
-            self.__user_gini(u_r, self._cutoff)
+            self.__user_se(u_r, self._cutoff)
 
-        n_recommended_items = len(self._item_count)
-
-        gini = sum([(2 * (j + (self._num_items - n_recommended_items) + 1) - self._num_items - 1) * (cs / self._free_norm) for j, cs in enumerate(sorted(self._item_count.values()))])
-        gini /= (self._num_items - 1)
-        gini = 1 - gini
-
-        return gini
+        return sum([w * self.__sales_novelty(i) for i, w in self._item_weights.items()])/len(self._recommendations)
 
 

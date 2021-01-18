@@ -9,7 +9,7 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
 import math
 import numpy as np
-from ..base_metric import BaseMetric
+from evaluation.metrics.base_metric import BaseMetric
 
 
 class EFD(BaseMetric):
