@@ -41,7 +41,7 @@ experiment:
   top_k: 50
   evaluation:
     cutoff: 10
-    base_metrics: [ nDCG, Precision, Recall, ItemCoverage, HR, MRR, MAP, F1, Gini, SEntropy, EFD, EPC, LAUC, AUC, GAUC ]
+    base_metrics: [ nDCG, Precision, Recall, ItemCoverage, HR, MRR, MAP, F1, Gini, SEntropy, EFD, EPC, LAUC]
 #    cutoff: 50
     relevance: 1
     paired_ttest: True

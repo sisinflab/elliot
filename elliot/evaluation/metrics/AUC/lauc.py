@@ -46,17 +46,16 @@ class LAUC(BaseMetric):
         :param user_relevant_items: list of user relevant items in the form [item1,...]
         :return: the value of the Precision metric for the specific user
         """
-        neg_num = num_items - train_size
-
-        return sum([(neg_num - r)/neg_num for r, (i, _) in enumerate(user_recommendations[:cutoff]) if i in user_relevant_items])/cutoff
+        neg_num = num_items - train_size - len(user_relevant_items) + 1
+        pos_ranks = [r for r, (i, _) in enumerate(user_recommendations[:cutoff]) if i in user_relevant_items]
+        return sum([(neg_num - r_r + p_r)/(neg_num) for p_r, r_r in enumerate(pos_ranks)])/min(cutoff, len(user_relevant_items))
 
     def eval(self):
         """
         Evaluation function
         :return: the overall averaged value of Precision
         """
-        # a = [LAUC.__user_auc_at_k(u_r, self._cutoff, self._relevant_items[u], self._num_items, len(self._evaluation_objects.data.train_dict[u]))
-        #      for u, u_r in self._recommendations.items()]
+
         return np.average(
             [LAUC.__user_auc_at_k(u_r, self._cutoff, self._relevant_items[u], self._num_items, len(self._evaluation_objects.data.train_dict[u]))
              for u, u_r in self._recommendations.items()]

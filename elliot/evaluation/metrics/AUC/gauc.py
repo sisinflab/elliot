@@ -46,9 +46,9 @@ class GAUC(BaseMetric):
         :param user_relevant_items: list of user relevant items in the form [item1,...]
         :return: the value of the Precision metric for the specific user
         """
-        neg_num = num_items - train_size
-
-        return sum([(neg_num - r)/neg_num for r, (i, _) in enumerate(user_recommendations) if i in user_relevant_items])/len(user_relevant_items)
+        neg_num = num_items - train_size - len(user_relevant_items) + 1
+        pos_ranks = [r for r, (i, _) in enumerate(user_recommendations) if i in user_relevant_items]
+        return sum([(neg_num - r_r + p_r)/(neg_num) for p_r, r_r in enumerate(pos_ranks)])/len(user_relevant_items)
 
     def eval(self):
         """
