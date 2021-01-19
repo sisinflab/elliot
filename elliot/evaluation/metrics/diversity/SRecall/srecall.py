@@ -21,8 +21,9 @@ class SRecall(BaseMetric):
         """
         Constructor
         :param recommendations: list of recommendations in the form {user: [(item1,value1),...]}
-        :param cutoff: numerical threshold to limit the recommendation list
-        :param relevant_items: list of relevant items (binary) per user in the form {user: [item1,...]}
+        :param config: SimpleNameSpace that represents the configuration of the experiment
+        :param params: Parameters of the model
+        :param eval_objects: list of objects that may be useful for the computation of the different metrics
         """
         super().__init__(recommendations, config, params, eval_objects, additional_data)
         self._cutoff = self._evaluation_objects.cutoff
@@ -41,7 +42,7 @@ class SRecall(BaseMetric):
     @staticmethod
     def __user_srecall(user_recommendations, cutoff, user_relevant_items, feature_map, total_features):
         """
-        Per User F-score
+        Per User SRecall
         :param user_recommendations: list of user recommendation in the form [(item1,value1),...]
         :param cutoff: numerical threshold to limit the recommendation list
         :param user_relevant_items: list of user relevant items in the form [item1,...]
@@ -53,7 +54,7 @@ class SRecall(BaseMetric):
     def eval(self):
         """
         Evaluation function
-        :return: the overall averaged value of F-score
+        :return: the overall averaged value of SRecall
         """
         return np.average(
             [SRecall.__user_srecall(u_r, self._cutoff, self._relevant_items[u], self._feature_map,self._total_features)
@@ -63,7 +64,7 @@ class SRecall(BaseMetric):
     def eval_user_metric(self):
         """
         Evaluation function
-        :return: the overall averaged value of F-score
+        :return: the overall averaged value of SRecall
         """
         return {u: SRecall.__user_srecall(u_r, self._cutoff, self._relevant_items[u], self._feature_map, self._total_features)
              for u, u_r in self._recommendations.items()}

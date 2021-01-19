@@ -1,5 +1,5 @@
 """
-This is the implementation of the Precision metric.
+This is the implementation of the F-score metric.
 It proceeds from a user-wise computation, and average the values over the users.
 """
 
@@ -21,8 +21,9 @@ class F1(BaseMetric):
         """
         Constructor
         :param recommendations: list of recommendations in the form {user: [(item1,value1),...]}
-        :param cutoff: numerical threshold to limit the recommendation list
-        :param relevant_items: list of relevant items (binary) per user in the form {user: [item1,...]}
+        :param config: SimpleNameSpace that represents the configuration of the experiment
+        :param params: Parameters of the model
+        :param eval_objects: list of objects that may be useful for the computation of the different metrics
         """
         super().__init__(recommendations, config, params, eval_objects)
         self._cutoff = self._evaluation_objects.cutoff

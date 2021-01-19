@@ -1,6 +1,6 @@
 """
-This is the implementation of the Precision metric.
-It proceeds from a user-wise computation, and average the values over the users.
+This is the implementation of the Mean Squared Error metric.
+It proceeds from a system-wise computation.
 """
 
 __version__ = '0.1'
@@ -13,16 +13,17 @@ from evaluation.metrics.base_metric import BaseMetric
 
 class MSE(BaseMetric):
     """
-    This class represents the implementation of the Precision recommendation metric.
-    Passing 'Precision' to the metrics list will enable the computation of the metric.
+    This class represents the implementation of the Mean Squared Error recommendation metric.
+    Passing 'MSE' to the metrics list will enable the computation of the metric.
     """
 
     def __init__(self, recommendations, config, params, eval_objects):
         """
         Constructor
         :param recommendations: list of recommendations in the form {user: [(item1,value1),...]}
-        :param cutoff: numerical threshold to limit the recommendation list
-        :param relevant_items: list of relevant items (binary) per user in the form {user: [item1,...]}
+        :param config: SimpleNameSpace that represents the configuration of the experiment
+        :param params: Parameters of the model
+        :param eval_objects: list of objects that may be useful for the computation of the different metrics
         """
         super().__init__(recommendations, config, params, eval_objects)
         self._cutoff = self._evaluation_objects.cutoff
@@ -41,7 +42,7 @@ class MSE(BaseMetric):
     @staticmethod
     def __user_MSE(user_recommendations, user_test, user_relevant_items):
         """
-        Per User Precision
+        Per User computation for Mean Squared Error
         :param user_recommendations: list of user recommendation in the form [(item1,value1),...]
         :param cutoff: numerical threshold to limit the recommendation list
         :param user_relevant_items: list of user relevant items in the form [item1,...]
@@ -52,7 +53,7 @@ class MSE(BaseMetric):
     def eval(self):
         """
         Evaluation function
-        :return: the overall averaged value of Precision
+        :return: the overall averaged value of Mean Squared Error
         """
         return sum(
             [MSE.__user_MSE(u_r, self._test[u], self._relevant_items[u])
@@ -62,7 +63,7 @@ class MSE(BaseMetric):
     def eval_user_metric(self):
         """
         Evaluation function
-        :return: the overall averaged value of Precision
+        :return: the overall averaged value of Mean Squared Error per user
         """
         return {u: MSE.__user_MSE(u_r, self._test[u], self._relevant_items[u])/len(self._relevant_items[u])
              for u, u_r in self._recommendations.items()}

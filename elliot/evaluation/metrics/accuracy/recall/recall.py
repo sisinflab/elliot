@@ -21,8 +21,9 @@ class Recall(BaseMetric):
         """
         Constructor
         :param recommendations: list of recommendations in the form {user: [(item1,value1),...]}
-        :param cutoff: numerical threshold to limit the recommendation list
-        :param relevant_items: list of relevant items (binary) per user in the form {user: [item1,...]}
+        :param config: SimpleNameSpace that represents the configuration of the experiment
+        :param params: Parameters of the model
+        :param eval_objects: list of objects that may be useful for the computation of the different metrics
         """
         super().__init__(recommendations, config, params, eval_objects)
         self._cutoff = self._evaluation_objects.cutoff
@@ -62,7 +63,7 @@ class Recall(BaseMetric):
     def eval_user_metric(self):
         """
         Evaluation Function
-        :return: the overall averaged value of Recall
+        :return: the overall averaged value of Recall per user
         """
         return {u: Recall.__user_recall(u_r, self._cutoff, self._relevant_items[u])
              for u, u_r in self._recommendations.items()}

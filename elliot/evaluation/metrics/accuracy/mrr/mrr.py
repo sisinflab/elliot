@@ -1,5 +1,5 @@
 """
-This is the implementation of the MRR metric.
+This is the implementation of the Mean Reciprocal Rank metric.
 It proceeds from a user-wise computation, and average the values over the users.
 """
 
@@ -13,7 +13,7 @@ from evaluation.metrics.base_metric import BaseMetric
 
 class MRR(BaseMetric):
     """
-    This class represents the implementation of the MRR recommendation metric.
+    This class represents the implementation of the Mean Reciprocal Rank recommendation metric.
     Passing 'MRR' to the metrics list will enable the computation of the metric.
     """
 
@@ -21,8 +21,9 @@ class MRR(BaseMetric):
         """
         Constructor
         :param recommendations: list of recommendations in the form {user: [(item1,value1),...]}
-        :param cutoff: numerical threshold to limit the recommendation list
-        :param relevant_items: list of relevant items (binary) per user in the form {user: [item1,...]}
+        :param config: SimpleNameSpace that represents the configuration of the experiment
+        :param params: Parameters of the model
+        :param eval_objects: list of objects that may be useful for the computation of the different metrics
         """
         super().__init__(recommendations, config, params, eval_objects)
         self._cutoff = self._evaluation_objects.cutoff
@@ -39,7 +40,7 @@ class MRR(BaseMetric):
     @staticmethod
     def __user_mrr(user_recommendations, cutoff, user_relevant_items):
         """
-        Per User Precision
+        Per User Mean Reciprocal Rank
         :param user_recommendations: list of user recommendation in the form [(item1,value1),...]
         :param cutoff: numerical threshold to limit the recommendation list
         :param user_relevant_items: list of user relevant items in the form [item1,...]
@@ -57,7 +58,7 @@ class MRR(BaseMetric):
     def eval(self):
         """
         Evaluation function
-        :return: the overall averaged value of Precision
+        :return: the overall averaged value of Mean Reciprocal Rank
         """
         return np.average(
             [MRR.__user_mrr(u_r, self._cutoff, self._relevant_items[u])
@@ -67,7 +68,7 @@ class MRR(BaseMetric):
     def eval_user_metric(self):
         """
         Evaluation function
-        :return: the overall averaged value of Precision
+        :return: the overall averaged value of Mean Reciprocal Rank per user
         """
         return {u: MRR.__user_mrr(u_r, self._cutoff, self._relevant_items[u])
              for u, u_r in self._recommendations.items()}

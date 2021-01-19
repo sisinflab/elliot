@@ -1,6 +1,6 @@
 """
-This is the implementation of the Precision metric.
-It proceeds from a user-wise computation, and average the values over the users.
+This is the implementation of the GroupAUC metric.
+It proceeds from a user-wise computation, and average the AUC values over the users.
 """
 
 __version__ = '0.1'
@@ -13,16 +13,17 @@ from evaluation.metrics.base_metric import BaseMetric
 
 class GAUC(BaseMetric):
     """
-    This class represents the implementation of the Precision recommendation metric.
-    Passing 'Precision' to the metrics list will enable the computation of the metric.
+    This class represents the implementation of the GroupAUC recommendation metric.
+    Passing 'GAUC' to the metrics list will enable the computation of the metric.
     """
 
     def __init__(self, recommendations, config, params, eval_objects):
         """
         Constructor
         :param recommendations: list of recommendations in the form {user: [(item1,value1),...]}
-        :param cutoff: numerical threshold to limit the recommendation list
-        :param relevant_items: list of relevant items (binary) per user in the form {user: [item1,...]}
+        :param config: SimpleNameSpace that represents the configuration of the experiment
+        :param params: Parameters of the model
+        :param eval_objects: list of objects that may be useful for the computation of the different metrics
         """
         super().__init__(recommendations, config, params, eval_objects)
         self._cutoff = self._evaluation_objects.cutoff
@@ -40,7 +41,7 @@ class GAUC(BaseMetric):
     @staticmethod
     def __user_gauc(user_recommendations, user_relevant_items, num_items, train_size):
         """
-        Per User Precision
+        Per User AUC
         :param user_recommendations: list of user recommendation in the form [(item1,value1),...]
         :param cutoff: numerical threshold to limit the recommendation list
         :param user_relevant_items: list of user relevant items in the form [item1,...]
@@ -53,7 +54,7 @@ class GAUC(BaseMetric):
     def eval(self):
         """
         Evaluation function
-        :return: the overall averaged value of Precision
+        :return: the overall averaged value of AUC
         """
 
         return np.average(
@@ -64,7 +65,7 @@ class GAUC(BaseMetric):
     def eval_user_metric(self):
         """
         Evaluation function
-        :return: the overall averaged value of Precision
+        :return: the overall averaged value of AUC per user
         """
         return {u: GAUC.__user_gauc(u_r, self._relevant_items[u], self._num_items, len(self._evaluation_objects.data.train_dict[u]))
              for u, u_r in self._recommendations.items()}

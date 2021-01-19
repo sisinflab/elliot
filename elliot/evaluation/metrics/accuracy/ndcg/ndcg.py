@@ -1,5 +1,5 @@
 """
-This is the implementation of the nDCG metric.
+This is the implementation of the normalized Discounted Cumulative Gain metric.
 It proceeds from a user-wise computation, and average the values over the users.
 """
 
@@ -23,8 +23,9 @@ class NDCG(BaseMetric):
         """
         Constructor
         :param recommendations: list of recommendations in the form {user: [(item1,value1),...]}
-        :param cutoff: numerical threshold to limit the recommendation list
-        :param relevant_items: list of relevant items (binary) per user in the form {user: [item1,...]}
+        :param config: SimpleNameSpace that represents the configuration of the experiment
+        :param params: Parameters of the model
+        :param eval_objects: list of objects that may be useful for the computation of the different metrics
         """
         super().__init__(recommendations, config, params, eval_objects)
         self._cutoff = self._evaluation_objects.cutoff
@@ -64,7 +65,7 @@ class NDCG(BaseMetric):
     @staticmethod
     def compute_user_ndcg(user_recommendations: t.List, user_gain_map: t.Dict, cutoff: int) -> float:
         """
-        Method to compute nDCG
+        Method to compute normalized Discounted Cumulative Gain
         :param sorted_item_predictions:
         :param gain_map:
         :param cutoff:
@@ -79,7 +80,7 @@ class NDCG(BaseMetric):
     @staticmethod
     def __user_ndcg(user_recommendations: t.List, user_gain_map: t.Dict, cutoff: int):
         """
-        Per User nDCG
+        Per User normalized Discounted Cumulative Gain
         :param user_recommendations: list of user recommendation in the form [(item1,value1),...]
         :param user_gain_map: dict of discounted relevant items in the form {user1:{item1:value1,...},...}
         :param cutoff: numerical threshold to limit the recommendation list
@@ -93,7 +94,7 @@ class NDCG(BaseMetric):
     def eval(self):
         """
         Evaluation function
-        :return: the overall averaged value of nDCG
+        :return: the overall averaged value of normalized Discounted Cumulative Gain
         """
 
         return np.average(
@@ -104,7 +105,7 @@ class NDCG(BaseMetric):
     def eval_user_metric(self):
         """
         Evaluation function
-        :return: the overall averaged value of nDCG
+        :return: the overall averaged value of normalized Discounted Cumulative Gain per user
         """
 
         return {u: NDCG.__user_ndcg(u_r, self._relevance_map[u], self._cutoff)

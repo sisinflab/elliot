@@ -1,5 +1,5 @@
 """
-This is the implementation of the MAD metric.
+This is the implementation of the Item MAD rating metric.
 It proceeds from a user-wise computation, and average the values over the users.
 """
 
@@ -14,16 +14,17 @@ from evaluation.metrics.base_metric import BaseMetric
 
 class ItemMADrating(BaseMetric):
     """
-    This class represents the implementation of the Precision recommendation metric.
-    Passing 'Precision' to the metrics list will enable the computation of the metric.
+    This class represents the implementation of the Item MAD rating recommendation metric.
+    Passing 'ItemMADrating' to the metrics list will enable the computation of the metric.
     """
 
     def __init__(self, recommendations, config, params, eval_objects, additional_data):
         """
         Constructor
         :param recommendations: list of recommendations in the form {user: [(item1,value1),...]}
-        :param cutoff: numerical threshold to limit the recommendation list
-        :param relevant_items: list of relevant items (binary) per user in the form {user: [item1,...]}
+        :param config: SimpleNameSpace that represents the configuration of the experiment
+        :param params: Parameters of the model
+        :param eval_objects: list of objects that may be useful for the computation of the different metrics
         """
         super().__init__(recommendations, config, params, eval_objects, additional_data)
         self._cutoff = self._config.top_k
@@ -39,12 +40,12 @@ class ItemMADrating(BaseMetric):
         Metric Name Getter
         :return: returns the public name of the metric
         """
-        return f"UserMADrating_{self._additional_data['clustering_name']}"
+        return f"ItemMADrating_{self._additional_data['clustering_name']}"
 
     @staticmethod
     def __user_mad(user_recommendations, user_relevant_items):
         """
-        Per User Precision
+        Per User Item MAD rating
         :param user_recommendations: list of user recommendation in the form [(item1,value1),...]
         :param cutoff: numerical threshold to limit the recommendation list
         :param user_relevant_items: list of user relevant items in the form [item1,...]
@@ -56,7 +57,7 @@ class ItemMADrating(BaseMetric):
     def eval(self):
         """
         Evaluation function
-        :return: the overall averaged value of Precision
+        :return: the overall averaged value of Item MAD rating
         """
         for u, u_r in self._recommendations.items():
             v = ItemMADrating.__user_mad(u_r, self._relevant_items[u])

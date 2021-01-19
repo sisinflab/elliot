@@ -1,6 +1,6 @@
 """
-This is the implementation of the Precision metric.
-It proceeds from a user-wise computation, and average the values over the users.
+This is the implementation of the global AUC metric.
+It proceeds from a system-wise computation.
 """
 
 __version__ = '0.1'
@@ -13,16 +13,17 @@ from evaluation.metrics.base_metric import BaseMetric
 
 class AUC(BaseMetric):
     """
-    This class represents the implementation of the Precision recommendation metric.
-    Passing 'Precision' to the metrics list will enable the computation of the metric.
+    This class represents the implementation of the global AUC recommendation metric.
+    Passing 'AUC' to the metrics list will enable the computation of the metric.
     """
 
     def __init__(self, recommendations, config, params, eval_objects):
         """
         Constructor
         :param recommendations: list of recommendations in the form {user: [(item1,value1),...]}
-        :param cutoff: numerical threshold to limit the recommendation list
-        :param relevant_items: list of relevant items (binary) per user in the form {user: [item1,...]}
+        :param config: SimpleNameSpace that represents the configuration of the experiment
+        :param params: Parameters of the model
+        :param eval_objects: list of objects that may be useful for the computation of the different metrics
         """
         super().__init__(recommendations, config, params, eval_objects)
         self._cutoff = self._evaluation_objects.cutoff
@@ -40,11 +41,12 @@ class AUC(BaseMetric):
     @staticmethod
     def __user_auc(user_recommendations, user_relevant_items, num_items, train_size):
         """
-        Per User Precision
+        Per User Computation of AUC values
         :param user_recommendations: list of user recommendation in the form [(item1,value1),...]
-        :param cutoff: numerical threshold to limit the recommendation list
         :param user_relevant_items: list of user relevant items in the form [item1,...]
-        :return: the value of the Precision metric for the specific user
+        :param num_items: overall number of items considered in the training set
+        :param train_size: length of the user profile
+        :return: the list of the AUC values per each test item
         """
         neg_num = num_items - train_size - len(user_relevant_items) + 1
         pos_ranks = [r for r, (i, _) in enumerate(user_recommendations) if i in user_relevant_items]
@@ -53,7 +55,7 @@ class AUC(BaseMetric):
     def eval(self):
         """
         Evaluation function
-        :return: the overall averaged value of Precision
+        :return: the overall value of AUC
         """
         list_of_lists = [AUC.__user_auc(u_r, self._relevant_items[u], self._num_items, len(self._evaluation_objects.data.train_dict[u]))
              for u, u_r in self._recommendations.items()]

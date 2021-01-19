@@ -1,5 +1,5 @@
 """
-This is the implementation of the Precision metric.
+This is the implementation of the Root Mean Squared Error metric.
 It proceeds from a user-wise computation, and average the values over the users.
 """
 
@@ -13,16 +13,17 @@ from evaluation.metrics.base_metric import BaseMetric
 
 class RMSE(BaseMetric):
     """
-    This class represents the implementation of the Precision recommendation metric.
-    Passing 'Precision' to the metrics list will enable the computation of the metric.
+    This class represents the implementation of the Root Mean Squared Error recommendation metric.
+    Passing 'RMSE' to the metrics list will enable the computation of the metric.
     """
 
     def __init__(self, recommendations, config, params, eval_objects):
         """
         Constructor
         :param recommendations: list of recommendations in the form {user: [(item1,value1),...]}
-        :param cutoff: numerical threshold to limit the recommendation list
-        :param relevant_items: list of relevant items (binary) per user in the form {user: [item1,...]}
+        :param config: SimpleNameSpace that represents the configuration of the experiment
+        :param params: Parameters of the model
+        :param eval_objects: list of objects that may be useful for the computation of the different metrics
         """
         super().__init__(recommendations, config, params, eval_objects)
         self._cutoff = self._evaluation_objects.cutoff
@@ -41,7 +42,7 @@ class RMSE(BaseMetric):
     @staticmethod
     def __user_RMSE(user_recommendations, user_test, user_relevant_items):
         """
-        Per User Precision
+        Per User computation for Root Mean Squared Error
         :param user_recommendations: list of user recommendation in the form [(item1,value1),...]
         :param cutoff: numerical threshold to limit the recommendation list
         :param user_relevant_items: list of user relevant items in the form [item1,...]
@@ -52,7 +53,7 @@ class RMSE(BaseMetric):
     def eval(self):
         """
         Evaluation function
-        :return: the overall averaged value of Precision
+        :return: the overall averaged value of Root Mean Squared Error
         """
         return np.sqrt(sum(
             [RMSE.__user_RMSE(u_r, self._test[u], self._relevant_items[u])
@@ -62,7 +63,7 @@ class RMSE(BaseMetric):
     def eval_user_metric(self):
         """
         Evaluation function
-        :return: the overall averaged value of Precision
+        :return: the overall averaged value of Root Mean Squared Error
         """
         return {u: np.sqrt(RMSE.__user_RMSE(u_r, self._test[u], self._relevant_items[u])/len(self._relevant_items[u]))
              for u, u_r in self._recommendations.items()}
