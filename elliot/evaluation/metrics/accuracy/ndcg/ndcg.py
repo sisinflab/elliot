@@ -11,7 +11,7 @@ import typing as t
 import numpy as np
 import math
 
-from ..base_metric import BaseMetric
+from evaluation.metrics.base_metric import BaseMetric
 
 class NDCG(BaseMetric):
     """

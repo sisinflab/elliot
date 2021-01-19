@@ -16,7 +16,6 @@ from evaluation.metrics.accuracy.ndcg import NDCG
 from evaluation.metrics.accuracy.precision import Precision
 from evaluation.metrics.accuracy.recall import Recall
 from evaluation.metrics.diversity.item_coverage import ItemCoverage
-from evaluation.metrics.statistical_array_metric import StatisticalMetric
 from evaluation.metrics.fairness.MAD import UserMADrating
 from evaluation.metrics.accuracy.hit_rate import HR
 from evaluation.metrics.accuracy.mrr import MRR
@@ -31,28 +30,32 @@ from evaluation.metrics.diversity.shannon_entropy import ShannonEntropy
 from evaluation.metrics.novelty.EFD import EFD
 from evaluation.metrics.novelty.EPC import EPC
 from evaluation.metrics.accuracy.AUC import LAUC, AUC, GAUC
+from evaluation.metrics.diversity.SRecall import SRecall
+
+from evaluation.metrics.statistical_array_metric import StatisticalMetric
 
 _metric_dictionary = {
     "nDCG": NDCG,
     "Precision": Precision,
     "Recall": Recall,
-    "ItemCoverage": ItemCoverage,
-    "UserMADrating": UserMADrating,
     "HR": HR,
     "MRR": MRR,
     "MAP": MAP,
-    "MAE": MAE,
-    "MSE": MSE,
-    "RMSE": RMSE,
     "F1": F1,
     "DSC": DSC,
+    "LAUC": LAUC,
+    "GAUC": GAUC,
+    "AUC": AUC,
+    "ItemCoverage": ItemCoverage,
     "Gini": GiniIndex,
     "SEntropy": ShannonEntropy,
     "EFD": EFD,
     "EPC": EPC,
-    "LAUC": LAUC,
-    "GAUC": GAUC,
-    "AUC": AUC
+    "MAE": MAE,
+    "MSE": MSE,
+    "RMSE": RMSE,
+    "UserMADrating": UserMADrating,
+    "SRecall": SRecall
 }
 
 

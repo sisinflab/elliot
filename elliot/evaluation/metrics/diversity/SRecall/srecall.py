@@ -1,5 +1,5 @@
 """
-This is the implementation of the Precision metric.
+This is the implementation of the SRecall metric.
 It proceeds from a user-wise computation, and average the values over the users.
 """
 
@@ -11,24 +11,24 @@ import numpy as np
 from evaluation.metrics.base_metric import BaseMetric
 
 
-class F1(BaseMetric):
+class SRecall(BaseMetric):
     """
-    This class represents the implementation of the F-score recommendation metric.
-    Passing 'F1' to the metrics list will enable the computation of the metric.
+    This class represents the implementation of the SRecall recommendation metric.
+    Passing 'SRecall' to the metrics list will enable the computation of the metric.
     """
 
-    def __init__(self, recommendations, config, params, eval_objects):
+    def __init__(self, recommendations, config, params, eval_objects, additional_data):
         """
         Constructor
         :param recommendations: list of recommendations in the form {user: [(item1,value1),...]}
         :param cutoff: numerical threshold to limit the recommendation list
         :param relevant_items: list of relevant items (binary) per user in the form {user: [item1,...]}
         """
-        super().__init__(recommendations, config, params, eval_objects)
+        super().__init__(recommendations, config, params, eval_objects, additional_data)
         self._cutoff = self._evaluation_objects.cutoff
         self._relevant_items = self._evaluation_objects.relevance.get_binary_relevance()
-        self._beta = 1 # F-score is the Sørensen-Dice (DSC) coefficient with beta equal to 1
-        self._squared_beta = self._beta**2
+        self._feature_map = SRecall._load_attribute_file(additional_data["feature_data"])
+        self._total_features = len({topic for item in eval_objects.data.items for topic in self._feature_map.get(item, [])})
 
     @staticmethod
     def name():
@@ -36,10 +36,10 @@ class F1(BaseMetric):
         Metric Name Getter
         :return: returns the public name of the metric
         """
-        return "F1"
+        return "SRecall"
 
     @staticmethod
-    def __user_f1(user_recommendations, cutoff, user_relevant_items, squared_beta):
+    def __user_srecall(user_recommendations, cutoff, user_relevant_items, feature_map, total_features):
         """
         Per User F-score
         :param user_recommendations: list of user recommendation in the form [(item1,value1),...]
@@ -47,11 +47,8 @@ class F1(BaseMetric):
         :param user_relevant_items: list of user relevant items in the form [item1,...]
         :return: the value of the Precision metric for the specific user
         """
-        p = sum([1 for i in user_recommendations[:cutoff] if i[0] in user_relevant_items]) / cutoff
-        r = sum([1 for i in user_recommendations[:cutoff] if i[0] in user_relevant_items]) / min(len(user_relevant_items), cutoff)
-        num = (1 + squared_beta) * p * r
-        den = (squared_beta * p) + r
-        return num/den if den != 0 else 0
+        subtopics = len({topic for i, _ in user_recommendations[:cutoff] if i in user_relevant_items for topic in feature_map.get(i, [])})
+        return subtopics/total_features if total_features != 0 else 0
 
     def eval(self):
         """
@@ -59,7 +56,7 @@ class F1(BaseMetric):
         :return: the overall averaged value of F-score
         """
         return np.average(
-            [F1.__user_f1(u_r, self._cutoff, self._relevant_items[u], self._squared_beta)
+            [SRecall.__user_srecall(u_r, self._cutoff, self._relevant_items[u], self._feature_map,self._total_features)
              for u, u_r in self._recommendations.items()]
         )
 
@@ -68,6 +65,16 @@ class F1(BaseMetric):
         Evaluation function
         :return: the overall averaged value of F-score
         """
-        return {u: F1.__user_f1(u_r, self._cutoff, self._relevant_items[u], self._squared_beta)
+        return {u: SRecall.__user_srecall(u_r, self._cutoff, self._relevant_items[u], self._feature_map, self._total_features)
              for u, u_r in self._recommendations.items()}
+
+    @staticmethod
+    def _load_attribute_file(attribute_file, separator='\t'):
+        map = {}
+        with open(attribute_file) as file:
+            for line in file:
+                line = line.split(separator)
+                int_list = [int(i) for i in line[1:]]
+                map[int(line[0])] = list(set(int_list))
+        return map
 

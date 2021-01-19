@@ -8,7 +8,7 @@ __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
 import numpy as np
-from ..base_metric import BaseMetric
+from evaluation.metrics.base_metric import BaseMetric
 
 
 class LAUC(BaseMetric):
