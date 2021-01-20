@@ -1,8 +1,7 @@
 experiment:
   data_config:
     strategy: dataset|fixed|hierarchy
-    dataloader: KnowledgeChainsLoader
-    dataloader: DataSetLoader
+    dataloader: KnowledgeChainsLoader|DataSetLoader
     dataset_path: ../data/{0}/trainingset.tsv
     root_folder: ../data/{0}/splitting/
     train_path: ../data/{0}/trainingset.tsv
@@ -43,10 +42,10 @@ experiment:
   top_k: 50
   evaluation:
     cutoff: 10
-    base_metrics: [ nDCG, Precision, Recall, ItemCoverage, HR, MRR, MAP, F1, Gini, SEntropy, EFD, EPC, AUC, GAUC, LAUC, MAE, MSE, RMSE]
-    relevance: 1
+    simple_metrics: [ nDCG, Precision, Recall, ItemCoverage, HR, MRR, MAP, F1, Gini, SEntropy, EFD, EPC, AUC, GAUC, LAUC, MAE, MSE, RMSE]
+    relevance_threshold: 1
     paired_ttest: True
-    additional_metrics:
+    complex_metrics:
     - metric: UserMADrating
       clustering_name: Happiness
       clustering_file: /home/cheggynho/Documents/UMUAI2019FatRec/ml-1m-2020-03-08/Clusterings/UsersClusterings/user_clustering_happiness.tsv

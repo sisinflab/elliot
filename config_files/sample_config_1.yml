@@ -17,8 +17,8 @@ experiment:
   top_k: 50
   evaluation:
     cutoff: 10
-    base_metrics: [ nDCG, Precision, Recall, ItemCoverage, Gini, SEntropy, EFD, EPC]
-    relevance: 1
+    simple_metrics: [ nDCG, Precision, Recall, ItemCoverage, Gini, SEntropy, EFD, EPC]
+    relevance_threshold: 1
     paired_ttest: True
   gpu: -1 # -1 is not use GPU
   models:

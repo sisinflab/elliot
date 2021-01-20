@@ -10,7 +10,7 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 import numpy as np
 import random
 from utils import logging
-import tqdm
+from tqdm import tqdm
 
 from dataset.samplers import sparse_sampler as sp
 from evaluation.evaluator import Evaluator
