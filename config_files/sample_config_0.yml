@@ -1,0 +1,39 @@
+experiment:
+  data_config:
+    strategy: fixed
+    train_path: ../data/{0}/trainingset.tsv
+    test_path: ../data/{0}/testset.tsv
+    side_information:
+        feature_data: ../data/{0}/original/features.npy
+        map: ../data/{0}/map.tsv
+        features: ../data/{0}/features.tsv
+        properties: ../data/{0}/properties.conf
+  dataset: example
+  path_output_rec_result: ../results/{0}/recs/
+  path_output_rec_weight: ../results/{0}/weights/
+  path_output_rec_performance: ../results/{0}/performance/
+  path_logger_config: ./config/logger_config.yml
+  path_log_folder: ../log/
+  top_k: 50
+  evaluation:
+    cutoff: 10
+    base_metrics: [ nDCG, Precision, Recall, ItemCoverage, HR, MRR, MAP, F1, Gini, SEntropy, EFD, EPC, LAUC]
+    relevance: 1
+    paired_ttest: True
+  gpu: -1 # -1 is not use GPU
+  models:
+    MultiVAE:
+      meta:
+        hyper_max_evals: 2
+        hyper_opt_alg: tpe
+        validation_rate: 10
+        verbose: False
+        save_weights: False
+        save_recs: False
+      lr: 0.01
+      epochs: [50,20]
+      intermediate_dim: 300
+      latent_dim: 100
+      batch_size: -1
+      dropout_pkeep: 1
+      reg_lambda: 0.01

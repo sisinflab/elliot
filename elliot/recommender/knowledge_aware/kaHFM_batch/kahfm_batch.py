@@ -106,7 +106,7 @@ class KaHFMBatch(RecMixin, BaseRecommenderModel):
                     t.update()
 
             if not (it + 1) % self._validation_rate:
-                recs = self.get_recommendations(self._config.top_k)
+                recs = self.get_recommendations(self.evaluator.get_needed_recommendations())
                 results, statistical_results, test_results, test_statistical_results = self.evaluator.eval(recs)
                 self._results.append(results)
                 self._statistical_results.append(statistical_results)

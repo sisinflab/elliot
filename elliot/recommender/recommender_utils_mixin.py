@@ -22,12 +22,13 @@ class RecMixin(object):
                     t.update()
 
             if not (it + 1) % self._validation_rate:
-                recs = self.get_recommendations(self._config.top_k)
+                recs = self.get_recommendations(self.evaluator.get_needed_recommendations())
                 results, statistical_results, test_results, test_statistical_results = self.evaluator.eval(recs)
                 self._results.append(results)
                 self._statistical_results.append(statistical_results)
                 self._test_results.append(results)
                 self._test_statistical_results.append(statistical_results)
+
                 print(f'Epoch {(it + 1)}/{self._num_iters} loss {loss/steps:.5f}')
 
                 if self._results[-1][self._validation_metric] > best_metric_value:

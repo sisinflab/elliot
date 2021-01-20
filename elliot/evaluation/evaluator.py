@@ -45,7 +45,7 @@ class Evaluator(object):
         self._paired_ttest = self._data.config.evaluation.paired_ttest
         self._metrics = metrics.parse_metrics(data.config.evaluation.base_metrics)
         #TODO
-        self._additional_metrics = data.config.evaluation.additional_metrics
+        self._additional_metrics = getattr(data.config.evaluation, "additional_metrics", {})
         self._test = data.get_test()
 
         self._evaluation_objects = SimpleNamespace(relevance=relevance.Relevance(self._test, self._rel_threshold),

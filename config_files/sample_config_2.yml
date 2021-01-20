@@ -1,0 +1,62 @@
+experiment:
+  data_config:
+    strategy: fixed
+    dataloader: KnowledgeChainsLoader
+    train_path: ../data/{0}/trainingset.tsv
+    test_path: ../data/{0}/testset.tsv
+    side_information:
+        map: ../data/{0}/map.tsv
+        features: ../data/{0}/features.tsv
+        properties: ../data/{0}/properties.conf
+  dataset: categorical_dbpedia_ml1m
+  path_output_rec_result: ../results/{0}/recs/
+  path_output_rec_weight: ../results/{0}/weights/
+  path_output_rec_performance: ../results/{0}/performance/
+  path_logger_config: ./config/logger_config.yml
+  path_log_folder: ../log/
+  top_k: 50
+  evaluation:
+    cutoff: 10
+    base_metrics: [ nDCG, Precision, Recall, ItemCoverage, HR, MRR, MAP, F1, Gini, SEntropy, EFD, EPC, LAUC]
+    relevance: 1
+    paired_ttest: True
+    additional_metrics:
+    - metric: UserMADrating
+      clustering_name: Happiness
+      clustering_file: /home/cheggynho/Documents/UMUAI2019FatRec/ml-1m-2020-03-08/Clusterings/UsersClusterings/user_clustering_happiness.tsv
+    - metric: DSC
+      beta: 2
+    - metric: SRecall
+      feature_data: ../data/categorical_dbpedia_ml1m/map.tsv
+  gpu: -1 # -1 is not use GPU
+  models:
+    MultiVAE:
+      meta:
+        hyper_max_evals: 2
+        hyper_opt_alg: tpe
+        validation_rate: 10
+        verbose: False
+        save_weights: False
+        save_recs: False
+      lr: 0.01
+      epochs: [50,20]
+      intermediate_dim: 300
+      latent_dim: 100
+      batch_size: -1
+      dropout_pkeep: 1
+      reg_lambda: 0.01
+    KaHFMBatch:
+      meta:
+        hyper_max_evals: 5
+        hyper_opt_alg: tpe
+        validation_rate: 10
+        verbose: False
+        save_weights: False
+        save_recs: False
+        validation_metric: nDCG
+        restore_epoch: -1
+      lr: [0.001, 0.0005, 0.0001]
+      epochs: 100
+      batch_size: [512,1024, 2048]
+      l_w: [0.0025, 0.005]
+      l_b: 0
