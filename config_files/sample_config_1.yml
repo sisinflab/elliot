@@ -26,12 +26,12 @@ experiment:
       meta:
         hyper_max_evals: 2
         hyper_opt_alg: tpe
-        validation_rate: 10
+        validation_rate: 1
         verbose: False
         save_weights: False
         save_recs: False
       lr: 0.01
-      epochs: [50,20]
+      epochs: [5,20]
       intermediate_dim: 300
       latent_dim: 100
       batch_size: -1
@@ -39,16 +39,16 @@ experiment:
       reg_lambda: 0.01
     KaHFMBatch:
       meta:
-        hyper_max_evals: 5
+        hyper_max_evals: 3
         hyper_opt_alg: tpe
-        validation_rate: 10
+        validation_rate: 1
         verbose: False
         save_weights: False
         save_recs: False
         validation_metric: nDCG
         restore_epoch: -1
       lr: [0.001, 0.0005, 0.0001]
-      epochs: 100
-      batch_size: [512,1024, 2048]
+      epochs: 20
+      batch_size: [512,1024,2048]
       l_w: [0.0025, 0.005]
       l_b: 0

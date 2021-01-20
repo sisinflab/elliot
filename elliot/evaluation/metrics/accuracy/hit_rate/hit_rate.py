@@ -47,7 +47,7 @@ class HR(BaseMetric):
         :param user_relevant_items: list of user relevant items in the form [item1,...]
         :return: the value of the Precision metric for the specific user
         """
-        return sum([1 for i in user_recommendations[:cutoff] if i[0] in user_relevant_items]) > 0
+        return 1 if sum([1 for i in user_recommendations[:cutoff] if i[0] in user_relevant_items]) > 0 else 0
 
     def eval(self):
         """

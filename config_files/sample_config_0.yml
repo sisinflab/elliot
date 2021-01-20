@@ -3,11 +3,6 @@ experiment:
     strategy: fixed
     train_path: ../data/{0}/trainingset.tsv
     test_path: ../data/{0}/testset.tsv
-    side_information:
-        feature_data: ../data/{0}/original/features.npy
-        map: ../data/{0}/map.tsv
-        features: ../data/{0}/features.tsv
-        properties: ../data/{0}/properties.conf
   dataset: example
   path_output_rec_result: ../results/{0}/recs/
   path_output_rec_weight: ../results/{0}/weights/
@@ -22,6 +17,21 @@ experiment:
     paired_ttest: True
   gpu: -1 # -1 is not use GPU
   models:
+    MultiDAE:
+      meta:
+        hyper_max_evals: 1
+        hyper_opt_alg: tpe|atpe|mix|rand|anneal
+        validation_rate: 10
+        verbose: False
+        save_weights: False
+        save_recs: True
+      lr: 0.001
+      epochs: 50
+      intermediate_dim: 600
+      latent_dim: 200
+      batch_size: -1
+      dropout_pkeep: 1
+      reg_lambda: 0.01
     MultiVAE:
       meta:
         hyper_max_evals: 2
@@ -29,7 +39,7 @@ experiment:
         validation_rate: 10
         verbose: False
         save_weights: False
-        save_recs: False
+        save_recs: True
       lr: 0.01
       epochs: [50,20]
       intermediate_dim: 300
