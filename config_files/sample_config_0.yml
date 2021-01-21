@@ -17,24 +17,32 @@ experiment:
     paired_ttest: True
   gpu: -1 # -1 is not use GPU
   models:
-    Random:
+    ItemKNN:
       meta:
-        save_recs: True
-    MultiDAE:
-      meta:
-        hyper_max_evals: 1
-        hyper_opt_alg: tpe|atpe|mix|rand|anneal
-        validation_rate: 10
         verbose: False
-        save_weights: False
+        save_weights: True
         save_recs: True
-      lr: 0.001
-      epochs: 50
-      intermediate_dim: 600
-      latent_dim: 200
-      batch_size: -1
-      dropout_pkeep: 1
-      reg_lambda: 0.01
+#      restore: True
+      neighbors: 50
+      similarity: cosine
+#    Random:
+#      meta:
+#        save_recs: True
+#    MultiDAE:
+#      meta:
+#        hyper_max_evals: 1
+#        hyper_opt_alg: tpe|atpe|mix|rand|anneal
+#        validation_rate: 10
+#        verbose: False
+#        save_weights: False
+#        save_recs: True
+#      lr: 0.001
+#      epochs: 50
+#      intermediate_dim: 600
+#      latent_dim: 200
+#      batch_size: -1
+#      dropout_pkeep: 1
+#      reg_lambda: 0.01
 #    MultiVAE:
 #      meta:
 #        hyper_max_evals: 2
