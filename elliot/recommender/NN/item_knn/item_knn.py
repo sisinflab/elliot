@@ -9,6 +9,7 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
 import numpy as np
 import pickle
+import time
 
 from evaluation.evaluator import Evaluator
 from utils.folder import build_model_folder
@@ -16,6 +17,7 @@ from utils.write import store_recommendation
 
 from recommender.base_recommender_model import BaseRecommenderModel
 from recommender.NN.item_knn.item_knn_similarity import Similarity
+from recommender.NN.item_knn.aiolli_ferrari import AiolliSimilarity
 
 np.random.seed(42)
 
@@ -32,18 +34,26 @@ class ItemKNN(BaseRecommenderModel):
 
         self._num_neighbors = self._params.neighbors
         self._similarity = self._params.similarity
+        self._implementation = getattr(self._params, "implementation", "standard")
 
         self._ratings = self._data.train_dict
-        self._datamodel = Similarity(self._data, self._num_neighbors, self._similarity)
+        if self._implementation == "aiolli":
+            self._datamodel = AiolliSimilarity(self._data, maxk=self._num_neighbors, shrink=100, similarity=self._similarity, normalize=True)
+        else:
+            self._datamodel = Similarity(self._data, self._num_neighbors, self._similarity)
 
         self._params.name = self.name
 
         build_model_folder(self._config.path_output_rec_weight, self.name)
         self._saving_filepath = f'{self._config.path_output_rec_weight}{self.name}/best-weights-{self.name}'
+
+        start = time.time()
         if self._restore:
             self.restore_weights()
         else:
             self._datamodel.initialize()
+        end = time.time()
+        print(f"The similarity computation has taken: {end - start}")
 
         self.evaluator = Evaluator(self._data, self._params)
 
@@ -57,7 +67,7 @@ class ItemKNN(BaseRecommenderModel):
 
     @property
     def name(self):
-        return f"NN_nn:{self._num_neighbors}_sim:{self._similarity}"
+        return f"NN_nn:{self._num_neighbors}_sim:{self._similarity}{'_imp:Aiolli'if self._implementation=='aiolli' else ''}"
 
     def train(self):
 

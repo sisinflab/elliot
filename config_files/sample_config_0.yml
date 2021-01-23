@@ -3,7 +3,7 @@ experiment:
     strategy: fixed
     train_path: ../data/{0}/trainingset.tsv
     test_path: ../data/{0}/testset.tsv
-  dataset: example
+  dataset: categorical_dbpedia_ml1m
   path_output_rec_result: ../results/{0}/recs/
   path_output_rec_weight: ../results/{0}/weights/
   path_output_rec_performance: ../results/{0}/performance/
@@ -20,11 +20,12 @@ experiment:
     ItemKNN:
       meta:
         verbose: False
-        save_weights: True
+#        save_weights: True
         save_recs: True
 #      restore: True
       neighbors: 50
       similarity: cosine
+      implementation: aiolli
 #    Random:
 #      meta:
 #        save_recs: True
