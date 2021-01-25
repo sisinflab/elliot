@@ -58,7 +58,7 @@ class AUC(BaseMetric):
         :return: the overall value of AUC
         """
         list_of_lists = [AUC.__user_auc(u_r, self._relevant_items[u], self._num_items, len(self._evaluation_objects.data.train_dict[u]))
-             for u, u_r in self._recommendations.items()]
+             for u, u_r in self._recommendations.items() if len(self._relevant_items[u])]
         return np.average([item for sublist in list_of_lists for item in sublist])
 
     @staticmethod

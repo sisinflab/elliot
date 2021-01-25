@@ -61,7 +61,7 @@ class F1(BaseMetric):
         """
         return np.average(
             [F1.__user_f1(u_r, self._cutoff, self._relevant_items[u], self._squared_beta)
-             for u, u_r in self._recommendations.items()]
+             for u, u_r in self._recommendations.items() if len(self._relevant_items[u])]
         )
 
     def eval_user_metric(self):
@@ -70,5 +70,5 @@ class F1(BaseMetric):
         :return: the overall averaged value of F-score
         """
         return {u: F1.__user_f1(u_r, self._cutoff, self._relevant_items[u], self._squared_beta)
-             for u, u_r in self._recommendations.items()}
+             for u, u_r in self._recommendations.items() if len(self._relevant_items[u])}
 

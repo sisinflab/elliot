@@ -62,7 +62,7 @@ class MRR(BaseMetric):
         """
         return np.average(
             [MRR.__user_mrr(u_r, self._cutoff, self._relevant_items[u])
-             for u, u_r in self._recommendations.items()]
+             for u, u_r in self._recommendations.items() if len(self._relevant_items[u])]
         )
 
     def eval_user_metric(self):
@@ -71,5 +71,5 @@ class MRR(BaseMetric):
         :return: the overall averaged value of Mean Reciprocal Rank per user
         """
         return {u: MRR.__user_mrr(u_r, self._cutoff, self._relevant_items[u])
-             for u, u_r in self._recommendations.items()}
+             for u, u_r in self._recommendations.items() if len(self._relevant_items[u])}
 

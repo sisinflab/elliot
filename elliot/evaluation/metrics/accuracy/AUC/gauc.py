@@ -59,7 +59,7 @@ class GAUC(BaseMetric):
 
         return np.average(
             [GAUC.__user_gauc(u_r, self._relevant_items[u], self._num_items, len(self._evaluation_objects.data.train_dict[u]))
-             for u, u_r in self._recommendations.items()]
+             for u, u_r in self._recommendations.items() if len(self._relevant_items[u])]
         )
 
     def eval_user_metric(self):
@@ -68,5 +68,5 @@ class GAUC(BaseMetric):
         :return: the overall averaged value of AUC per user
         """
         return {u: GAUC.__user_gauc(u_r, self._relevant_items[u], self._num_items, len(self._evaluation_objects.data.train_dict[u]))
-             for u, u_r in self._recommendations.items()}
+             for u, u_r in self._recommendations.items() if len(self._relevant_items[u])}
 
