@@ -15,33 +15,34 @@ class Sampler:
     def __init__(self, indexed_ratings):
         self._indexed_ratings = indexed_ratings
         self._users = list(self._indexed_ratings.keys())
+        self._nusers = len(self._users)
         self._items = list({k for a in self._indexed_ratings.values() for k in a.keys()})
+        self._nitems = len(self._items)
+        self._ui_dict = {u: list(set(indexed_ratings[u])) for u in indexed_ratings}
+        self._lui_dict = {u: len(v) for u, v in self._ui_dict.items()}
 
     def step(self, events: int, batch_size: int):
         r_int = np.random.randint
-        n_users = len(self._users)
-        n_items = len(self._items)
-        n_batch = events // batch_size
-        indexed_ratings = self._indexed_ratings
-        user_input, pos_input, neg_input = [], [], []
+        n_users = self._nusers
+        n_items = self._nitems
+        ui_dict = self._ui_dict
+        lui_dict = self._lui_dict
 
-        for ab in range(n_batch):
-            bui, bii, bji = [], [], []
-            for cd in range(batch_size):
-                u = r_int(n_users)
-                ui = set(indexed_ratings[u])
-                lui = len(ui)
-                if lui == n_items:
-                    continue
-                i = list(ui)[r_int(lui)]
+        def sample():
+            u = r_int(n_users)
+            ui = ui_dict[u]
+            lui = lui_dict[u]
+            if lui == n_items:
+                sample()
+            i = ui[r_int(lui)]
 
+            j = r_int(n_items)
+            while j in ui:
                 j = r_int(n_items)
-                while j in ui:
-                    j = r_int(n_items)
-                bui.append(u)
-                bii.append(i)
-                bji.append(j)
-            user_input.append(np.array(bui)[:, None])
-            pos_input.append(np.array(bii)[:, None])
-            neg_input.append(np.array(bji)[:, None])
-        return user_input, pos_input, neg_input,
+            return u, i, j
+
+        for batch_start in range(0, events, batch_size):
+            batch_end = min(batch_start + batch_size, events)
+            batch_uij = [sample() for _ in range(batch_start, batch_end)]
+            bui, bii, bij = map(list, zip(*batch_uij))
+            yield np.array(bui)[:, None], np.array(bii)[:, None], np.array(bij)[:, None]

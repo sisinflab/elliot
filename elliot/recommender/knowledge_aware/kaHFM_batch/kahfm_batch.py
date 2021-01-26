@@ -9,8 +9,9 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malite
 
 from tqdm import tqdm
 import numpy as np
+import time
 
-from dataset.samplers import custom_sampler as cs
+from dataset.samplers import custom_sampler_old as cs
 from evaluation.evaluator import Evaluator
 from recommender import BaseRecommenderModel
 from recommender.knowledge_aware.kaHFM_batch.kahfm_batch_model import KaHFM_model
@@ -44,6 +45,12 @@ class KaHFMBatch(RecMixin, BaseRecommenderModel):
 
         self._ratings = self._data.train_dict
         self._sampler = cs.Sampler(self._data.i_train_dict)
+
+        # start = time.time()
+        # # [1 for batch in self._sampler.step(self._data.transactions, self._batch_size)]
+        # self._sampler.step(self._data.transactions, self._batch_size)
+        # stop = time.time()
+        # print(f"Time to sample: {stop-start}")
 
         self._tfidf_obj = TFIDF(self._data.side_information_data.feature_map)
         self._tfidf = self._tfidf_obj.tfidf()
@@ -99,7 +106,8 @@ class KaHFMBatch(RecMixin, BaseRecommenderModel):
             loss = 0
             steps = 0
             with tqdm(total=int(self._data.transactions // self._batch_size), disable=not self._verbose) as t:
-                for batch in zip(*self._sampler.step(self._data.transactions, self._batch_size)):
+                # for batch in zip(*self._sampler.step(self._data.transactions, self._batch_size)):
+                for batch in self._sampler.step(self._data.transactions, self._batch_size):
                     steps += 1
                     loss += self._model.train_step(batch)
                     t.set_postfix({'loss': f'{loss.numpy() / steps:.5f}'})
