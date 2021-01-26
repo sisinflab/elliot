@@ -42,7 +42,5 @@ class Sampler:
             return u, i, j
 
         for batch_start in range(0, events, batch_size):
-            batch_end = min(batch_start + batch_size, events)
-            batch_uij = [sample() for _ in range(batch_start, batch_end)]
-            bui, bii, bij = map(list, zip(*batch_uij))
-            yield np.array(bui)[:, None], np.array(bii)[:, None], np.array(bij)[:, None]
+            bui, bii, bij = map(np.array, zip(*[sample() for _ in range(batch_start, min(batch_start + batch_size, events))]))
+            yield bui[:, None], bii[:, None], bij[:, None]

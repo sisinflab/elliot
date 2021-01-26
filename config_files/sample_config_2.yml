@@ -28,7 +28,7 @@ experiment:
 #      beta: 2
 #    - metric: SRecall
 #      feature_data: ../data/categorical_dbpedia_ml1m/map.tsv
-  gpu: 1 # -1 is not use GPU
+  gpu: -1 # -1 is not use GPU
   models:
 #    MultiVAE:
 #      meta:
@@ -50,13 +50,13 @@ experiment:
         hyper_max_evals: 20
         hyper_opt_alg: tpe
         validation_rate: 10
-        verbose: True
+        verbose: False
         save_weights: False
         save_recs: False
         validation_metric: nDCG
         restore_epoch: -1
-      lr: [0.001, 0.0005, 0.0001]
-      epochs: 5
-      batch_size: [512,1024, 2048]
-      l_w: [0.0025, 0.005, 0.001]
+      lr: 0.0001
+      epochs: 100
+      batch_size: 512
+      l_w: 0.005
       l_b: 0
