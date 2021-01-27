@@ -37,7 +37,6 @@ class MultiDAE(RecMixin, BaseRecommenderModel):
         self._num_users = self._data.num_users
         self._random = np.random
         self._random_p = random
-        self._num_iters = self._params.epochs
 
         self._ratings = self._data.train_dict
         self._sampler = sp.Sampler(self._data.sp_i_train)
@@ -83,7 +82,7 @@ class MultiDAE(RecMixin, BaseRecommenderModel):
         self.logger.critical("Test2")
         best_metric_value = 0
 
-        for it in range(self._num_iters):
+        for it in range(self._epochs):
             self.restore_weights(it)
             loss = 0
             steps = 0
@@ -96,16 +95,14 @@ class MultiDAE(RecMixin, BaseRecommenderModel):
 
             if not (it + 1) % self._validation_rate:
                 recs = self.get_recommendations(self.evaluator.get_needed_recommendations())
-                results, statistical_results, test_results, test_statistical_results = self.evaluator.eval(recs)
-                self._results.append(results)
-                self._statistical_results.append(statistical_results)
-                self._test_results.append(results)
-                self._test_statistical_results.append(statistical_results)
-                print(f'Epoch {(it + 1)}/{self._num_iters} loss {loss/steps:.5f}')
+                result_dict = self.evaluator.eval(recs)
+                self._results.append(result_dict)
 
-                if self._results[-1][self._validation_metric] > best_metric_value:
+                print(f'Epoch {(it + 1)}/{self._epochs} loss {loss/steps:.5f}')
+
+                if self._results[-1][self._validation_k]["val_results"][self._validation_metric] > best_metric_value:
                     print("******************************************")
-                    best_metric_value = self._results[-1][self._validation_metric]
+                    best_metric_value = self._results[-1][self._validation_k]["val_results"][self._validation_metric]
                     if self._save_weights:
                         self._model.save_weights(self._saving_filepath)
                     if self._save_recs:

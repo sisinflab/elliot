@@ -26,9 +26,8 @@ class BaseRecommenderModel(ABC):
         self._params = params
 
         self._restore_epochs = getattr(self._params.meta, "restore_epoch", -1)
-        self._validation_metric = getattr(self._params.meta, "validation_metric", "nDCG@10")
-        self._validation_metric = self._validation_metric.split("@")
-        self._validation_k = int(self._validation_metric[1])
+        self._validation_metric = getattr(self._params.meta, "validation_metric", "nDCG@10").split("@")
+        self._validation_k = int(self._validation_metric[1]) if len(self._validation_metric) > 1 else 10
         self._validation_metric = self._validation_metric[0]
         self._save_weights = getattr(self._params.meta, "save_weights", False)
         self._save_recs = getattr(self._params.meta, "save_recs", False)

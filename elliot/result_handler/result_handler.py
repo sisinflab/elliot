@@ -88,13 +88,12 @@ class ResultHandler:
 
                         metrics = rec_0_model[0][_eval_statistical_results][k].keys()
 
-                        common_users = []
+                        # common_users = []
                         for metric_name in metrics:
                             array_0 = rec_0_model[0][_eval_statistical_results][k][metric_name]
                             array_1 = rec_1_model[0][_eval_statistical_results][k][metric_name]
 
-                            if not common_users:
-                                common_users = PairedTTest.common_users(array_0, array_1)
+                            common_users = PairedTTest.common_users(array_0, array_1)
 
                             p_value = PairedTTest.compare(array_0, array_1, common_users)
 

@@ -13,6 +13,7 @@ import pickle
 
 from dataset.samplers import pairwise_sampler as ps
 from evaluation.evaluator import Evaluator
+from recommender.recommender_utils_mixin import RecMixin
 from utils.folder import build_model_folder
 from utils.write import store_recommendation
 
@@ -137,7 +138,7 @@ class MF(object):
         self._item_factors[self._public_items[item]] = v
 
 
-class BPRMF(BaseRecommenderModel):
+class BPRMF(RecMixin, BaseRecommenderModel):
 
     def __init__(self, data, config, params, *args, **kwargs):
         super().__init__(data, config, params, *args, **kwargs)
@@ -147,7 +148,6 @@ class BPRMF(BaseRecommenderModel):
         self._random = np.random
         self._sample_negative_items_empirically = True
 
-        self._num_iters = self._params.epochs
         self._factors = self._params.embed_k
         self._learning_rate = self._params.lr
         self._bias_regularization = self._params.bias_regularization
@@ -212,8 +212,8 @@ class BPRMF(BaseRecommenderModel):
 
     def train(self):
         print(f"Transactions: {self._data.transactions}")
-        best_ndcg = -np.inf
-        for it in range(self._num_iters):
+        best_metric_value = -np.inf
+        for it in range(self._epochs):
             self.restore_weights(it)
             print(f"\n********** Iteration: {it + 1}")
             self._iteration = it
@@ -222,15 +222,12 @@ class BPRMF(BaseRecommenderModel):
 
             if not (it + 1) % self._validation_rate:
                 recs = self.get_recommendations(self.evaluator.get_needed_recommendations())
-                results, statistical_results, test_results, test_statistical_results = self.evaluator.eval(recs)
-                self._results.append(results)
-                self._statistical_results.append(statistical_results)
-                self._test_results.append(results)
-                self._test_statistical_results.append(statistical_results)
+                result_dict = self.evaluator.eval(recs)
+                self._results.append(result_dict)
 
-                if self._results[-1][self._validation_metric] > best_ndcg:
+                if self._results[-1][self._validation_k]["val_results"][self._validation_metric] > best_metric_value:
                     print("******************************************")
-                    best_ndcg = self._results[-1][self._validation_metric]
+                    best_metric_value = self._results[-1][self._validation_k]["val_results"][self._validation_metric]
                     if self._save_weights:
                         with open(self._saving_filepath, "wb") as f:
                             pickle.dump(self._datamodel.get_model_state(), f)
@@ -265,19 +262,19 @@ class BPRMF(BaseRecommenderModel):
         d_j = (-user_factors*z - self._negative_item_regularization*item_factors_j)
         self._datamodel.set_item_factors(j, item_factors_j + (self._learning_rate * d_j))
 
-    def get_loss(self):
-        return -max([r[self._validation_metric] for r in self._results])
+    # def get_loss(self):
+    #     return -max([r[self._validation_metric] for r in self._results])
 
-    def get_params(self):
-        return self._params.__dict__
+    # def get_params(self):
+    #     return self._params.__dict__
 
-    def get_results(self):
-        val_max = np.argmax([r[self._validation_metric] for r in self._results])
-        return self._results[val_max]
+    # def get_results(self):
+    #     val_max = np.argmax([r[self._validation_metric] for r in self._results])
+    #     return self._results[val_max]
 
-    def get_statistical_results(self):
-        val_max = np.argmax([r[self._validation_metric] for r in self._results])
-        return self._statistical_results[val_max]
+    # def get_statistical_results(self):
+    #     val_max = np.argmax([r[self._validation_metric] for r in self._results])
+    #     return self._statistical_results[val_max]
 
     def restore_weights(self, it):
         if self._restore_epochs == it:

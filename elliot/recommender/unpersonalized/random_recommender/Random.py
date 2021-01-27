@@ -36,13 +36,10 @@ class Random(RecMixin, BaseRecommenderModel):
 
     def train(self):
         recs = self.get_recommendations(self.evaluator.get_needed_recommendations())
-        results, statistical_results, test_results, test_statistical_results = self.evaluator.eval(recs)
-        self._results.append(results)
-        self._statistical_results.append(statistical_results)
-        self._test_results.append(results)
-        self._test_statistical_results.append(statistical_results)
+        result_dict = self.evaluator.eval(recs)
+        self._results.append(result_dict)
 
-    def get_recommendations(self, top_k, *args):
+    def get_recommendations(self, top_k):
         r_int = np.random.randint
         n_items = self._num_items
         items = self._data.items

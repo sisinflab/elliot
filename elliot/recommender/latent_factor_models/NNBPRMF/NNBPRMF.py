@@ -43,7 +43,6 @@ class NNBPRMF(RecMixin, BaseRecommenderModel):
         self._num_users = self._data.num_users
         self._random = np.random
         self._sample_negative_items_empirically = True
-        self._num_iters = self._params.epochs
 
         self._ratings = self._data.train_dict
         self._sampler = cs.Sampler(self._data.i_train_dict)
@@ -79,32 +78,35 @@ class NNBPRMF(RecMixin, BaseRecommenderModel):
 
     def train(self):
         best_metric_value = 0
-        for it in range(self._num_iters):
+        for it in range(self._epochs):
             self.restore_weights(it)
             loss = 0
             steps = 0
             with tqdm(total=int(self._data.transactions // self._batch_size), disable=not self._verbose) as t:
-                for batch in zip(*self._sampler.step(self._data.transactions, self._batch_size)):
+                for batch in self._sampler.step(self._data.transactions, self._batch_size):
                     steps += 1
                     loss += self._model.train_step(batch)
                     t.set_postfix({'loss': f'{loss.numpy() / steps:.5f}'})
                     t.update()
 
             if not (it + 1) % self._validation_rate:
-                recs, auc, auc_users = self.get_recommendations(self.evaluator.get_needed_recommendations(), self._compute_auc)
-                results, statistical_results, test_results, test_statistical_results = self.evaluator.eval(recs)
-                results.update({'AUC': auc})
-                statistical_results.update({'AUC': auc_users})
-                self._results.append(results)
-                self._statistical_results.append(statistical_results)
-                self._test_results.append(results)
-                self._test_statistical_results.append(statistical_results)
+                recs, auc, auc_users = self.get_recommendations(self.evaluator.get_needed_recommendations())
+                result_dict = self.evaluator.eval(recs)
+                self._results.append(result_dict)
 
-                print(f'Epoch {(it + 1)}/{self._num_iters} loss {loss  / steps:.3f}')
+                # old AUC
+                # results.update({'AUC': auc})
+                # statistical_results.update({'AUC': auc_users})
+                # self._results.append(results)
+                # self._statistical_results.append(statistical_results)
+                # self._test_results.append(results)
+                # self._test_statistical_results.append(statistical_results)
 
-                if self._results[-1][self._validation_metric] > best_metric_value:
+                print(f'Epoch {(it + 1)}/{self._epochs} loss {loss  / steps:.3f}')
+
+                if self._results[-1][self._validation_k]["val_results"][self._validation_metric] > best_metric_value:
                     print("******************************************")
-                    best_metric_value = self._results[-1][self._validation_metric]
+                    best_metric_value = self._results[-1][self._validation_k]["val_results"][self._validation_metric]
                     if self._save_weights:
                         self._model.save_weights(self._saving_filepath)
                     if self._save_recs:
