@@ -40,7 +40,7 @@ class Evaluator(object):
         """
         self._data = data
         self._params = params
-        self._k = getattr(data.config.evaluation, "cutoff", data.config.top_k)
+        self._k = getattr(data.config.evaluation, "cutoff", [data.config.top_k])
         self._rel_threshold = data.config.evaluation.relevance_threshold
         self._paired_ttest = self._data.config.evaluation.paired_ttest
         self._metrics = metrics.parse_metrics(data.config.evaluation.simple_metrics)
@@ -49,14 +49,12 @@ class Evaluator(object):
         self._test = data.get_test()
 
         self._evaluation_objects = SimpleNamespace(relevance=relevance.Relevance(self._test, self._rel_threshold),
-                                                   cutoff=self._k,
                                                    num_items=self._data.num_items,
                                                    data = self._data,
                                                    additional_metrics=self._complex_metrics)
         if data.get_validation():
             self._val = data.get_validation()
             self._val_evaluation_objects = SimpleNamespace(relevance=relevance.Relevance(self._val, self._rel_threshold),
-                                                           cutoff=self._k,
                                                            num_items=self._data.num_items,
                                                            data = self._data,
                                                            additional_metrics=self._complex_metrics)
@@ -67,26 +65,39 @@ class Evaluator(object):
         Runtime Evaluation of Accuracy Performance (top-k)
         :return:
         """
+        result_dict = {}
+        for k in self._k:
+            val_results, val_statistical_results, test_results, test_statistical_results = self.eval_at_k(recommendations, k)
+            local_result_dict ={"val_results": val_results,
+                                "val_statistical_results": val_statistical_results,
+                                "test_results": test_results,
+                                "test_statistical_results": test_statistical_results}
+            result_dict[k] = local_result_dict
+        return result_dict
+
+    def eval_at_k(self, recommendations, k):
         result_list = []
-        for test_data, eval_objs in self.get_test_data():
-            results, statistical_results = self.process_test_data(recommendations, test_data, eval_objs)
+        for test_data, eval_objs in self._get_test_data():
+            if eval_objs is not None:
+                eval_objs.cutoff = k
+            results, statistical_results = self._process_test_data(recommendations, test_data, eval_objs)
             result_list.append((results, statistical_results))
 
-        if (not result_list[0][0]) or (not result_list[0][1]):
+        if (not result_list[0][0]):
             return result_list[1][0], result_list[1][1], result_list[1][0], result_list[1][1]
-        elif (not result_list[1][0]) or (not result_list[1][1]):
+        elif (not result_list[1][0]):
             return result_list[0][0], result_list[0][1], result_list[0][0], result_list[0][1]
         else:
             return result_list[0][0], result_list[0][1], result_list[1][0], result_list[1][1]
 
-    def get_test_data(self):
+    def _get_test_data(self):
         return [(self._val if hasattr(self, '_val') else None,
                  self._val_evaluation_objects if hasattr(self, '_val_evaluation_objects') else None),
                 (self._test if hasattr(self, '_test') else None,
                  self._evaluation_objects if hasattr(self, '_evaluation_objects') else None)
                 ]
 
-    def process_test_data(self, recommendations, test_data, eval_objs):
+    def _process_test_data(self, recommendations, test_data, eval_objs):
         if (not test_data) or (not eval_objs):
             return None, None
         else:

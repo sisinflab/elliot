@@ -26,17 +26,20 @@ class BaseRecommenderModel(ABC):
         self._params = params
 
         self._restore_epochs = getattr(self._params.meta, "restore_epoch", -1)
-        self._validation_metric = getattr(self._params.meta, "validation_metric", "nDCG")
+        self._validation_metric = getattr(self._params.meta, "validation_metric", "nDCG@10")
+        self._validation_metric = self._validation_metric.split("@")
+        self._validation_k = int(self._validation_metric[1])
+        self._validation_metric = self._validation_metric[0]
         self._save_weights = getattr(self._params.meta, "save_weights", False)
         self._save_recs = getattr(self._params.meta, "save_recs", False)
         self._verbose = getattr(self._params.meta, "verbose", None)
         self._validation_rate = getattr(self._params.meta, "validation_rate", 1)
         self._compute_auc = getattr(self._params.meta, "compute_auc", False)
+        self._epochs = getattr(self._params, "epochs", 2)
+        if self._epochs < self._validation_rate:
+            raise Exception(f"The first validation epoch ({self._validation_rate}) is later than the overall number of epochs ({self._epochs}).")
         self._batch_size = getattr(self._params, "batch_size", -1)
         self._results = []
-        self._statistical_results = []
-        self._test_results = []
-        self._test_statistical_results = []
 
     @abstractmethod
     def train(self):
@@ -58,14 +61,14 @@ class BaseRecommenderModel(ABC):
     def get_results(self):
         pass
 
-    @abstractmethod
-    def get_statistical_results(self):
-        pass
-
-    @abstractmethod
-    def get_test_results(self):
-        pass
-
-    @abstractmethod
-    def get_test_statistical_results(self):
-        pass
+    # @abstractmethod
+    # def get_statistical_results(self):
+    #     pass
+    #
+    # @abstractmethod
+    # def get_test_results(self):
+    #     pass
+    #
+    # @abstractmethod
+    # def get_test_statistical_results(self):
+    #     pass

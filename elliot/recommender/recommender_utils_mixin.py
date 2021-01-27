@@ -65,23 +65,23 @@ class RecMixin(object):
         return np.where((self._data.sp_i_train[range(start, stop)].toarray() == 0), True, False)
 
     def get_loss(self):
-        return -max([r[self._validation_metric] for r in self._results])
+        return -max([r[self._validation_k]["val_results"][self._validation_metric] for r in self._results])
 
     def get_params(self):
         return self._params.__dict__
 
     def get_results(self):
-        val_max = np.argmax([r[self._validation_metric] for r in self._results])
+        val_max = np.argmax([r[self._validation_k]["val_results"][self._validation_metric] for r in self._results])
         return self._results[val_max]
 
-    def get_test_results(self):
-        val_max = np.argmax([r[self._validation_metric] for r in self._results])
-        return self._test_results[val_max]
-
-    def get_statistical_results(self):
-        val_max = np.argmax([r[self._validation_metric] for r in self._results])
-        return self._statistical_results[val_max]
-
-    def get_test_statistical_results(self):
-        val_max = np.argmax([r[self._validation_metric] for r in self._results])
-        return self._test_statistical_results[val_max]
+    # def get_test_results(self):
+    #     val_max = np.argmax([r[self._validation_metric] for r in self._results])
+    #     return self._test_results[val_max]
+    #
+    # def get_statistical_results(self):
+    #     val_max = np.argmax([r[self._validation_metric] for r in self._results])
+    #     return self._statistical_results[val_max]
+    #
+    # def get_test_statistical_results(self):
+    #     val_max = np.argmax([r[self._validation_metric] for r in self._results])
+    #     return self._test_statistical_results[val_max]

@@ -16,7 +16,7 @@ experiment:
   path_log_folder: ../log/
   top_k: 50
   evaluation:
-    cutoff: 10
+    cutoff: [5,10]
     simple_metrics: [nDCG, Precision, Recall, ItemCoverage, HR, MAP, F1, Gini, SEntropy, EFD, EPC]
     relevance_threshold: 3
     paired_ttest: True
@@ -28,35 +28,35 @@ experiment:
 #      beta: 2
 #    - metric: SRecall
 #      feature_data: ../data/categorical_dbpedia_ml1m/map.tsv
-  gpu: -1 # -1 is not use GPU
+  gpu: 1 # -1 is not use GPU
   models:
-#    MultiVAE:
-#      meta:
-#        hyper_max_evals: 1
-#        hyper_opt_alg: tpe
-#        validation_rate: 10
-#        verbose: False
-#        save_weights: False
-#        save_recs: False
-#      lr: 0.01
-#      epochs: [50,20]
-#      intermediate_dim: 300
-#      latent_dim: 100
-#      batch_size: -1
-#      dropout_pkeep: 1
-#      reg_lambda: 0.01
-    KaHFMBatch:
+    MultiVAE:
       meta:
-        hyper_max_evals: 20
+        hyper_max_evals: 2
         hyper_opt_alg: tpe
         validation_rate: 10
         verbose: False
         save_weights: False
         save_recs: False
+      lr: 0.01
+      epochs: [10,20]
+      intermediate_dim: 300
+      latent_dim: 100
+      batch_size: -1
+      dropout_pkeep: 1
+      reg_lambda: 0.01
+    KaHFMBatch:
+      meta:
+        hyper_max_evals: 1
+        hyper_opt_alg: tpe
+        validation_rate: 10
+        verbose: True
+        save_weights: False
+        save_recs: True
         validation_metric: nDCG
         restore_epoch: -1
       lr: 0.0001
-      epochs: 100
+      epochs: 10
       batch_size: 512
       l_w: 0.005
       l_b: 0

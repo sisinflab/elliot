@@ -51,26 +51,23 @@ class ModelCoordinator(object):
 
         losses = []
         results = []
-        test_results = []
         for data_obj in self.data_objs:
             model = self.model_class(data=data_obj, config=self.base, params=model_params)
             model.train()
             losses.append(model.get_loss())
             results.append(model.get_results())
-            test_results.append(model.get_test_results())
 
         loss = np.average(losses)
-        results = {metric: np.average([result[metric] for result in results]) for metric in model.get_results().keys()}
-        test_results = {metric: np.average([result[metric] for result in test_results]) for metric in model.get_results().keys()}
+        results = self._average_results(results)
 
         return {
             'loss': loss,
             'status': STATUS_OK,
             'params': model.get_params(),
-            'results': results,
-            'statistical_results': model.get_statistical_results(),
-            'test_results': test_results,
-            'test_statistical_results': model.get_test_statistical_results(),
+            'val_results': {k: result_dict["val_results"] for k, result_dict in results.items()},
+            'val_statistical_results': {k: result_dict["val_statistical_results"] for k, result_dict in model.get_results().items()},
+            'test_results': {k: result_dict["test_results"] for k, result_dict in results.items()},
+            'test_statistical_results': {k: result_dict["test_statistical_results"] for k, result_dict in model.get_results().items()},
             'name': model.name
         }
 
@@ -84,25 +81,32 @@ class ModelCoordinator(object):
 
         losses = []
         results = []
-        test_results = []
         for data_obj in self.data_objs:
             model = self.model_class(data=data_obj, config=self.base, params=self.params)
             model.train()
             losses.append(model.get_loss())
             results.append(model.get_results())
-            test_results.append(model.get_test_results())
 
         loss = np.average(losses)
-        results = {metric: np.average([result[metric] for result in results]) for metric in model.get_results().keys()}
-        test_results = {metric: np.average([result[metric] for result in test_results]) for metric in model.get_test_results().keys()}
+        results = self._average_results(results)
 
         return {
             'loss': loss,
             'status': STATUS_OK,
             'params': model.get_params(),
-            'results': results,
-            'statistical_results': model.get_statistical_results(),
-            'test_results': test_results,
-            'test_statistical_results': model.get_test_statistical_results(),
+            'val_results': {k: result_dict["val_results"] for k, result_dict in results.items()},
+            'val_statistical_results': {k: result_dict["val_statistical_results"] for k, result_dict in model.get_results().items()},
+            'test_results': {k: result_dict["test_results"] for k, result_dict in results.items()},
+            'test_statistical_results': {k: result_dict["test_statistical_results"] for k, result_dict in model.get_results().items()},
             'name': model.name
         }
+
+    def _average_results(self, results_list):
+        ks = list(results_list[0].keys())
+        eval_result_types = ["val_results", "test_results"]
+        metrics = list(results_list[0][ks[0]]["val_results"].keys())
+        return {k: {type_: {metric: np.average([fold_result[k][type_][metric]
+                                                for fold_result in results_list])
+                            for metric in metrics}
+                    for type_ in eval_result_types}
+                for k in ks}

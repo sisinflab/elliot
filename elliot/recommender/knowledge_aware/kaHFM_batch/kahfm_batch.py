@@ -40,7 +40,6 @@ class KaHFMBatch(RecMixin, BaseRecommenderModel):
         self._num_users = self._data.num_users
         self._random = np.random
         self._sample_negative_items_empirically = True
-        self._num_iters = self._params.epochs
 
         self._ratings = self._data.train_dict
         self._sampler = cs.Sampler(self._data.i_train_dict)
@@ -94,7 +93,7 @@ class KaHFMBatch(RecMixin, BaseRecommenderModel):
 
     def train(self):
         best_metric_value = 0
-        for it in range(self._num_iters):
+        for it in range(self._epochs):
             self.restore_weights(it)
             loss = 0
             steps = 0
@@ -108,17 +107,14 @@ class KaHFMBatch(RecMixin, BaseRecommenderModel):
 
             if not (it + 1) % self._validation_rate:
                 recs = self.get_recommendations(self.evaluator.get_needed_recommendations())
-                results, statistical_results, test_results, test_statistical_results = self.evaluator.eval(recs)
-                self._results.append(results)
-                self._statistical_results.append(statistical_results)
-                self._test_results.append(results)
-                self._test_statistical_results.append(statistical_results)
+                result_dict = self.evaluator.eval(recs)
+                self._results.append(result_dict)
 
-                print(f'Epoch {(it + 1)}/{self._num_iters} loss {loss:.3f}')
+                print(f'Epoch {(it + 1)}/{self._epochs} loss {loss:.3f}')
 
-                if self._results[-1][self._validation_metric] > best_metric_value:
+                if self._results[-1][self._validation_k]["val_results"][self._validation_metric] > best_metric_value:
                     print("******************************************")
-                    best_metric_value = self._results[-1][self._validation_metric]
+                    best_metric_value = self._results[-1][self._validation_k]["val_results"][self._validation_metric]
                     if self._save_weights:
                         self._model.save_weights(self._saving_filepath)
                     if self._save_recs:
