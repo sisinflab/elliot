@@ -28,6 +28,7 @@ from types import SimpleNamespace
 
 from . import metrics
 from . import relevance
+from . import popularity_utils
 import dataset.dataset as ds
 
 
@@ -48,13 +49,17 @@ class Evaluator(object):
         self._complex_metrics = getattr(data.config.evaluation, "complex_metrics", {})
         self._test = data.get_test()
 
+        self._pop = popularity_utils.Popularity(self._data)
+
         self._evaluation_objects = SimpleNamespace(relevance=relevance.Relevance(self._test, self._rel_threshold),
+                                                   pop=self._pop,
                                                    num_items=self._data.num_items,
                                                    data = self._data,
                                                    additional_metrics=self._complex_metrics)
         if data.get_validation():
             self._val = data.get_validation()
             self._val_evaluation_objects = SimpleNamespace(relevance=relevance.Relevance(self._val, self._rel_threshold),
+                                                           pop=self._pop,
                                                            num_items=self._data.num_items,
                                                            data = self._data,
                                                            additional_metrics=self._complex_metrics)
