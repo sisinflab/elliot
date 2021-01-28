@@ -4,6 +4,8 @@ Tensorflow 2.1.0 implementation of APR.
 @author Anonymized
 """
 
+import operator
+
 import numpy as np
 
 from evaluation.evaluator import Evaluator
@@ -15,11 +17,11 @@ from utils.write import store_recommendation
 np.random.seed(0)
 
 
-class Random(RecMixin, BaseRecommenderModel):
+class MostPop(RecMixin, BaseRecommenderModel):
 
     def __init__(self, data, config, params, *args, **kwargs):
         """
-        Create a Random recommender.
+        Create a Most Popular recommender.
         :param data: data loader object
         :param path_output_rec_result: path to the directory rec. results
         :param path_output_rec_weight: path to the directory rec. model parameters
@@ -31,6 +33,9 @@ class Random(RecMixin, BaseRecommenderModel):
         self._random = np.random
         self.evaluator = Evaluator(self._data, self._params)
 
+        self._pop_items = {self._data.private_items[p]: pop for p, pop in enumerate(self._data.sp_i_train.astype(bool).sum(axis=0).tolist()[0])}
+        self._sorted_pop_items = dict(sorted(self._pop_items.items(), key=operator.itemgetter(1), reverse=True))
+
         self._params.name = self.name
 
         build_model_folder(self._config.path_output_rec_weight, self.name)
@@ -38,7 +43,7 @@ class Random(RecMixin, BaseRecommenderModel):
 
     @property
     def name(self):
-        return "Random"
+        return "MostPop"
 
     def train(self):
         recs = self.get_recommendations(self.evaluator.get_needed_recommendations())
@@ -49,23 +54,26 @@ class Random(RecMixin, BaseRecommenderModel):
             store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}.tsv")
 
     def get_recommendations(self, top_k):
-        r_int = np.random.randint
         n_items = self._num_items
-        items = self._data.items
+        sorted_pop_items = self._sorted_pop_items
         ratings = self._data.train_dict
 
         r = {}
         for u, i_s in ratings.items():
             l = []
             ui = set(i_s.keys())
+
             lui = len(ui)
             if lui+top_k >= n_items:
                 r[u] = l
                 continue
-            for index in range(top_k):
-                j = items[r_int(n_items)]
-                while j in ui:
-                    j = items[r_int(n_items)]
-                l.append((j, 1))
+
+            for item, pop in sorted_pop_items.items():
+                if item in ui:
+                    continue
+                else:
+                    l.append((item, pop))
+                if len(l) >= top_k:
+                    break
             r[u] = l
         return r
