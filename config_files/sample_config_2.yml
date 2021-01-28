@@ -47,7 +47,7 @@ experiment:
       reg_lambda: 0.01
     KaHFMBatch:
       meta:
-        hyper_max_evals: 1
+        hyper_max_evals: 20
         hyper_opt_alg: tpe
         validation_rate: 10
         verbose: True
@@ -60,3 +60,85 @@ experiment:
       batch_size: 512
       l_w: 0.005
       l_b: 0
+    MultiDAE:
+      meta:
+        hyper_max_evals: 1
+        hyper_opt_alg: tpe
+        validation_rate: 1
+        verbose: True
+        save_weights: False
+        save_recs: False
+      lr: 0.001
+      epochs: 1
+      intermediate_dim: 600
+      latent_dim: 200
+      batch_size: -1
+      dropout_pkeep: 1
+      reg_lambda: 0.01
+    BPRMF:
+      meta:
+        hyper_max_evals: 1
+        hyper_opt_alg: tpe
+        validation_rate: 1
+        verbose: True
+        save_weights: False
+        save_recs: False
+        validation_metric: nDCG
+        restore_epoch: -1
+      lr: 0.05
+      epochs: 1
+      embed_k: 10
+      bias_regularization: 0
+      user_regularization: 0.005
+      positive_item_regularization: 0.0025
+      negative_item_regularization: 0.00025
+      update_negative_item_factors: True
+      update_users: True
+      update_items: True
+      update_bias: True
+    NNBPRMF:
+      meta:
+        hyper_max_evals: 1
+        hyper_opt_alg: tpe
+        validation_rate: 1
+        verbose: True
+        save_weights: False
+        save_recs: False
+        validation_metric: nDCG
+        restore_epoch: -1
+      lr: 0.001
+      epochs: 1
+      embed_k: 50
+      batch_size: 512
+      l_w: 0.0025
+      l_b: 0
+    KaHFM:
+      meta:
+        hyper_max_evals: 1
+        hyper_opt_alg: tpe
+        validation_rate: 1
+        verbose: True
+        save_weights: False
+        save_recs: True
+        validation_metric: nDCG
+        restore_epoch: -1
+      lr: 0.05
+      epochs: 1
+      bias_regularization: 0
+      user_regularization: 0.0025
+      positive_item_regularization: 0.0025
+      negative_item_regularization: 0.00025
+      update_negative_item_factors: True
+      update_users: True
+      update_items: True
+      update_bias: True
+      Random:
+        meta:
+          save_recs: False
+    ItemKNN:
+      meta:
+        verbose: True
+        save_recs: False
+      neighbors: 50
+      similarity: cosine
+      implementation: aiolli
