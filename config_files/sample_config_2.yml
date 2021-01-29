@@ -40,7 +40,7 @@ experiment:
         save_recs: False
         validation_metric: nDCG
         restore_epoch: -1
-      restore: True
+      restore: False
       embed_k: 10
 #    WRMF:
 #      meta:
@@ -167,10 +167,17 @@ experiment:
 ###      Random:
 ###        meta:
 ###          save_recs: False
-##    ItemKNN:
-##      meta:
-##        verbose: True
-##        save_recs: False
-##      neighbors: 50
-##      similarity: cosine
-##      implementation: aiolli
+#    UserKNN:
+#      meta:
+#        verbose: True
+#        save_recs: False
+#      neighbors: 5
+#      similarity: cosine
+#       implementation: aiolli
+#    ItemKNN:
+#      meta:
+#        verbose: True
+#        save_recs: False
+#      neighbors: 50
+#      similarity: cosine
+#      implementation: aiolli

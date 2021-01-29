@@ -18,4 +18,4 @@ from .autoencoders import MultiVAE
 from .knowledge_aware import KaHFM
 from .knowledge_aware import KaHFMBatch
 from .graph_based import NGCF
-from .NN import ItemKNN
+from .NN import ItemKNN, UserKNN

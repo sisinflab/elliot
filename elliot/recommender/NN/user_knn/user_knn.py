@@ -17,13 +17,13 @@ from utils.folder import build_model_folder
 from utils.write import store_recommendation
 
 from recommender.base_recommender_model import BaseRecommenderModel
-from recommender.NN.item_knn.item_knn_similarity import Similarity
-from recommender.NN.item_knn.aiolli_ferrari import AiolliSimilarity
+from recommender.NN.user_knn.user_knn_similarity import Similarity
+from recommender.NN.user_knn.aiolli_ferrari import AiolliSimilarity
 
 np.random.seed(42)
 
 
-class ItemKNN(RecMixin, BaseRecommenderModel):
+class UserKNN(RecMixin, BaseRecommenderModel):
 
     def __init__(self, data, config, params, *args, **kwargs):
         super().__init__(data, config, params, *args, **kwargs)
@@ -68,7 +68,7 @@ class ItemKNN(RecMixin, BaseRecommenderModel):
 
     @property
     def name(self):
-        return f"Item_NN_nn:{self._num_neighbors}_sim:{self._similarity}{'_imp:Aiolli'if self._implementation=='aiolli' else ''}"
+        return f"User_NN_nn:{self._num_neighbors}_sim:{self._similarity}{'_imp:Aiolli'if self._implementation=='aiolli' else ''}"
 
     def train(self):
 
@@ -85,27 +85,6 @@ class ItemKNN(RecMixin, BaseRecommenderModel):
             if self._save_recs:
                 store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}.tsv")
 
-    # def get_loss(self):
-    #     return -max([r[self._validation_metric] for r in self._results])
-    #
-    # def get_params(self):
-    #     return self._params.__dict__
-    #
-    # def get_results(self):
-    #     val_max = np.argmax([r[self._validation_metric] for r in self._results])
-    #     return self._results[val_max]
-    #
-    # def get_statistical_results(self):
-    #     val_max = np.argmax([r[self._validation_metric] for r in self._results])
-    #     return self._statistical_results[val_max]
-    #
-    # def get_test_results(self):
-    #     val_max = np.argmax([r[self._validation_metric] for r in self._results])
-    #     return self._test_results[val_max]
-    #
-    # def get_test_statistical_results(self):
-    #     val_max = np.argmax([r[self._validation_metric] for r in self._results])
-    #     return self._test_statistical_results[val_max]
 
     def restore_weights(self):
         try:

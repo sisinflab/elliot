@@ -17,9 +17,9 @@ pip-selfcheck.json
 
 .idea
 # End of https://www.toptal.com/developers/gitignore/api/venv
-/data/tradesy/
+
 /results/
-/data/example/
+/data/*
 /share/
 **/__pycache__/**
 *.log
