@@ -30,12 +30,38 @@ experiment:
 #      feature_data: ../data/categorical_dbpedia_ml1m/map.tsv
   gpu: -1 # -1 is not use GPU
   models:
-    MostPop:
+    PureSVD:
       meta:
-        save_recs: True
-    Random:
-      meta:
-        save_recs: True
+        hyper_max_evals: 1
+        hyper_opt_alg: tpe
+        validation_rate: 1
+        verbose: True
+        save_weights: False
+        save_recs: False
+        validation_metric: nDCG
+        restore_epoch: -1
+      restore: True
+      embed_k: 10
+#    WRMF:
+#      meta:
+#        hyper_max_evals: 1
+#        hyper_opt_alg: tpe
+#        validation_rate: 1
+#        verbose: True
+#        save_weights: False
+#        save_recs: False
+#        validation_metric: nDCG
+#        restore_epoch: -1
+#      epochs: 2
+#      embed_k: 10
+#      alpha: 1
+#      reg: 0.1
+#    MostPop:
+#      meta:
+#        save_recs: True
+#    Random:
+#      meta:
+#        save_recs: True
 #    MultiVAE:
 #      meta:
 #        hyper_max_evals: 3

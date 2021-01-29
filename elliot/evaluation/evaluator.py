@@ -116,7 +116,8 @@ class Evaluator(object):
             results = {m.name(): m.eval() for m in metric_objects}
 
             str_results = {k: str(round(v, rounding_factor)) for k, v in results.items()}
-            print(f"\nEval Time: {time() - eval_start_time}")
+            print(f"\nCut-off: {eval_objs.cutoff}")
+            print(f"Eval Time: {time() - eval_start_time}")
 
             res_print = "\n".join(["\t".join(e) for e in str_results.items()])
 

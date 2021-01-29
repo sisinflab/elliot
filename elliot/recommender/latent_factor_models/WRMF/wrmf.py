@@ -49,7 +49,7 @@ class WRMF(RecMixin, BaseRecommenderModel):
         self._params.name = self.name
 
         build_model_folder(self._config.path_output_rec_weight, self.name)
-        self._saving_filepath = f'{self._config.path_output_rec_weight}{self.name}best-weights-{self.name}'
+        self._saving_filepath = f'{self._config.path_output_rec_weight}{self.name}/best-weights-{self.name}'
 
     def get_recommendations(self, k: int = 100):
         return {u: self._model.get_user_recs(u, k) for u in self._ratings.keys()}
@@ -78,16 +78,16 @@ class WRMF(RecMixin, BaseRecommenderModel):
 
         for it in range(self._epochs):
             self.restore_weights(it)
-            loss = 0
-            steps = 0
             self._model.train_step()
+
+            print("Iteration Finished")
 
             if not (it + 1) % self._validation_rate:
                 recs = self.get_recommendations(self.evaluator.get_needed_recommendations())
                 result_dict = self.evaluator.eval(recs)
                 self._results.append(result_dict)
 
-                print(f'Epoch {(it + 1)}/{self._epochs} loss {loss/steps:.5f}')
+                print(f'Epoch {(it + 1)}/{self._epochs}')
 
                 if self._results[-1][self._validation_k]["val_results"][self._validation_metric] > best_metric_value:
                     print("******************************************")
