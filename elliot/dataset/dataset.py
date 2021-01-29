@@ -149,6 +149,7 @@ class DataSet(AbstractDataset):
                                 for user, items in self.train_dict.items()}
 
         self.sp_i_train = self.build_sparse()
+        self.sp_i_train_ratings = self.build_sparse_ratings()
 
         if len(data_tuple) == 2:
             self.test_dict = self.build_dict(data_tuple[1], self.users)
@@ -191,6 +192,17 @@ class DataSet(AbstractDataset):
         cols = [i for _, i in rows_cols]
         data = sp.csr_matrix((np.ones_like(rows), (rows, cols)), dtype='float32',
                              shape=(len(self.users), len(self.items)))
+        return data
+
+    def build_sparse_ratings(self):
+        rows_cols_ratings = [(u, i, r) for u, items in self.i_train_dict.items() for i, r in items.items()]
+        rows = [u for u, _, _ in rows_cols_ratings]
+        cols = [i for _, i, _ in rows_cols_ratings]
+        ratings = [r for _, _, r in rows_cols_ratings]
+
+        data = sp.csr_matrix((ratings, (rows, cols)), dtype='float32',
+                             shape=(len(self.users), len(self.items)))
+
         return data
 
     def get_test(self):

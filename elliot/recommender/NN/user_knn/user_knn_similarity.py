@@ -28,10 +28,12 @@ class Similarity(object):
         This function initialize the data model
         """
 
-        self._user_ratings = {}
+        self._user_ratings = self._ratings
+
+        self._item_ratings = {}
         for u, user_items in self._ratings.items():
             for i, v in user_items.items():
-                self._user_ratings.setdefault(u, {}).update({i: v})
+                self._item_ratings.setdefault(i, {}).update({u: v})
 
         self._transactions = self._data.transactions
 
@@ -62,27 +64,28 @@ class Similarity(object):
 
     def process_cosine(self):
         x, y = np.triu_indices(self._similarity_matrix.shape[0], k=1)
-        g = np.vectorize(self.compute_cosine)
-        g(x, y)
+        self._similarity_matrix[x, y] = cosine_similarity(self._data.sp_i_train_ratings)[x, y]
+        # g = np.vectorize(self.compute_cosine)
+        # g(x, y)
         # for item_row in range(self._similarity_matrix.shape[0]):
         #     for item_col in range(item_row + 1, self._similarity_matrix.shape[1]):
         #         self._similarity_matrix[item_row, item_col] = self.compute_cosine(
         #             self._item_ratings.get(self._private_items[item_row],{}), self._item_ratings.get(self._private_items[item_col], {}))
 
-    def compute_cosine(self, i_index, j_index):
-        u_dict = self._user_ratings.get(self._private_users[i_index],{})
-        v_dict = self._user_ratings.get(self._private_users[j_index],{})
-        union_keyset = set().union(*[u_dict, v_dict])
-        u: np.ndarray = np.array([[u_dict.get(x, 0) for x in union_keyset]])
-        v: np.ndarray = np.array([[v_dict.get(x, 0) for x in union_keyset]])
-        self._similarity_matrix[i_index, j_index] = cosine_similarity(u, v)[0, 0]
+    # def compute_cosine(self, i_index, j_index):
+    #     u_dict = self._user_ratings.get(self._private_users[i_index],{})
+    #     v_dict = self._user_ratings.get(self._private_users[j_index],{})
+    #     union_keyset = set().union(*[u_dict, v_dict])
+    #     u: np.ndarray = np.array([[1 if x in u_dict.keys() else 0 for x in union_keyset]])
+    #     v: np.ndarray = np.array([[1 if x in v_dict.keys() else 0 for x in union_keyset]])
+    #     self._similarity_matrix[i_index, j_index] = cosine_similarity(u, v)[0, 0]
 
     def get_transactions(self):
         return self._transactions
 
     def get_user_recs(self, u, k):
         user_items = self._ratings[u].keys()
-        predictions = {i: self.score_item(self.get_user_neighbors(u), self._data.sp_i_train[:, i].nonzero()[0])
+        predictions = {i: self.score_item(self.get_user_neighbors(u), self._item_ratings[i].keys())
                        for i in self._data.items if i not in user_items}
         indices, values = zip(*predictions.items())
         indices = np.array(indices)

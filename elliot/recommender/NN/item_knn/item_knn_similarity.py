@@ -62,8 +62,9 @@ class Similarity(object):
 
     def process_cosine(self):
         x, y = np.triu_indices(self._similarity_matrix.shape[0], k=1)
-        g = np.vectorize(self.compute_cosine)
-        g(x,y)
+        self._similarity_matrix[x, y] = cosine_similarity(self._data.sp_i_train_ratings.T)[x, y]
+        # g = np.vectorize(self.compute_cosine)
+        # g(x,y)
         # for item_row in range(self._similarity_matrix.shape[0]):
         #     for item_col in range(item_row + 1, self._similarity_matrix.shape[1]):
         #         self._similarity_matrix[item_row, item_col] = self.compute_cosine(
