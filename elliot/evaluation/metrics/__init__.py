@@ -37,7 +37,7 @@ from evaluation.metrics.novelty.EPC import EPC
 
 from evaluation.metrics.bias import ARP, APLT, ACLT, PopRSP, PopREO
 
-from evaluation.metrics.fairness.MAD import UserMADrating
+from evaluation.metrics.fairness.MAD import UserMADrating, ItemMADrating
 
 from evaluation.metrics.statistical_array_metric import StatisticalMetric
 
@@ -63,6 +63,7 @@ _metric_dictionary = {
     "MSE": MSE,
     "RMSE": RMSE,
     "UserMADrating": UserMADrating,
+    "ItemMADrating": ItemMADrating,
     "SRecall": SRecall,
     "ARP": ARP,
     "APLT": APLT,
