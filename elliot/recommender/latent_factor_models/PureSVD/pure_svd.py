@@ -2,6 +2,7 @@
 Module description:
 
 """
+from recommender.latent_factor_models.PureSVD.pure_svd_model import PureSVDModel
 from recommender.latent_factor_models.WRMF.wrmf_model import WRMFModel
 
 __version__ = '0.1'
@@ -24,7 +25,7 @@ from recommender.base_recommender_model import BaseRecommenderModel
 np.random.seed(42)
 
 
-class WRMF(RecMixin, BaseRecommenderModel):
+class PureSVD(RecMixin, BaseRecommenderModel):
 
     def __init__(self, data, config, params, *args, **kwargs):
         super().__init__(data, config, params, *args, **kwargs)
@@ -32,15 +33,12 @@ class WRMF(RecMixin, BaseRecommenderModel):
         self._num_items = self._data.num_items
         self._num_users = self._data.num_users
         self._random = np.random
-        self._sample_negative_items_empirically = True
 
         self._factors = self._params.embed_k
-        self._alpha = self._params.alpha
-        self._reg = self._params.reg
 
         self._ratings = self._data.train_dict
         self._sp_i_train = self._data.sp_i_train
-        self._model = WRMFModel(self._factors, self._data, self._random, self._alpha, self._reg)
+        self._model = PureSVDModel(self._factors, self._sp_i_train, 42)
 
         self._iteration = 0
 
@@ -65,11 +63,7 @@ class WRMF(RecMixin, BaseRecommenderModel):
 
     @property
     def name(self):
-        return "WRMF" \
-               + "-e:" + str(self._params.epochs) \
-               + "-factors:" + str(self._params.embed_k) \
-               + "-reg:" + str(self._params.reg) \
-               + "-alpha:" + str(self._params.alpha)
+        return "PureSVD" + "-factors:" + str(self._params.embed_k)
 
     def train(self):
 

@@ -17,7 +17,7 @@ class WRMFModel(object):
     Simple Matrix Factorization class
     """
 
-    def __init__(self, factors, data, random, alpha, reg, n_users, n_items):
+    def __init__(self, factors, data, random, alpha, reg):
 
         self._data = data
         self.random = random
@@ -26,11 +26,11 @@ class WRMFModel(object):
         self.user_num, self.item_num = self._data.num_users, self._data.num_items
 
         self.X = sp.csr_matrix(self.random.normal(scale=0.01,
-                                                  size=(n_users, factors)))
+                                                  size=(self.user_num, factors)))
         self.Y = sp.csr_matrix(self.random.normal(scale=0.01,
-                                                  size=(n_items, factors)))
-        self.X_eye = sp.eye(n_users)
-        self.Y_eye = sp.eye(n_items)
+                                                  size=(self.item_num, factors)))
+        self.X_eye = sp.eye(self.user_num)
+        self.Y_eye = sp.eye(self.item_num)
         self.lambda_eye = reg * sp.eye(factors)
 
         self.user_vec, self.item_vec, self.pred_mat = None, None, None
