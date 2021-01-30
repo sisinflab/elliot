@@ -27,7 +27,8 @@ from evaluation.metrics.rating.mae import MAE
 from evaluation.metrics.rating.mse import MSE
 from evaluation.metrics.rating.rmse import RMSE
 
-from evaluation.metrics.diversity.item_coverage import ItemCoverage
+from evaluation.metrics.coverage import ItemCoverage, UserCoverage, NumRetrieved
+
 from evaluation.metrics.diversity.gini_index import GiniIndex
 from evaluation.metrics.diversity.shannon_entropy import ShannonEntropy
 from evaluation.metrics.diversity.SRecall import SRecall
@@ -37,7 +38,7 @@ from evaluation.metrics.novelty.EPC import EPC
 
 from evaluation.metrics.bias import ARP, APLT, ACLT, PopRSP, PopREO
 
-from evaluation.metrics.fairness.MAD import UserMADrating, ItemMADrating
+from evaluation.metrics.fairness.MAD import UserMADrating, ItemMADrating, UserMADranking, ItemMADranking
 
 from evaluation.metrics.statistical_array_metric import StatisticalMetric
 
@@ -55,6 +56,8 @@ _metric_dictionary = {
     "GAUC": GAUC,
     "AUC": AUC,
     "ItemCoverage": ItemCoverage,
+    "UserCoverage": UserCoverage,
+    "NumRetrieved": NumRetrieved,
     "Gini": GiniIndex,
     "SEntropy": ShannonEntropy,
     "EFD": EFD,
@@ -64,6 +67,8 @@ _metric_dictionary = {
     "RMSE": RMSE,
     "UserMADrating": UserMADrating,
     "ItemMADrating": ItemMADrating,
+    "UserMADranking": UserMADranking,
+    "ItemMADranking": ItemMADranking,
     "SRecall": SRecall,
     "ARP": ARP,
     "APLT": APLT,

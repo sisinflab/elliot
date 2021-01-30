@@ -10,3 +10,5 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
 from .UserMADrating import UserMADrating
 from .ItemMADrating import ItemMADrating
+from .UserMADranking import UserMADranking
+from .ItemMADranking import ItemMADranking
