@@ -1,5 +1,5 @@
 """
-This is the implementation of the Ranking-based Equal Opportunity (REO) metric.
+This is the implementation of the Popularity-based Ranking-based Equal Opportunity (REO) metric.
 It proceeds from a user-wise computation, and average the values over the users.
 """
 
@@ -15,7 +15,7 @@ from evaluation.metrics.base_metric import BaseMetric
 
 class PopREO(BaseMetric):
     """
-    This class represents the implementation of the Ranking-based Equal Opportunity (REO) recommendation metric.
+    This class represents the implementation of the Popularity-based Ranking-based Equal Opportunity (REO) recommendation metric.
     Passing 'PopREO' to the metrics list will enable the computation of the metric.
     """
 
@@ -46,7 +46,7 @@ class PopREO(BaseMetric):
 
     def __user_pop_reo(self, user_recommendations, cutoff, long_tail, short_head, u_train, user_relevant_items):
         """
-        Per User Ranking-based Equal Opportunity (REO)
+        Per User Popularity-based Ranking-based Equal Opportunity (REO)
         :param user_recommendations: list of user recommendation in the form [(item1,value1),...]
         :param cutoff: numerical threshold to limit the recommendation list
         :param user_relevant_items: list of user relevant items in the form [item1,...]

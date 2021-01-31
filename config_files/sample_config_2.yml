@@ -21,33 +21,36 @@ experiment:
     relevance_threshold: 3
     paired_ttest: True
     complex_metrics:
-    - metric: ItemMADrating
+    - metric: REO
       clustering_name: ItemPopularity
       clustering_file: ../data/categorical_dbpedia_ml1m/items_clustering_popularity.tsv
-    - metric: ItemMADranking
-      clustering_name: ItemPopularity
-      clustering_file: ../data/categorical_dbpedia_ml1m/items_clustering_popularity.tsv
-    - metric: UserMADrating
-      clustering_name: Happiness
-      clustering_file: ../data/categorical_dbpedia_ml1m/user_clustering_happiness.tsv
-    - metric: UserMADranking
-      clustering_name: Happiness
-      clustering_file: ../data/categorical_dbpedia_ml1m/user_clustering_happiness.tsv
-    - metric: BiasDisparityBR
-      user_clustering_name: Happiness
-      user_clustering_file: ../data/categorical_dbpedia_ml1m/user_clustering_happiness.tsv
-      item_clustering_name: ItemPopularity
-      item_clustering_file: ../data/categorical_dbpedia_ml1m/items_clustering_popularity.tsv
-    - metric: BiasDisparityBS
-      user_clustering_name: Happiness
-      user_clustering_file: ../data/categorical_dbpedia_ml1m/user_clustering_happiness.tsv
-      item_clustering_name: ItemPopularity
-      item_clustering_file: ../data/categorical_dbpedia_ml1m/items_clustering_popularity.tsv
-    - metric: BiasDisparityBD
-      user_clustering_name: Happiness
-      user_clustering_file: ../data/categorical_dbpedia_ml1m/user_clustering_happiness.tsv
-      item_clustering_name: ItemPopularity
-      item_clustering_file: ../data/categorical_dbpedia_ml1m/items_clustering_popularity.tsv
+#    - metric: ItemMADrating
+#      clustering_name: ItemPopularity
+#      clustering_file: ../data/categorical_dbpedia_ml1m/items_clustering_popularity.tsv
+#    - metric: ItemMADranking
+#      clustering_name: ItemPopularity
+#      clustering_file: ../data/categorical_dbpedia_ml1m/items_clustering_popularity.tsv
+#    - metric: UserMADrating
+#      clustering_name: Happiness
+#      clustering_file: ../data/categorical_dbpedia_ml1m/user_clustering_happiness.tsv
+#    - metric: UserMADranking
+#      clustering_name: Happiness
+#      clustering_file: ../data/categorical_dbpedia_ml1m/user_clustering_happiness.tsv
+#    - metric: BiasDisparityBR
+#      user_clustering_name: Happiness
+#      user_clustering_file: ../data/categorical_dbpedia_ml1m/user_clustering_happiness.tsv
+#      item_clustering_name: ItemPopularity
+#      item_clustering_file: ../data/categorical_dbpedia_ml1m/items_clustering_popularity.tsv
+#    - metric: BiasDisparityBS
+#      user_clustering_name: Happiness
+#      user_clustering_file: ../data/categorical_dbpedia_ml1m/user_clustering_happiness.tsv
+#      item_clustering_name: ItemPopularity
+#      item_clustering_file: ../data/categorical_dbpedia_ml1m/items_clustering_popularity.tsv
+#    - metric: BiasDisparityBD
+#      user_clustering_name: Happiness
+#      user_clustering_file: ../data/categorical_dbpedia_ml1m/user_clustering_happiness.tsv
+#      item_clustering_name: ItemPopularity
+#      item_clustering_file: ../data/categorical_dbpedia_ml1m/items_clustering_popularity.tsv
 #    - metric: DSC
 #      beta: 2
 #    - metric: SRecall

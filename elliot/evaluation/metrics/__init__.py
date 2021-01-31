@@ -40,6 +40,8 @@ from evaluation.metrics.bias import ARP, APLT, ACLT, PopRSP, PopREO
 
 from evaluation.metrics.fairness.MAD import UserMADrating, ItemMADrating, UserMADranking, ItemMADranking
 from evaluation.metrics.fairness.BiasDisparity import BiasDisparityBR, BiasDisparityBS, BiasDisparityBD
+from evaluation.metrics.fairness.rsp import RSP
+from evaluation.metrics.fairness.reo import REO
 
 from evaluation.metrics.statistical_array_metric import StatisticalMetric
 
@@ -78,7 +80,9 @@ _metric_dictionary = {
     "APLT": APLT,
     "ACLT": ACLT,
     "PopRSP": PopRSP,
-    "PopREO": PopREO
+    "PopREO": PopREO,
+    "RSP": RSP,
+    "REO": REO
 }
 
 
