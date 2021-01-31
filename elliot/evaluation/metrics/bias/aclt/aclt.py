@@ -17,6 +17,11 @@ class ACLT(BaseMetric):
     """
     This class represents the implementation of the Average coverage of long tail items recommendation metric.
     Passing 'ACLT' to the metrics list will enable the computation of the metric.
+
+    Himan Abdollahpouri, Robin Burke, Bamshad Mobasher
+    "Managing Popularity Bias in Recommender Systems with Personalized Re-Ranking"
+    Proceedings of the Thirty-Second International Florida Artificial
+    Intelligence Research Society Conference, 2019
     """
 
     def __init__(self, recommendations, config, params, eval_objects):

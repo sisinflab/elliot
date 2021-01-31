@@ -15,6 +15,9 @@ class ARP(BaseMetric):
     """
     This class represents the implementation of the Average Recommendation Popularity recommendation metric.
     Passing 'ARP' to the metrics list will enable the computation of the metric.
+
+    Yin, H.; Cui, B.; Li, J.; Yao, J.; and Chen, C. 2012.
+    Challenging the long tail recommendation. Proceedings of the VLDB Endowment
     """
 
     def __init__(self, recommendations, config, params, eval_objects):

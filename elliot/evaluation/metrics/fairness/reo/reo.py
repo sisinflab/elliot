@@ -19,6 +19,10 @@ class REO(BaseMetric):
     """
     This class represents the implementation of the Ranking-based Equal Opportunity (REO) recommendation metric.
     Passing 'REO' to the metrics list will enable the computation of the metric.
+
+
+    Zhu, Ziwei, Jianling Wang, and James Caverlee. "Measuring and Mitigating Item Under-Recommendation Bias in Personalized Ranking Systems." Proceedings of the 43rd International ACM SIGIR Conference on Research and Development in Information Retrieval. 2020.
+
     """
 
     def __init__(self, recommendations, config, params, eval_objects, additional_data):

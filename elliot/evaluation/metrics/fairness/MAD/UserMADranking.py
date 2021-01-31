@@ -19,6 +19,10 @@ class UserMADranking(BaseMetric):
     """
     This class represents the implementation of the User MAD ranking recommendation metric.
     Passing 'UserMADranking' to the metrics list will enable the computation of the metric.
+
+    Deldjoo, Yashar, Vito Walter Anelli, Hamed Zamani, Alejandro Bellogin, and Tommaso Di Noia.
+    "A flexible framework for evaluating user and item fairness in recommender systems."
+    User Modeling and User-Adapted Interaction (2020): 1-47.
     """
 
     def __init__(self, recommendations, config, params, eval_objects, additional_data):

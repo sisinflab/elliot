@@ -19,6 +19,11 @@ class BiasDisparityBS(BaseMetric):
     """
     This class represents the implementation of the Bias Disparity - Bias Source recommendation metric.
     Passing 'BiasDisparityBS' to the metrics list will enable the computation of the metric.
+
+    Tsintzou, Virginia, Evaggelia Pitoura, and Panayiotis Tsaparas. "Bias disparity in recommendation systems.
+    Proceedings of the Workshop on Recommendation in Multi-stakeholder
+               Environments co-located with the 13th {ACM} Conference on Recommender
+               Systems (RecSys 2019)
     """
 
     def __init__(self, recommendations, config, params, eval_objects, additional_data):
