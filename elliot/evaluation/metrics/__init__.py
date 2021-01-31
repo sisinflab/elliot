@@ -39,6 +39,7 @@ from evaluation.metrics.novelty.EPC import EPC
 from evaluation.metrics.bias import ARP, APLT, ACLT, PopRSP, PopREO
 
 from evaluation.metrics.fairness.MAD import UserMADrating, ItemMADrating, UserMADranking, ItemMADranking
+from evaluation.metrics.fairness.BiasDisparity import BiasDisparityBR, BiasDisparityBS, BiasDisparityBD
 
 from evaluation.metrics.statistical_array_metric import StatisticalMetric
 
@@ -69,6 +70,9 @@ _metric_dictionary = {
     "ItemMADrating": ItemMADrating,
     "UserMADranking": UserMADranking,
     "ItemMADranking": ItemMADranking,
+    "BiasDisparityBR": BiasDisparityBR,
+    "BiasDisparityBS": BiasDisparityBS,
+    "BiasDisparityBD": BiasDisparityBD,
     "SRecall": SRecall,
     "ARP": ARP,
     "APLT": APLT,

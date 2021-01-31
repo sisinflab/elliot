@@ -33,6 +33,21 @@ experiment:
     - metric: UserMADranking
       clustering_name: Happiness
       clustering_file: ../data/categorical_dbpedia_ml1m/user_clustering_happiness.tsv
+    - metric: BiasDisparityBR
+      user_clustering_name: Happiness
+      user_clustering_file: ../data/categorical_dbpedia_ml1m/user_clustering_happiness.tsv
+      item_clustering_name: ItemPopularity
+      item_clustering_file: ../data/categorical_dbpedia_ml1m/items_clustering_popularity.tsv
+    - metric: BiasDisparityBS
+      user_clustering_name: Happiness
+      user_clustering_file: ../data/categorical_dbpedia_ml1m/user_clustering_happiness.tsv
+      item_clustering_name: ItemPopularity
+      item_clustering_file: ../data/categorical_dbpedia_ml1m/items_clustering_popularity.tsv
+    - metric: BiasDisparityBD
+      user_clustering_name: Happiness
+      user_clustering_file: ../data/categorical_dbpedia_ml1m/user_clustering_happiness.tsv
+      item_clustering_name: ItemPopularity
+      item_clustering_file: ../data/categorical_dbpedia_ml1m/items_clustering_popularity.tsv
 #    - metric: DSC
 #      beta: 2
 #    - metric: SRecall
