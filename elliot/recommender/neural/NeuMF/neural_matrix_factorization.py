@@ -37,6 +37,8 @@ class NeuralMatrixFactorization(RecMixin, BaseRecommenderModel):
         self._sample_negative_items_empirically = True
 
         self._sampler = pws.Sampler(self._data.i_train_dict)
+
+        self._learning_rate = self._params.lr
         self._embed_mf_size = self._params.embed_mf_size
         self._embed_mlp_size = self._params.embed_mlp_size
         self._mlp_hidden_size = list(make_tuple(self._params.mlp_hidden_size))
@@ -52,9 +54,12 @@ class NeuralMatrixFactorization(RecMixin, BaseRecommenderModel):
 
         self._ratings = self._data.train_dict
         self._sp_i_train = self._data.sp_i_train
+        self._i_items_set = list(range(self._num_items))
+        # self._i_zeros = [list(items_set-set(user_train)) for user_train in self._sp_i_train.tolil().rows]
         self._model = NeuralMatrixFactorizationModel(self._num_users, self._num_items, self._embed_mf_size,
                                                      self._embed_mlp_size, self._mlp_hidden_size,
-                                                     self._prob_keep_dropout, self._is_mf_train, self._is_mlp_train)
+                                                     self._prob_keep_dropout, self._is_mf_train, self._is_mlp_train,
+                                                     self._learning_rate)
 
         self._iteration = 0
 
@@ -111,6 +116,22 @@ class NeuralMatrixFactorization(RecMixin, BaseRecommenderModel):
                     if self._save_recs:
                         store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}-it:{it + 1}.tsv")
 
+    def get_recommendations(self, k: int = 100):
+        predictions_top_k = {}
+        for index, offset in enumerate(range(0, self._num_users, self._batch_size)):
+            offset_stop = min(offset + self._batch_size, self._num_users)
+            predictions = self._model.get_recs(
+                (
+                    np.repeat(np.array(list(range(offset,offset_stop)))[:, None], repeats=self._num_items,axis=1),
+                 np.array([self._i_items_set for _ in range(offset,offset_stop)])
+                 )
+            )
+            v, i = self._model.get_top_k(predictions, self.get_train_mask(offset, offset_stop), k=k)
+            items_ratings_pair = [list(zip(map(self._data.private_items.get, u_list[0]), u_list[1]))
+                                  for u_list in list(zip(i.numpy(), v.numpy()))]
+            predictions_top_k.update(dict(zip(map(self._data.private_users.get,
+                                                  range(offset, offset_stop)), items_ratings_pair)))
+        return predictions_top_k
 
     def restore_weights(self, it):
         if self._restore_epochs == it:

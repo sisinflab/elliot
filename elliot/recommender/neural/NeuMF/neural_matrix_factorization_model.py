@@ -69,6 +69,7 @@ class NeuralMatrixFactorizationModel(keras.Model):
 
         self.optimizer = tf.optimizers.Adam(learning_rate)
 
+    @tf.function
     def call(self, inputs, training=None, mask=None):
         user, item = inputs
         user_mf_e = self.user_mf_embedding(user)
@@ -89,7 +90,7 @@ class NeuralMatrixFactorizationModel(keras.Model):
             raise RuntimeError('mf_train and mlp_train can not be False at the same time')
         return output
 
-
+    @tf.function
     def train_step(self, batch):
         user, pos, label = batch
         with tf.GradientTape() as tape:
@@ -102,3 +103,44 @@ class NeuralMatrixFactorizationModel(keras.Model):
 
         return loss
 
+    @tf.function
+    def predict(self, inputs, training=False, **kwargs):
+        """
+        Get full predictions on the whole users/items matrix.
+
+        Returns:
+            The matrix of predicted values.
+        """
+        output = self.call(inputs=inputs, training=training)
+        return output
+
+    @tf.function
+    def get_recs(self, inputs, training=False, **kwargs):
+        """
+        Get full predictions on the whole users/items matrix.
+
+        Returns:
+            The matrix of predicted values.
+        """
+        user, item = inputs
+        user_mf_e = self.user_mf_embedding(user)
+        item_mf_e = self.item_mf_embedding(item)
+        user_mlp_e = self.user_mlp_embedding(user)
+        item_mlp_e = self.item_mlp_embedding(item)
+        if self.is_mf_train:
+            mf_output = user_mf_e * item_mf_e  # [batch_size, embedding_size]
+        if self.is_mlp_train:
+            mlp_output = self.mlp_layers(tf.concat([user_mlp_e, item_mlp_e], -1))  # [batch_size, layers[-1]]
+        if self.is_mf_train and self.is_mlp_train:
+            output = self.sigmoid(self.predict_layer(tf.concat([mf_output, mlp_output], -1)))
+        elif self.is_mf_train:
+            output = self.sigmoid(self.predict_layer(mf_output))
+        elif self.is_mlp_train:
+            output = self.sigmoid(self.predict_layer(mlp_output))
+        else:
+            raise RuntimeError('mf_train and mlp_train can not be False at the same time')
+        return tf.squeeze(output)
+
+    @tf.function
+    def get_top_k(self, preds, train_mask, k=100):
+        return tf.nn.top_k(tf.where(train_mask, preds, -np.inf), k=k, sorted=True)

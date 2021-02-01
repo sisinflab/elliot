@@ -83,12 +83,12 @@ experiment:
 #      embed_k: 10
 #      alpha: 1
 #      reg: 0.1
-    MostPop:
-      meta:
-        save_recs: True
-    Random:
-      meta:
-        save_recs: True
+#    MostPop:
+#      meta:
+#        save_recs: True
+#    Random:
+#      meta:
+#        save_recs: True
 #    MultiVAE:
 #      meta:
 #        hyper_max_evals: 3
@@ -211,8 +211,9 @@ experiment:
       prob_keep_dropout: 0.2
       is_mf_train: True
       is_mlp_train: True
-      batch_size: 1024
-      epochs: 1
+      batch_size: 512
+      epochs: 10
+      lr: 0.01
 #       implementation: aiolli
 #    ItemKNN:
 #      meta:
