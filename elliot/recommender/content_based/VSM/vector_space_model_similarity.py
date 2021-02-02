@@ -1,6 +1,7 @@
 
 import numpy as np
-from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.metrics.pairwise import cosine_similarity, euclidean_distances, haversine_distances, chi2_kernel, manhattan_distances
+from sklearn.metrics import pairwise_distances
 
 
 
@@ -29,27 +30,45 @@ class Similarity(object):
         This function initialize the data model
         """
 
-        self._user_ratings = self._ratings
-
-        self._item_ratings = {}
-        for u, user_items in self._ratings.items():
-            for i, v in user_items.items():
-                self._item_ratings.setdefault(i, {}).update({u: v})
+        supported_similarities = ["cosine", "dot", ]
+        supported_dissimilarities = ["euclidean", "manhattan", "haversine",  "chi2", 'cityblock', 'l1', 'l2', 'braycurtis', 'canberra', 'chebyshev', 'correlation', 'dice', 'hamming', 'jaccard', 'kulsinski', 'mahalanobis', 'minkowski', 'rogerstanimoto', 'russellrao', 'seuclidean', 'sokalmichener', 'sokalsneath', 'sqeuclidean', 'yule']
+        print(f"\nSupported Similarities: {supported_similarities}")
+        print(f"Supported Distances/Dissimilarities: {supported_dissimilarities}\n")
 
         self._transactions = self._data.transactions
-
         self._similarity_matrix = np.empty((len(self._users), len(self._items)))
 
         self.process_similarity(self._similarity)
 
     def process_similarity(self, similarity):
         if similarity == "cosine":
-            self.process_cosine()
+            self._similarity_matrix = cosine_similarity(self._user_profile_matrix, self._item_attribute_matrix)
+        elif similarity == "dot":
+            self._similarity_matrix = (self._data.sp_i_train_ratings @ self._data.sp_i_train_ratings.T).toarray()
+        elif similarity == "euclidean":
+            self._similarity_matrix = (1 / (1 + euclidean_distances(self._user_profile_matrix, self._item_attribute_matrix)))
+        elif similarity == "manhattan":
+            self._similarity_matrix = (1 / (1 + manhattan_distances(self._user_profile_matrix, self._item_attribute_matrix)))
+        elif similarity == "haversine":
+            self._similarity_matrix = (1 / (1 + haversine_distances(self._user_profile_matrix, self._item_attribute_matrix)))
+        elif similarity == "chi2":
+            self._similarity_matrix = (1 / (1 + chi2_kernel(self._user_profile_matrix, self._item_attribute_matrix)))
+        elif similarity in ['cityblock', 'l1', 'l2']:
+            self._similarity_matrix = (1 / (1 + pairwise_distances(self._user_profile_matrix, self._item_attribute_matrix, metric=similarity)))
+        elif similarity in ['braycurtis', 'canberra', 'chebyshev', 'correlation', 'dice', 'hamming', 'jaccard', 'kulsinski', 'mahalanobis', 'minkowski', 'rogerstanimoto', 'russellrao', 'seuclidean', 'sokalmichener', 'sokalsneath', 'sqeuclidean', 'yule']:
+            self._similarity_matrix = (1 / (1 + pairwise_distances(self._user_profile_matrix.toarray(), self._item_attribute_matrix.toarray(), metric=similarity)))
         else:
             raise Exception("Not implemented similarity")
 
-    def process_cosine(self):
-        self._similarity_matrix = cosine_similarity(self._user_profile_matrix, self._item_attribute_matrix)
+        # if similarity == "cosine":
+        #     self._similarity_matrix = cosine_similarity(self._user_profile_matrix, self._item_attribute_matrix)
+        # elif similarity == "dot":
+        #     self._similarity_matrix = (self._user_profile_matrix @ self._item_attribute_matrix.T).toarray()
+        # else:
+        #     raise Exception("Not implemented similarity")
+
+    # def process_cosine(self):
+    #     self._similarity_matrix = cosine_similarity(self._user_profile_matrix, self._item_attribute_matrix)
 
     def get_transactions(self):
         return self._transactions
@@ -68,11 +87,11 @@ class Similarity(object):
         local_top_k = real_values.argsort()[::-1]
         return [(real_indices[item], real_values[item]) for item in local_top_k]
 
-    @staticmethod
-    def score_item(neighs, user_neighs_items):
-        num = sum([v for k, v in neighs.items() if k in user_neighs_items])
-        den = sum(np.power(list(neighs.values()), 1))
-        return num/den if den != 0 else 0
+    # @staticmethod
+    # def score_item(neighs, user_neighs_items):
+    #     num = sum([v for k, v in neighs.items() if k in user_neighs_items])
+    #     den = sum(np.power(list(neighs.values()), 1))
+    #     return num/den if den != 0 else 0
 
     def get_model_state(self):
         saving_dict = {}

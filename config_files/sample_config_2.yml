@@ -220,17 +220,19 @@ experiment:
 #        verbose: True
 #        save_recs: False
 #      neighbors: 50
-#      similarity: cosine
+#      similarity: braycurtis
 #      implementation: aiolli
-#    AttributeItemKNN:
-#      meta:
-#        verbose: True
-#        save_recs: False
-#      neighbors: 50
-#      similarity: cosine
-#      implementation: aiolli
-    VSM:
+    AttributeItemKNN:
       meta:
         verbose: True
         save_recs: False
-      similarity: cosine
+      neighbors: 50
+      similarity: braycurtis
+#      implementation: aiolli
+#    VSM:
+#      meta:
+#        verbose: True
+#        save_recs: False
+#      similarity: braycurtis
+#      user_profile: tfidf
+#      item_profile: tfidf

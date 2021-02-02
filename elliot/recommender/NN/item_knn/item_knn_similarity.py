@@ -1,7 +1,7 @@
 
 import numpy as np
-from sklearn.metrics.pairwise import cosine_similarity
-
+from sklearn.metrics.pairwise import cosine_similarity, euclidean_distances, haversine_distances, chi2_kernel, manhattan_distances
+from sklearn.metrics import pairwise_distances
 
 
 
@@ -27,6 +27,11 @@ class Similarity(object):
         """
         This function initialize the data model
         """
+
+        supported_similarities = ["cosine", "dot", ]
+        supported_dissimilarities = ["euclidean", "manhattan", "haversine",  "chi2", 'cityblock', 'l1', 'l2', 'braycurtis', 'canberra', 'chebyshev', 'correlation', 'dice', 'hamming', 'jaccard', 'kulsinski', 'mahalanobis', 'minkowski', 'rogerstanimoto', 'russellrao', 'seuclidean', 'sokalmichener', 'sokalsneath', 'sqeuclidean', 'yule']
+        print(f"\nSupported Similarities: {supported_similarities}")
+        print(f"Supported Distances/Dissimilarities: {supported_dissimilarities}\n")
 
         self._item_ratings = {}
         for u, user_items in self._ratings.items():
@@ -56,7 +61,28 @@ class Similarity(object):
 
     def process_similarity(self, similarity):
         if similarity == "cosine":
-            self.process_cosine()
+            x, y = np.triu_indices(self._similarity_matrix.shape[0], k=1)
+            self._similarity_matrix[x, y] = cosine_similarity(self._data.sp_i_train_ratings.T)[x, y]
+        elif similarity == "dot":
+            self._similarity_matrix = (self._data.sp_i_train_ratings.T @ self._data.sp_i_train_ratings).toarray()
+        elif similarity == "euclidean":
+            x, y = np.triu_indices(self._similarity_matrix.shape[0], k=1)
+            self._similarity_matrix[x, y] = (1 / (1 + euclidean_distances(self._data.sp_i_train_ratings.T)))[x, y]
+        elif similarity == "manhattan":
+            x, y = np.triu_indices(self._similarity_matrix.shape[0], k=1)
+            self._similarity_matrix[x, y] = (1 / (1 + manhattan_distances(self._data.sp_i_train_ratings.T)))[x, y]
+        elif similarity == "haversine":
+            x, y = np.triu_indices(self._similarity_matrix.shape[0], k=1)
+            self._similarity_matrix[x, y] = (1 / (1 + haversine_distances(self._data.sp_i_train_ratings.T)))[x, y]
+        elif similarity == "chi2":
+            x, y = np.triu_indices(self._similarity_matrix.shape[0], k=1)
+            self._similarity_matrix[x, y] = (1 / (1 + chi2_kernel(self._data.sp_i_train_ratings.T)))[x, y]
+        elif similarity in ['cityblock', 'l1', 'l2']:
+            x, y = np.triu_indices(self._similarity_matrix.shape[0], k=1)
+            self._similarity_matrix[x, y] = (1 / (1 + pairwise_distances(self._data.sp_i_train_ratings.T, metric=similarity)))[x, y]
+        elif similarity in ['braycurtis', 'canberra', 'chebyshev', 'correlation', 'dice', 'hamming', 'jaccard', 'kulsinski', 'mahalanobis', 'minkowski', 'rogerstanimoto', 'russellrao', 'seuclidean', 'sokalmichener', 'sokalsneath', 'sqeuclidean', 'yule']:
+            x, y = np.triu_indices(self._similarity_matrix.shape[0], k=1)
+            self._similarity_matrix[x, y] = (1 / (1 + pairwise_distances(self._data.sp_i_train_ratings.T.toarray(), metric=similarity)))[x, y]
         else:
             raise Exception("Not implemented similarity")
 

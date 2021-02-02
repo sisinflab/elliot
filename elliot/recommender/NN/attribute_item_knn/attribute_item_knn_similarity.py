@@ -1,6 +1,7 @@
 
 import numpy as np
-from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.metrics.pairwise import cosine_similarity, euclidean_distances, haversine_distances, chi2_kernel, manhattan_distances
+from sklearn.metrics import pairwise_distances
 
 
 
@@ -28,6 +29,11 @@ class Similarity(object):
         """
         This function initialize the data model
         """
+
+        supported_similarities = ["cosine", "dot", ]
+        supported_dissimilarities = ["euclidean", "manhattan", "haversine",  "chi2", 'cityblock', 'l1', 'l2', 'braycurtis', 'canberra', 'chebyshev', 'correlation', 'dice', 'hamming', 'jaccard', 'kulsinski', 'mahalanobis', 'minkowski', 'rogerstanimoto', 'russellrao', 'seuclidean', 'sokalmichener', 'sokalsneath', 'sqeuclidean', 'yule']
+        print(f"\nSupported Similarities: {supported_similarities}")
+        print(f"Supported Distances/Dissimilarities: {supported_dissimilarities}\n")
 
         self._item_ratings = {}
         for u, user_items in self._ratings.items():
@@ -57,19 +63,40 @@ class Similarity(object):
 
     def process_similarity(self, similarity):
         if similarity == "cosine":
-            self.process_cosine()
+            x, y = np.triu_indices(self._similarity_matrix.shape[0], k=1)
+            self._similarity_matrix[x, y] = cosine_similarity(self._attribute_matrix)[x, y]
+        elif similarity == "dot":
+            self._similarity_matrix = (self._attribute_matrix @ self._attribute_matrix.T).toarray()
+        elif similarity == "euclidean":
+            x, y = np.triu_indices(self._similarity_matrix.shape[0], k=1)
+            self._similarity_matrix[x, y] = (1 / (1 + euclidean_distances(self._attribute_matrix)))[x, y]
+        elif similarity == "manhattan":
+            x, y = np.triu_indices(self._similarity_matrix.shape[0], k=1)
+            self._similarity_matrix[x, y] = (1 / (1 + manhattan_distances(self._attribute_matrix)))[x, y]
+        elif similarity == "haversine":
+            x, y = np.triu_indices(self._similarity_matrix.shape[0], k=1)
+            self._similarity_matrix[x, y] = (1 / (1 + haversine_distances(self._attribute_matrix)))[x, y]
+        elif similarity == "chi2":
+            x, y = np.triu_indices(self._similarity_matrix.shape[0], k=1)
+            self._similarity_matrix[x, y] = (1 / (1 + chi2_kernel(self._attribute_matrix)))[x, y]
+        elif similarity in ['cityblock', 'l1', 'l2']:
+            x, y = np.triu_indices(self._similarity_matrix.shape[0], k=1)
+            self._similarity_matrix[x, y] = (1 / (1 + pairwise_distances(self._attribute_matrix, metric=similarity)))[x, y]
+        elif similarity in ['braycurtis', 'canberra', 'chebyshev', 'correlation', 'dice', 'hamming', 'jaccard', 'kulsinski', 'mahalanobis', 'minkowski', 'rogerstanimoto', 'russellrao', 'seuclidean', 'sokalmichener', 'sokalsneath', 'sqeuclidean', 'yule']:
+            x, y = np.triu_indices(self._similarity_matrix.shape[0], k=1)
+            self._similarity_matrix[x, y] = (1 / (1 + pairwise_distances(self._attribute_matrix.toarray(), metric=similarity)))[x, y]
         else:
             raise Exception("Not implemented similarity")
 
-    def process_cosine(self):
-        x, y = np.triu_indices(self._similarity_matrix.shape[0], k=1)
-        self._similarity_matrix[x, y] = cosine_similarity(self._attribute_matrix)[x, y]
-        # g = np.vectorize(self.compute_cosine)
-        # g(x,y)
-        # for item_row in range(self._similarity_matrix.shape[0]):
-        #     for item_col in range(item_row + 1, self._similarity_matrix.shape[1]):
-        #         self._similarity_matrix[item_row, item_col] = self.compute_cosine(
-        #             self._item_ratings.get(self._private_items[item_row],{}), self._item_ratings.get(self._private_items[item_col], {}))
+    # def process_cosine(self):
+    #     x, y = np.triu_indices(self._similarity_matrix.shape[0], k=1)
+    #     self._similarity_matrix[x, y] = cosine_similarity(self._attribute_matrix)[x, y]
+    #     # g = np.vectorize(self.compute_cosine)
+    #     # g(x,y)
+    #     # for item_row in range(self._similarity_matrix.shape[0]):
+    #     #     for item_col in range(item_row + 1, self._similarity_matrix.shape[1]):
+    #     #         self._similarity_matrix[item_row, item_col] = self.compute_cosine(
+    #     #             self._item_ratings.get(self._private_items[item_row],{}), self._item_ratings.get(self._private_items[item_col], {}))
 
     def compute_cosine(self, i_index, j_index):
         i_dict = self._item_ratings.get(self._private_items[i_index],{})
