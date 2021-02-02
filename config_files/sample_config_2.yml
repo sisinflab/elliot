@@ -9,11 +9,11 @@ experiment:
         features: ../data/{0}/features.tsv
         properties: ../data/{0}/properties.conf
   dataset: categorical_dbpedia_ml1m
-  path_output_rec_result: ../results/{0}/recs/
-  path_output_rec_weight: ../results/{0}/weights/
-  path_output_rec_performance: ../results/{0}/performance/
-  path_logger_config: ./config/logger_config.yml
-  path_log_folder: ../log/
+#  path_output_rec_result: ../results/{0}/recs/
+#  path_output_rec_weight: ../results/{0}/weights/
+#  path_output_rec_performance: ../results/{0}/performance/
+#  path_logger_config: ./config/logger_config.yml
+#  path_log_folder: ../log/
   top_k: 50
   evaluation:
     cutoff: [5,10]
@@ -200,20 +200,20 @@ experiment:
 #        save_recs: False
 #      neighbors: 5
 #      similarity: cosine
-    NeuMF:
-      meta:
-        verbose: True
-        save_recs: False
-        validation_rate: 1
-      embed_mf_size: 10
-      embed_mlp_size: 10
-      mlp_hidden_size: (5, 3, 2)
-      prob_keep_dropout: 0.2
-      is_mf_train: True
-      is_mlp_train: True
-      batch_size: 512
-      epochs: 10
-      lr: 0.01
+#    NeuMF:
+#      meta:
+#        verbose: True
+#        save_recs: False
+#        validation_rate: 1
+#      embed_mf_size: 10
+#      embed_mlp_size: 10
+#      mlp_hidden_size: (5, 3, 2)
+#      prob_keep_dropout: 0.2
+#      is_mf_train: True
+#      is_mlp_train: True
+#      batch_size: 512
+#      epochs: 10
+#      lr: 0.001
 #       implementation: aiolli
 #    ItemKNN:
 #      meta:
@@ -222,3 +222,15 @@ experiment:
 #      neighbors: 50
 #      similarity: cosine
 #      implementation: aiolli
+#    AttributeItemKNN:
+#      meta:
+#        verbose: True
+#        save_recs: False
+#      neighbors: 50
+#      similarity: cosine
+#      implementation: aiolli
+    VSM:
+      meta:
+        verbose: True
+        save_recs: False
+      similarity: cosine

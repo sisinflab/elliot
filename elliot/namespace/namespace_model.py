@@ -59,11 +59,11 @@ class NameSpaceModel:
         #     self.config[_experiment][_data_paths][path] = \
         #         self.config[_experiment][_data_paths][path].format(self.config[_experiment][_dataset])
 
-        self.config[_experiment][_recs] = self.config[_experiment][_recs] \
+        self.config[_experiment][_recs] = self.config[_experiment].get(_recs, "../results/{0}/recs/") \
             .format(self.config[_experiment][_dataset])
-        self.config[_experiment][_weights] = self.config[_experiment][_weights] \
+        self.config[_experiment][_weights] = self.config[_experiment].get(_weights, "../results/{0}/weights/") \
             .format(self.config[_experiment][_dataset])
-        self.config[_experiment][_performance] = self.config[_experiment][_performance] \
+        self.config[_experiment][_performance] = self.config[_experiment].get(_performance, "../results/{0}/performance/") \
             .format(self.config[_experiment][_dataset])
 
         self.config[_experiment][_paired_ttest] = self.config[_experiment].get(_paired_ttest, False)
@@ -107,6 +107,10 @@ class NameSpaceModel:
                 setattr(self.base_namespace, p, self.config[_experiment][p])
             elif p == _evaluation and self.config[_experiment].get(p, {}):
                 setattr(self.base_namespace, p, SimpleNamespace(**self.config[_experiment][p]))
+            elif p == _logger_config and not self.config[_experiment].get(p, False):
+                setattr(self.base_namespace, p, "./config/logger_config.yml")
+            elif p == _log_folder and not self.config[_experiment].get(p, False):
+                setattr(self.base_namespace, p, "../log/")
             else:
                 if self.config[_experiment].get(p):
                     setattr(self.base_namespace, p, self.config[_experiment][p])
