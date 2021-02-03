@@ -36,8 +36,8 @@ class VSM(RecMixin, BaseRecommenderModel):
         self._random = np.random
 
         self._similarity = self._params.similarity
-        self._user_profile_type = getattr(self._params, "user_profile", "binary")
-        self._item_profile_type = getattr(self._params, "item_profile", "binary")
+        self._user_profile_type = getattr(self._params, "user_profile", "tfidf")
+        self._item_profile_type = getattr(self._params, "item_profile", "tfidf")
 
         self._ratings = self._data.train_dict
 
