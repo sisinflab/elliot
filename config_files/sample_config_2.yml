@@ -155,7 +155,7 @@ experiment:
 ##      update_users: True
 ##      update_items: True
 ##      update_bias: True
-    FunkSVD:
+    PMF:
       meta:
         hyper_max_evals: 1
         hyper_opt_alg: tpe
@@ -169,8 +169,9 @@ experiment:
       epochs: 10
       embed_k: 50
       batch_size: 512
-      reg_w: 0.0025
+      reg: 0.0025
       reg_b: 0
+      gaussian_variance: 0.1
 ###    KaHFM:
 ###      meta:
 ###        hyper_max_evals: 1
