@@ -15,8 +15,6 @@ from tensorflow import keras
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 tf.random.set_seed(0)
 
-tf.random.set_seed(0)
-
 
 class NeuralMatrixFactorizationModel(keras.Model):
     def __init__(self,

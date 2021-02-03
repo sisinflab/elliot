@@ -16,7 +16,7 @@ from tqdm import tqdm
 
 from dataset.samplers import pointwise_pos_neg_sampler as pws
 from evaluation.evaluator import Evaluator
-from recommender.neural.NeuMF.neural_matrix_factorization_model import NeuralMatrixFactorizationModel
+from recommender.latent_factor_models.MF.matrix_factorization_model import MatrixFactorizationModel
 from recommender.recommender_utils_mixin import RecMixin
 from utils.folder import build_model_folder
 from utils.write import store_recommendation
@@ -26,7 +26,7 @@ from recommender.base_recommender_model import BaseRecommenderModel
 np.random.seed(42)
 
 
-class NeuralMatrixFactorization(RecMixin, BaseRecommenderModel):
+class MatrixFactorization(RecMixin, BaseRecommenderModel):
 
     def __init__(self, data, config, params, *args, **kwargs):
         super().__init__(data, config, params, *args, **kwargs)
@@ -39,12 +39,9 @@ class NeuralMatrixFactorization(RecMixin, BaseRecommenderModel):
         self._sampler = pws.Sampler(self._data.i_train_dict)
 
         self._learning_rate = self._params.lr
-        self._embed_mf_size = self._params.embed_mf_size
-        self._embed_mlp_size = self._params.embed_mlp_size
-        self._mlp_hidden_size = list(make_tuple(self._params.mlp_hidden_size))
-        self._prob_keep_dropout = self._params.prob_keep_dropout
-        self._is_mf_train = self._params.is_mf_train
-        self._is_mlp_train = self._params.is_mlp_train
+        self._embed_mf_size = self._params.embed_k
+        self._l_w = self._params.reg
+
         # self._is_pretrain = self._params.is_pretrain
         # self._mf_pretrain_path = self._params.mf_pretrain_path
         # self._mlp_pretrain_path = self._params.mlp_pretrain_path
@@ -56,10 +53,8 @@ class NeuralMatrixFactorization(RecMixin, BaseRecommenderModel):
         self._sp_i_train = self._data.sp_i_train
         self._i_items_set = list(range(self._num_items))
         # self._i_zeros = [list(items_set-set(user_train)) for user_train in self._sp_i_train.tolil().rows]
-        self._model = NeuralMatrixFactorizationModel(self._num_users, self._num_items, self._embed_mf_size,
-                                                     self._embed_mlp_size, self._mlp_hidden_size,
-                                                     self._prob_keep_dropout, self._is_mf_train, self._is_mlp_train,
-                                                     self._learning_rate)
+        self._model = MatrixFactorizationModel(self._num_users, self._num_items, self._embed_mf_size,
+                                               self._l_w, self._learning_rate)
 
         self._iteration = 0
 
@@ -72,10 +67,10 @@ class NeuralMatrixFactorization(RecMixin, BaseRecommenderModel):
 
     @property
     def name(self):
-        return "NeuMF"
-               # + "-e:" + str(self._params.epochs) \
-               # + "-factors:" + str(self._params.embed_k) \
-               # + "-reg:" + str(self._params.reg) \
+        return "MF"\
+               + "-e:" + str(self._params.epochs) \
+               + "-factors:" + str(self._params.embed_k) \
+               + "-reg:" + str(self._params.reg) \
                # + "-alpha:" + str(self._params.alpha)
 
     def get_recommendations(self, k: int = 100):
