@@ -148,7 +148,7 @@ class BPRMF(RecMixin, BaseRecommenderModel):
         self._random = np.random
         self._sample_negative_items_empirically = True
 
-        self._factors = self._params.embed_k
+        self._factors = self._params.factors
         self._learning_rate = self._params.lr
         self._bias_regularization = self._params.bias_regularization
         self._user_regularization = self._params.user_regularization
@@ -186,15 +186,15 @@ class BPRMF(RecMixin, BaseRecommenderModel):
 
     @property
     def name(self):
-        return "BPR" \
+        return "SequentialBPRMF" \
                + self._datamodel.name \
-               + "_lr:" + str(self._params.lr) \
-               + "-e:" + str(self._params.epochs) \
-               + "-factors:" + str(self._params.embed_k) \
-               + "-br:" + str(self._params.bias_regularization) \
-               + "-ur:" + str(self._params.user_regularization) \
-               + "-pir:" + str(self._params.positive_item_regularization) \
-               + "-nir:" + str(self._params.negative_item_regularization)
+               + "_lr:" + str(self._learning_rate) \
+               + "-e:" + str(self._epochs) \
+               + "-factors:" + str(self._factors) \
+               + "-br:" + str(self._bias_regularization) \
+               + "-ur:" + str(self._user_regularization) \
+               + "-pir:" + str(self._positive_item_regularization) \
+               + "-nir:" + str(self._negative_item_regularization)
 
     def train_step(self):
         start_it = time.perf_counter()

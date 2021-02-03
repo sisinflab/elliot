@@ -39,7 +39,7 @@ class FunkSVD(RecMixin, BaseRecommenderModel):
         self._sampler = pws.Sampler(self._data.i_train_dict)
 
         self._learning_rate = self._params.lr
-        self._embed_mf_size = self._params.embed_k
+        self._factors = self._params.factors
         self._lambda_weights = self._params.reg_w
         self._lambda_bias = self._params.reg_b
 
@@ -50,7 +50,7 @@ class FunkSVD(RecMixin, BaseRecommenderModel):
         self._sp_i_train = self._data.sp_i_train
         self._i_items_set = list(range(self._num_items))
         # self._i_zeros = [list(items_set-set(user_train)) for user_train in self._sp_i_train.tolil().rows]
-        self._model = FunkSVDModel(self._num_users, self._num_items, self._embed_mf_size,
+        self._model = FunkSVDModel(self._num_users, self._num_items, self._factors,
                                    self._lambda_weights, self._lambda_bias, self._learning_rate)
 
         self._iteration = 0
@@ -65,10 +65,11 @@ class FunkSVD(RecMixin, BaseRecommenderModel):
     @property
     def name(self):
         return "FunkSVD"\
-               + "-e:" + str(self._params.epochs) \
-               + "-factors:" + str(self._params.embed_k) \
-               + "-reg_w:" + str(self._params.reg_w) \
-               + "-reg_b:" + str(self._params.reg_b)
+               + "-e:" + str(self._epochs) \
+               + "-lr:" + str(self._learning_rate) \
+               + "-factors:" + str(self._factors) \
+               + "-reg_w:" + str(self._lambda_weights) \
+               + "-reg_b:" + str(self._lambda_bias)
 
     def get_recommendations(self, k: int = 100):
         pass

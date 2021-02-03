@@ -1,6 +1,8 @@
 """
 Module description:
 
+Mnih, Andriy, and Russ R. Salakhutdinov. "Probabilistic matrix factorization." Advances in neural information processing systems 20 (2007)
+
 """
 
 
@@ -39,7 +41,7 @@ class ProbabilisticMatrixFactorization(RecMixin, BaseRecommenderModel):
         self._sampler = pws.Sampler(self._data.i_train_dict)
 
         self._learning_rate = self._params.lr
-        self._embed_mf_size = self._params.embed_k
+        self._factors = self._params.factors
         self._l_w = self._params.reg
         self._gvar = self._params.gaussian_variance
 
@@ -49,9 +51,8 @@ class ProbabilisticMatrixFactorization(RecMixin, BaseRecommenderModel):
         self._ratings = self._data.train_dict
         self._sp_i_train = self._data.sp_i_train
         self._i_items_set = list(range(self._num_items))
-        # self._i_zeros = [list(items_set-set(user_train)) for user_train in self._sp_i_train.tolil().rows]
-        self._model = ProbabilisticMatrixFactorizationModel(self._num_users, self._num_items, self._embed_mf_size,
-                                               self._l_w, self._gvar, self._learning_rate)
+        self._model = ProbabilisticMatrixFactorizationModel(self._num_users, self._num_items, self._factors,
+                                                            self._l_w, self._gvar, self._learning_rate)
 
         self._iteration = 0
 
@@ -66,11 +67,10 @@ class ProbabilisticMatrixFactorization(RecMixin, BaseRecommenderModel):
     def name(self):
         return "PMF"\
                + "-e:" + str(self._epochs) \
+               + "-factors:" + str(self._factors) \
                + "-lr:" + str(self._learning_rate) \
-               + "-factors:" + str(self._params.embed_k) \
                + "-reg:" + str(self._l_w) \
                + "-gvar:" + str(self._gvar)
-               # + "-alpha:" + str(self._params.alpha)
 
     def get_recommendations(self, k: int = 100):
         pass

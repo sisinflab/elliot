@@ -155,23 +155,23 @@ experiment:
 ##      update_users: True
 ##      update_items: True
 ##      update_bias: True
-    PMF:
-      meta:
-        hyper_max_evals: 1
-        hyper_opt_alg: tpe
-        validation_rate: 1
-        verbose: True
-        save_weights: False
-        save_recs: False
-        validation_metric: nDCG@10
-        restore_epoch: -1
-      lr: 0.001
-      epochs: 10
-      embed_k: 50
-      batch_size: 512
-      reg: 0.0025
-      reg_b: 0
-      gaussian_variance: 0.1
+#    PMF:
+#      meta:
+#        hyper_max_evals: 1
+#        hyper_opt_alg: tpe
+#        validation_rate: 1
+#        verbose: True
+#        save_weights: False
+#        save_recs: False
+#        validation_metric: nDCG@10
+#        restore_epoch: -1
+#      lr: 0.001
+#      epochs: 10
+#      embed_k: 50
+#      batch_size: 512
+#      reg: 0.0025
+#      reg_b: 0
+#      gaussian_variance: 0.1
 ###    KaHFM:
 ###      meta:
 ###        hyper_max_evals: 1
@@ -201,20 +201,20 @@ experiment:
 #        save_recs: False
 #      neighbors: 5
 #      similarity: cosine
-#    NeuMF:
-#      meta:
-#        verbose: True
-#        save_recs: False
-#        validation_rate: 1
-#      embed_mf_size: 10
-#      embed_mlp_size: 10
-#      mlp_hidden_size: (5, 3, 2)
-#      prob_keep_dropout: 0.2
-#      is_mf_train: True
-#      is_mlp_train: True
-#      batch_size: 512
-#      epochs: 10
-#      lr: 0.001
+    NeuMF:
+      meta:
+        verbose: True
+        save_recs: False
+        validation_rate: 1
+      mf_factors: 10
+      mlp_factors: 10
+      mlp_hidden_size: (5, 3, 2)
+      prob_keep_dropout: 0.2
+      is_mf_train: True
+      is_mlp_train: True
+      batch_size: 512
+      epochs: 10
+      lr: 0.001
 #       implementation: aiolli
 #    ItemKNN:
 #      meta:

@@ -52,7 +52,7 @@ class NNBPRMF(RecMixin, BaseRecommenderModel):
 
         ######################################
 
-        self._factors = self._params.embed_k
+        self._factors = self._params.factors
         self._learning_rate = self._params.lr
         self._l_w = self._params.l_w
         self._l_b = self._params.l_b
@@ -70,11 +70,11 @@ class NNBPRMF(RecMixin, BaseRecommenderModel):
     @property
     def name(self):
         return "BPR_NN" \
-               + "_lr:" + str(self._params.lr) \
-               + "-e:" + str(self._params.epochs) \
-               + "-factors:" + str(self._params.embed_k) \
-               + "-br:" + str(self._params.l_b) \
-               + "-wr:" + str(self._params.l_w)
+               + "_lr:" + str(self._learning_rate) \
+               + "-e:" + str(self._epochs) \
+               + "-factors:" + str(self._factors) \
+               + "-br:" + str(self._l_b) \
+               + "-wr:" + str(self._l_w)
 
     def train(self):
         best_metric_value = 0

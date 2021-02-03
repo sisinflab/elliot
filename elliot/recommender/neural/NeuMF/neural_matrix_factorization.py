@@ -39,15 +39,12 @@ class NeuralMatrixFactorization(RecMixin, BaseRecommenderModel):
         self._sampler = pws.Sampler(self._data.i_train_dict)
 
         self._learning_rate = self._params.lr
-        self._embed_mf_size = self._params.embed_mf_size
-        self._embed_mlp_size = self._params.embed_mlp_size
+        self._mf_factors = self._params.mf_factors
+        self._mlp_factors = self._params.mlp_factors
         self._mlp_hidden_size = list(make_tuple(self._params.mlp_hidden_size))
         self._prob_keep_dropout = self._params.prob_keep_dropout
         self._is_mf_train = self._params.is_mf_train
         self._is_mlp_train = self._params.is_mlp_train
-        # self._is_pretrain = self._params.is_pretrain
-        # self._mf_pretrain_path = self._params.mf_pretrain_path
-        # self._mlp_pretrain_path = self._params.mlp_pretrain_path
 
         if self._batch_size < 1:
             self._batch_size = self._data.transactions
@@ -56,8 +53,8 @@ class NeuralMatrixFactorization(RecMixin, BaseRecommenderModel):
         self._sp_i_train = self._data.sp_i_train
         self._i_items_set = list(range(self._num_items))
         # self._i_zeros = [list(items_set-set(user_train)) for user_train in self._sp_i_train.tolil().rows]
-        self._model = NeuralMatrixFactorizationModel(self._num_users, self._num_items, self._embed_mf_size,
-                                                     self._embed_mlp_size, self._mlp_hidden_size,
+        self._model = NeuralMatrixFactorizationModel(self._num_users, self._num_items, self._mf_factors,
+                                                     self._mlp_factors, self._mlp_hidden_size,
                                                      self._prob_keep_dropout, self._is_mf_train, self._is_mlp_train,
                                                      self._learning_rate)
 
@@ -72,11 +69,14 @@ class NeuralMatrixFactorization(RecMixin, BaseRecommenderModel):
 
     @property
     def name(self):
-        return "NeuMF"
-               # + "-e:" + str(self._params.epochs) \
-               # + "-factors:" + str(self._params.embed_k) \
-               # + "-reg:" + str(self._params.reg) \
-               # + "-alpha:" + str(self._params.alpha)
+        return "NeuMF"\
+               + "-e:" + str(self._epochs) \
+               + "-mffactors:" + str(self._mf_factors) \
+               + "-mlpfactors:" + str(self._mlp_factors) \
+               + "-mlpunits:" + str(self._params.mlp_hidden_size).replace(",","-") \
+               + "-droppk:" + str(self._prob_keep_dropout) \
+               + "-mftrain:" + str(self._is_mf_train)\
+               + "-mlptrain:" + str(self._is_mlp_train)
 
     def get_recommendations(self, k: int = 100):
         pass

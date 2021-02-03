@@ -1,6 +1,8 @@
 """
 Module description:
 
+Mnih, Andriy, and Russ R. Salakhutdinov. "Probabilistic matrix factorization." Advances in neural information processing systems 20 (2007)
+
 """
 
 __version__ = '0.1'

@@ -39,7 +39,7 @@ class MatrixFactorization(RecMixin, BaseRecommenderModel):
         self._sampler = pws.Sampler(self._data.i_train_dict)
 
         self._learning_rate = self._params.lr
-        self._embed_mf_size = self._params.embed_k
+        self._factors = self._params.factors
         self._l_w = self._params.reg
 
         # self._is_pretrain = self._params.is_pretrain
@@ -68,10 +68,10 @@ class MatrixFactorization(RecMixin, BaseRecommenderModel):
     @property
     def name(self):
         return "MF"\
-               + "-e:" + str(self._params.epochs) \
-               + "-factors:" + str(self._params.embed_k) \
-               + "-reg:" + str(self._params.reg) \
-               # + "-alpha:" + str(self._params.alpha)
+               + "-e:" + str(self._epochs) \
+               + "-lr:" + str(self._learning_rate) \
+               + "-factors:" + str(self._factors) \
+               + "-reg:" + str(self._l_w)
 
     def get_recommendations(self, k: int = 100):
         pass

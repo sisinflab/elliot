@@ -34,7 +34,7 @@ class WRMF(RecMixin, BaseRecommenderModel):
         self._random = np.random
         self._sample_negative_items_empirically = True
 
-        self._factors = self._params.embed_k
+        self._factors = self._params.factors
         self._alpha = self._params.alpha
         self._reg = self._params.reg
 
@@ -66,10 +66,10 @@ class WRMF(RecMixin, BaseRecommenderModel):
     @property
     def name(self):
         return "WRMF" \
-               + "-e:" + str(self._params.epochs) \
-               + "-factors:" + str(self._params.embed_k) \
-               + "-reg:" + str(self._params.reg) \
-               + "-alpha:" + str(self._params.alpha)
+               + "-e:" + str(self._epochs) \
+               + "-factors:" + str(self._factors) \
+               + "-reg:" + str(self._reg) \
+               + "-alpha:" + str(self._alpha)
 
     def train(self):
 
