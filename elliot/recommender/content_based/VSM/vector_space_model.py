@@ -103,6 +103,7 @@ class VSM(RecMixin, BaseRecommenderModel):
         print(f"Transactions: {self._data.transactions}")
         best_metric_value = 0
 
+        print("Computing recommendations..")
         recs = self.get_recommendations(self.evaluator.get_needed_recommendations())
         result_dict = self.evaluator.eval(recs)
         self._results.append(result_dict)
@@ -115,10 +116,11 @@ class VSM(RecMixin, BaseRecommenderModel):
 
     def compute_binary_profile(self, user_items_dict: t.Dict):
         user_features = {}
-        partial = 1/len(user_items_dict)
+        # partial = 1/len(user_items_dict)
         for item in user_items_dict.keys():
             for feature in self._data.side_information_data.feature_map.get(item,[]):
-                user_features[feature] = user_features.get(feature, 0) + partial
+                # user_features[feature] = user_features.get(feature, 0) + partial
+                user_features[feature] = user_features.get(feature, 1)
         return user_features
 
     def build_feature_sparse(self, feature_dict, num_entities):
