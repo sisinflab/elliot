@@ -155,21 +155,22 @@ experiment:
 ##      update_users: True
 ##      update_items: True
 ##      update_bias: True
-#    MF:
-#      meta:
-#        hyper_max_evals: 1
-#        hyper_opt_alg: tpe
-#        validation_rate: 1
-#        verbose: True
-#        save_weights: False
-#        save_recs: False
-#        validation_metric: nDCG@10
-#        restore_epoch: -1
-#      lr: 0.001
-#      epochs: 10
-#      embed_k: 50
-#      batch_size: 512
-#      reg: 0.0025
+    FunkSVD:
+      meta:
+        hyper_max_evals: 1
+        hyper_opt_alg: tpe
+        validation_rate: 1
+        verbose: True
+        save_weights: False
+        save_recs: False
+        validation_metric: nDCG@10
+        restore_epoch: -1
+      lr: 0.001
+      epochs: 10
+      embed_k: 50
+      batch_size: 512
+      reg_w: 0.0025
+      reg_b: 0
 ###    KaHFM:
 ###      meta:
 ###        hyper_max_evals: 1
@@ -228,10 +229,10 @@ experiment:
 #      neighbors: 50
 #      similarity: braycurtis
 #      implementation: aiolli
-    VSM:
-      meta:
-        verbose: True
-        save_recs: False
-      similarity: cosine
-      user_profile: binary
-      item_profile: binary
+#    VSM:
+#      meta:
+#        verbose: True
+#        save_recs: False
+#      similarity: cosine
+#      user_profile: binary
+#      item_profile: binary

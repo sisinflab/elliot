@@ -12,3 +12,4 @@ from .BPRMF import BPRMF
 from .WRMF import WRMF
 from .PureSVD import PureSVD
 from .MF import MF
+from .FunkSVD import FunkSVD
