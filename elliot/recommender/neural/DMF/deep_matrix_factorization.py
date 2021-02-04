@@ -14,9 +14,9 @@ import pickle
 from ast import literal_eval as make_tuple
 from tqdm import tqdm
 
-from dataset.samplers import pointwise_pos_neg_sampler as pws
+from dataset.samplers import pointwise_pos_neg_ratio_ratings_sampler as pws
 from evaluation.evaluator import Evaluator
-from recommender.neural.NeuMF.neural_matrix_factorization_model import NeuralMatrixFactorizationModel
+from recommender.neural.DMF.deep_matrix_factorization_model import DeepMatrixFactorizationModel
 from recommender.recommender_utils_mixin import RecMixin
 from utils.folder import build_model_folder
 from utils.write import store_recommendation
@@ -26,7 +26,7 @@ from recommender.base_recommender_model import BaseRecommenderModel
 np.random.seed(42)
 
 
-class NeuralMatrixFactorization(RecMixin, BaseRecommenderModel):
+class DeepMatrixFactorization(RecMixin, BaseRecommenderModel):
 
     def __init__(self, data, config, params, *args, **kwargs):
         super().__init__(data, config, params, *args, **kwargs)
@@ -34,29 +34,29 @@ class NeuralMatrixFactorization(RecMixin, BaseRecommenderModel):
         self._num_items = self._data.num_items
         self._num_users = self._data.num_users
         self._random = np.random
-        self._sample_negative_items_empirically = True
-
-        self._sampler = pws.Sampler(self._data.i_train_dict)
 
         self._learning_rate = self._params.lr
-        self._mf_factors = self._params.mf_factors
-        self._mlp_factors = self._params.mlp_factors
-        self._mlp_hidden_size = list(make_tuple(self._params.mlp_hidden_size))
-        self._prob_keep_dropout = self._params.prob_keep_dropout
-        self._is_mf_train = self._params.is_mf_train
-        self._is_mlp_train = self._params.is_mlp_train
+        self._user_mlp = list(make_tuple(self._params.user_mlp))
+        self._item_mlp = list(make_tuple(self._params.item_mlp))
+        self._neg_ratio = self._params.neg_ratio
+        self._reg = self._params.reg
+        self._similarity = self._params.similarity
+        self._max_ratings = 5
+        self._transactions_per_epoch = self._data.transactions + self._neg_ratio * self._data.transactions
+        self._transactions_per_epoch = 20000
 
         if self._batch_size < 1:
-            self._batch_size = self._data.transactions
+            self._batch_size = self._data.transactions + self._neg_ratio * self._data.transactions
+
+        self._sampler = pws.Sampler(self._data.i_train_dict, self._data.sp_i_train_ratings, self._neg_ratio)
 
         self._ratings = self._data.train_dict
         self._sp_i_train = self._data.sp_i_train
         self._i_items_set = list(range(self._num_items))
         # self._i_zeros = [list(items_set-set(user_train)) for user_train in self._sp_i_train.tolil().rows]
-        self._model = NeuralMatrixFactorizationModel(self._num_users, self._num_items, self._mf_factors,
-                                                     self._mlp_factors, self._mlp_hidden_size,
-                                                     self._prob_keep_dropout, self._is_mf_train, self._is_mlp_train,
-                                                     self._learning_rate)
+        self._model = DeepMatrixFactorizationModel(self._num_users, self._num_items, self._user_mlp,
+                                                   self._item_mlp, self._reg,
+                                                   self._similarity, self._max_ratings, self._learning_rate)
 
         self._iteration = 0
 
@@ -69,15 +69,14 @@ class NeuralMatrixFactorization(RecMixin, BaseRecommenderModel):
 
     @property
     def name(self):
-        return "NeuMF"\
+        return "DMF"\
                + "-e:" + str(self._epochs) \
                + "-lr:" + str(self._learning_rate) \
-               + "-mffactors:" + str(self._mf_factors) \
-               + "-mlpfactors:" + str(self._mlp_factors) \
-               + "-mlpunits:" + str(self._params.mlp_hidden_size).replace(",","-") \
-               + "-droppk:" + str(self._prob_keep_dropout) \
-               + "-mftrain:" + str(self._is_mf_train)\
-               + "-mlptrain:" + str(self._is_mlp_train)
+               + "-user_mlp:" + str(self._params.user_mlp).replace(",","-") \
+               + "-item_mlp:" + str(self._params.item_mlp).replace(",","-") \
+               + "-neg_ratio:" + str(self._neg_ratio) \
+               + "-reg:" + str(self._reg) \
+               + "-similarity:" + str(self._similarity)
 
     def predict(self, u: int, i: int):
         pass
@@ -91,8 +90,8 @@ class NeuralMatrixFactorization(RecMixin, BaseRecommenderModel):
             self.restore_weights(it)
             loss = 0
             steps = 0
-            with tqdm(total=int(self._data.transactions // self._batch_size), disable=not self._verbose) as t:
-                for batch in self._sampler.step(self._data.transactions, self._batch_size):
+            with tqdm(total=int(self._transactions_per_epoch // self._batch_size), disable=not self._verbose) as t:
+                for batch in self._sampler.step(self._transactions_per_epoch, self._batch_size):
                     steps += 1
                     loss += self._model.train_step(batch)
                     t.set_postfix({'loss': f'{loss.numpy() / steps:.5f}'})
@@ -120,8 +119,8 @@ class NeuralMatrixFactorization(RecMixin, BaseRecommenderModel):
             offset_stop = min(offset + self._batch_size, self._num_users)
             predictions = self._model.get_recs(
                 (
-                    np.repeat(np.array(list(range(offset, offset_stop)))[:, None], repeats=self._num_items, axis=1),
-                    np.array([self._i_items_set for _ in range(offset, offset_stop)])
+                    np.repeat(self._data.sp_i_train[offset: offset_stop].toarray()[:, None], repeats=self._num_items, axis=1),
+                    np.array([self._data.sp_i_train.T.toarray() for _ in range(offset, offset_stop)])
                  )
             )
             v, i = self._model.get_top_k(predictions, self.get_train_mask(offset, offset_stop), k=k)

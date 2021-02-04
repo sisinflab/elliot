@@ -19,5 +19,6 @@ from .knowledge_aware import KaHFM
 from .knowledge_aware import KaHFMBatch
 from .graph_based import NGCF
 from .NN import ItemKNN, UserKNN, AttributeItemKNN, AttributeUserKNN
-from .neural import NeuralMatrixFactorization as NeuMF
+from .neural import DeepMatrixFactorization as DMF, NeuralMatrixFactorization as NeuMF
 from .content_based import VSM
+from .algebric import SlopeOne
