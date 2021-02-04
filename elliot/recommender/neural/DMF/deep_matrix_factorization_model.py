@@ -25,6 +25,7 @@ class DeepMatrixFactorizationModel(keras.Model):
                  reg,
                  similarity,
                  max_ratings,
+                 sp_i_train_ratings,
                  learning_rate=0.01,
                  name="DMF",
                  **kwargs):
@@ -38,10 +39,15 @@ class DeepMatrixFactorizationModel(keras.Model):
         self.reg = reg
         self.similarity = similarity
         self.max_ratings = max_ratings
+        self._sp_i_train_ratings = sp_i_train_ratings
 
         self.initializer = tf.initializers.GlorotUniform()
 
-
+        self.user_embedding = keras.layers.Embedding(input_dim=self.num_users, output_dim=self.num_items,weights=[sp_i_train_ratings.toarray()],
+                                                        trainable=False, dtype=tf.float32)
+        self.item_embedding = keras.layers.Embedding(input_dim=self.num_items, output_dim=self.num_users,
+                                                     weights=[sp_i_train_ratings.T.toarray()],
+                                                     trainable=False, dtype=tf.float32)
         self.user_mlp_layers = keras.Sequential()
         for units in user_mlp[:-1]:
             self.user_mlp_layers.add(keras.layers.Dense(units, activation='relu'))
@@ -53,9 +59,9 @@ class DeepMatrixFactorizationModel(keras.Model):
         self.item_mlp_layers.add(keras.layers.Dense(item_mlp[-1], activation='linear'))
 
         if self.similarity == "cosine":
-            self.predict_layer = keras.layers.Dot(axes=-1, normalize=True)
+            self.predict_layer = self.cosine
         elif self.similarity == "dot":
-            self.predict_layer = keras.layers.Dot(axes=-1)
+            self.predict_layer = self.dot_prod
         else:
             raise NotImplementedError
 
@@ -64,12 +70,22 @@ class DeepMatrixFactorizationModel(keras.Model):
         self.optimizer = tf.optimizers.Adam(learning_rate)
 
     @tf.function
+    def cosine(self, layer_0, layer_1):
+        return tf.reduce_sum(tf.nn.l2_normalize(layer_0, 0) * tf.nn.l2_normalize(layer_1, 0), axis=-1)
+
+    @tf.function
+    def dot_prod(self, layer_0, layer_1):
+        return tf.reduce_sum(layer_0 * layer_1, axis=-1)
+
+    @tf.function
     def call(self, inputs, training=None, mask=None):
         user, item = inputs
-        user_mlp_output = self.user_mlp_layers(tf.squeeze(user))
-        item_mlp_output = self.item_mlp_layers(tf.squeeze(item))
-        output = self.predict_layer([user_mlp_output, item_mlp_output])
-        return output
+        user_e = self.user_embedding(user)
+        item_e = self.item_embedding(item)
+        user_mlp_output = self.user_mlp_layers(user_e)
+        item_mlp_output = self.item_mlp_layers(item_e)
+        output = self.predict_layer(user_mlp_output, item_mlp_output)
+        return tf.squeeze(output)
 
     @tf.function
     def train_step(self, batch):
@@ -96,7 +112,7 @@ class DeepMatrixFactorizationModel(keras.Model):
         output = self.call(inputs=inputs, training=training)
         return output
 
-    # @tf.function
+    @tf.function
     def get_recs(self, inputs, training=False, **kwargs):
         """
         Get full predictions on the whole users/items matrix.
@@ -105,10 +121,12 @@ class DeepMatrixFactorizationModel(keras.Model):
             The matrix of predicted values.
         """
         user, item = inputs
-        user_mlp_output = self.user_mlp_layers(tf.squeeze(user))
-        item_mlp_output = self.item_mlp_layers(tf.squeeze(item))
-        output = self.predict_layer([user_mlp_output, item_mlp_output])
-        return tf.squeeze(output)
+        user_e = self.user_embedding(user)
+        item_e = self.item_embedding(item)
+        user_mlp_output = self.user_mlp_layers(user_e)
+        item_mlp_output = self.item_mlp_layers(item_e)
+        output = self.predict_layer(user_mlp_output, item_mlp_output)
+        return output
 
     @tf.function
     def get_top_k(self, preds, train_mask, k=100):

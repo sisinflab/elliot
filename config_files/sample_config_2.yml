@@ -212,7 +212,7 @@ experiment:
       lr: 0.001
       user_mlp: (64, 32)
       item_mlp: (64, 32)
-      batch_size: 32
+      batch_size: 128
       epochs: 10
       neg_ratio: 5
       reg: 0.005

@@ -49,7 +49,7 @@ class Sampler:
                 while i in ui:
                     i = r_int(n_items)
                 r = 0
-            return self._sparse_i_ratings[u].toarray(), self._sparse_i_ratings.getcol(i).toarray(), r
+            return u, i, r
 
         for batch_start in range(0, events, batch_size):
             bui, bii, bij = map(np.array, zip(*[sample() for _ in range(batch_start, min(batch_start + batch_size, events))]))
