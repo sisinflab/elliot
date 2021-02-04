@@ -78,9 +78,6 @@ class NeuralMatrixFactorization(RecMixin, BaseRecommenderModel):
                + "-mftrain:" + str(self._is_mf_train)\
                + "-mlptrain:" + str(self._is_mlp_train)
 
-    def get_recommendations(self, k: int = 100):
-        pass
-
     def predict(self, u: int, i: int):
         pass
 
@@ -122,8 +119,8 @@ class NeuralMatrixFactorization(RecMixin, BaseRecommenderModel):
             offset_stop = min(offset + self._batch_size, self._num_users)
             predictions = self._model.get_recs(
                 (
-                    np.repeat(np.array(list(range(offset,offset_stop)))[:, None], repeats=self._num_items,axis=1),
-                 np.array([self._i_items_set for _ in range(offset,offset_stop)])
+                    np.repeat(np.array(list(range(offset, offset_stop)))[:, None], repeats=self._num_items, axis=1),
+                    np.array([self._i_items_set for _ in range(offset, offset_stop)])
                  )
             )
             v, i = self._model.get_top_k(predictions, self.get_train_mask(offset, offset_stop), k=k)

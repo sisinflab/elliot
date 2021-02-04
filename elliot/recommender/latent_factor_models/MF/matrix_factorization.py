@@ -53,7 +53,7 @@ class MatrixFactorization(RecMixin, BaseRecommenderModel):
         self._sp_i_train = self._data.sp_i_train
         self._i_items_set = list(range(self._num_items))
         # self._i_zeros = [list(items_set-set(user_train)) for user_train in self._sp_i_train.tolil().rows]
-        self._model = MatrixFactorizationModel(self._num_users, self._num_items, self._embed_mf_size,
+        self._model = MatrixFactorizationModel(self._num_users, self._num_items, self._factors,
                                                self._l_w, self._learning_rate)
 
         self._iteration = 0

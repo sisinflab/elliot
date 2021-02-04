@@ -118,7 +118,7 @@ class VSM(RecMixin, BaseRecommenderModel):
         user_features = {}
         # partial = 1/len(user_items_dict)
         for item in user_items_dict.keys():
-            for feature in self._data.side_information_data.feature_map.get(item,[]):
+            for feature in self._data.side_information_data.feature_map.get(item, []):
                 # user_features[feature] = user_features.get(feature, 0) + partial
                 user_features[feature] = user_features.get(feature, 1)
         return user_features
