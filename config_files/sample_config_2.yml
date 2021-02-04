@@ -212,11 +212,22 @@ experiment:
       lr: 0.001
       user_mlp: (64, 32)
       item_mlp: (64, 32)
-      batch_size: 128
+      batch_size: 64
       epochs: 10
-      neg_ratio: 5
+      neg_ratio: 1
       reg: 0.005
-      similarity: cosine
+      similarity: dot
+#    PMF:
+#      meta:
+#        verbose: True
+#        save_recs: False
+#        validation_rate: 1
+#      epochs: 10
+#      lr: 0.001
+#      factors: 50
+#      reg: 0.005
+#      gaussian_variance: 0.01
+#      batch_size: 512
 #    NeuMF:
 #      meta:
 #        verbose: True

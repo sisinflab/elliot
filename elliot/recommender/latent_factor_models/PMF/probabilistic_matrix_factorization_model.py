@@ -35,7 +35,7 @@ class ProbabilisticMatrixFactorizationModel(keras.Model):
         self.embed_mf_size = embed_mf_size
         self.lambda_weights = lambda_weights
 
-        self.initializer = tf.initializers.GlorotUniform()
+        self.initializer = tf.initializers.RandomNormal(stddev=0.01)
 
         self.user_mf_embedding = keras.layers.Embedding(input_dim=self.num_users, output_dim=self.embed_mf_size,
                                                         embeddings_initializer=self.initializer, name='U_MF',
@@ -46,7 +46,7 @@ class ProbabilisticMatrixFactorizationModel(keras.Model):
                                                         embeddings_initializer=self.initializer, name='I_MF',
                                                         dtype=tf.float32)
 
-        self.predict_layer = keras.layers.Dense(1, input_dim=self.embed_mf_size)
+        self.predict_layer = self.dot_prod
         self.noise = keras.layers.GaussianNoise(gaussian_variance, input_dim=1)
 
         self.activate = keras.activations.sigmoid
@@ -55,14 +55,18 @@ class ProbabilisticMatrixFactorizationModel(keras.Model):
         self.optimizer = tf.optimizers.Adam(learning_rate)
 
     @tf.function
+    def dot_prod(self, layer_0, layer_1):
+        return tf.reduce_sum(layer_0 * layer_1, axis=-1)
+
+    @tf.function
     def call(self, inputs, training=None, mask=None):
         user, item = inputs
         user_mf_e = self.user_mf_embedding(user)
         item_mf_e = self.item_mf_embedding(item)
 
-        mf_output = user_mf_e * item_mf_e  # [batch_size, embedding_size]
+        mf_output = self.predict_layer(user_mf_e, item_mf_e)  # [batch_size, embedding_size]
 
-        output = self.activate(self.predict_layer(mf_output))
+        output = self.activate(mf_output)
 
         return output
 
@@ -102,9 +106,9 @@ class ProbabilisticMatrixFactorizationModel(keras.Model):
         user_mf_e = self.user_mf_embedding(user)
         item_mf_e = self.item_mf_embedding(item)
 
-        mf_output = user_mf_e * item_mf_e  # [batch_size, embedding_size]
+        mf_output = self.predict_layer(user_mf_e, item_mf_e)  # [batch_size, embedding_size]
 
-        output = self.activate(self.predict_layer(mf_output))
+        output = self.activate(mf_output)
 
         return tf.squeeze(output)
 

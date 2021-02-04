@@ -41,7 +41,7 @@ class DeepMatrixFactorizationModel(keras.Model):
         self.max_ratings = max_ratings
         self._sp_i_train_ratings = sp_i_train_ratings
 
-        self.initializer = tf.initializers.GlorotUniform()
+        self.initializer = tf.initializers.RandomNormal(stddev=0.01)
 
         self.user_embedding = keras.layers.Embedding(input_dim=self.num_users, output_dim=self.num_items,weights=[sp_i_train_ratings.toarray()],
                                                         trainable=False, dtype=tf.float32)
@@ -50,13 +50,13 @@ class DeepMatrixFactorizationModel(keras.Model):
                                                      trainable=False, dtype=tf.float32)
         self.user_mlp_layers = keras.Sequential()
         for units in user_mlp[:-1]:
-            self.user_mlp_layers.add(keras.layers.Dense(units, activation='relu'))
-        self.user_mlp_layers.add(keras.layers.Dense(user_mlp[-1], activation='linear'))
+            self.user_mlp_layers.add(keras.layers.Dense(units, activation='relu', kernel_initializer=self.initializer))
+        self.user_mlp_layers.add(keras.layers.Dense(user_mlp[-1], activation='linear', kernel_initializer=self.initializer))
 
         self.item_mlp_layers = keras.Sequential()
         for units in item_mlp[:-1]:
-            self.item_mlp_layers.add(keras.layers.Dense(units, activation='relu'))
-        self.item_mlp_layers.add(keras.layers.Dense(item_mlp[-1], activation='linear'))
+            self.item_mlp_layers.add(keras.layers.Dense(units, activation='relu', kernel_initializer=self.initializer))
+        self.item_mlp_layers.add(keras.layers.Dense(item_mlp[-1], activation='linear', kernel_initializer=self.initializer))
 
         if self.similarity == "cosine":
             self.predict_layer = self.cosine
