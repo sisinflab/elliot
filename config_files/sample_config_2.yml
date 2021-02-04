@@ -209,12 +209,12 @@ experiment:
         verbose: True
         save_recs: False
         validation_rate: 1
-      lr: 0.001
+      lr: 0.0001
       user_mlp: (64, 32)
       item_mlp: (64, 32)
       batch_size: 64
       epochs: 10
-      neg_ratio: 1
+      neg_ratio: 5
       reg: 0.005
       similarity: dot
 #    PMF:
