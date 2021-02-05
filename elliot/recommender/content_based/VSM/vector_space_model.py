@@ -40,7 +40,6 @@ class VSM(RecMixin, BaseRecommenderModel):
             ("_similarity", "similarity", "sim", "cosine", None, None),
             ("_user_profile_type", "user_profile", "up", "tfidf", None, None),
             ("_item_profile_type", "item_profile", "ip", "tfidf", None, None),
-            ("_mlpunits", "mlp_units", "mlpunits", "(1,2,3)", lambda x: list(make_tuple(x)), lambda x: str(x).replace(",", "-")),
         ]
         self.autoset_params()
 

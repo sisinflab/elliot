@@ -12,7 +12,6 @@ from recommender.recommender_utils_mixin import RecMixin
 from utils.folder import build_model_folder
 from utils.write import store_recommendation
 
-np.random.seed(0)
 
 
 class Random(RecMixin, BaseRecommenderModel):
@@ -31,6 +30,13 @@ class Random(RecMixin, BaseRecommenderModel):
         self._random = np.random
         self.evaluator = Evaluator(self._data, self._params)
 
+        self._params_list = [
+            ("_seed", "random_seed", "seed", 42, None, None)
+        ]
+        self.autoset_params()
+
+        np.random.seed(self._seed)
+
         self._params.name = self.name
 
         build_model_folder(self._config.path_output_rec_weight, self.name)
@@ -38,7 +44,7 @@ class Random(RecMixin, BaseRecommenderModel):
 
     @property
     def name(self):
-        return "Random"
+        return f"Random_{self.get_params_shortcut()}"
 
     def train(self):
         recs = self.get_recommendations(self.evaluator.get_needed_recommendations())

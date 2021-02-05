@@ -40,10 +40,18 @@ class ProbabilisticMatrixFactorization(RecMixin, BaseRecommenderModel):
 
         self._sampler = pws.Sampler(self._data.i_train_dict)
 
-        self._learning_rate = self._params.lr
-        self._factors = self._params.factors
-        self._l_w = self._params.reg
-        self._gvar = self._params.gaussian_variance
+        self._params_list = [
+            ("_learning_rate", "lr", "lr", 0.001, None, None),
+            ("_factors", "factors", "factors", 50, None, None),
+            ("_l_w", "reg", "reg", 0.0025, None, None),
+            ("_gvar", "gaussian_variance", "gvar", 0.1, None, None),
+        ]
+        self.autoset_params()
+
+        # self._learning_rate = self._params.lr
+        # self._factors = self._params.factors
+        # self._l_w = self._params.reg
+        # self._gvar = self._params.gaussian_variance
 
         if self._batch_size < 1:
             self._batch_size = self._data.transactions
@@ -66,11 +74,9 @@ class ProbabilisticMatrixFactorization(RecMixin, BaseRecommenderModel):
     @property
     def name(self):
         return "PMF"\
-               + "-e:" + str(self._epochs) \
-               + "-factors:" + str(self._factors) \
-               + "-lr:" + str(self._learning_rate) \
-               + "-reg:" + str(self._l_w) \
-               + "-gvar:" + str(self._gvar)
+               + "_e:" + str(self._epochs) \
+               + "_bs:" + str(self._batch_size) \
+               + f"_{self.get_params_shortcut()}"
 
     def get_recommendations(self, k: int = 100):
         pass

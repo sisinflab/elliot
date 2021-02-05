@@ -30,11 +30,16 @@ class PureSVD(RecMixin, BaseRecommenderModel):
         self._num_users = self._data.num_users
         self._random = np.random
 
-        self._factors = self._params.factors
+        self._params_list = [
+            ("_factors", "factors", "factors", 10, None, None),
+            ("_seed", "seed", "seed", 42, None, None)
+        ]
+        self.autoset_params()
+        # self._factors = self._params.factors
 
         self._ratings = self._data.train_dict
         self._sp_i_train = self._data.sp_i_train
-        self._model = PureSVDModel(self._factors, self._data, 42)
+        self._model = PureSVDModel(self._factors, self._data, self._seed)
 
         self.evaluator = Evaluator(self._data, self._params)
 
@@ -57,7 +62,7 @@ class PureSVD(RecMixin, BaseRecommenderModel):
 
     @property
     def name(self):
-        return "PureSVD" + "-factors:" + str(self._factors)
+        return f"PureSVD_{self.get_params_shortcut()}"
 
     def train(self):
 

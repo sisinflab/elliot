@@ -35,13 +35,22 @@ class DeepMatrixFactorization(RecMixin, BaseRecommenderModel):
         self._num_users = self._data.num_users
         self._random = np.random
 
-        self._learning_rate = self._params.lr
-        self._user_mlp = list(make_tuple(self._params.user_mlp))
-        self._item_mlp = list(make_tuple(self._params.item_mlp))
-        self._neg_ratio = self._params.neg_ratio
-        self._reg = self._params.reg
-        self._similarity = self._params.similarity
-        self._max_ratings = 5
+        self._params_list = [
+            ("_learning_rate", "lr", "lr", 0.0001, None, None),
+            ("_user_mlp", "user_mlp", "umlp", "(64,32)", lambda x: list(make_tuple(x)), lambda x: str(x).replace(",", "-")),
+            ("_item_mlp", "item_mlp", "imlp", "(64,32)", lambda x: list(make_tuple(x)), lambda x: str(x).replace(",", "-")),
+            ("_neg_ratio", "neg_ratio", "negratio", 5, None, None),
+            ("_reg", "reg", "reg", 0.001, None, None),
+            ("_similarity", "similarity", "sim", "cosine", None, None)
+        ]
+        self.autoset_params()
+        # self._learning_rate = self._params.lr
+        # self._user_mlp = list(make_tuple(self._params.user_mlp))
+        # self._item_mlp = list(make_tuple(self._params.item_mlp))
+        # self._neg_ratio = self._params.neg_ratio
+        # self._reg = self._params.reg
+        # self._similarity = self._params.similarity
+        self._max_ratings = np.max(self._data.sp_i_train_ratings)
         self._transactions_per_epoch = self._data.transactions + self._neg_ratio * self._data.transactions
 
         if self._batch_size < 1:
@@ -67,16 +76,22 @@ class DeepMatrixFactorization(RecMixin, BaseRecommenderModel):
         build_model_folder(self._config.path_output_rec_weight, self.name)
         self._saving_filepath = f'{self._config.path_output_rec_weight}{self.name}/best-weights-{self.name}'
 
+    # @property
+    # def name(self):
+    #     return "DMF"\
+    #            + "-e:" + str(self._epochs) \
+    #            + "-lr:" + str(self._learning_rate) \
+    #            + "-user_mlp:" + str(self._params.user_mlp).replace(",","-") \
+    #            + "-item_mlp:" + str(self._params.item_mlp).replace(",","-") \
+    #            + "-neg_ratio:" + str(self._neg_ratio) \
+    #            + "-reg:" + str(self._reg) \
+    #            + "-similarity:" + str(self._similarity)
     @property
     def name(self):
         return "DMF"\
-               + "-e:" + str(self._epochs) \
-               + "-lr:" + str(self._learning_rate) \
-               + "-user_mlp:" + str(self._params.user_mlp).replace(",","-") \
-               + "-item_mlp:" + str(self._params.item_mlp).replace(",","-") \
-               + "-neg_ratio:" + str(self._neg_ratio) \
-               + "-reg:" + str(self._reg) \
-               + "-similarity:" + str(self._similarity)
+               + "_e:" + str(self._epochs) \
+               + "_bs:" + str(self._batch_size) \
+               + f"_{self.get_params_shortcut()}"
 
     def predict(self, u: int, i: int):
         pass

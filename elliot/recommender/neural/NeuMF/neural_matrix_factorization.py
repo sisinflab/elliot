@@ -48,13 +48,6 @@ class NeuralMatrixFactorization(RecMixin, BaseRecommenderModel):
             ("_is_mlp_train", "is_mlp_train", "mlptrain", True, None, None),
         ]
         self.autoset_params()
-        # self._learning_rate = self._params.lr
-        # self._mf_factors = self._params.mf_factors
-        # self._mlp_factors = self._params.mlp_factors
-        # self._mlp_hidden_size = list(make_tuple(self._params.mlp_hidden_size))
-        # self._prob_keep_dropout = self._params.prob_keep_dropout
-        # self._is_mf_train = self._params.is_mf_train
-        # self._is_mlp_train = self._params.is_mlp_train
 
         if self._batch_size < 1:
             self._batch_size = self._data.transactions

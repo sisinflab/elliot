@@ -35,9 +35,15 @@ class AttributeUserKNN(RecMixin, BaseRecommenderModel):
         self._num_users = self._data.num_users
         self._random = np.random
 
-        self._num_neighbors = self._params.neighbors
-        self._similarity = self._params.similarity
-        self._profile_type = getattr(self._params, "profile", "binary")
+        self._params_list = [
+            ("_num_neighbors", "neighbors", "nn", 40, None, None),
+            ("_similarity", "similarity", "sim", "cosine", None, None),
+            ("_profile_type", "profile", "profile", "binary", None, None)
+        ]
+        self.autoset_params()
+        # self._num_neighbors = self._params.neighbors
+        # self._similarity = self._params.similarity
+        # self._profile_type = getattr(self._params, "profile", "binary")
 
         self._ratings = self._data.train_dict
 
@@ -78,7 +84,7 @@ class AttributeUserKNN(RecMixin, BaseRecommenderModel):
 
     @property
     def name(self):
-        return f"AttributeUserKNN_NN_nn:{self._num_neighbors}_sim:{self._similarity}"
+        return f"AttributeUserKNN_{self.get_params_shortcut()}"
 
     def train(self):
 
