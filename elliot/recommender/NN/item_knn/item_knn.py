@@ -33,9 +33,15 @@ class ItemKNN(RecMixin, BaseRecommenderModel):
         self._num_users = self._data.num_users
         self._random = np.random
 
-        self._num_neighbors = self._params.neighbors
-        self._similarity = self._params.similarity
-        self._implementation = getattr(self._params, "implementation", "standard")
+        self._params_list = [
+            ("_num_neighbors", "neighbors", "nn", 40, None, None),
+            ("_similarity", "similarity", "sim", "cosine", None, None),
+            ("_implementation", "implementation", "imp", "standard", None, None)
+        ]
+        self.autoset_params()
+        # self._num_neighbors = self._params.neighbors
+        # self._similarity = self._params.similarity
+        # self._implementation = getattr(self._params, "implementation", "standard")
 
         self._ratings = self._data.train_dict
         if self._implementation == "aiolli":
@@ -68,7 +74,8 @@ class ItemKNN(RecMixin, BaseRecommenderModel):
 
     @property
     def name(self):
-        return f"Item_NN_nn:{self._num_neighbors}_sim:{self._similarity}{'_imp:Aiolli'if self._implementation=='aiolli' else ''}"
+        # return f"Item_NN_nn:{self._num_neighbors}_sim:{self._similarity}{'_imp:Aiolli'if self._implementation=='aiolli' else ''}"
+        return f"ItemKNN_{self.get_params_shortcut()}"
 
     def train(self):
 

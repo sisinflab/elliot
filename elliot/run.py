@@ -8,8 +8,10 @@ __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
 import importlib
+import sys
 import typing
 
+from os import path
 from hyperopt import Trials, fmin
 
 from namespace.namespace_model_builder import NameSpaceBuilder
@@ -19,10 +21,10 @@ import numpy as np
 from utils import logging as logging_project
 
 _rstate = np.random.RandomState(42)
+here = path.abspath(path.dirname(__file__))
 
-
-def run_experiment(config_path: str='./config/config.yml'):
-    builder = NameSpaceBuilder(config_path)
+def run_experiment(config_path: str = './config/config.yml'):
+    builder = NameSpaceBuilder(config_path, here, path.abspath(path.dirname(config_path)))
     base = builder.base
     logging_project.init(base.base_namespace.path_logger_config, base.base_namespace.path_log_folder)
     logger = logging_project.get_logger("__main__")
@@ -38,7 +40,15 @@ def run_experiment(config_path: str='./config/config.yml'):
         test_trials = []
         for data_test in data_test_list:
             logging_project.prepare_logger(key, base.base_namespace.path_log_folder)
-            model_class = getattr(importlib.import_module("recommender"), key)
+            if key.startswith("external."):
+                spec = importlib.util.spec_from_file_location("external",
+                                                              path.relpath(base.base_namespace.external_models_path))
+                external = importlib.util.module_from_spec(spec)
+                sys.modules[spec.name] = external
+                spec.loader.exec_module(external)
+                model_class = getattr(importlib.import_module("external"), key.split(".", 1)[1])
+            else:
+                model_class = getattr(importlib.import_module("recommender"), key)
             print("\n********************************")
             print(f"Tuning begun for {model_class.__name__}\n")
             model_placeholder = ho.ModelCoordinator(data_test, base.base_namespace, model_base, model_class)

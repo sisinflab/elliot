@@ -46,9 +46,7 @@ class Recall(BaseMetric):
         :param user_relevant_items: list of user relevant items in the form [item1,...]
         :return: the value of the Recall metric for the specific user
         """
-        # TODO check formula
-        return sum([1 for i in user_recommendations[:cutoff] if i[0] in user_relevant_items]) / \
-               min(len(user_relevant_items), cutoff)
+        return sum([1 for i in user_recommendations[:cutoff] if i[0] in user_relevant_items]) / len(user_relevant_items)
 
     def eval(self):
         """

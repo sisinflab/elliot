@@ -9,6 +9,7 @@ experiment:
         features: ../data/{0}/features.tsv
         properties: ../data/{0}/properties.conf
   dataset: example
+  external_models_path: ../external/models/__init__.py
 #  path_output_rec_result: ../results/{0}/recs/
 #  path_output_rec_weight: ../results/{0}/weights/
 #  path_output_rec_performance: ../results/{0}/performance/
@@ -236,7 +237,7 @@ experiment:
 #      mf_factors: 10
 #      mlp_factors: 10
 #      mlp_hidden_size: (5, 3, 2)
-#      prob_keep_dropout: 0.2
+#      dropout: 0.2
 #      is_mf_train: True
 #      is_mlp_train: True
 #      batch_size: 512
@@ -246,7 +247,7 @@ experiment:
 #    ItemKNN:
 #      meta:
 #        verbose: True
-#        save_recs: False
+#        save_recs: True
 #      neighbors: 50
 #      similarity: braycurtis
 #      implementation: aiolli
@@ -264,3 +265,6 @@ experiment:
 #      similarity: cosine
 #      user_profile: binary
 #      item_profile: binary
+#    external.MostPop:
+#      meta:
+#        save_recs: True

@@ -20,7 +20,7 @@ class NeuralMatrixFactorizationModel(keras.Model):
     def __init__(self,
                  num_users,
                  num_items,
-                 embed_mf_size, embed_mlp_size, mlp_hidden_size, prob_keep_dropout, is_mf_train,
+                 embed_mf_size, embed_mlp_size, mlp_hidden_size, dropout, is_mf_train,
                  is_mlp_train, learning_rate=0.01,
                  name="NNBPRMF",
                  **kwargs):
@@ -31,7 +31,7 @@ class NeuralMatrixFactorizationModel(keras.Model):
         self.embed_mf_size = embed_mf_size
         self.embed_mlp_size = embed_mlp_size
         self.mlp_hidden_size = mlp_hidden_size
-        self.prob_keep_dropout = prob_keep_dropout
+        self.dropout = dropout
         self.is_mf_train = is_mf_train
         self.is_mlp_train = is_mlp_train
 
@@ -53,7 +53,7 @@ class NeuralMatrixFactorizationModel(keras.Model):
         self.mlp_layers = keras.Sequential()
 
         for units in mlp_hidden_size:
-            self.mlp_layers.add(keras.layers.Dropout(prob_keep_dropout))
+            self.mlp_layers.add(keras.layers.Dropout(dropout))
             self.mlp_layers.add(keras.layers.Dense(units, activation='relu'))
 
         if self.is_mf_train and self.is_mlp_train:

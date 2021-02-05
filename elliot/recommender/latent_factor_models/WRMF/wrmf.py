@@ -32,11 +32,17 @@ class WRMF(RecMixin, BaseRecommenderModel):
         self._num_items = self._data.num_items
         self._num_users = self._data.num_users
         self._random = np.random
-        self._sample_negative_items_empirically = True
 
-        self._factors = self._params.factors
-        self._alpha = self._params.alpha
-        self._reg = self._params.reg
+        self._params_list = [
+            ("_factors", "factors", "factors", 10, None, None),
+            ("_alpha", "alpha", "alpha", 1, None, None),
+            ("_reg", "reg", "reg", 0.1, None, None)
+        ]
+        self.autoset_params()
+
+        # self._factors = self._params.factors
+        # self._alpha = self._params.alpha
+        # self._reg = self._params.reg
 
         self._ratings = self._data.train_dict
         self._sp_i_train = self._data.sp_i_train
@@ -66,10 +72,8 @@ class WRMF(RecMixin, BaseRecommenderModel):
     @property
     def name(self):
         return "WRMF" \
-               + "-e:" + str(self._epochs) \
-               + "-factors:" + str(self._factors) \
-               + "-reg:" + str(self._reg) \
-               + "-alpha:" + str(self._alpha)
+               + "_e:" + str(self._epochs) \
+               + f"_{self.get_params_shortcut()}"
 
     def train(self):
 

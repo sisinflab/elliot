@@ -38,13 +38,16 @@ class NeuralMatrixFactorization(RecMixin, BaseRecommenderModel):
 
         self._sampler = pws.Sampler(self._data.i_train_dict)
 
-        self._learning_rate = self._params.lr
-        self._mf_factors = self._params.mf_factors
-        self._mlp_factors = self._params.mlp_factors
-        self._mlp_hidden_size = list(make_tuple(self._params.mlp_hidden_size))
-        self._prob_keep_dropout = self._params.prob_keep_dropout
-        self._is_mf_train = self._params.is_mf_train
-        self._is_mlp_train = self._params.is_mlp_train
+        self._params_list = [
+            ("_learning_rate", "lr", "lr", 0.001, None, None),
+            ("_mf_factors", "mf_factors", "mffactors", 10, None, None),
+            ("_mlp_factors", "mlp_factors", "mlpfactors", 10, None, None),
+            ("_mlp_hidden_size", "mlp_hidden_size", "mlpunits", "(64,32)", lambda x: list(make_tuple(x)), lambda x: str(x).replace(",", "-")),
+            ("_dropout", "dropout", "drop", 0, None, None),
+            ("_is_mf_train", "is_mf_train", "mftrain", True, None, None),
+            ("_is_mlp_train", "is_mlp_train", "mlptrain", True, None, None),
+        ]
+        self.autoset_params()
 
         if self._batch_size < 1:
             self._batch_size = self._data.transactions
@@ -55,7 +58,7 @@ class NeuralMatrixFactorization(RecMixin, BaseRecommenderModel):
         # self._i_zeros = [list(items_set-set(user_train)) for user_train in self._sp_i_train.tolil().rows]
         self._model = NeuralMatrixFactorizationModel(self._num_users, self._num_items, self._mf_factors,
                                                      self._mlp_factors, self._mlp_hidden_size,
-                                                     self._prob_keep_dropout, self._is_mf_train, self._is_mlp_train,
+                                                     self._dropout, self._is_mf_train, self._is_mlp_train,
                                                      self._learning_rate)
 
         self._iteration = 0
@@ -67,17 +70,24 @@ class NeuralMatrixFactorization(RecMixin, BaseRecommenderModel):
         build_model_folder(self._config.path_output_rec_weight, self.name)
         self._saving_filepath = f'{self._config.path_output_rec_weight}{self.name}/best-weights-{self.name}'
 
+    # @property
+    # def name(self):
+    #     return "NeuMF"\
+    #            + "-e:" + str(self._epochs) \
+    #            + "-lr:" + str(self._learning_rate) \
+    #            + "-mffactors:" + str(self._mf_factors) \
+    #            + "-mlpfactors:" + str(self._mlp_factors) \
+    #            + "-mlpunits:" + str(self._params.mlp_hidden_size).replace(",","-") \
+    #            + "-droppk:" + str(self._prob_keep_dropout) \
+    #            + "-mftrain:" + str(self._is_mf_train)\
+    #            + "-mlptrain:" + str(self._is_mlp_train)
+
     @property
     def name(self):
         return "NeuMF"\
-               + "-e:" + str(self._epochs) \
-               + "-lr:" + str(self._learning_rate) \
-               + "-mffactors:" + str(self._mf_factors) \
-               + "-mlpfactors:" + str(self._mlp_factors) \
-               + "-mlpunits:" + str(self._params.mlp_hidden_size).replace(",","-") \
-               + "-droppk:" + str(self._prob_keep_dropout) \
-               + "-mftrain:" + str(self._is_mf_train)\
-               + "-mlptrain:" + str(self._is_mlp_train)
+               + "_e:" + str(self._epochs) \
+               + "_bs:" + str(self._batch_size) \
+               + f"_{self.get_params_shortcut()}"
 
     def predict(self, u: int, i: int):
         pass
