@@ -21,6 +21,7 @@ from utils.write import store_recommendation
 from recommender.base_recommender_model import BaseRecommenderModel
 from recommender.content_based.VSM.vector_space_model_similarity import Similarity
 from recommender.content_based.VSM.tfidf_utils import TFIDF
+from ast import literal_eval as make_tuple
 
 np.random.seed(42)
 
@@ -35,9 +36,13 @@ class VSM(RecMixin, BaseRecommenderModel):
         self._num_users = self._data.num_users
         self._random = np.random
 
-        self._similarity = self._params.similarity
-        self._user_profile_type = getattr(self._params, "user_profile", "tfidf")
-        self._item_profile_type = getattr(self._params, "item_profile", "tfidf")
+        self._params_list = [
+            ("_similarity", "similarity", "sim", "cosine", None, None),
+            ("_user_profile_type", "user_profile", "up", "tfidf", None, None),
+            ("_item_profile_type", "item_profile", "ip", "tfidf", None, None),
+            ("_mlpunits", "mlp_units", "mlpunits", "(1,2,3)", lambda x: list(make_tuple(x)), lambda x: str(x).replace(",", "-")),
+        ]
+        self.autoset_params()
 
         self._ratings = self._data.train_dict
 
@@ -96,7 +101,7 @@ class VSM(RecMixin, BaseRecommenderModel):
 
     @property
     def name(self):
-        return f"VSM_sim:{self._similarity}"
+        return f"VSM_{self.get_params_shortcut()}"
 
     def train(self):
 

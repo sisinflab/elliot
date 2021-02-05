@@ -39,6 +39,32 @@ class BaseRecommenderModel(ABC):
             raise Exception(f"The first validation epoch ({self._validation_rate}) is later than the overall number of epochs ({self._epochs}).")
         self._batch_size = getattr(self._params, "batch_size", -1)
         self._results = []
+        self._params_list = []
+
+    def get_params_shortcut(self):
+        return "_".join([str(p[2])+":"+ str(p[5](getattr(self, p[0])) if p[5] else getattr(self, p[0])) for p in self._params_list])
+
+    def autoset_params(self):
+        """
+        Define Parameters as tuples: (variable_name, public_name, shortcut, default, reading_function, printing_function)
+        Example:
+
+        self._params_list = [
+            ("_similarity", "similarity", "sim", "cosine", None, None),
+            ("_user_profile_type", "user_profile", "up", "tfidf", None, None),
+            ("_item_profile_type", "item_profile", "ip", "tfidf", None, None),
+            ("_mlpunits", "mlp_units", "mlpunits", "(1,2,3)", lambda x: list(make_tuple(x)), lambda x: str(x).replace(",", "-")),
+        ]
+        """
+        print("\nLoading parameters: ")
+        for variable_name, public_name, shortcut, default, reading_function, _ in self._params_list:
+            if reading_function is None:
+                setattr(self, variable_name, getattr(self._params, public_name, default))
+            else:
+                setattr(self, variable_name, reading_function(getattr(self._params, public_name, default)))
+            print(f"Parameter {public_name} set to {getattr(self, variable_name)}")
+        if not self._params_list:
+            print("No parameters defined")
 
     @abstractmethod
     def train(self):
