@@ -10,6 +10,7 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 import importlib
 import typing
 
+from os import path
 from hyperopt import Trials, fmin
 
 from namespace.namespace_model_builder import NameSpaceBuilder
@@ -19,10 +20,10 @@ import numpy as np
 from utils import logging as logging_project
 
 _rstate = np.random.RandomState(42)
+here = path.abspath(path.dirname(__file__))
 
-
-def run_experiment(config_path: str='./config/config.yml'):
-    builder = NameSpaceBuilder(config_path)
+def run_experiment(config_path: str = './config/config.yml'):
+    builder = NameSpaceBuilder(config_path, here, path.abspath(path.dirname(config_path)))
     base = builder.base
     logging_project.init(base.base_namespace.path_logger_config, base.base_namespace.path_log_folder)
     logger = logging_project.get_logger("__main__")

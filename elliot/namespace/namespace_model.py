@@ -16,6 +16,9 @@ from yaml import load
 from collections import OrderedDict
 from utils.folder import manage_directories
 import hyperoptimization as ho
+import re
+
+regexp = re.compile(r'[\D][\w-]+\.[\w-]+')
 
 _experiment = 'experiment'
 
@@ -45,13 +48,26 @@ _meta = 'meta'
 
 
 class NameSpaceModel:
-    def __init__(self, config_path):
+    def __init__(self, config_path, base_folder_path_elliot, base_folder_path_config):
         self.base_namespace = SimpleNamespace()
+
+        self._base_folder_path_elliot = base_folder_path_elliot
+        self._base_folder_path_config = base_folder_path_config
 
         self.config_file = open(config_path)
         self.config = load(self.config_file, Loader=FullLoader)
 
         os.environ['CUDA_VISIBLE_DEVICES'] = str(self.config[_experiment][_gpu])
+
+    @staticmethod
+    def _set_path(config_path, local_path):
+        if os.path.isabs(local_path):
+            return local_path
+        else:
+            if local_path.startswith(("./", "../")) or regexp.search(local_path):
+                return f"{config_path}/{local_path}"
+            else:
+                return local_path
 
     def fill_base(self):
 
@@ -59,11 +75,14 @@ class NameSpaceModel:
         #     self.config[_experiment][_data_paths][path] = \
         #         self.config[_experiment][_data_paths][path].format(self.config[_experiment][_dataset])
 
-        self.config[_experiment][_recs] = self.config[_experiment].get(_recs, "../results/{0}/recs/") \
+        self.config[_experiment][_recs] = self.config[_experiment]\
+            .get(_recs, self._set_path(self._base_folder_path_config, "../results/{0}/recs/"))\
             .format(self.config[_experiment][_dataset])
-        self.config[_experiment][_weights] = self.config[_experiment].get(_weights, "../results/{0}/weights/") \
+        self.config[_experiment][_weights] = self.config[_experiment]\
+            .get(_weights, self._set_path(self._base_folder_path_config, "../results/{0}/weights/")) \
             .format(self.config[_experiment][_dataset])
-        self.config[_experiment][_performance] = self.config[_experiment].get(_performance, "../results/{0}/performance/") \
+        self.config[_experiment][_performance] = self.config[_experiment]\
+            .get(_performance, self._set_path(self._base_folder_path_config, "../results/{0}/performance/")) \
             .format(self.config[_experiment][_dataset])
 
         self.config[_experiment][_paired_ttest] = self.config[_experiment].get(_paired_ttest, False)
@@ -76,16 +95,20 @@ class NameSpaceModel:
                   _log_folder, _dataloader, _splitting, _prefiltering, _evaluation]:
             if p == _data_config:
                 side_information = self.config[_experiment][p].get("side_information", {})
-                side_information.update({k: v.format(self.config[_experiment][_dataset])
+                side_information.update({k: self._set_path(self._base_folder_path_config,
+                                                           v.format(self.config[_experiment][_dataset]))
                                          for k, v in side_information.items() if isinstance(v, str)})
                 side_information = SimpleNamespace(**side_information)
-                self.config[_experiment][p].update({k: v.format(self.config[_experiment][_dataset])
-                                                    for k, v in self.config[_experiment][p].items() if isinstance(v, str)})
+                self.config[_experiment][p].update({k: self._set_path(self._base_folder_path_config,
+                                                                      v.format(self.config[_experiment][_dataset]))
+                                                    for k, v in self.config[_experiment][p].items() if
+                                                    isinstance(v, str)})
                 self.config[_experiment][p]["side_information"] = side_information
                 self.config[_experiment][p][_dataloader] = self.config[_experiment][p].get(_dataloader, "DataSetLoader")
                 setattr(self.base_namespace, p, SimpleNamespace(**self.config[_experiment][p]))
             elif p == _splitting and self.config[_experiment].get(p, {}):
-                self.config[_experiment][p].update({k: v.format(self.config[_experiment][_dataset])
+                self.config[_experiment][p].update({k: self._set_path(self._base_folder_path_config,
+                                                                      v.format(self.config[_experiment][_dataset]))
                                                     for k, v in self.config[_experiment][p].items() if
                                                     isinstance(v, str)})
 
@@ -106,11 +129,17 @@ class NameSpaceModel:
                 self.config[_experiment][p] = preprocessing_strategy
                 setattr(self.base_namespace, p, self.config[_experiment][p])
             elif p == _evaluation and self.config[_experiment].get(p, {}):
+                complex_metrics = self.config[_experiment][p].get("complex_metrics", {})
+                complex_metrics = [{k: self._set_path(self._base_folder_path_config,
+                                                      v.format(self.config[_experiment][_dataset]))
+                                    for k, v in complex_metric.items() if isinstance(v, str)}
+                                   for complex_metric in complex_metrics]
+                self.config[_experiment][p]["complex_metrics"] = complex_metrics
                 setattr(self.base_namespace, p, SimpleNamespace(**self.config[_experiment][p]))
             elif p == _logger_config and not self.config[_experiment].get(p, False):
-                setattr(self.base_namespace, p, "./config/logger_config.yml")
+                setattr(self.base_namespace, p, f"{self._base_folder_path_elliot}/config/logger_config.yml")
             elif p == _log_folder and not self.config[_experiment].get(p, False):
-                setattr(self.base_namespace, p, "../log/")
+                setattr(self.base_namespace, p, f"{self._base_folder_path_elliot}/../log/")
             else:
                 if self.config[_experiment].get(p):
                     setattr(self.base_namespace, p, self.config[_experiment][p])
