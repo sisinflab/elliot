@@ -47,14 +47,23 @@ class MultiDAE(RecMixin, BaseRecommenderModel):
 
         ######################################
 
+        self._params_list = [
+            ("_intermediate_dim", "intermediate_dim", "intermediate_dim", 600, None, None),
+            ("_latent_dim", "latent_dim", "latent_dim", 200, None, None),
+            ("_lambda", "reg_lambda", "reg_lambda", 0.01, None, None),
+            ("_learning_rate", "lr", "lr", 0.001, None, None),
+            ("_dropout_rate", "dropout_pkeep", "dropout_pkeep", 1, None, None),
+        ]
+        self.autoset_params()
+
         self._params.name = self.name
 
-        self._intermediate_dim = self._params.intermediate_dim
-        self._latent_dim = self._params.latent_dim
-
-        self._lambda = self._params.reg_lambda
-        self._learning_rate = self._params.lr
-        self._dropout_rate = 1. - self._params.dropout_pkeep
+        # self._intermediate_dim = self._params.intermediate_dim
+        # self._latent_dim = self._params.latent_dim
+        #
+        # self._lambda = self._params.reg_lambda
+        # self._learning_rate = self._params.lr
+        self._dropout_rate = 1. - self._dropout_rate
 
         self._model = DenoisingAutoEncoder(self._num_items,
                                            self._intermediate_dim,
@@ -70,13 +79,9 @@ class MultiDAE(RecMixin, BaseRecommenderModel):
     @property
     def name(self):
         return "MultiDAE" \
-               + "_lr:" + str(self._params.lr) \
-               + "-e:" + str(self._params.epochs) \
-               + "-idim:" + str(self._params.intermediate_dim) \
-               + "-ldim:" + str(self._params.latent_dim) \
-               + "-bs:" + str(self._params.batch_size) \
-               + "-dpk:" + str(self._params.dropout_pkeep) \
-               + "-lmb:" + str(self._params.reg_lambda)
+               + "_e:" + str(self._epochs) \
+               + "_bs:" + str(self._batch_size) \
+               + f"_{self.get_params_shortcut()}"
 
     def train(self):
         self.logger.critical("Test2")

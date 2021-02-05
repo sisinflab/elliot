@@ -52,16 +52,32 @@ class NGCF(RecMixin, BaseRecommenderModel):
 
         ######################################
 
+        self._params_list = [
+            ("_learning_rate", "lr", "lr", 600, None, None),
+            ("_factors", "latent_dim", "factors", 200, None, None),
+            ("_l_w", "l_w", "l_w", 0.01, None, None),
+            ("_weight_size", "weight_size", "weight_size", "(64,32)", lambda x: list(make_tuple(x)),
+             lambda x: str(x).replace(",", "-")),
+            ("_node_dropout", "node_dropout", "node_dropout", "(64,32)", lambda x: list(make_tuple(x)),
+             lambda x: str(x).replace(",", "-")),
+            ("_message_dropout", "message_dropout", "message_dropout", "(64,32)", lambda x: list(make_tuple(x)),
+             lambda x: str(x).replace(",", "-")),
+            ("_n_fold", "n_fold", "n_fold", 1, None, None),
+        ]
+        self.autoset_params()
+
+        self._n_layers = len(self._weight_size)
+
         self._params.name = self.name
 
-        self._learning_rate = self._params.learning_rate
-        self._embed_k = self._params.embed_k
-        self._l_w = self._params.l_w
-        self._weight_size = list(make_tuple(self._params.weight_size))
-        self._n_layers = len(self._weight_size)
-        self._node_dropout = list(make_tuple(self._params.node_dropout))
-        self._message_dropout = list(make_tuple(self._params.message_dropout))
-        self._n_fold = self._params.n_fold
+        # self._learning_rate = self._params.lr
+        # self._factors = self._params.factors
+        # self._l_w = self._params.l_w
+        # self._weight_size = list(make_tuple(self._params.weight_size))
+        # self._n_layers = len(self._weight_size)
+        # self._node_dropout = list(make_tuple(self._params.node_dropout))
+        # self._message_dropout = list(make_tuple(self._params.message_dropout))
+        # self._n_fold = self._params.n_fold
 
         self._plain_adj, self._norm_adj, self._mean_adj = self.create_adj_mat()
 
@@ -69,7 +85,7 @@ class NGCF(RecMixin, BaseRecommenderModel):
             num_users=self._num_users,
             num_items=self._num_items,
             learning_rate=self._learning_rate,
-            embed_k=self._embed_k,
+            embed_k=self._factors,
             l_w=self._l_w,
             weight_size=self._weight_size,
             n_layers=self._n_layers,
@@ -112,14 +128,9 @@ class NGCF(RecMixin, BaseRecommenderModel):
     @property
     def name(self):
         return "NGCF" \
-               + "_lr:" + str(self._params.learning_rate) \
-               + "-embedk:" + str(self._params.embed_k) \
-               + "-lw:" + str(self._params.l_w) \
-               + "-weightsize:" + str(self._params.weight_size) \
-               + "-nlayers:" + str(len(self._params.weight_size)) \
-               + "-nodedropout:" + str(self._params.node_dropout) \
-               + "-messagedropout:" + str(self._params.message_dropout) \
-               + "-nfold:" + str(self._params.n_fold)
+               + "_e:" + str(self._epochs) \
+               + "_bs:" + str(self._batch_size) \
+               + f"_{self.get_params_shortcut()}"
 
     def train(self):
         best_metric_value = 0

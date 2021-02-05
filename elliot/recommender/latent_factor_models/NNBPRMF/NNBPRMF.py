@@ -52,15 +52,23 @@ class NNBPRMF(RecMixin, BaseRecommenderModel):
 
         ######################################
 
-        self._factors = self._params.factors
-        self._learning_rate = self._params.lr
-        self._l_w = self._params.l_w
-        self._l_b = self._params.l_b
+        self._params_list = [
+            ("_factors", "factors", "factors", 10, None, None),
+            ("_learning_rate", "lr", "lr", 0.001, None, None),
+            ("_l_w", "l_w", "l_w", 0.1, None, None),
+            ("_l_b", "l_b", "l_b", 0.001, None, None),
+        ]
+        self.autoset_params()
 
-        self._model = NNBPRMF_model(self._params.embed_k,
-                                    self._params.lr,
-                                    self._params.l_w,
-                                    self._params.l_b,
+        # self._factors = self._params.factors
+        # self._learning_rate = self._params.lr
+        # self._l_w = self._params.l_w
+        # self._l_b = self._params.l_b
+
+        self._model = NNBPRMF_model(self._factors,
+                                    self._learning_rate,
+                                    self._l_w,
+                                    self._l_b,
                                     self._num_users,
                                     self._num_items)
 
@@ -70,11 +78,9 @@ class NNBPRMF(RecMixin, BaseRecommenderModel):
     @property
     def name(self):
         return "BPR_NN" \
-               + "_lr:" + str(self._learning_rate) \
-               + "-e:" + str(self._epochs) \
-               + "-factors:" + str(self._factors) \
-               + "-br:" + str(self._l_b) \
-               + "-wr:" + str(self._l_w)
+               + "_e:" + str(self._epochs) \
+               + "_bs:" + str(self._batch_size) \
+               + f"_{self.get_params_shortcut()}"
 
     def train(self):
         best_metric_value = 0

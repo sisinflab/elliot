@@ -38,10 +38,18 @@ class FunkSVD(RecMixin, BaseRecommenderModel):
 
         self._sampler = pws.Sampler(self._data.i_train_dict)
 
-        self._learning_rate = self._params.lr
-        self._factors = self._params.factors
-        self._lambda_weights = self._params.reg_w
-        self._lambda_bias = self._params.reg_b
+        self._params_list = [
+            ("_factors", "factors", "factors", 10, None, None),
+            ("_learning_rate", "lr", "lr", 0.001, None, None),
+            ("_lambda_weights", "reg_w", "reg_w", 0.1, None, None),
+            ("_lambda_bias", "reg_b", "reg_b", 0.001, None, None),
+        ]
+        self.autoset_params()
+
+        # self._learning_rate = self._params.lr
+        # self._factors = self._params.factors
+        # self._lambda_weights = self._params.reg_w
+        # self._lambda_bias = self._params.reg_b
 
         if self._batch_size < 1:
             self._batch_size = self._data.transactions
@@ -64,12 +72,10 @@ class FunkSVD(RecMixin, BaseRecommenderModel):
 
     @property
     def name(self):
-        return "FunkSVD"\
-               + "-e:" + str(self._epochs) \
-               + "-lr:" + str(self._learning_rate) \
-               + "-factors:" + str(self._factors) \
-               + "-reg_w:" + str(self._lambda_weights) \
-               + "-reg_b:" + str(self._lambda_bias)
+        return "FunkSVD" \
+               + "_e:" + str(self._epochs) \
+               + "_bs:" + str(self._batch_size) \
+               + f"_{self.get_params_shortcut()}"
 
     def get_recommendations(self, k: int = 100):
         pass

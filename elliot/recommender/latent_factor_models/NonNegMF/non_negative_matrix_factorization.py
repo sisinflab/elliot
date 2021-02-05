@@ -37,9 +37,16 @@ class NonNegMF(RecMixin, BaseRecommenderModel):
         self._random = np.random
         self._sample_negative_items_empirically = True
 
-        self._learning_rate = self._params.lr
-        self._factors = self._params.factors
-        self._l_w = self._params.reg
+        self._params_list = [
+            ("_factors", "factors", "factors", 10, None, None),
+            ("_learning_rate", "lr", "lr", 0.001, None, None),
+            ("_l_w", "reg", "reg", 0.1, None, None),
+        ]
+        self.autoset_params()
+
+        # self._learning_rate = self._params.lr
+        # self._factors = self._params.factors
+        # self._l_w = self._params.reg
 
         if self._batch_size < 1:
             self._batch_size = self._data.transactions
@@ -48,7 +55,7 @@ class NonNegMF(RecMixin, BaseRecommenderModel):
         self._global_mean = np.mean([r for user_items in self._data.train_dict.values() for r in user_items.values()])
         self._sp_i_train = self._data.sp_i_train
         self._i_items_set = list(range(self._num_items))
-        # self._i_zeros = [list(items_set-set(user_train)) for user_train in self._sp_i_train.tolil().rows]
+
         self._model = NonNegMFModel(self._data, self._num_users, self._num_items, self._global_mean, self._factors,
                                     self._l_w, self._learning_rate, random_seed=42)
 
@@ -64,10 +71,9 @@ class NonNegMF(RecMixin, BaseRecommenderModel):
     @property
     def name(self):
         return "NonNegMF" \
-               + "-e:" + str(self._epochs) \
-               + "-lr:" + str(self._learning_rate) \
-               + "-factors:" + str(self._factors) \
-               + "-reg:" + str(self._l_w)
+               + "_e:" + str(self._epochs) \
+               + "_bs:" + str(self._batch_size) \
+               + f"_{self.get_params_shortcut()}"
 
     def get_recommendations(self, k: int = 100):
         return {u: self._model.get_user_recs(u, k) for u in self._ratings.keys()}

@@ -39,7 +39,6 @@ class KaHFMBatch(RecMixin, BaseRecommenderModel):
         self._num_items = self._data.num_items
         self._num_users = self._data.num_users
         self._random = np.random
-        self._sample_negative_items_empirically = True
 
         self._ratings = self._data.train_dict
         self._sampler = cs.Sampler(self._data.i_train_dict)
@@ -70,10 +69,17 @@ class KaHFMBatch(RecMixin, BaseRecommenderModel):
 
         ######################################
 
+        self._params_list = [
+            ("_learning_rate", "lr", "lr", 0.0001, None, None),
+            ("_l_w", "l_w", "l_w", 0.005, None, None),
+            ("_l_b", "l_b", "l_b", 0, None, None),
+        ]
+        self.autoset_params()
+
         self._factors = self._data.factors
-        self._learning_rate = self._params.lr
-        self._l_w = self._params.l_w
-        self._l_b = self._params.l_b
+        # self._learning_rate = self._params.lr
+        # self._l_w = self._params.l_w
+        # self._l_b = self._params.l_b
 
         self._model = KaHFM_model(self._user_factors,
                                   self._item_factors,
@@ -86,10 +92,9 @@ class KaHFMBatch(RecMixin, BaseRecommenderModel):
     @property
     def name(self):
         return "KaHFMBatch" \
-               + "_lr:" + str(self._params.lr) \
-               + "-e:" + str(self._params.epochs) \
-               + "-br:" + str(self._params.l_b) \
-               + "-wr:" + str(self._params.l_w)
+               + "_e:" + str(self._epochs) \
+               + "_bs:" + str(self._batch_size) \
+               + f"_{self.get_params_shortcut()}"
 
     def train(self):
         best_metric_value = 0
