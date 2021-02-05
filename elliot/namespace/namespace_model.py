@@ -41,6 +41,7 @@ _paired_ttest = 'paired_ttest'
 _models = 'models'
 _recommender = 'recommender'
 _gpu = 'gpu'
+_external_models_path = 'external_models_path'
 _hyper_max_evals = 'hyper_max_evals'
 _hyper_opt_alg = 'hyper_opt_alg'
 _data_paths = 'data_paths'
@@ -92,7 +93,7 @@ class NameSpaceModel:
                            self.config[_experiment][_performance])
 
         for p in [_data_config, _weights, _recs, _dataset, _top_k, _paired_ttest, _performance, _logger_config,
-                  _log_folder, _dataloader, _splitting, _prefiltering, _evaluation]:
+                  _log_folder, _dataloader, _splitting, _prefiltering, _evaluation, _external_models_path]:
             if p == _data_config:
                 side_information = self.config[_experiment][p].get("side_information", {})
                 side_information.update({k: self._set_path(self._base_folder_path_config,
@@ -140,6 +141,9 @@ class NameSpaceModel:
                 setattr(self.base_namespace, p, f"{self._base_folder_path_elliot}/config/logger_config.yml")
             elif p == _log_folder and not self.config[_experiment].get(p, False):
                 setattr(self.base_namespace, p, f"{self._base_folder_path_elliot}/../log/")
+            elif p == _external_models_path and self.config[_experiment].get(p, False):
+                self.config[_experiment][p] = self._set_path(self._base_folder_path_config, self.config[_experiment][p])
+                setattr(self.base_namespace, p, self.config[_experiment][p])
             else:
                 if self.config[_experiment].get(p):
                     setattr(self.base_namespace, p, self.config[_experiment][p])

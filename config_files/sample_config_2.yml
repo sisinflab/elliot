@@ -9,6 +9,7 @@ experiment:
         features: ../data/{0}/features.tsv
         properties: ../data/{0}/properties.conf
   dataset: example
+  external_models_path: ../external/models/__init__.py
 #  path_output_rec_result: ../results/{0}/recs/
 #  path_output_rec_weight: ../results/{0}/weights/
 #  path_output_rec_performance: ../results/{0}/performance/
@@ -204,19 +205,19 @@ experiment:
 #        save_recs: False
 #      neighbors: 5
 #      similarity: cosine
-    DMF:
-      meta:
-        verbose: True
-        save_recs: False
-        validation_rate: 1
-      lr: 0.0001
-      user_mlp: (64, 32)
-      item_mlp: (64, 32)
-      batch_size: 64
-      epochs: 10
-      neg_ratio: 5
-      reg: 0.005
-      similarity: dot
+#    DMF:
+#      meta:
+#        verbose: True
+#        save_recs: False
+#        validation_rate: 1
+#      lr: 0.0001
+#      user_mlp: (64, 32)
+#      item_mlp: (64, 32)
+#      batch_size: 64
+#      epochs: 10
+#      neg_ratio: 5
+#      reg: 0.005
+#      similarity: dot
 #    PMF:
 #      meta:
 #        verbose: True
@@ -264,3 +265,6 @@ experiment:
 #      similarity: cosine
 #      user_profile: binary
 #      item_profile: binary
+    external.MostPop:
+      meta:
+        save_recs: True
