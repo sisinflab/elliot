@@ -1,0 +1,282 @@
+experiment:
+  data_config:
+    strategy: fixed
+#    dataloader: KnowledgeChainsLoader
+    train_path: ../data/{0}/trainingset.tsv
+    test_path: ../data/{0}/testset.tsv
+#    side_information:
+#        map: ../data/{0}/map.tsv
+#        features: ../data/{0}/features.tsv
+#        properties: ../data/{0}/properties.conf
+  dataset: example
+#  path_output_rec_result: ../results/{0}/recs/
+#  path_output_rec_weight: ../results/{0}/weights/
+#  path_output_rec_performance: ../results/{0}/performance/
+#  path_logger_config: ./config/logger_config.yml
+#  path_log_folder: ../log/
+  top_k: 50
+  evaluation:
+    cutoff: [5,10]
+    simple_metrics: [nDCG, Recall]
+#    simple_metrics: [ nDCG, Precision, Recall, ItemCoverage, HR, MAP, F1, Gini, SEntropy, EFD, EPC, ARP, APLT, ACLT, PopRSP, PopREO, MAR, UserCoverage, NumRetrieved ]
+    relevance_threshold: 3
+    paired_ttest: True
+#    complex_metrics:
+#    - metric: REO
+#      clustering_name: ItemPopularity
+#      clustering_file: ../data/categorical_dbpedia_ml1m/items_clustering_popularity.tsv
+#    - metric: ItemMADrating
+#      clustering_name: ItemPopularity
+#      clustering_file: ../data/categorical_dbpedia_ml1m/items_clustering_popularity.tsv
+#    - metric: ItemMADranking
+#      clustering_name: ItemPopularity
+#      clustering_file: ../data/categorical_dbpedia_ml1m/items_clustering_popularity.tsv
+#    - metric: UserMADrating
+#      clustering_name: Happiness
+#      clustering_file: ../data/categorical_dbpedia_ml1m/user_clustering_happiness.tsv
+#    - metric: UserMADranking
+#      clustering_name: Happiness
+#      clustering_file: ../data/categorical_dbpedia_ml1m/user_clustering_happiness.tsv
+#    - metric: BiasDisparityBR
+#      user_clustering_name: Happiness
+#      user_clustering_file: ../data/categorical_dbpedia_ml1m/user_clustering_happiness.tsv
+#      item_clustering_name: ItemPopularity
+#      item_clustering_file: ../data/categorical_dbpedia_ml1m/items_clustering_popularity.tsv
+#    - metric: BiasDisparityBS
+#      user_clustering_name: Happiness
+#      user_clustering_file: ../data/categorical_dbpedia_ml1m/user_clustering_happiness.tsv
+#      item_clustering_name: ItemPopularity
+#      item_clustering_file: ../data/categorical_dbpedia_ml1m/items_clustering_popularity.tsv
+#    - metric: BiasDisparityBD
+#      user_clustering_name: Happiness
+#      user_clustering_file: ../data/categorical_dbpedia_ml1m/user_clustering_happiness.tsv
+#      item_clustering_name: ItemPopularity
+#      item_clustering_file: ../data/categorical_dbpedia_ml1m/items_clustering_popularity.tsv
+#    - metric: DSC
+#      beta: 2
+#    - metric: SRecall
+#      feature_data: ../data/categorical_dbpedia_ml1m/map.tsv
+  gpu: -1 # -1 is not use GPU
+  models:
+#    PureSVD:
+#      meta:
+#        hyper_max_evals: 1
+#        hyper_opt_alg: tpe
+#        validation_rate: 1
+#        verbose: True
+#        save_weights: False
+#        save_recs: False
+#        validation_metric: nDCG
+#        restore_epoch: -1
+#      restore: False
+#      embed_k: 10
+#    WRMF:
+#      meta:
+#        hyper_max_evals: 1
+#        hyper_opt_alg: tpe
+#        validation_rate: 1
+#        verbose: True
+#        save_weights: False
+#        save_recs: False
+#        validation_metric: nDCG
+#        restore_epoch: -1
+#      epochs: 2
+#      embed_k: 10
+#      alpha: 1
+#      reg: 0.1
+#    MostPop:
+#      meta:
+#        save_recs: True
+#    SlopeOne:
+#      meta:
+#        save_recs: True
+#    Random:
+#      meta:
+#        save_recs: True
+#    MultiVAE:
+#      meta:
+#        hyper_max_evals: 3
+#        hyper_opt_alg: tpe
+#        validation_rate: 10
+#        verbose: False
+#        save_weights: False
+#        save_recs: False
+#      lr: [0.01, 0.001]
+#      epochs: 10
+#      intermediate_dim: [300,200]
+#      latent_dim: 100
+#      batch_size: -1
+#      dropout_pkeep: 1
+#      reg_lambda: 0.01
+##    KaHFMBatch:
+##      meta:
+##        hyper_max_evals: 20
+##        hyper_opt_alg: tpe
+##        validation_rate: 10
+##        verbose: True
+##        save_weights: False
+##        save_recs: True
+##        validation_metric: nDCG
+##        restore_epoch: -1
+##      lr: 0.0001
+##      epochs: 10
+##      batch_size: 512
+##      l_w: 0.005
+##      l_b: 0
+#    MultiDAE:
+#      meta:
+#        hyper_max_evals: 1
+#        hyper_opt_alg: tpe
+#        validation_rate: 1
+#        verbose: True
+#        save_weights: False
+#        save_recs: False
+#      lr: 0.001
+#      epochs: 1
+#      intermediate_dim: 600
+#      latent_dim: 200
+#      batch_size: -1
+#      dropout_pkeep: 1
+#      reg_lambda: 0.01
+##    BPRMF:
+##      meta:
+##        hyper_max_evals: 1
+##        hyper_opt_alg: tpe
+##        validation_rate: 1
+##        verbose: True
+##        save_weights: False
+##        save_recs: False
+##        validation_metric: nDCG
+##        restore_epoch: -1
+##      lr: 0.05
+##      epochs: 1
+##      embed_k: 10
+##      bias_regularization: 0
+##      user_regularization: 0.005
+##      positive_item_regularization: 0.0025
+##      negative_item_regularization: 0.00025
+##      update_negative_item_factors: True
+##      update_users: True
+##      update_items: True
+##      update_bias: True
+#    PMF:
+#      meta:
+#        hyper_max_evals: 1
+#        hyper_opt_alg: tpe
+#        validation_rate: 1
+#        verbose: True
+#        save_weights: False
+#        save_recs: False
+#        validation_metric: nDCG@10
+#        restore_epoch: -1
+#      lr: 0.001
+#      epochs: 10
+#      embed_k: 50
+#      batch_size: 512
+#      reg: 0.0025
+#      reg_b: 0
+#      gaussian_variance: 0.1
+###    KaHFM:
+###      meta:
+###        hyper_max_evals: 1
+###        hyper_opt_alg: tpe
+###        validation_rate: 1
+###        verbose: True
+###        save_weights: False
+###        save_recs: True
+###        validation_metric: nDCG
+###        restore_epoch: -1
+###      lr: 0.05
+###      epochs: 1
+###      bias_regularization: 0
+###      user_regularization: 0.0025
+###      positive_item_regularization: 0.0025
+###      negative_item_regularization: 0.00025
+###      update_negative_item_factors: True
+###      update_users: True
+###      update_items: True
+###      update_bias: True
+###      Random:
+###        meta:
+###          save_recs: False
+#    UserKNN:
+#      meta:
+#        verbose: True
+#        save_recs: False
+#      neighbors: 5
+#      similarity: cosine
+#    DMF:
+#      meta:
+#        verbose: True
+#        save_recs: False
+#        validation_rate: 1
+#      lr: 0.0001
+#      user_mlp: (64, 32)
+#      item_mlp: (64, 32)
+#      batch_size: 64
+#      epochs: 10
+#      neg_ratio: 5
+#      reg: 0.005
+#      similarity: dot
+#    PMF:
+#      meta:
+#        verbose: True
+#        save_recs: False
+#        validation_rate: 1
+#      epochs: 10
+#      lr: 0.001
+#      factors: 50
+#      reg: 0.005
+#      gaussian_variance: 0.01
+#      batch_size: 512
+#    NeuMF:
+#      meta:
+#        verbose: True
+#        save_recs: False
+#        validation_rate: 1
+#      mf_factors: 10
+#      mlp_factors: 10
+#      mlp_hidden_size: (5, 3, 2)
+#      prob_keep_dropout: 0.2
+#      is_mf_train: True
+#      is_mlp_train: True
+#      batch_size: 512
+#      epochs: 10
+#      lr: 0.001
+#       implementation: aiolli
+#    ItemKNN:
+#      meta:
+#        verbose: True
+#        save_recs: False
+#      neighbors: 50
+#      similarity: braycurtis
+#      implementation: aiolli
+#    AttributeItemKNN:
+#      meta:
+#        verbose: True
+#        save_recs: False
+#      neighbors: 50
+#      similarity: braycurtis
+#      implementation: aiolli
+#    VSM:
+#      meta:
+#        verbose: True
+#        save_recs: False
+#      similarity: cosine
+#      user_profile: binary
+#      item_profile: binary
+    NonNegMF:
+      meta:
+        hyper_max_evals: 2
+        hyper_opt_alg: tpe
+        validation_rate: 1
+        verbose: True
+        save_weights: False
+        save_recs: False
+        validation_metric: nDCG
+        restore_epoch: -1
+      epochs: 2
+      restore: False
+      factors: [16,32]
+      reg: 0.1
+      lr: 0.001
