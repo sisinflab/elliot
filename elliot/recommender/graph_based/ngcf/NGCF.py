@@ -24,7 +24,7 @@ from utils.folder import build_model_folder
 from recommender import BaseRecommenderModel
 from recommender.recommender_utils_mixin import RecMixin
 
-from recommender.graph_based.ngcf.NGCFModel import NGCFModel
+from recommender.graph_based.ngcf.NGCF_model import NGCF_model
 
 np.random.seed(42)
 random.seed(0)

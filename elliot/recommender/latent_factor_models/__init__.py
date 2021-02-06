@@ -14,4 +14,5 @@ from .PureSVD import PureSVD
 from .MF import MF
 from .FunkSVD import FunkSVD
 from .PMF import PMF
+from .LogisticMF import LMF
 from .NonNegMF import NonNegMF

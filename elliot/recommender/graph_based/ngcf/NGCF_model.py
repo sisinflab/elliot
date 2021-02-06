@@ -11,7 +11,6 @@ import logging
 import os
 import tensorflow as tf
 from tensorflow import keras
-from tensorflow.keras import layers
 import numpy as np
 
 tf.random.set_seed(42)
@@ -20,8 +19,7 @@ logging.disable(logging.WARNING)
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 
-class NGCFModel(keras.Model):
-    """Combines the encoder and decoder into an end-to-end model for training."""
+class NGCF_model(keras.Model):
 
     def __init__(self,
                  num_users,
@@ -59,8 +57,7 @@ class NGCFModel(keras.Model):
         # Generate a set of adjacency sub-matrix.
         if len(self.node_dropout):
             # node dropout.
-            # self.A_fold_hat = self._split_A_hat_node_dropout()
-            print(1)
+            self.A_fold_hat = self._split_A_hat_node_dropout()
         else:
             self.A_fold_hat = self._split_A_hat()
 
@@ -155,23 +152,22 @@ class NGCFModel(keras.Model):
             A_fold_hat.append(self._convert_sp_mat_to_sp_tensor(self.norm_adj[start:end]))
         return A_fold_hat
 
-    # def _split_A_hat_node_dropout(self):
-    #     A_fold_hat = []
-    #
-    #     fold_len = (self.num_users + self.num_items) // self.n_fold
-    #     for i_fold in range(self.n_fold):
-    #         start = i_fold * fold_len
-    #         if i_fold == self.n_fold - 1:
-    #             end = self.num_users + self.num_items
-    #         else:
-    #             end = (i_fold + 1) * fold_len
-    #
-    #         # A_fold_hat.append(self._convert_sp_mat_to_sp_tensor(X[start:end]))
-    #         temp = self._convert_sp_mat_to_sp_tensor(self.norm_adj[start:end])
-    #         n_nonzero_temp = self.norm_adj[start:end].count_nonzero()
-    #         A_fold_hat.append(self._dropout_sparse(temp, 1 - self.node_dropout[0], n_nonzero_temp))
-    #
-    #     return A_fold_hat
+    def _split_A_hat_node_dropout(self):
+        A_fold_hat = []
+
+        fold_len = (self.num_users + self.num_items) // self.n_fold
+        for i_fold in range(self.n_fold):
+            start = i_fold * fold_len
+            if i_fold == self.n_fold - 1:
+                end = self.num_users + self.num_items
+            else:
+                end = (i_fold + 1) * fold_len
+
+            # A_fold_hat.append(self._convert_sp_mat_to_sp_tensor(X[start:end]))
+            temp = self._convert_sp_mat_to_sp_tensor(self.norm_adj[start:end])
+            n_nonzero_temp = self.norm_adj[start:end].count_nonzero()
+            A_fold_hat.append(self._dropout_sparse(temp, 1 - self.node_dropout[0], n_nonzero_temp))
+        return A_fold_hat
 
     def call(self, inputs, **kwargs):
         """
@@ -195,15 +191,6 @@ class NGCFModel(keras.Model):
     @tf.function
     def predict(self, start, stop, **kwargs):
         return tf.matmul(self.Gu[start:stop], self.Gi, transpose_b=True)
-
-    # def predict_all(self):
-    #     """
-    #     Get full predictions on the whole users/items matrix.
-    #
-    #     Returns:
-    #         The matrix of predicted values.
-    #     """
-    #     return tf.matmul(self.Gu, self.Gi, transpose_b=True)
 
     def train_step(self, batch):
         """
@@ -243,41 +230,6 @@ class NGCFModel(keras.Model):
 
     def get_config(self):
         raise NotImplementedError
-
-    # @tf.function
-    # def call(self, inputs, training=None, **kwargs):
-    #     z_mean = self.encoder(inputs, training=training)
-    #     reconstructed = self.decoder(z_mean)
-    #     return reconstructed
-
-    # @tf.function
-    # def train_step(self, batch):
-    #     with tf.GradientTape() as tape:
-    #         # Clean Inference
-    #         logits = self.call(inputs=batch, training=True)
-    #         log_softmax_var = tf.nn.log_softmax(logits)
-    #
-    #         # per-user average negative log-likelihood
-    #         loss = -tf.reduce_mean(tf.reduce_sum(
-    #             log_softmax_var * batch, axis=1))
-    #
-    #     grads = tape.gradient(loss, self.trainable_weights)
-    #     self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
-    #
-    #     return loss
-
-    # @tf.function
-    # def predict(self, inputs, training=False, **kwargs):
-    #     """
-    #     Get full predictions on the whole users/items matrix.
-    #
-    #     Returns:
-    #         The matrix of predicted values.
-    #     """
-    #
-    #     logits = self.call(inputs=inputs, training=training)
-    #     log_softmax_var = tf.nn.log_softmax(logits)
-    #     return log_softmax_var
 
     @tf.function
     def get_top_k(self, preds, train_mask, k=100):
