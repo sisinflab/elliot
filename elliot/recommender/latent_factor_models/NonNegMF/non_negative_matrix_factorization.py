@@ -52,7 +52,8 @@ class NonNegMF(RecMixin, BaseRecommenderModel):
             self._batch_size = self._data.transactions
 
         self._ratings = self._data.train_dict
-        self._global_mean = np.mean([r for user_items in self._data.train_dict.values() for r in user_items.values()])
+        # self._global_mean = np.mean([r for user_items in self._data.train_dict.values() for r in user_items.values()])
+        self._global_mean = np.mean(self._data.sp_i_train_ratings)
         self._sp_i_train = self._data.sp_i_train
         self._i_items_set = list(range(self._num_items))
 

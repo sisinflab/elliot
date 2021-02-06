@@ -1,23 +1,23 @@
 experiment:
   data_config:
     strategy: fixed
-#    dataloader: KnowledgeChainsLoader
+    dataloader: KnowledgeChainsLoader
     train_path: ../data/{0}/trainingset.tsv
     test_path: ../data/{0}/testset.tsv
     side_information:
         map: ../data/{0}/map.tsv
         features: ../data/{0}/features.tsv
         properties: ../data/{0}/properties.conf
-  dataset: example
+  dataset: categorical_dbpedia_ml1m
   external_models_path: ../external/models/__init__.py
 #  path_output_rec_result: ../results/{0}/recs/
 #  path_output_rec_weight: ../results/{0}/weights/
 #  path_output_rec_performance: ../results/{0}/performance/
 #  path_logger_config: ./config/logger_config.yml
 #  path_log_folder: ../log/
-  top_k: 50
+  top_k: 20
   evaluation:
-    cutoff: [5,10]
+    cutoff: [10]
     simple_metrics: [nDCG, Precision, Recall, ItemCoverage, HR, MAP, F1, Gini, SEntropy, EFD, EPC, ARP, APLT, ACLT, PopRSP, PopREO, MAR, UserCoverage, NumRetrieved]
     relevance_threshold: 3
     paired_ttest: True
@@ -52,10 +52,10 @@ experiment:
 #      user_clustering_file: ../data/categorical_dbpedia_ml1m/user_clustering_happiness.tsv
 #      item_clustering_name: ItemPopularity
 #      item_clustering_file: ../data/categorical_dbpedia_ml1m/items_clustering_popularity.tsv
-#    - metric: DSC
-#      beta: 2
-#    - metric: SRecall
-#      feature_data: ../data/categorical_dbpedia_ml1m/map.tsv
+    - metric: DSC
+      beta: 2
+    - metric: SRecall
+      feature_data: ../data/categorical_dbpedia_ml1m/map.tsv
   gpu: -1 # -1 is not use GPU
   models:
 #    PureSVD:
@@ -123,6 +123,21 @@ experiment:
 ##      batch_size: 512
 ##      l_w: 0.005
 ##      l_b: 0
+    KaHFMEmbeddings:
+      meta:
+        hyper_max_evals: 1
+        hyper_opt_alg: tpe
+        validation_rate: 1
+        verbose: True
+        save_weights: False
+        save_recs: False
+        validation_metric: nDCG
+        restore_epoch: -1
+      lr: 0.0001
+      epochs: 200
+      batch_size: 1024
+      l_w: 0.005
+      l_b: 0
 #    MultiDAE:
 #      meta:
 #        hyper_max_evals: 1
@@ -205,19 +220,19 @@ experiment:
 #        save_recs: False
 #      neighbors: 5
 #      similarity: cosine
-    DMF:
-      meta:
-        verbose: True
-        save_recs: False
-        validation_rate: 1
-      lr: 0.0001
-      user_mlp: (64, 32)
-      item_mlp: (64, 32)
-      batch_size: 64
-      epochs: 10
-      neg_ratio: 5
-      reg: 0.005
-      similarity: dot
+#    DMF:
+#      meta:
+#        verbose: True
+#        save_recs: False
+#        validation_rate: 1
+#      lr: 0.0001
+#      user_mlp: (64, 32)
+#      item_mlp: (64, 32)
+#      batch_size: 64
+#      epochs: 10
+#      neg_ratio: 5
+#      reg: 0.005
+#      similarity: dot
 #    PMF:
 #      meta:
 #        verbose: True
@@ -268,3 +283,13 @@ experiment:
 #    external.MostPop:
 #      meta:
 #        save_recs: True
+#    NonNegMF:
+#      meta:
+#        verbose: True
+#        save_recs: False
+#        validation_rate: 1
+#      epochs: 10
+#      lr: 0.001
+#      factors: 50
+#      reg: 0.005
+#      batch_size: 512

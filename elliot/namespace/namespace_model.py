@@ -131,10 +131,10 @@ class NameSpaceModel:
                 setattr(self.base_namespace, p, self.config[_experiment][p])
             elif p == _evaluation and self.config[_experiment].get(p, {}):
                 complex_metrics = self.config[_experiment][p].get("complex_metrics", {})
-                complex_metrics = [{k: self._set_path(self._base_folder_path_config,
+                for complex_metric in complex_metrics:
+                    complex_metric.update({k: self._set_path(self._base_folder_path_config,
                                                       v.format(self.config[_experiment][_dataset]))
-                                    for k, v in complex_metric.items() if isinstance(v, str)}
-                                   for complex_metric in complex_metrics]
+                                    for k, v in complex_metric.items() if isinstance(v, str)})
                 self.config[_experiment][p]["complex_metrics"] = complex_metrics
                 setattr(self.base_namespace, p, SimpleNamespace(**self.config[_experiment][p]))
             elif p == _logger_config and not self.config[_experiment].get(p, False):
