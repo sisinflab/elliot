@@ -42,8 +42,16 @@ class VBPR(NNBPRMF, VisualLoader):
         self._embed_d = self._params.embed_d
         self._l_e = self._params.l_e
 
-        self.process_visual_features(self._data)
+        self._params_list += [
+            ("_embed_d", "embed_d", "embed_d", 0.001, None, None),
+            ("_l_e", "l_e", "l_e", 0.1, None, None)
+        ]
+
         self._params.name = self.name
+
+        self.autoset_params()
+
+        self.process_visual_features(self._data)
 
         self._model = VBPR_model(self._params.embed_k,
                                  self._params.embed_d,
@@ -59,11 +67,7 @@ class VBPR(NNBPRMF, VisualLoader):
     @property
     def name(self):
         return "VBPR" \
-               + "_lr:" + str(self._params.lr) \
-               + "-e:" + str(self._params.epochs) \
-               + "-factors:" + str(self._params.embed_k) \
-               + "-factors_d:" + str(self._params.embed_d) \
-               + "-br:" + str(self._params.l_b) \
-               + "-wr:" + str(self._params.l_w) \
-               + "-er:" + str(self._params.l_e)
+               + "_e:" + str(self._epochs) \
+               + "_bs:" + str(self._batch_size) \
+               + f"_{self.get_params_shortcut()}"
 
