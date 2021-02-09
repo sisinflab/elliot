@@ -42,6 +42,7 @@ class Evaluator(object):
         self._data = data
         self._params = params
         self._k = getattr(data.config.evaluation, "cutoff", [data.config.top_k])
+        self._k = self._k if isinstance(self._k, list) else [self._k]
         self._rel_threshold = data.config.evaluation.relevance_threshold
         self._paired_ttest = self._data.config.evaluation.paired_ttest
         self._metrics = metrics.parse_metrics(data.config.evaluation.simple_metrics)

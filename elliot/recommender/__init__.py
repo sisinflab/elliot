@@ -21,4 +21,4 @@ from .NN import ItemKNN, UserKNN, AttributeItemKNN, AttributeUserKNN
 from .neural import DeepMatrixFactorization as DMF, NeuralMatrixFactorization as NeuMF, GeneralizedMF as GMF
 from .content_based import VSM
 from .algebric import SlopeOne
-# from .attentive import AFM
+from .attentive import AFM
