@@ -43,12 +43,12 @@ class GeneralizedMatrixFactorizationModel(keras.Model):
 
         if self.is_edge_weight_train:
             self.activation = keras.activations.sigmoid
-            self.edge_weight = tf.Variable(self.initializer([self.embed_mf_size, 1]), name='H')
+            self.edge_weight = tf.Variable(self.initializer([self.embed_mf_size, 1]), name='h')
             self.loss = keras.losses.BinaryCrossentropy()
 
         else:
             self.activation = keras.activations.linear
-            self.edge_weight = tf.Variable(initial_value=1, shape=[self.embed_mf_size, 1], name='H')
+            self.edge_weight = tf.Variable(initial_value=1, shape=[self.embed_mf_size, 1], name='h')
             self.loss = keras.losses.MeanSquaredError()
 
         self.optimizer = tf.optimizers.Adam(learning_rate)
