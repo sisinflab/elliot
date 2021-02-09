@@ -18,7 +18,7 @@ from .knowledge_aware import KaHFM, KaHFMBatch, KaHFMEmbeddings
 from .graph_based import NGCF, LightGCN
 from .visual_recommenders import VBPR
 from .NN import ItemKNN, UserKNN, AttributeItemKNN, AttributeUserKNN
-from .neural import DeepMatrixFactorization as DMF, NeuralMatrixFactorization as NeuMF
+from .neural import DeepMatrixFactorization as DMF, NeuralMatrixFactorization as NeuMF, GeneralizedMF as GMF
 from .content_based import VSM
 from .algebric import SlopeOne
 # from .attentive import AFM
