@@ -4,8 +4,9 @@ Module description:
 """
 
 __version__ = '0.1'
-__author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta'
-__email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malitesta@poliba.it'
+__author__ = 'Felice Antonio Merra'
+__email__ = 'felice.merra@poliba.it'
+__paper__ = 'https://vision.cornell.edu/se3/wp-content/uploads/2017/03/WWW-fp0554-hsiehA.pdf'
 
 from operator import itemgetter
 
@@ -18,13 +19,13 @@ from evaluation.evaluator import Evaluator
 from utils.write import store_recommendation
 
 from recommender import BaseRecommenderModel
-from recommender.latent_factor_models.NNBPRMF.NNBPRMF_model import NNBPRMF_model
+from recommender.latent_factor_models.CML.CML_model import CML_model
 from recommender.recommender_utils_mixin import RecMixin
 
 np.random.seed(42)
 
 
-class NNBPRMF(RecMixin, BaseRecommenderModel):
+class CML(RecMixin, BaseRecommenderModel):
 
     def __init__(self, data, config, params, *args, **kwargs):
         """
@@ -48,37 +49,46 @@ class NNBPRMF(RecMixin, BaseRecommenderModel):
         self._sampler = cs.Sampler(self._data.i_train_dict)
         self._iteration = 0
         self.evaluator = Evaluator(self._data, self._params)
-        self._params.name = self.name
 
         ######################################
 
-        self._params_list = [
-            ("_factors", "factors", "factors", 10, None, None),
-            ("_learning_rate", "lr", "lr", 0.001, None, None),
-            ("_l_w", "l_w", "l_w", 0.1, None, None),
-            ("_l_b", "l_b", "l_b", 0.001, None, None),
-        ]
-        self.autoset_params()
+        # self._params_list = [
+        #     ("_factors", "factors", "factors", 10, None, None),
+        #     ("_learning_rate", "lr", "lr", 0.001, None, None),
+        #     ("_l_w", "l_w", "l_w", 0.1, None, None),
+        #     ("_l_b", "l_b", "l_b", 0.001, None, None),
+        # ]
+        # self.autoset_params()
 
-        # self._factors = self._params.factors
-        # self._learning_rate = self._params.lr
-        # self._l_w = self._params.l_w
-        # self._l_b = self._params.l_b
+        self._user_factors = self._params.factors
+        self._item_factors = self._params.factors
+        self._learning_rate = self._params.lr
+        self._l_w = self._params.l_w
+        self._l_b = self._params.l_b
+        self._margin = self._params.margin
 
-        self._model = NNBPRMF_model(self._factors,
-                                    self._learning_rate,
-                                    self._l_w,
-                                    self._l_b,
-                                    self._num_users,
-                                    self._num_items)
+        self._params.name = self.name
+
+        self._model = CML_model(self._user_factors,
+                                self._item_factors,
+                                self._learning_rate,
+                                self._l_w,
+                                self._l_b,
+                                self._margin,
+                                self._num_users,
+                                self._num_items)
 
         self._saving_filepath = f'{self._config.path_output_rec_weight}/best-weights-{self.name}'
         self.logger = logging.get_logger(self.__class__.__name__)
 
     @property
     def name(self):
-        return "BPR_NN" \
+        return "CML" \
                + "_e:" + str(self._epochs) \
+               + "_factors:" + str(self._user_factors) \
+               + "_lr:" + str(self._learning_rate) \
+               + "_l_w:" + str(self._l_w) \
+               + "_l_b:" + str(self._l_b) \
                + "_bs:" + str(self._batch_size) \
                + f"_{self.get_params_shortcut()}"
 
@@ -100,15 +110,7 @@ class NNBPRMF(RecMixin, BaseRecommenderModel):
                 result_dict = self.evaluator.eval(recs)
                 self._results.append(result_dict)
 
-                # old AUC
-                # results.update({'AUC': auc})
-                # statistical_results.update({'AUC': auc_users})
-                # self._results.append(results)
-                # self._statistical_results.append(statistical_results)
-                # self._test_results.append(results)
-                # self._test_statistical_results.append(statistical_results)
-
-                print(f'Epoch {(it + 1)}/{self._epochs} loss {loss  / steps:.3f}')
+                print(f'Epoch {(it + 1)}/{self._epochs} loss {loss / steps:.3f}')
 
                 if self._results[-1][self._validation_k]["val_results"][self._validation_metric] > best_metric_value:
                     print("******************************************")
@@ -125,7 +127,7 @@ class NNBPRMF(RecMixin, BaseRecommenderModel):
         auc = 0
         auc_users = {}
         for index, offset in enumerate(range(0, self._num_users, self._params.batch_size)):
-            offset_stop = min(offset+self._params.batch_size, self._num_users)
+            offset_stop = min(offset + self._params.batch_size, self._num_users)
             predictions = self._model.predict(offset, offset_stop)
             mask = self.get_train_mask(offset, offset_stop)
             v, i = self._model.get_top_k(predictions, mask, k=k)
@@ -139,4 +141,6 @@ class NNBPRMF(RecMixin, BaseRecommenderModel):
             items_ratings_pair = [list(zip(map(self._data.private_items.get, u_list[0]), u_list[1]))
                                   for u_list in list(zip(i.numpy(), v.numpy()))]
             predictions_top_k.update(dict(zip(range(offset, offset_stop), items_ratings_pair)))
-        return predictions_top_k, auc/len(test_user_ok), auc_users
+        return predictions_top_k, auc / len(test_user_ok), auc_users
+
+

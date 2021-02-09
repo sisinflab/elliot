@@ -87,7 +87,7 @@ class KaHFMBatch(RecMixin, BaseRecommenderModel):
                                   self._params.l_w,
                                   self._params.l_b)
 
-        self._saving_filepath = f'{self._config.path_output_rec_weight}best-weights-{self.name}'
+        self._saving_filepath = f'{self._config.path_output_rec_weight}/best-weights-{self.name}'
 
     @property
     def name(self):
