@@ -37,18 +37,14 @@ class BPRSlim(RecMixin, BaseRecommenderModel):
         self._num_users = self._data.num_users
         self._random = np.random
         self._sample_negative_items_empirically = True
-        self._lr = self._params.lr
-        self._lj_reg = self._params.lj_reg
-        self._li_reg = self._params.li_reg
 
-        # self._params_list = [
-        #     ("_factors", "factors", "factors", 10, None, None),
-        #     ("_learning_rate", "lr", "lr", 0.001, None, None),
-        #     ("_lr", "lr", "lr", 0.001, None, None),
-        #     ("_l_w", "reg", "reg", 0.1, None, None),
-        # ]
-        #
-        # self.autoset_params()
+        self._params_list = [
+            ("_lr", "lr", "lr", 0.001, None, None),
+            ("_lj_reg", "lj_reg", "ljreg", 0.001, None, None),
+            ("_li_reg", "li_reg", "lireg", 0.1, None, None),
+        ]
+
+        self.autoset_params()
 
         if self._batch_size < 1:
             self._batch_size = self._data.transactions
@@ -75,9 +71,6 @@ class BPRSlim(RecMixin, BaseRecommenderModel):
         return "BPRSlim" \
                + "_e:" + str(self._epochs) \
                + "_bs:" + str(self._batch_size) \
-               + "_lr:" + str(self._lr) \
-               + "_li_reg:" + str(self._li_reg) \
-               + "_lj_reg:" + str(self._lj_reg) \
                + f"_{self.get_params_shortcut()}"
 
     def get_recommendations(self, k: int = 100):

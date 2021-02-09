@@ -34,8 +34,13 @@ class Slim(RecMixin, BaseRecommenderModel):
 
         self._num_items = self._data.num_items
         self._num_users = self._data.num_users
-        self._l1_ratio = self._params.l1_ratio
-        self._alpha = self._params.alpha
+
+        self._params_list = [
+            ("_l1_ratio", "l1_ratio", "l1", 0.001, None, None),
+            ("_alpha", "alpha", "alpha", 0.001, None, None),
+        ]
+
+        self.autoset_params()
 
         self._ratings = self._data.train_dict
         self._sp_i_train = self._data.sp_i_train
@@ -56,8 +61,6 @@ class Slim(RecMixin, BaseRecommenderModel):
     def name(self):
         return "Slim" \
                + "_e:" + str(self._epochs) \
-               + "_l1_ratio:" + str(self._l1_ratio) \
-               + "_alpha:" + str(self._alpha) \
                + f"_{self.get_params_shortcut()}"
 
     def get_recommendations(self, k: int = 100):

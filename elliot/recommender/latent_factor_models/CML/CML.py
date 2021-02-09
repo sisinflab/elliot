@@ -50,22 +50,16 @@ class CML(RecMixin, BaseRecommenderModel):
         self._iteration = 0
         self.evaluator = Evaluator(self._data, self._params)
 
-        ######################################
+        self._params_list = [
+            ("_user_factors", "factors", "factors", 100, None, None),
+            ("_learning_rate", "lr", "lr", 0.001, None, None),
+            ("_l_w", "l_w", "l_w", 0.001, None, None),
+            ("_l_b", "l_b", "l_b", 0.001, None, None),
+            ("_margin", "margin", "margin", 0.5, None, None),
+        ]
+        self.autoset_params()
 
-        # self._params_list = [
-        #     ("_factors", "factors", "factors", 10, None, None),
-        #     ("_learning_rate", "lr", "lr", 0.001, None, None),
-        #     ("_l_w", "l_w", "l_w", 0.1, None, None),
-        #     ("_l_b", "l_b", "l_b", 0.001, None, None),
-        # ]
-        # self.autoset_params()
-
-        self._user_factors = self._params.factors
-        self._item_factors = self._params.factors
-        self._learning_rate = self._params.lr
-        self._l_w = self._params.l_w
-        self._l_b = self._params.l_b
-        self._margin = self._params.margin
+        self._item_factors = self._user_factors
 
         self._params.name = self.name
 
@@ -85,10 +79,6 @@ class CML(RecMixin, BaseRecommenderModel):
     def name(self):
         return "CML" \
                + "_e:" + str(self._epochs) \
-               + "_factors:" + str(self._user_factors) \
-               + "_lr:" + str(self._learning_rate) \
-               + "_l_w:" + str(self._l_w) \
-               + "_l_b:" + str(self._l_b) \
                + "_bs:" + str(self._batch_size) \
                + f"_{self.get_params_shortcut()}"
 
