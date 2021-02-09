@@ -17,3 +17,4 @@ from .PMF import PMF
 from .LogisticMF import LMF
 from .NonNegMF import NonNegMF
 from .FM import FM
+from .BPRSlim import BPRSlim
