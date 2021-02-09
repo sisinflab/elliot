@@ -281,19 +281,33 @@ experiment:
 #      factors: [16,32]
 #      reg: 0.1
 #      lr: 0.001
-    BPRSlim:
+#    BPRSlim:
+#      meta:
+#        hyper_max_evals: 2
+#        hyper_opt_alg: tpe
+#        validation_rate: 1
+#        verbose: True
+#        save_weights: False
+#        save_recs: False
+#        validation_metric: nDCG
+#        restore_epoch: -1
+#      epochs: 2
+#      restore: False
+#      li_reg: 0.0
+#      lj_reg: 0.0
+#      lr: 0.001
+#      batch_size: 1
+    Slim:
       meta:
         hyper_max_evals: 2
         hyper_opt_alg: tpe
         validation_rate: 1
         verbose: True
-        save_weights: False
+        save_weights: True
         save_recs: False
         validation_metric: nDCG
         restore_epoch: -1
-      epochs: 2
+      epochs: [100,200]
       restore: False
-      li_reg: 0.0
-      lj_reg: 0.0
-      lr: 0.001
-      batch_size: 1
+      l1_ratio: 0.001
+      alpha: 0.001

@@ -72,7 +72,7 @@ class BPRSlim(RecMixin, BaseRecommenderModel):
 
     @property
     def name(self):
-        return "NonNegMF" \
+        return "BPRSlim" \
                + "_e:" + str(self._epochs) \
                + "_bs:" + str(self._batch_size) \
                + "_lr:" + str(self._lr) \

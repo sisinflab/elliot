@@ -18,3 +18,4 @@ from .LogisticMF import LMF
 from .NonNegMF import NonNegMF
 from .FM import FM
 from .BPRSlim import BPRSlim
+from .Slim import Slim
