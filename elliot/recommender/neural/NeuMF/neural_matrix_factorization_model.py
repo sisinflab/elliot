@@ -22,7 +22,7 @@ class NeuralMatrixFactorizationModel(keras.Model):
                  num_items,
                  embed_mf_size, embed_mlp_size, mlp_hidden_size, dropout, is_mf_train,
                  is_mlp_train, learning_rate=0.01,
-                 name="NNBPRMF",
+                 name="NeuralMatrixFactorizationModel",
                  **kwargs):
         super().__init__(name=name, **kwargs)
         tf.random.set_seed(42)

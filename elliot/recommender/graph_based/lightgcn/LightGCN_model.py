@@ -19,7 +19,7 @@ logging.disable(logging.WARNING)
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 
-class NGCFModel(keras.Model):
+class LightGCNModel(keras.Model):
 
     def __init__(self,
                  num_users,
@@ -27,14 +27,11 @@ class NGCFModel(keras.Model):
                  learning_rate,
                  embed_k,
                  l_w,
-                 weight_size,
                  n_layers,
-                 node_dropout,
-                 message_dropout,
                  n_fold,
                  adjacency,
                  laplacian,
-                 name="NGFC",
+                 name="LightGCN",
                  **kwargs
                  ):
         super().__init__(name=name, **kwargs)
@@ -44,20 +41,13 @@ class NGCFModel(keras.Model):
         self.embed_k = embed_k
         self.learning_rate = learning_rate
         self.l_w = l_w
-        self.weight_size = weight_size
-        self.n_layers = n_layers
-        self.node_dropout = node_dropout
-        self.message_dropout = message_dropout
         self.n_fold = n_fold
+        self.n_layers = n_layers
         self.adjacency = adjacency
         self.laplacian = laplacian
 
         # Generate a set of adjacency sub-matrix.
-        if len(self.node_dropout):
-            # node dropout.
-            self.A_fold_hat = self._split_A_hat(dropout=True)
-        else:
-            self.A_fold_hat = self._split_A_hat(dropout=False)
+        self.A_fold_hat = self._split_A_hat()
 
         self.initializer = tf.initializers.GlorotUniform()
         # Initialize Model Parameters
@@ -71,82 +61,40 @@ class NGCFModel(keras.Model):
         indices = np.mat([coo.row, coo.col]).transpose()
         return tf.SparseTensor(indices, coo.data, coo.shape)
 
-    @staticmethod
-    def _dropout_sparse(X, keep_prob, n_nonzero_elems):
-        """
-        Dropout for sparse tensors.
-        """
-        noise_shape = [n_nonzero_elems]
-        random_tensor = keep_prob
-        random_tensor += tf.random.uniform(noise_shape)
-        dropout_mask = tf.cast(tf.floor(random_tensor), dtype=tf.bool)
-        pre_out = tf.sparse.retain(X, dropout_mask)
-
-        return pre_out * tf.math.divide(1., keep_prob)
-
     def _create_weights(self):
-        # Gu and Gi are obtained as:
-        # Gu = Gu_0 || Gu_1 || ... || Gu_L
-        # Gi = Gi_0 || Gi_1 || ... || Gi_L
-        self.weight_size_list = [self.embed_k] + self.weight_size
-        self.Gu = tf.Variable(tf.zeros([self.num_users, sum(self.weight_size_list)]), name='Gu')
-        self.Gi = tf.Variable(tf.zeros([self.num_items, sum(self.weight_size_list)]), name='Gi')
-
-        self.GraphLayers = dict()
-
-        for k in range(self.n_layers):
-            self.GraphLayers['W_1_%d' % k] = tf.Variable(
-                self.initializer([self.weight_size_list[k], self.weight_size_list[k + 1]]), name='W_1_%d' % k)
-            self.GraphLayers['b_1_%d' % k] = tf.Variable(
-                self.initializer([1, self.weight_size_list[k + 1]]), name='b_1_%d' % k)
-
-            self.GraphLayers['W_2_%d' % k] = tf.Variable(
-                self.initializer([self.weight_size_list[k], self.weight_size_list[k + 1]]), name='W_2_%d' % k)
-            self.GraphLayers['b_2_%d' % k] = tf.Variable(
-                self.initializer([1, self.weight_size_list[k + 1]]), name='b_2_%d' % k)
+        self.Gu = tf.Variable(tf.zeros([self.num_users, self.embed_k]), name='Gu')
+        self.Gi = tf.Variable(tf.zeros([self.num_items, self.embed_k]), name='Gi')
 
     @tf.function
     def _propagate_embeddings(self):
-        # Extract gu_0 and gi_0 to begin embedding updating for L layers
-        gu_0 = self.Gu[:, :self.embed_k]
-        gi_0 = self.Gi[:, :self.embed_k]
-
+        gu_0 = self.Gu
+        gi_0 = self.Gi
         ego_embeddings = tf.concat([gu_0, gi_0], axis=0)
         all_embeddings = [ego_embeddings]
+        all_alphas = [1]
 
-        for k in range(0, self.n_layers):
+        for k in range(1, self.n_layers + 1):
             # This matrix multiplication is performed in smaller folders of the adj matrix to fit into memory
             laplacian_embeddings = []
             for f in range(self.n_fold):
                 laplacian_embeddings.append(tf.sparse.sparse_dense_matmul(self.A_fold_hat[f], ego_embeddings))
+
             laplacian_embeddings = tf.concat(laplacian_embeddings, 0)
+            ego_embeddings = laplacian_embeddings
 
-            first_contribution = tf.matmul(
-                    laplacian_embeddings + ego_embeddings,
-                    self.GraphLayers['W_1_%d' % k]
-                ) + self.GraphLayers['b_1_%d' % k]
+            all_embeddings += [laplacian_embeddings]
 
-            second_contribution = tf.multiply(ego_embeddings, laplacian_embeddings)
-            second_contribution = tf.matmul(
-                    second_contribution,
-                    self.GraphLayers['W_2_%d' % k]
-                ) + self.GraphLayers['b_2_%d' % k]
+            all_alphas += [1 / (1 + k)]
 
-            ego_embeddings = tf.nn.leaky_relu(first_contribution + second_contribution)
-
-            ego_embeddings = tf.nn.dropout(ego_embeddings, self.message_dropout[k])
-
-            norm_embeddings = tf.nn.l2_normalize(ego_embeddings, axis=1)
-
-            all_embeddings += [norm_embeddings]
-
-        all_embeddings = tf.concat(all_embeddings, 1)
+        all_embeddings = [emb * alpha for alpha, emb in zip(all_alphas, all_embeddings)]
+        all_embeddings = tf.stack(all_embeddings, 1)
+        all_embeddings = tf.reduce_mean(all_embeddings, axis=1, keepdims=False)
         gu, gi = tf.split(all_embeddings, [self.num_users, self.num_items], 0)
         self.Gu.assign(gu)
         self.Gi.assign(gi)
 
     @tf.function
-    def _split_A_hat(self, dropout=False):
+    def _split_A_hat(self):
         A_fold_hat = []
 
         fold_len = (self.num_users + self.num_items) // self.n_fold
@@ -157,12 +105,7 @@ class NGCFModel(keras.Model):
             else:
                 end = (i_fold + 1) * fold_len
 
-            if not dropout:
-                A_fold_hat.append(self._convert_sp_mat_to_sp_tensor(self.laplacian[start:end]))
-            else:
-                temp = self._convert_sp_mat_to_sp_tensor(self.laplacian[start:end])
-                n_nonzero_temp = self.laplacian[start:end].count_nonzero()
-                A_fold_hat.append(self._dropout_sparse(temp, self.node_dropout[0], n_nonzero_temp))
+            A_fold_hat.append(self._convert_sp_mat_to_sp_tensor(self.laplacian[start:end]))
 
         return A_fold_hat
 
@@ -214,16 +157,13 @@ class NGCFModel(keras.Model):
             # Regularization Component
             reg_loss = self.l_w * tf.reduce_sum([tf.nn.l2_loss(gamma_u),
                                                  tf.nn.l2_loss(gamma_pos),
-                                                 tf.nn.l2_loss(gamma_neg)] +
-                                                [tf.nn.l2_loss(value) for _, value in self.GraphLayers.items()]) * 2
+                                                 tf.nn.l2_loss(gamma_neg)]) * 2
 
             # Loss to be optimized
             loss += reg_loss
 
-        grads = tape.gradient(loss, [self.Gu, self.Gi] +
-                              [value for _, value in self.GraphLayers.items()])
-        self.optimizer.apply_gradients(zip(grads, [self.Gu, self.Gi] +
-                                           [value for _, value in self.GraphLayers.items()]))
+        grads = tape.gradient(loss, [self.Gu, self.Gi])
+        self.optimizer.apply_gradients(zip(grads, [self.Gu, self.Gi]))
 
         return loss
 

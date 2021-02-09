@@ -10,7 +10,6 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malite
 import scipy.sparse as sp
 from tqdm import tqdm
 
-from ast import literal_eval as make_tuple
 from utils.write import store_recommendation
 
 import numpy as np
@@ -24,13 +23,13 @@ from utils.folder import build_model_folder
 from recommender import BaseRecommenderModel
 from recommender.recommender_utils_mixin import RecMixin
 
-from recommender.graph_based.ngcf.NGCF_model import NGCFModel
+from recommender.graph_based.lightgcn.LightGCN_model import LightGCNModel
 
 np.random.seed(42)
 random.seed(0)
 
 
-class NGCF(RecMixin, BaseRecommenderModel):
+class LightGCN(RecMixin, BaseRecommenderModel):
 
     def __init__(self, data, config, params, *args, **kwargs):
         """
@@ -55,18 +54,11 @@ class NGCF(RecMixin, BaseRecommenderModel):
         self._params_list = [
             ("_learning_rate", "lr", "lr", 0.1, None, None),
             ("_factors", "latent_dim", "factors", 64, None, None),
+            ("_n_layers", "n_layers", "n_layers", 2, None, None),
             ("_l_w", "l_w", "l_w", 0.01, None, None),
-            ("_weight_size", "weight_size", "weight_size", "(64,32)", lambda x: list(make_tuple(x)),
-             lambda x: str(x).replace(",", "-")),
-            ("_node_dropout", "node_dropout", "node_dropout", "(64,32)", lambda x: list(make_tuple(x)),
-             lambda x: str(x).replace(",", "-")),
-            ("_message_dropout", "message_dropout", "message_dropout", "(64,32)", lambda x: list(make_tuple(x)),
-             lambda x: str(x).replace(",", "-")),
             ("_n_fold", "n_fold", "n_fold", 1, None, None),
         ]
         self.autoset_params()
-
-        self._n_layers = len(self._weight_size)
 
         self._params.name = self.name
 
@@ -81,16 +73,13 @@ class NGCF(RecMixin, BaseRecommenderModel):
 
         self._adjacency, self._laplacian = self._create_adj_mat()
 
-        self._model = NGCFModel(
+        self._model = LightGCNModel(
             num_users=self._num_users,
             num_items=self._num_items,
             learning_rate=self._learning_rate,
             embed_k=self._factors,
-            l_w=self._l_w,
-            weight_size=self._weight_size,
             n_layers=self._n_layers,
-            node_dropout=self._node_dropout,
-            message_dropout=self._message_dropout,
+            l_w=self._l_w,
             n_fold=self._n_fold,
             adjacency=self._adjacency,
             laplacian=self._laplacian
@@ -127,7 +116,7 @@ class NGCF(RecMixin, BaseRecommenderModel):
 
     @property
     def name(self):
-        return "NGCF" \
+        return "LightGCN" \
                + "_e:" + str(self._epochs) \
                + "_bs:" + str(self._batch_size) \
                + f"_{self.get_params_shortcut()}"
@@ -172,4 +161,3 @@ class NGCF(RecMixin, BaseRecommenderModel):
                                   for u_list in list(zip(i.numpy(), v.numpy()))]
             predictions_top_k.update(dict(zip(range(offset, offset_stop), items_ratings_pair)))
         return predictions_top_k
-

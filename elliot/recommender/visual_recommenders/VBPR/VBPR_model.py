@@ -45,7 +45,7 @@ class VBPR_model(NNBPRMF_model):
             self.initializer(shape=[self.num_image_feature, 1]), name='Bp', dtype=tf.float32)
         self.Tu = tf.Variable(
             self.initializer(shape=[self._num_users, self._factors_d]),
-            name='Tu', dtype=tf.float32)  # (users, low_embedding_size)
+            name='Tu', dtype=tf.float32)
         self.F = tf.Variable(
             self.emb_image, dtype=tf.float32, trainable=False)
         self.E = tf.Variable(

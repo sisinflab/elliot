@@ -33,7 +33,7 @@ experiment:
 #    core: 5
 #    rounds: 2
 #  dataset: categorical_dbpedia_ml1m
-  dataset: example
+  dataset: amazon_men
 #  path_output_rec_result: ../results/{0}/recs/
 #  path_output_rec_weight: ../results/{0}/weights/
 #  path_output_rec_performance: ../results/{0}/performance/
@@ -53,7 +53,7 @@ experiment:
       beta: 2
     - metric: SRecall
       feature_data: ../data/example/map.tsv
-  gpu: -1 # -1 is not use GPU
+  gpu: 0 # -1 is not use GPU
   models:
 #    MostPop:
 #      meta:
@@ -128,21 +128,21 @@ experiment:
 #      batch_size: 512
 #      l_w: 0.0025
 #      l_b: 0
-#    VBPR:
-#      meta:
-#        verbose: 1
-#        save_weights: True
-#        save_recs: True
-#        validation_metric: nDCG
-#        restore_epoch: -1
-#      lr: 0.005
-#      epochs: 20
-#      embed_k: 100
-#      embed_d: 20
-#      batch_size: 128
-#      l_w: 0.000025
-#      l_b: 0
-#      l_e: 0.002
+    VBPR:
+      meta:
+        verbose: 1
+        save_weights: True
+        save_recs: True
+        validation_metric: nDCG
+        restore_epoch: -1
+      lr: 0.005
+      epochs: 20
+      embed_k: 100
+      embed_d: 20
+      batch_size: 128
+      l_w: 0.000025
+      l_b: 0
+      l_e: 0.002
 #    KaHFM:
 #      meta:
 #        hyper_max_evals: 1
@@ -183,17 +183,36 @@ experiment:
 #        hyper_max_evals: 1
 #        hyper_opt_alg: tpe
 #        validation_rate: 10
-#        verbose: True
-#        save_weights: True
-#        save_recs: True
-#      learning_rate: 0.1
+#        verbose: False
+#        save_weights: False
+#        save_recs: False
+#        validation_metric: nDCG@10
+#        restore_epoch: -1
+#      learning_rate: 0.001
 #      epochs: 100
-#      embed_k: 64
+#      latent_dim: 128
 #      l_w: 0.001
 #      weight_size: (64,)
-#      batch_size: 128
+#      batch_size: 512
 #      node_dropout: ()
 #      message_dropout: (0.1,)
+#      n_fold: 5
+#    LightGCN:
+#      meta:
+#        hyper_max_evals: 1
+#        hyper_opt_alg: tpe
+#        validation_rate: 10
+#        verbose: False
+#        save_weights: False
+#        save_recs: False
+#        validation_metric: nDCG@10
+#        restore_epoch: -1
+#      learning_rate: 0.001
+#      epochs: 100
+#      latent_dim: 128
+#      l_w: 0.001
+#      batch_size: 512
+#      n_layers: 1
 #      n_fold: 5
 #    PureSVD:
 #      meta:
@@ -299,20 +318,20 @@ experiment:
 #      factors: 10
 #      reg: 0.1
 #      lr: 0.001
-    LMF:
-      meta:
-        hyper_max_evals: 1
-        hyper_opt_alg: tpe
-        validation_rate: 10
-        verbose: False
-        save_weights: False
-        save_recs: False
-        validation_metric: nDCG@10
-        restore_epoch: -1
-      epochs: 100
-      restore: False
-      factors: 50
-      reg: 0.01
-      lr: 0.01
-      alpha: 0.5
-      batch_size: 512
+#    LMF:
+#      meta:
+#        hyper_max_evals: 1
+#        hyper_opt_alg: tpe
+#        validation_rate: 10
+#        verbose: False
+#        save_weights: False
+#        save_recs: False
+#        validation_metric: nDCG@10
+#        restore_epoch: -1
+#      epochs: 100
+#      restore: False
+#      factors: 50
+#      reg: 0.01
+#      lr: 0.01
+#      alpha: 0.5
+#      batch_size: 512
