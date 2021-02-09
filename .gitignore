@@ -23,3 +23,4 @@ pip-selfcheck.json
 /share/
 **/__pycache__/**
 *.log
+/local_sample_main.py
