@@ -138,27 +138,28 @@ experiment:
 #      batch_size: -1
 #      dropout_pkeep: 1
 #      reg_lambda: 0.01
-##    BPRMF:
-##      meta:
-##        hyper_max_evals: 1
-##        hyper_opt_alg: tpe
-##        validation_rate: 1
-##        verbose: True
-##        save_weights: False
-##        save_recs: False
-##        validation_metric: nDCG
-##        restore_epoch: -1
-##      lr: 0.05
-##      epochs: 1
-##      embed_k: 10
-##      bias_regularization: 0
-##      user_regularization: 0.005
-##      positive_item_regularization: 0.0025
-##      negative_item_regularization: 0.00025
-##      update_negative_item_factors: True
-##      update_users: True
-##      update_items: True
-##      update_bias: True
+#    BPRMF:
+#      meta:
+#        hyper_max_evals: 1
+#        hyper_opt_alg: tpe
+#        validation_rate: 1
+#        verbose: True
+#        save_weights: False
+#        save_recs: False
+#        validation_metric: nDCG
+#        restore_epoch: -1
+#      lr: 0.05
+#      epochs: 1
+#      embed_k: 10
+#      batch_size: 512
+#      bias_regularization: 0
+#      user_regularization: 0.005
+#      positive_item_regularization: 0.0025
+#      negative_item_regularization: 0.00025
+#      update_negative_item_factors: True
+#      update_users: True
+#      update_items: True
+#      update_bias: True
 #    PMF:
 #      meta:
 #        hyper_max_evals: 1
@@ -265,7 +266,22 @@ experiment:
 #      similarity: cosine
 #      user_profile: binary
 #      item_profile: binary
-    NonNegMF:
+#    NonNegMF:
+#      meta:
+#        hyper_max_evals: 2
+#        hyper_opt_alg: tpe
+#        validation_rate: 1
+#        verbose: True
+#        save_weights: False
+#        save_recs: False
+#        validation_metric: nDCG
+#        restore_epoch: -1
+#      epochs: 2
+#      restore: False
+#      factors: [16,32]
+#      reg: 0.1
+#      lr: 0.001
+    BPRSlim:
       meta:
         hyper_max_evals: 2
         hyper_opt_alg: tpe
@@ -277,6 +293,7 @@ experiment:
         restore_epoch: -1
       epochs: 2
       restore: False
-      factors: [16,32]
-      reg: 0.1
+      li_reg: 0.0
+      lj_reg: 0.0
       lr: 0.001
+      batch_size: 1
