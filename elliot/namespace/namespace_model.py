@@ -9,6 +9,7 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
 import os
 from types import SimpleNamespace
+from ast import literal_eval
 
 from hyperopt import hp
 from yaml import FullLoader as FullLoader
@@ -157,7 +158,15 @@ class NameSpaceModel:
                 space_list = []
                 for k, value in self.config[_experiment][_models][key].items():
                     if isinstance(value, list):
-                        space_list.append((k, hp.choice(k, value)))
+                        if isinstance(value[0], str):
+                            func_ = getattr(hp, value[0].replace(" ","").split("(")[0])
+                            val_string = value[0].replace(" ","").split("(")[1].split(")")[0] if len(value[0].replace(" ","").split("(")) > 1 else None
+                            val = [literal_eval(val_string) if val_string else None]
+                            val.extend([literal_eval(val.replace(" ","").replace(")","")) if isinstance(val, str) else val for val in value[1:]])
+                            val = [v for v in val if v is not None]
+                            space_list.append((k, func_(k, *val)))
+                        else:
+                            space_list.append((k, hp.choice(k, value)))
                 _SPACE = OrderedDict(space_list)
                 _max_evals = meta_model[_hyper_max_evals]
                 _opt_alg = ho.parse_algorithms(meta_model[_hyper_opt_alg])

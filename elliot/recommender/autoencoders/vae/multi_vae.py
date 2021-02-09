@@ -48,8 +48,8 @@ class MultiVAE(RecMixin, BaseRecommenderModel):
         self._params.name = self.name
 
         self._params_list = [
-            ("_intermediate_dim", "intermediate_dim", "intermediate_dim", 600, None, None),
-            ("_latent_dim", "latent_dim", "latent_dim", 200, None, None),
+            ("_intermediate_dim", "intermediate_dim", "intermediate_dim", 600, int, None),
+            ("_latent_dim", "latent_dim", "latent_dim", 200, int, None),
             ("_lambda", "reg_lambda", "reg_lambda", 0.01, None, None),
             ("_learning_rate", "lr", "lr", 0.001, None, None),
             ("_dropout_rate", "dropout_pkeep", "dropout_pkeep", 1, None, None),

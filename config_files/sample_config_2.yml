@@ -1,14 +1,14 @@
 experiment:
   data_config:
     strategy: fixed
-    dataloader: KnowledgeChainsLoader
+#    dataloader: KnowledgeChainsLoader
     train_path: ../data/{0}/trainingset.tsv
     test_path: ../data/{0}/testset.tsv
     side_information:
         map: ../data/{0}/map.tsv
         features: ../data/{0}/features.tsv
         properties: ../data/{0}/properties.conf
-  dataset: categorical_dbpedia_ml1m
+  dataset: example
   external_models_path: ../external/models/__init__.py
 #  path_output_rec_result: ../results/{0}/recs/
 #  path_output_rec_weight: ../results/{0}/weights/
@@ -93,21 +93,21 @@ experiment:
 #    Random:
 #      meta:
 #        save_recs: True
-#    MultiVAE:
-#      meta:
-#        hyper_max_evals: 3
-#        hyper_opt_alg: tpe
-#        validation_rate: 10
-#        verbose: False
-#        save_weights: False
-#        save_recs: False
-#      lr: [0.01, 0.001]
-#      epochs: 10
-#      intermediate_dim: [300,200]
-#      latent_dim: 100
-#      batch_size: -1
-#      dropout_pkeep: 1
-#      reg_lambda: 0.01
+    MultiVAE:
+      meta:
+        hyper_max_evals: 3
+        hyper_opt_alg: tpe
+        validation_rate: 10
+        verbose: False
+        save_weights: False
+        save_recs: False
+      lr: [loguniform, -10, -1]
+      epochs: 10
+      intermediate_dim: [uniform,50,100]
+      latent_dim: 100
+      batch_size: -1
+      dropout_pkeep: 1
+      reg_lambda: 0.01
 ##    KaHFMBatch:
 ##      meta:
 ##        hyper_max_evals: 20
@@ -123,21 +123,36 @@ experiment:
 ##      batch_size: 512
 ##      l_w: 0.005
 ##      l_b: 0
-    KaHFMEmbeddings:
-      meta:
-        hyper_max_evals: 1
-        hyper_opt_alg: tpe
-        validation_rate: 1
-        verbose: True
-        save_weights: False
-        save_recs: False
-        validation_metric: nDCG
-        restore_epoch: -1
-      lr: 0.0001
-      epochs: 200
-      batch_size: 1024
-      l_w: 0.005
-      l_b: 0
+#    KaHFMEmbeddings:
+#      meta:
+#        hyper_max_evals: 1
+#        hyper_opt_alg: tpe
+#        validation_rate: 1
+#        verbose: True
+#        save_weights: False
+#        save_recs: False
+#        validation_metric: nDCG
+#        restore_epoch: -1
+#      lr: 0.0001
+#      epochs: 200
+#      batch_size: 1024
+#      l_w: 0.005
+#      l_b: 0
+#    external.KaVAE:
+#      meta:
+#        hyper_max_evals: 5
+#        hyper_opt_alg: tpe
+#        validation_rate: 1
+#        verbose: False
+#        save_weights: False
+#        save_recs: False
+#      lr: 0.0001
+#      epochs: [uniform,1,100]
+#      intermediate_dim: [300, 600]
+#      latent_dim: [100, 200]
+#      batch_size: 64
+#      dropout_pkeep: [1, 0.9]
+#      reg_lambda: [0.0001, 0]
 #    MultiDAE:
 #      meta:
 #        hyper_max_evals: 1
