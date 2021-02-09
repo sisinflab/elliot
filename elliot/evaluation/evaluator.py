@@ -25,6 +25,7 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 import warnings
 from time import time
 from types import SimpleNamespace
+import numpy as np
 
 from . import metrics
 from . import relevance
@@ -43,10 +44,15 @@ class Evaluator(object):
         self._params = params
         self._k = getattr(data.config.evaluation, "cutoff", [data.config.top_k])
         self._k = self._k if isinstance(self._k, list) else [self._k]
+        if any(np.array(self._k) > data.config.top_k):
+            raise Exception("Cutoff values must be smaller than recommendation list length (top_k)")
         self._rel_threshold = data.config.evaluation.relevance_threshold
         self._paired_ttest = self._data.config.evaluation.paired_ttest
         self._metrics = metrics.parse_metrics(data.config.evaluation.simple_metrics)
         #TODO
+        _validation_metric = getattr(self._params.meta, "validation_metric", "nDCG@10").split("@")[0]
+        if _validation_metric.lower() not in [m.lower() for m in data.config.evaluation.simple_metrics]:
+            raise Exception("Validation metric must be in list of general metrics")
         self._complex_metrics = getattr(data.config.evaluation, "complex_metrics", {})
         self._test = data.get_test()
 

@@ -85,10 +85,13 @@ _metric_dictionary = {
     "REO": REO
 }
 
+_lower_dict = {k.lower(): v for k, v in _metric_dictionary.items()}
+
 
 def parse_metrics(metrics):
-    return [_metric_dictionary[m] for m in metrics if m in _metric_dictionary.keys()]
+    return [_lower_dict[m.lower()] for m in metrics if m.lower() in _lower_dict.keys()]
 
 
 def parse_metric(metric):
-    return _metric_dictionary[metric] if metric in _metric_dictionary.keys() else None
+    metric = metric.lower()
+    return _lower_dict[metric] if metric in _lower_dict.keys() else None

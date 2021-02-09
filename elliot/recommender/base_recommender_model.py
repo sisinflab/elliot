@@ -28,6 +28,12 @@ class BaseRecommenderModel(ABC):
         self._restore_epochs = getattr(self._params.meta, "restore_epoch", -1)
         self._validation_metric = getattr(self._params.meta, "validation_metric", "nDCG@10").split("@")
         self._validation_k = int(self._validation_metric[1]) if len(self._validation_metric) > 1 else 10
+
+        _cutoff_k = getattr(data.config.evaluation, "cutoff", [data.config.top_k])
+        _cutoff_k = _cutoff_k if isinstance(_cutoff_k, list) else [_cutoff_k]
+        if self._validation_k not in _cutoff_k:
+            raise Exception("Validation cutoff must be in general cutoff values")
+
         self._validation_metric = self._validation_metric[0]
         self._save_weights = getattr(self._params.meta, "save_weights", False)
         self._save_recs = getattr(self._params.meta, "save_recs", False)
@@ -36,7 +42,8 @@ class BaseRecommenderModel(ABC):
         self._compute_auc = getattr(self._params.meta, "compute_auc", False)
         self._epochs = getattr(self._params, "epochs", 2)
         if self._epochs < self._validation_rate:
-            raise Exception(f"The first validation epoch ({self._validation_rate}) is later than the overall number of epochs ({self._epochs}).")
+            raise Exception(f"The first validation epoch ({self._validation_rate}) "
+                            f"is later than the overall number of epochs ({self._epochs}).")
         self._batch_size = getattr(self._params, "batch_size", -1)
         self._results = []
         self._params_list = []
