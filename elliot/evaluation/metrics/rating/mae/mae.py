@@ -2,6 +2,7 @@
 This is the implementation of the Mean Absolute Error metric.
 It proceeds from a system-wise computation.
 """
+import warnings
 
 __version__ = '0.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo'
@@ -70,4 +71,5 @@ class MAE(BaseMetric):
 
     @staticmethod
     def needs_full_recommendations():
+        warnings.warn("\n*** WARNING: Mean Absolute Error metric requires full length recommendations")
         return True

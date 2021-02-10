@@ -7,6 +7,7 @@ __version__ = '0.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
+import warnings
 import numpy as np
 from evaluation.metrics.base_metric import BaseMetric
 
@@ -63,4 +64,5 @@ class AUC(BaseMetric):
 
     @staticmethod
     def needs_full_recommendations():
+        warnings.warn("\n*** WARNING: AUC metric requires full length recommendations")
         return True

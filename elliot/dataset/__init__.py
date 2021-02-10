@@ -9,3 +9,4 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
 from dataset.dataset import DataSetLoader, DataSet
 from dataset.dataloader.knowledge_aware_chains import KnowledgeChainsLoader, KnowledgeChainsDataObject
+from dataset.dataloader.visual_dataloader import VisualLoader

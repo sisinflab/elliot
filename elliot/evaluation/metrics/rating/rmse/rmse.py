@@ -2,6 +2,7 @@
 This is the implementation of the Root Mean Squared Error metric.
 It proceeds from a user-wise computation, and average the values over the users.
 """
+import warnings
 
 __version__ = '0.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo'
@@ -70,4 +71,5 @@ class RMSE(BaseMetric):
 
     @staticmethod
     def needs_full_recommendations():
+        warnings.warn("\n*** WARNING: Root Mean Squared Error metric requires full length recommendations")
         return True

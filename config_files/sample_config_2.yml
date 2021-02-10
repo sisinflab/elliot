@@ -2,12 +2,17 @@ experiment:
   data_config:
     strategy: fixed
 #    dataloader: KnowledgeChainsLoader
+    dataloader: VisualLoader
     train_path: ../data/{0}/trainingset.tsv
     test_path: ../data/{0}/testset.tsv
     side_information:
-        map: ../data/{0}/map.tsv
-        features: ../data/{0}/features.tsv
-        properties: ../data/{0}/properties.conf
+        visual_features: ../data/{0}/ciao.npy
+        item_mapping: ../data/{0}/visual_feats.tsv
+        images_src_folder: ../data/yoyo/
+        output_image_size: (224,224)
+#        map: ../data/{0}/map.tsv
+#        features: ../data/{0}/features.tsv
+#        properties: ../data/{0}/properties.conf
   dataset: example
   external_models_path: ../external/models/__init__.py
 #  path_output_rec_result: ../results/{0}/recs/
@@ -18,7 +23,7 @@ experiment:
   top_k: 20
   evaluation:
     cutoff: [10]
-    simple_metrics: [nDCG, Precision, Recall, ItemCoverage, HR, MAP, F1, Gini, SEntropy, EFD, EPC, ARP, APLT, ACLT, PopRSP, PopREO, MAR, UserCoverage, NumRetrieved]
+    simple_metrics: [AUC, nDCG, Precision, Recall, ItemCoverage, HR, MAP, F1, Gini, SEntropy, EFD, EPC, ARP, APLT, ACLT, PopRSP, PopREO, MAR, UserCoverage, NumRetrieved]
     relevance_threshold: 3
     paired_ttest: True
     complex_metrics:
@@ -98,7 +103,7 @@ experiment:
         hyper_max_evals: 3
         hyper_opt_alg: tpe
         validation_rate: 10
-        verbose: False
+        verbose: True
         save_weights: False
         save_recs: False
       lr: [loguniform, -10, -1]

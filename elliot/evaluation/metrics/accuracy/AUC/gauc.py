@@ -2,6 +2,7 @@
 This is the implementation of the GroupAUC metric.
 It proceeds from a user-wise computation, and average the AUC values over the users.
 """
+import warnings
 
 __version__ = '0.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo'
@@ -69,4 +70,10 @@ class GAUC(BaseMetric):
         """
         return {u: GAUC.__user_gauc(u_r, self._relevant_items[u], self._num_items, len(self._evaluation_objects.data.train_dict[u]))
              for u, u_r in self._recommendations.items() if len(self._relevant_items[u])}
+
+
+    @staticmethod
+    def needs_full_recommendations():
+        warnings.warn("\n*** WARNING: Group AUC metric requires full length recommendations")
+        return True
 
