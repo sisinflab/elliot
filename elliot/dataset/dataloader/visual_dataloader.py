@@ -13,6 +13,7 @@ import typing as t
 import pandas as pd
 import scipy.sparse as sp
 from ast import literal_eval
+import PIL
 from PIL import Image
 from types import SimpleNamespace
 import concurrent.futures as c
@@ -252,7 +253,7 @@ class VisualDataObject:
         if self.side_information_data.images_src_folder:
             self.output_image_size = literal_eval(
                 self.side_information_data.size_tuple) if self.side_information_data.size_tuple else None
-            self.image_dict = self.read_images(self.side_information_data.images_src_folder, self.side_information_data.aligned_items, self.output_image_size)
+            self.image_dict = self.read_images_multiprocessing(self.side_information_data.images_src_folder, self.side_information_data.aligned_items, self.output_image_size)
 
         self.users = list(self.train_dict.keys())
         self.num_users = len(self.users)
@@ -263,7 +264,6 @@ class VisualDataObject:
         self.public_users = {v: k for k, v in self.private_users.items()}
         self.private_items = {p: i for p, i in enumerate(self.items)}
         self.public_items = {v: k for k, v in self.private_items.items()}
-        self.public_features = {v: k for k, v in self.private_features.items()}
         self.transactions = sum(len(v) for v in self.train_dict.values())
 
         self.i_train_dict = {self.public_users[user]: {self.public_items[i]: v for i, v in items.items()}
@@ -284,8 +284,8 @@ class VisualDataObject:
         for path in os.listdir(images_folder):
             image_id = int(path.split(".")[0])
             if image_id in image_set:
-                im_pos = Image.open(os.path.join(images_folder, path))
                 try:
+                    im_pos = Image.open(os.path.join(images_folder, path))
                     im_pos.load()
 
                     if im_pos.mode != 'RGB':
@@ -296,7 +296,7 @@ class VisualDataObject:
 
                     image_dict[image_id] = im_pos
                 except ValueError:
-                    print(f'Image at path {pos.numpy()}.jpg was not loaded correctly!')
+                    print(f'Image at path {os.path.join(images_folder, image_path)}.jpg was not loaded correctly!')
         return image_dict
 
     def read_images_multiprocessing(self, images_folder, image_set, size_tuple):
@@ -316,17 +316,17 @@ class VisualDataObject:
                                        [size_tuple] * workers,
                                        paths[offset_start:offset_stop])
                 for result in results:
-                    samples += result
+                    samples += [result]
 
-        [image_dict.update(dict_) for dict_ in samples]
+        [image_dict.update(dict_) for dict_ in samples if isinstance(dict_, dict)]
         return image_dict
 
     @staticmethod
     def read_single_image(images_folder, image_set, size_tuple, image_path):
         image_id = int(image_path.split(".")[0])
         if image_id in image_set:
-            im_pos = Image.open(os.path.join(images_folder, image_path))
             try:
+                im_pos = Image.open(os.path.join(images_folder, image_path))
                 im_pos.load()
 
                 if im_pos.mode != 'RGB':
@@ -336,8 +336,9 @@ class VisualDataObject:
                     im_pos = np.array(im_pos.resize(size_tuple)) / np.float32(255)
 
                 return {image_id: im_pos}
-            except ValueError:
-                print(f'Image at path {pos.numpy()}.jpg was not loaded correctly!')
+            except (ValueError, PIL.UnidentifiedImageError) as er:
+                print(f'Image at path {os.path.join(images_folder, image_path)} was not loaded correctly!')
+                print(er)
 
 
     def dataframe_to_dict(self, data):
