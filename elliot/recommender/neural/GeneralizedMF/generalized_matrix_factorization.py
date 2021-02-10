@@ -33,7 +33,6 @@ class GeneralizedMatrixFactorization(RecMixin, BaseRecommenderModel):
         self._num_items = self._data.num_items
         self._num_users = self._data.num_users
         self._random = np.random
-        self._sample_negative_items_empirically = True
 
         self._sampler = pws.Sampler(self._data.i_train_dict)
 
@@ -55,12 +54,8 @@ class GeneralizedMatrixFactorization(RecMixin, BaseRecommenderModel):
                                                           self._is_edge_weight_train,
                                                           self._learning_rate)
 
-        self._iteration = 0
-
         self.evaluator = Evaluator(self._data, self._params)
-
         self._params.name = self.name
-
         build_model_folder(self._config.path_output_rec_weight, self.name)
         self._saving_filepath = f'{self._config.path_output_rec_weight}{self.name}/best-weights-{self.name}'
         self.logger = logging.get_logger(self.__class__.__name__)
@@ -76,12 +71,12 @@ class GeneralizedMatrixFactorization(RecMixin, BaseRecommenderModel):
         pass
 
     def train(self):
+        if self._restore:
+            return self.restore_weights()
 
         best_metric_value = 0
-        self._update_count = 0
 
         for it in range(self._epochs):
-            self.restore_weights(it)
             loss = 0
             steps = 0
             with tqdm(total=int(self._data.transactions // self._batch_size), disable=not self._verbose) as t:
@@ -90,7 +85,6 @@ class GeneralizedMatrixFactorization(RecMixin, BaseRecommenderModel):
                     loss += self._model.train_step(batch)
                     t.set_postfix({'loss': f'{loss.numpy() / steps:.5f}'})
                     t.update()
-                    self._update_count += 1
 
             if not (it + 1) % self._validation_rate:
                 recs = self.get_recommendations(self.evaluator.get_needed_recommendations())
@@ -124,13 +118,3 @@ class GeneralizedMatrixFactorization(RecMixin, BaseRecommenderModel):
                                                   range(offset, offset_stop)), items_ratings_pair)))
         return predictions_top_k
 
-    def restore_weights(self, it):
-        if self._restore_epochs == it:
-            try:
-                with open(self._saving_filepath, "rb") as f:
-                    self._model.set_model_state(pickle.load(f))
-                print(f"Model correctly Restored at Epoch: {self._restore_epochs}")
-                return True
-            except Exception as ex:
-                print(f"Error in model restoring operation! {ex}")
-        return False

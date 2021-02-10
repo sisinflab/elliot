@@ -41,12 +41,9 @@ class NGCF(RecMixin, BaseRecommenderModel):
         self._num_users = self._data.num_users
         self._random = np.random
         self._random_p = random
-        self._num_iters = self._params.epochs
 
         self._ratings = self._data.train_dict
         self._sampler = cs.Sampler(self._data.i_train_dict)
-        self._iteration = 0
-        self.evaluator = Evaluator(self._data, self._params)
         if self._batch_size < 1:
             self._batch_size = self._num_users
 
@@ -68,17 +65,6 @@ class NGCF(RecMixin, BaseRecommenderModel):
 
         self._n_layers = len(self._weight_size)
 
-        self._params.name = self.name
-
-        # self._learning_rate = self._params.lr
-        # self._factors = self._params.factors
-        # self._l_w = self._params.l_w
-        # self._weight_size = list(make_tuple(self._params.weight_size))
-        # self._n_layers = len(self._weight_size)
-        # self._node_dropout = list(make_tuple(self._params.node_dropout))
-        # self._message_dropout = list(make_tuple(self._params.message_dropout))
-        # self._n_fold = self._params.n_fold
-
         self._adjacency, self._laplacian = self._create_adj_mat()
 
         self._model = NGCFModel(
@@ -96,6 +82,8 @@ class NGCF(RecMixin, BaseRecommenderModel):
             laplacian=self._laplacian
         )
 
+        self.evaluator = Evaluator(self._data, self._params)
+        self._params.name = self.name
         build_model_folder(self._config.path_output_rec_weight, self.name)
         self._saving_filepath = f'{self._config.path_output_rec_weight}{self.name}/best-weights-{self.name}'
         self.logger = logging.get_logger(self.__class__.__name__)
@@ -133,8 +121,10 @@ class NGCF(RecMixin, BaseRecommenderModel):
                + f"_{self.get_params_shortcut()}"
 
     def train(self):
+        if self._restore:
+            return self.restore_weights()
+
         best_metric_value = 0
-        self._update_count = 0
         for it in range(self._epochs):
             self.restore_weights(it)
             loss = 0
@@ -145,7 +135,6 @@ class NGCF(RecMixin, BaseRecommenderModel):
                     loss += self._model.train_step(batch)
                     t.set_postfix({'loss': f'{loss.numpy() / steps:.5f}'})
                     t.update()
-                    self._update_count += 1
 
             if not (it + 1) % self._validation_rate:
                 recs = self.get_recommendations(self.evaluator.get_needed_recommendations())

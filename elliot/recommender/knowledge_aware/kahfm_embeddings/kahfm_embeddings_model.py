@@ -34,13 +34,8 @@ class KaHFMEmbeddingsModel(keras.Model):
         self._learning_rate = learning_rate
         self.l_w = l_w
         self.l_b = l_b
-        # self._num_items = num_items
-        # self._num_users = num_users
 
         self.initializer = tf.initializers.GlorotUniform()
-        # self.Bi = tf.Variable(tf.zeros(item_factors.shape[0]), name='Bi', dtype=tf.float32)
-        # self.Gu = tf.Variable(user_factors, name='Gu', dtype=tf.float32)
-        # self.Gi = tf.Variable(item_factors, name='Gi', dtype=tf.float32)
 
         self.user_embedding = keras.layers.Embedding(input_dim=user_factors.shape[0], output_dim=user_factors.shape[1],
                                                      weights=[user_factors],

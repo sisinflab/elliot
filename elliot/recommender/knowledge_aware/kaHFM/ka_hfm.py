@@ -8,6 +8,7 @@ from dataset.samplers import pairwise_sampler as ps
 from evaluation.evaluator import Evaluator
 from recommender.base_recommender_model import BaseRecommenderModel
 from recommender.recommender_utils_mixin import RecMixin
+from utils import logging
 from utils.folder import build_model_folder
 from utils.write import store_recommendation
 from recommender.knowledge_aware.kaHFM.tfidf_utils import TFIDF
@@ -177,38 +178,24 @@ class KaHFM(RecMixin, BaseRecommenderModel):
         ]
         self.autoset_params()
 
-        # self._learning_rate = self._params.lr
-        # self._bias_regularization = self._params.bias_regularization
-        # self._user_regularization = self._params.user_regularization
-        # self._positive_item_regularization = self._params.positive_item_regularization
-        # self._negative_item_regularization = self._params.negative_item_regularization
-        # self._update_negative_item_factors = self._params.update_negative_item_factors
-        # self._update_users = self._params.update_users
-        # self._update_items = self._params.update_items
-        # self._update_bias = self._params.update_bias
-
         self._ratings = self._data.train_dict
 
         self._tfidf_obj = TFIDF(self._data.side_information_data.feature_map)
         self._tfidf = self._tfidf_obj.tfidf()
         self._user_profiles = self._tfidf_obj.get_profiles(self._ratings)
 
-        self._datamodel = MF(self._ratings, self._data.side_information_data.feature_map, self._tfidf, self._user_profiles, self._random)
-        self._embed_k = self._datamodel.get_factors()
+        self._model = MF(self._ratings, self._data.side_information_data.feature_map, self._tfidf, self._user_profiles, self._random)
+        self._embed_k = self._model.get_factors()
         self._sampler = ps.Sampler(self._ratings, self._data.users, self._data.items)
 
-        self._iteration = 0
-
         self.evaluator = Evaluator(self._data, self._params)
-
         self._params.name = self.name
-
         build_model_folder(self._config.path_output_rec_weight, self.name)
         self._saving_filepath = f'{self._config.path_output_rec_weight}{self.name}/best-weights-{self.name}'
         self.logger = logging.get_logger(self.__class__.__name__)
 
     def get_recommendations(self, k: int = 100):
-        return {u: self._datamodel.get_user_recs(u, k) for u in self._ratings.keys()}
+        return {u: self._model.get_user_recs(u, k) for u in self._ratings.keys()}
 
     def predict(self, u: int, i: int):
         """
@@ -217,7 +204,7 @@ class KaHFM(RecMixin, BaseRecommenderModel):
         Returns:
             A single float vaue.
         """
-        return self._datamodel.predict(u, i)
+        return self._model.predict(u, i)
 
     @property
     def name(self):
@@ -227,6 +214,9 @@ class KaHFM(RecMixin, BaseRecommenderModel):
                + f"_{self.get_params_shortcut()}"
 
     def train_step(self):
+        if self._restore:
+            return self.restore_weights()
+
         start_it = time.perf_counter()
         print()
         print("Sampling...")
@@ -260,68 +250,55 @@ class KaHFM(RecMixin, BaseRecommenderModel):
                     best_metric_value = self._results[-1][self._validation_k]["val_results"][self._validation_metric]
                     if self._save_weights:
                         with open(self._saving_filepath, "wb") as f:
-                            pickle.dump(self._datamodel.get_model_state(), f)
+                            pickle.dump(self._model.get_model_state(), f)
                     if self._save_recs:
                         store_recommendation(recs,
                                              self._config.path_output_rec_result + f"{self.name}-it:{it + 1}.tsv")
 
     def update_factors(self, u: int, i: int, j: int):
-        user_factors = self._datamodel.get_user_factors(u)
-        item_factors_i = self._datamodel.get_item_factors(i)
-        item_factors_j = self._datamodel.get_item_factors(j)
-        item_bias_i = self._datamodel.get_item_bias(i)
-        item_bias_j = self._datamodel.get_item_bias(j)
+        user_factors = self._model.get_user_factors(u)
+        item_factors_i = self._model.get_item_factors(i)
+        item_factors_j = self._model.get_item_factors(j)
+        item_bias_i = self._model.get_item_bias(i)
+        item_bias_j = self._model.get_item_bias(j)
 
         z = 1 / (1 + np.exp(self.predict(u, i) - self.predict(u, j)))
         # update bias i
         d_bi = (z - self._bias_regularization * item_bias_i)
-        self._datamodel.set_item_bias(i, item_bias_i + (self._learning_rate * d_bi))
+        self._model.set_item_bias(i, item_bias_i + (self._learning_rate * d_bi))
 
         # update bias j
         d_bj = (-z - self._bias_regularization * item_bias_j)
-        self._datamodel.set_item_bias(j, item_bias_j + (self._learning_rate * d_bj))
+        self._model.set_item_bias(j, item_bias_j + (self._learning_rate * d_bj))
 
         # update user factors
         d_u = ((item_factors_i - item_factors_j) * z - self._user_regularization * user_factors)
-        self._datamodel.set_user_factors(u, user_factors + (self._learning_rate * d_u))
+        self._model.set_user_factors(u, user_factors + (self._learning_rate * d_u))
 
         # update item i factors
         d_i = (user_factors * z - self._positive_item_regularization * item_factors_i)
-        self._datamodel.set_item_factors(i, item_factors_i + (self._learning_rate * d_i))
+        self._model.set_item_factors(i, item_factors_i + (self._learning_rate * d_i))
 
         # update item j factors
         d_j = (-user_factors * z - self._negative_item_regularization * item_factors_j)
-        self._datamodel.set_item_factors(j, item_factors_j + (self._learning_rate * d_j))
+        self._model.set_item_factors(j, item_factors_j + (self._learning_rate * d_j))
 
-    # def get_loss(self):
-    #     return -max([r[self._validation_metric] for r in self._results])
-    #
-    # def get_params(self):
-    #     return self._params.__dict__
-    #
-    # def get_results(self):
-    #     val_max = np.argmax([r[self._validation_metric] for r in self._results])
-    #     return self._results[val_max]
-    #
-    # def get_statistical_results(self):
-    #     val_max = np.argmax([r[self._validation_metric] for r in self._results])
-    #     return self._statistical_results[val_max]
+    def restore_weights(self):
+        try:
+            with open(self._saving_filepath, "rb") as f:
+                self._model.set_model_state(pickle.load(f))
+            print(f"Model correctly Restored")
 
-    def restore_weights(self, it):
-        if self._restore_epochs == it:
-            try:
-                with open(self._saving_filepath, "rb") as f:
-                    self._datamodel.set_model_state(pickle.load(f))
-                print(f"Model correctly Restored at Epoch: {self._restore_epochs}")
-                return True
-            except Exception as ex:
-                print(f"Error in model restoring operation! {ex}")
+            recs = self.get_recommendations(self.evaluator.get_needed_recommendations())
+            result_dict = self.evaluator.eval(recs)
+            self._results.append(result_dict)
+
+            print("******************************************")
+            if self._save_recs:
+                store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}.tsv")
+            return True
+
+        except Exception as ex:
+            print(f"Error in model restoring operation! {ex}")
+
         return False
-
-    # def get_test_results(self):
-    #     val_max = np.argmax([r[self._validation_metric] for r in self._results])
-    #     return self._test_results[val_max]
-    #
-    # def get_test_statistical_results(self):
-    #     val_max = np.argmax([r[self._validation_metric] for r in self._results])
-    #     return self._test_statistical_results[val_max]

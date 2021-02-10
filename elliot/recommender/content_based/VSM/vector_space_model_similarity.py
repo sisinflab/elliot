@@ -60,16 +60,6 @@ class Similarity(object):
         else:
             raise Exception("Not implemented similarity")
 
-        # if similarity == "cosine":
-        #     self._similarity_matrix = cosine_similarity(self._user_profile_matrix, self._item_attribute_matrix)
-        # elif similarity == "dot":
-        #     self._similarity_matrix = (self._user_profile_matrix @ self._item_attribute_matrix.T).toarray()
-        # else:
-        #     raise Exception("Not implemented similarity")
-
-    # def process_cosine(self):
-    #     self._similarity_matrix = cosine_similarity(self._user_profile_matrix, self._item_attribute_matrix)
-
     def get_transactions(self):
         return self._transactions
 
@@ -86,12 +76,6 @@ class Similarity(object):
         real_indices = indices[partially_ordered_preds_indices]
         local_top_k = real_values.argsort()[::-1]
         return [(real_indices[item], real_values[item]) for item in local_top_k]
-
-    # @staticmethod
-    # def score_item(neighs, user_neighs_items):
-    #     num = sum([v for k, v in neighs.items() if k in user_neighs_items])
-    #     den = sum(np.power(list(neighs.values()), 1))
-    #     return num/den if den != 0 else 0
 
     def get_model_state(self):
         saving_dict = {}

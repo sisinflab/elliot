@@ -63,11 +63,8 @@ class KaHFMBatch(RecMixin, BaseRecommenderModel):
             for f, v in f_dict.items():
                 self._user_factors[self._data.public_users[u]][self._data.public_features[f]] = v
 
-        self._iteration = 0
-        self.evaluator = Evaluator(self._data, self._params)
         if self._batch_size < 1:
             self._batch_size = self._num_users
-        self._params.name = self.name
 
         ######################################
 
@@ -79,9 +76,6 @@ class KaHFMBatch(RecMixin, BaseRecommenderModel):
         self.autoset_params()
 
         self._factors = self._data.factors
-        # self._learning_rate = self._params.lr
-        # self._l_w = self._params.l_w
-        # self._l_b = self._params.l_b
 
         self._model = KaHFM_model(self._user_factors,
                                   self._item_factors,
@@ -89,6 +83,8 @@ class KaHFMBatch(RecMixin, BaseRecommenderModel):
                                   self._params.l_w,
                                   self._params.l_b)
 
+        self.evaluator = Evaluator(self._data, self._params)
+        self._params.name = self.name
         build_model_folder(self._config.path_output_rec_weight, self.name)
         self._saving_filepath = f'{self._config.path_output_rec_weight}{self.name}/best-weights-{self.name}'
         self.logger = logging.get_logger(self.__class__.__name__)
@@ -101,9 +97,11 @@ class KaHFMBatch(RecMixin, BaseRecommenderModel):
                + f"_{self.get_params_shortcut()}"
 
     def train(self):
+        if self._restore:
+            return self.restore_weights()
+
         best_metric_value = 0
         for it in range(self._epochs):
-            self.restore_weights(it)
             loss = 0
             steps = 0
             with tqdm(total=int(self._data.transactions // self._batch_size), disable=not self._verbose) as t:
@@ -129,16 +127,6 @@ class KaHFMBatch(RecMixin, BaseRecommenderModel):
                     if self._save_recs:
                         store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}-it:{it + 1}.tsv")
 
-    # def restore_weights(self, it):
-    #     if self._restore_epochs == it:
-    #         try:
-    #             self._model.load_weights(self._saving_filepath)
-    #             print(f"Model correctly Restored at Epoch: {self._restore_epochs}")
-    #             return True
-    #         except Exception as ex:
-    #             print(f"Error in model restoring operation! {ex}")
-    #     return False
-
     def get_recommendations(self, k: int = 100):
         predictions_top_k = {}
         for index, offset in enumerate(range(0, self._num_users, self._batch_size)):
@@ -149,20 +137,3 @@ class KaHFMBatch(RecMixin, BaseRecommenderModel):
                                   for u_list in list(zip(i.numpy(), v.numpy()))]
             predictions_top_k.update(dict(zip(range(offset, offset_stop), items_ratings_pair)))
         return predictions_top_k
-
-    # def get_train_mask(self, start, stop):
-    #     return np.where((self._data.sp_i_train[range(start, stop)].toarray() == 0), True, False)
-    #
-    # def get_loss(self):
-    #     return -max([r[self._validation_metric] for r in self._results])
-    #
-    # def get_params(self):
-    #     return self._params.__dict__
-    #
-    # def get_results(self):
-    #     val_max = np.argmax([r[self._validation_metric] for r in self._results])
-    #     return self._results[val_max]
-    #
-    # def get_statistical_results(self):
-    #     val_max = np.argmax([r[self._validation_metric] for r in self._results])
-    #     return self._statistical_results[val_max]
