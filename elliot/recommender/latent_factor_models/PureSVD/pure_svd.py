@@ -36,16 +36,13 @@ class PureSVD(RecMixin, BaseRecommenderModel):
             ("_seed", "seed", "seed", 42, None, None)
         ]
         self.autoset_params()
-        # self._factors = self._params.factors
 
         self._ratings = self._data.train_dict
         self._sp_i_train = self._data.sp_i_train
         self._model = PureSVDModel(self._factors, self._data, self._seed)
 
         self.evaluator = Evaluator(self._data, self._params)
-
         self._params.name = self.name
-
         build_model_folder(self._config.path_output_rec_weight, self.name)
         self._saving_filepath = f'{self._config.path_output_rec_weight}{self.name}/best-weights-{self.name}'
         self.logger = logging.get_logger(self.__class__.__name__)
@@ -69,9 +66,9 @@ class PureSVD(RecMixin, BaseRecommenderModel):
     def train(self):
 
         if self._restore:
-            self.restore_weights()
-        else:
-            self._model.train_step()
+            return self.restore_weights()
+
+        self._model.train_step()
 
         print("Computation finished, producing recommendations")
 
@@ -93,6 +90,17 @@ class PureSVD(RecMixin, BaseRecommenderModel):
             with open(self._saving_filepath, "rb") as f:
                 self._model.set_model_state(pickle.load(f))
             print(f"Model correctly Restored")
+
+            recs = self.get_recommendations(self.evaluator.get_needed_recommendations())
+            result_dict = self.evaluator.eval(recs)
+            self._results.append(result_dict)
+
+            print("******************************************")
+            if self._save_recs:
+                store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}.tsv")
             return True
+
         except Exception as ex:
             print(f"Error in model restoring operation! {ex}")
+
+        return False

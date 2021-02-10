@@ -8,13 +8,9 @@ __version__ = '0.1'
 __author__ = 'Felice Antonio Merra'
 __email__ = 'felice.merra@poliba.it'
 
-import time
 import numpy as np
 import pickle
-from ast import literal_eval as make_tuple
-from tqdm import tqdm
 
-from dataset.samplers import pointwise_pos_neg_sampler as pws
 from evaluation.evaluator import Evaluator
 from recommender.latent_factor_models.NonNegMF.non_negative_matrix_factorization_model import NonNegMFModel
 from recommender.recommender_utils_mixin import RecMixin
@@ -36,7 +32,6 @@ class NonNegMF(RecMixin, BaseRecommenderModel):
         self._num_items = self._data.num_items
         self._num_users = self._data.num_users
         self._random = np.random
-        self._sample_negative_items_empirically = True
 
         self._params_list = [
             ("_factors", "factors", "factors", 10, None, None),
@@ -45,15 +40,10 @@ class NonNegMF(RecMixin, BaseRecommenderModel):
         ]
         self.autoset_params()
 
-        # self._learning_rate = self._params.lr
-        # self._factors = self._params.factors
-        # self._l_w = self._params.reg
-
         if self._batch_size < 1:
             self._batch_size = self._data.transactions
 
         self._ratings = self._data.train_dict
-        # self._global_mean = np.mean([r for user_items in self._data.train_dict.values() for r in user_items.values()])
         self._global_mean = np.mean(self._data.sp_i_train_ratings)
         self._sp_i_train = self._data.sp_i_train
         self._i_items_set = list(range(self._num_items))
@@ -61,12 +51,8 @@ class NonNegMF(RecMixin, BaseRecommenderModel):
         self._model = NonNegMFModel(self._data, self._num_users, self._num_items, self._global_mean, self._factors,
                                     self._l_w, self._learning_rate, random_seed=42)
 
-        self._iteration = 0
-
         self.evaluator = Evaluator(self._data, self._params)
-
         self._params.name = self.name
-
         build_model_folder(self._config.path_output_rec_weight, self.name)
         self._saving_filepath = f'{self._config.path_output_rec_weight}{self.name}/best-weights-{self.name}'
         self.logger = logging.get_logger(self.__class__.__name__)
@@ -92,9 +78,11 @@ class NonNegMF(RecMixin, BaseRecommenderModel):
 
     def train(self):
         print(f"Transactions: {self._data.transactions}")
-        best_metric_value = -np.inf
+        if self._restore:
+            return self.restore_weights()
+
+        best_metric_value = 0
         for it in range(self._epochs):
-            self.restore_weights(it)
             print(f"\n********** Iteration: {it + 1}")
             self._iteration = it
 
@@ -114,14 +102,22 @@ class NonNegMF(RecMixin, BaseRecommenderModel):
                     if self._save_recs:
                         store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}-it:{it + 1}.tsv")
 
-    def restore_weights(self, it):
-        if self._restore_epochs == it:
-            try:
-                with open(self._saving_filepath, "rb") as f:
-                    self._model.set_model_state(pickle.load(f))
-                print(f"Model correctly Restored at Epoch: {self._restore_epochs}")
-                return True
-            except Exception as ex:
-                print(f"Error in model restoring operation! {ex}")
-        return False
+    def restore_weights(self):
+        try:
+            with open(self._saving_filepath, "rb") as f:
+                self._model.set_model_state(pickle.load(f))
+            print(f"Model correctly Restored")
 
+            recs = self.get_recommendations(self.evaluator.get_needed_recommendations())
+            result_dict = self.evaluator.eval(recs)
+            self._results.append(result_dict)
+
+            print("******************************************")
+            if self._save_recs:
+                store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}.tsv")
+            return True
+
+        except Exception as ex:
+            print(f"Error in model restoring operation! {ex}")
+
+        return False

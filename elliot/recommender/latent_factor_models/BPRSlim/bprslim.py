@@ -8,12 +8,9 @@ __version__ = '0.1'
 __author__ = 'Felice Antonio Merra'
 __email__ = 'felice.merra@poliba.it'
 
-import time
 import numpy as np
 import pickle
-from ast import literal_eval as make_tuple
 from tqdm import tqdm
-import scipy.sparse as sps
 
 from dataset.samplers import custom_sampler as cs
 from evaluation.evaluator import Evaluator
@@ -32,12 +29,9 @@ class BPRSlim(RecMixin, BaseRecommenderModel):
     def __init__(self, data, config, params, *args, **kwargs):
         super().__init__(data, config, params, *args, **kwargs)
 
-        self._restore = getattr(self._params, "restore", False)
-
         self._num_items = self._data.num_items
         self._num_users = self._data.num_users
         self._random = np.random
-        self._sample_negative_items_empirically = True
 
         self._params_list = [
             ("_lr", "lr", "lr", 0.001, None, None),
@@ -113,7 +107,7 @@ class BPRSlim(RecMixin, BaseRecommenderModel):
                     best_metric_value = self._results[-1][self._validation_k]["val_results"][self._validation_metric]
                     if self._save_weights:
                         with open(self._saving_filepath, "wb") as f:
-                            pickle.dump(self._datamodel.get_model_state(), f)
+                            pickle.dump(self._model.get_model_state(), f)
                     if self._save_recs:
                         store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}-it:{it + 1}.tsv")
 

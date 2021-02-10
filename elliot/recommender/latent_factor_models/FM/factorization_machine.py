@@ -18,6 +18,7 @@ from evaluation.evaluator import Evaluator
 from recommender.base_recommender_model import BaseRecommenderModel
 from recommender.latent_factor_models.FM.factorization_machine_model import FactorizationMachineModel
 from recommender.recommender_utils_mixin import RecMixin
+from utils import logging
 from utils.folder import build_model_folder
 from utils.write import store_recommendation
 
@@ -32,9 +33,6 @@ class FactorizationMachine(RecMixin, BaseRecommenderModel):
         self._num_items = self._data.num_items
         self._num_users = self._data.num_users
         self._random = np.random
-        self._sample_negative_items_empirically = True
-
-        self._sampler = pws.Sampler(self._data.i_train_dict)
 
         self._params_list = [
             ("_factors", "factors", "factors", 10, None, None),
@@ -44,30 +42,20 @@ class FactorizationMachine(RecMixin, BaseRecommenderModel):
         ]
         self.autoset_params()
 
-        # self._learning_rate = self._params.lr
-        # self._factors = self._params.factors
-        # self._l_w = self._params.reg
-
-        # self._is_pretrain = self._params.is_pretrain
-        # self._mf_pretrain_path = self._params.mf_pretrain_path
-        # self._mlp_pretrain_path = self._params.mlp_pretrain_path
-
         if self._batch_size < 1:
             self._batch_size = self._data.transactions
 
         self._ratings = self._data.train_dict
         self._sp_i_train = self._data.sp_i_train
         self._i_items_set = list(range(self._num_items))
-        # self._i_zeros = [list(items_set-set(user_train)) for user_train in self._sp_i_train.tolil().rows]
+
+        self._sampler = pws.Sampler(self._data.i_train_dict)
+
         self._model = FactorizationMachineModel(self._num_users, self._num_items, self._factors,
                                                 self._l_w_1, self._l_w_2, self._learning_rate)
 
-        self._iteration = 0
-
         self.evaluator = Evaluator(self._data, self._params)
-
         self._params.name = self.name
-
         build_model_folder(self._config.path_output_rec_weight, self.name)
         self._saving_filepath = f'{self._config.path_output_rec_weight}{self.name}/best-weights-{self.name}'
         self.logger = logging.get_logger(self.__class__.__name__)
@@ -79,19 +67,16 @@ class FactorizationMachine(RecMixin, BaseRecommenderModel):
                + "_bs:" + str(self._batch_size) \
                + f"_{self.get_params_shortcut()}"
 
-    def get_recommendations(self, k: int = 100):
-        pass
-
     def predict(self, u: int, i: int):
         pass
 
     def train(self):
+        if self._restore:
+            return self.restore_weights()
 
         best_metric_value = 0
-        self._update_count = 0
 
         for it in range(self._epochs):
-            self.restore_weights(it)
             loss = 0
             steps = 0
             with tqdm(total=int(self._data.transactions // self._batch_size), disable=not self._verbose) as t:
@@ -122,11 +107,8 @@ class FactorizationMachine(RecMixin, BaseRecommenderModel):
         for index, offset in enumerate(range(0, self._num_users, self._batch_size)):
             offset_stop = min(offset + self._batch_size, self._num_users)
             predictions = self._model.get_recs(
-                (
-                    np.repeat(np.array(list(range(offset,offset_stop)))[:, None], repeats=self._num_items,axis=1),
-                 np.array([self._i_items_set for _ in range(offset,offset_stop)])
-                 )
-            )
+                (np.repeat(np.array(list(range(offset, offset_stop)))[:, None], repeats=self._num_items, axis=1),
+                 np.array([self._i_items_set for _ in range(offset, offset_stop)])))
             v, i = self._model.get_top_k(predictions, self.get_train_mask(offset, offset_stop), k=k)
             items_ratings_pair = [list(zip(map(self._data.private_items.get, u_list[0]), u_list[1]))
                                   for u_list in list(zip(i.numpy(), v.numpy()))]
@@ -134,13 +116,22 @@ class FactorizationMachine(RecMixin, BaseRecommenderModel):
                                                   range(offset, offset_stop)), items_ratings_pair)))
         return predictions_top_k
 
-    def restore_weights(self, it):
-        if self._restore_epochs == it:
-            try:
-                with open(self._saving_filepath, "rb") as f:
-                    self._model.set_model_state(pickle.load(f))
-                print(f"Model correctly Restored at Epoch: {self._restore_epochs}")
-                return True
-            except Exception as ex:
-                print(f"Error in model restoring operation! {ex}")
+    def restore_weights(self):
+        try:
+            with open(self._saving_filepath, "rb") as f:
+                self._model.set_model_state(pickle.load(f))
+            print(f"Model correctly Restored")
+
+            recs = self.get_recommendations(self.evaluator.get_needed_recommendations())
+            result_dict = self.evaluator.eval(recs)
+            self._results.append(result_dict)
+
+            print("******************************************")
+            if self._save_recs:
+                store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}.tsv")
+            return True
+
+        except Exception as ex:
+            print(f"Error in model restoring operation! {ex}")
+
         return False
