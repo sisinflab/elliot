@@ -3,6 +3,7 @@ Module description:
 Lemire, Daniel, and Anna Maclachlan. "Slope one predictors for online rating-based collaborative filtering."
 Proceedings of the 2005 SIAM International Conference on Data Mining. Society for Industrial and Applied Mathematics
 """
+from utils import logging
 
 __version__ = '0.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo'
@@ -40,6 +41,7 @@ class SlopeOne(RecMixin, BaseRecommenderModel):
 
         build_model_folder(self._config.path_output_rec_weight, self.name)
         self._saving_filepath = f'{self._config.path_output_rec_weight}{self.name}/best-weights-{self.name}'
+        self.logger = logging.get_logger(self.__class__.__name__)
 
         self._datamodel.initialize()
         # start = time.time()

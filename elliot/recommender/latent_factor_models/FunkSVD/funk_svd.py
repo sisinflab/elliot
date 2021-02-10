@@ -2,7 +2,7 @@
 Module description:
 
 """
-
+from utils import logging
 
 __version__ = '0.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo'
@@ -16,7 +16,7 @@ from tqdm import tqdm
 
 from dataset.samplers import pointwise_pos_neg_sampler as pws
 from evaluation.evaluator import Evaluator
-from recommender.latent_factor_models.FunkSVD.fun_svd_model import FunkSVDModel
+from recommender.latent_factor_models.FunkSVD.funk_svd_model import FunkSVDModel
 from recommender.recommender_utils_mixin import RecMixin
 from utils.folder import build_model_folder
 from utils.write import store_recommendation
@@ -69,6 +69,7 @@ class FunkSVD(RecMixin, BaseRecommenderModel):
 
         build_model_folder(self._config.path_output_rec_weight, self.name)
         self._saving_filepath = f'{self._config.path_output_rec_weight}{self.name}/best-weights-{self.name}'
+        self.logger = logging.get_logger(self.__class__.__name__)
 
     @property
     def name(self):

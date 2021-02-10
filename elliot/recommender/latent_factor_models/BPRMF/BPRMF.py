@@ -189,6 +189,7 @@ class BPRMF(RecMixin, BaseRecommenderModel):
 
         build_model_folder(self._config.path_output_rec_weight, self.name)
         self._saving_filepath = f'{self._config.path_output_rec_weight}{self.name}/best-weights-{self.name}'
+        self.logger = logging.get_logger(self.__class__.__name__)
 
     def get_recommendations(self, k: int = 100):
         return {u: self._datamodel.get_user_recs(u, k) for u in self._ratings.keys()}

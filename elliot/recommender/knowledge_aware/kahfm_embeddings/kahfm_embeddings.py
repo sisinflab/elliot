@@ -2,6 +2,8 @@
 Module description:
 
 """
+from utils import logging
+from utils.folder import build_model_folder
 
 __version__ = '0.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta'
@@ -82,7 +84,9 @@ class KaHFMEmbeddings(RecMixin, BaseRecommenderModel):
                                   self._params.l_w,
                                   self._params.l_b)
 
-        self._saving_filepath = f'{self._config.path_output_rec_weight}/best-weights-{self.name}'
+        build_model_folder(self._config.path_output_rec_weight, self.name)
+        self._saving_filepath = f'{self._config.path_output_rec_weight}{self.name}/best-weights-{self.name}'
+        self.logger = logging.get_logger(self.__class__.__name__)
 
     @property
     def name(self):

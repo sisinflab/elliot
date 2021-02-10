@@ -4,7 +4,7 @@ Module description:
 Mnih, Andriy, and Russ R. Salakhutdinov. "Probabilistic matrix factorization." Advances in neural information processing systems 20 (2007)
 
 """
-
+from utils import logging
 
 __version__ = '0.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo'
@@ -70,6 +70,7 @@ class ProbabilisticMatrixFactorization(RecMixin, BaseRecommenderModel):
 
         build_model_folder(self._config.path_output_rec_weight, self.name)
         self._saving_filepath = f'{self._config.path_output_rec_weight}{self.name}/best-weights-{self.name}'
+        self.logger = logging.get_logger(self.__class__.__name__)
 
     @property
     def name(self):

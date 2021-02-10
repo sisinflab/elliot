@@ -150,39 +150,6 @@ class MF(object):
         self._item_factors[self._public_items[item]] = v
 
 
-# class Sampler:
-#     def __init__(self, ratings: t.Dict,
-#                  random: t.Any,
-#                  sample_negative_items_empirically: bool = True
-#                  ):
-#         self._ratings: t.Dict = ratings
-#         self._random: t.Any = random
-#         self._sample_negative_items_empirically: bool = sample_negative_items_empirically
-#         self._users: t.List = list(self._ratings.keys())
-#         self._items: t.List = list({k for a in self._ratings.values() for k in a.keys()})
-#
-#     def sample(self, events: int):
-#         r_int = self._random.randint
-#         n_users = len(self._users)
-#         n_items = len(self._items)
-#         users = self._users
-#         items = self._items
-#         ratings = self._ratings
-#
-#         for _ in range(events):
-#             u = users[r_int(n_users)]
-#             ui = set(ratings[u].keys())
-#             lui = len(ui)
-#             if lui == n_items: continue
-#             i = list(ui)[r_int(lui)]
-#
-#             j = items[r_int(n_items)]
-#             while j in ui:
-#                 j = items[r_int(n_items)]
-#
-#             yield u, i, j
-
-
 class KaHFM(RecMixin, BaseRecommenderModel):
 
     def __init__(self, data, config, params, *args, **kwargs):
@@ -237,7 +204,8 @@ class KaHFM(RecMixin, BaseRecommenderModel):
         self._params.name = self.name
 
         build_model_folder(self._config.path_output_rec_weight, self.name)
-        self._saving_filepath = f'{self._config.path_output_rec_weight}{self.name}best-weights-{self.name}'
+        self._saving_filepath = f'{self._config.path_output_rec_weight}{self.name}/best-weights-{self.name}'
+        self.logger = logging.get_logger(self.__class__.__name__)
 
     def get_recommendations(self, k: int = 100):
         return {u: self._datamodel.get_user_recs(u, k) for u in self._ratings.keys()}

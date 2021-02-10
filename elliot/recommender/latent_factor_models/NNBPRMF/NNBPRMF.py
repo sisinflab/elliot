@@ -2,6 +2,7 @@
 Module description:
 
 """
+from utils.folder import build_model_folder
 
 __version__ = '0.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta'
@@ -72,7 +73,8 @@ class NNBPRMF(RecMixin, BaseRecommenderModel):
                                     self._num_users,
                                     self._num_items)
 
-        self._saving_filepath = f'{self._config.path_output_rec_weight}/best-weights-{self.name}'
+        build_model_folder(self._config.path_output_rec_weight, self.name)
+        self._saving_filepath = f'{self._config.path_output_rec_weight}{self.name}/best-weights-{self.name}'
         self.logger = logging.get_logger(self.__class__.__name__)
 
     @property
