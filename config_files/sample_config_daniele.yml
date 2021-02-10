@@ -1,17 +1,17 @@
 experiment:
   data_config:
     strategy: fixed
-#    dataloader: KnowledgeChainsLoader|DataSetLoader
+    dataloader: VisualLoader
     dataset_path: ../data/{0}/trainingset.tsv
     root_folder: ../data/{0}/splitting/
     train_path: ../data/{0}/trainingset.tsv
 #    validation_path: ../data/{0}/trainingset.tsv
     test_path: ../data/{0}/testset.tsv
     side_information:
-        feature_data: ../data/{0}/original/features.npy
-        map: ../data/{0}/map.tsv
-        features: ../data/{0}/features.tsv
-        properties: ../data/{0}/properties.conf
+      visual_features: ../data/{0}/original/features.npy
+      item_mapping: ../data/{0}/visual_feats.tsv
+#      images_src_folder: ../data/{0}/original/images/
+#      output_image_size: (224,224)
 #  splitting:
 #    save_on_disk: True
 #    save_folder: ../data/{0}/splitting/
@@ -130,13 +130,14 @@ experiment:
 #      l_b: 0
     VBPR:
       meta:
-        verbose: 1
-        save_weights: True
-        save_recs: True
-        validation_metric: nDCG
+        verbose: True
+        validation_rate: 10
+        save_weights: False
+        save_recs: False
+        validation_metric: nDCG@10
         restore_epoch: -1
-      lr: 0.005
-      epochs: 20
+      lr: 0.0005
+      epochs: 50
       embed_k: 100
       embed_d: 20
       batch_size: 128
@@ -334,4 +335,20 @@ experiment:
 #      reg: 0.01
 #      lr: 0.01
 #      alpha: 0.5
+#      batch_size: 512
+#    GMF:
+#      meta:
+#        hyper_max_evals: 1
+#        hyper_opt_alg: tpe
+#        validation_rate: 10
+#        verbose: True
+#        save_weights: False
+#        save_recs: False
+#        validation_metric: nDCG@10
+#        restore_epoch: -1
+#      epochs: 100
+#      restore: False
+#      mf_factors: 50
+#      is_edge_weight_train: True
+#      lr: 0.01
 #      batch_size: 512

@@ -51,7 +51,7 @@ class VBPR(NNBPRMF, VisualLoader):
 
         self.autoset_params()
 
-        self.process_visual_features(self._data)
+        item_indices = [self._data.item_mapping[self._data.private_items[item]] for item in range(self._num_items)]
 
         self._model = VBPR_model(self._params.embed_k,
                                  self._params.embed_d,
@@ -59,8 +59,8 @@ class VBPR(NNBPRMF, VisualLoader):
                                  self._params.l_w,
                                  self._params.l_b,
                                  self._params.l_e,
-                                 self._emb_image,
-                                 self._num_image_feature,
+                                 self._data.visual_features[item_indices],
+                                 self._data.visual_features.shape[1],
                                  self._num_users,
                                  self._num_items)
 
