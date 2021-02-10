@@ -20,3 +20,4 @@ from .FM import FM
 from .BPRSlim import BPRSlim
 from .Slim import Slim
 from .CML import CML
+from .FISM import FISM
