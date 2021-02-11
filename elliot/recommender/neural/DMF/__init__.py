@@ -1,1 +1,1 @@
-from .deep_matrix_factorization import DeepMatrixFactorization
+from .deep_matrix_factorization import DMF
