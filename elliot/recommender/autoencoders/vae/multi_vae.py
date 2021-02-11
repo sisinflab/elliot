@@ -13,9 +13,8 @@ import random
 from tqdm import tqdm
 
 from dataset.samplers import sparse_sampler as sp
-from evaluation.evaluator import Evaluator
 from recommender import BaseRecommenderModel
-from utils.folder import build_model_folder
+from recommender.base_recommender_model import init_charger
 from utils.write import store_recommendation
 
 from recommender.autoencoders.vae.multi_vae_utils import VariationalAutoEncoder
@@ -27,13 +26,10 @@ random.seed(0)
 
 class MultiVAE(RecMixin, BaseRecommenderModel):
 
+    @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
         """
         """
-        super().__init__(data, config, params, *args, **kwargs)
-
-        self._num_items = self._data.num_items
-        self._num_users = self._data.num_users
         self._random = np.random
         self._random_p = random
 
@@ -44,7 +40,6 @@ class MultiVAE(RecMixin, BaseRecommenderModel):
             self._batch_size = self._num_users
 
         ######################################
-
 
         self._params_list = [
             ("_intermediate_dim", "intermediate_dim", "intermediate_dim", 600, int, None),
@@ -68,12 +63,6 @@ class MultiVAE(RecMixin, BaseRecommenderModel):
         self._total_anneal_steps = 200000
         # largest annealing parameter
         self._anneal_cap = 0.2
-
-        self.evaluator = Evaluator(self._data, self._params)
-        self._params.name = self.name
-        build_model_folder(self._config.path_output_rec_weight, self.name)
-        self._saving_filepath = f'{self._config.path_output_rec_weight}{self.name}/best-weights-{self.name}'
-        self.logger = logging.get_logger(self.__class__.__name__)
 
     @property
     def name(self):
@@ -120,23 +109,3 @@ class MultiVAE(RecMixin, BaseRecommenderModel):
                         self._model.save_weights(self._saving_filepath)
                     if self._save_recs:
                         store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}-it:{it + 1}.tsv")
-
-    def restore_weights(self):
-        try:
-            self._model.load_weights(self._saving_filepath)
-            print(f"Model correctly Restored")
-
-            recs = self.get_recommendations(self.evaluator.get_needed_recommendations())
-            result_dict = self.evaluator.eval(recs)
-            self._results.append(result_dict)
-
-            print("******************************************")
-            if self._save_recs:
-                store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}.tsv")
-            return True
-
-        except Exception as ex:
-            print(f"Error in model restoring operation! {ex}")
-
-        return False
-

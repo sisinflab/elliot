@@ -2,19 +2,19 @@ experiment:
   data_config:
     strategy: fixed
 #    dataloader: KnowledgeChainsLoader
-    dataloader: VisualLoader
+#    dataloader: VisualLoader
     train_path: ../data/{0}/trainingset.tsv
     test_path: ../data/{0}/testset.tsv
-    side_information:
-        visual_features: ../data/{0}/ciao.npy
-        item_mapping: ../data/{0}/visual_feats.tsv
-        images_src_folder: ../data/yoyo/
-        output_image_size: (224,224)
+#    side_information:
+#        visual_features: ../data/{0}/ciao.npy
+#        item_mapping: ../data/{0}/visual_feats.tsv
+#        images_src_folder: ../data/yoyo/
+#        output_image_size: (224,224)
 #        map: ../data/{0}/map.tsv
 #        features: ../data/{0}/features.tsv
 #        properties: ../data/{0}/properties.conf
   dataset: example
-  external_models_path: ../external/models/__init__.py
+#  external_models_path: ../external/models/__init__.py
 #  path_output_rec_result: ../results/{0}/recs/
 #  path_output_rec_weight: ../results/{0}/weights/
 #  path_output_rec_performance: ../results/{0}/performance/
@@ -22,14 +22,14 @@ experiment:
 #  path_log_folder: ../log/
   top_k: 20
   evaluation:
-    cutoff: [10]
-    simple_metrics: [AUC, nDCG, Precision, Recall, ItemCoverage, HR, MAP, F1, Gini, SEntropy, EFD, EPC, ARP, APLT, ACLT, PopRSP, PopREO, MAR, UserCoverage, NumRetrieved]
+    cutoff: 10
+    simple_metrics: [AUC, nDCG, Precision, Recall, ItemCoverage, HR, MAP, F1, Gini, SEntropy, EFD, EPC, ARP, APLT, ACLT]
     relevance_threshold: 3
     paired_ttest: True
-    complex_metrics:
-    - metric: REO
-      clustering_name: ItemPopularity
-      clustering_file: ../data/categorical_dbpedia_ml1m/items_clustering_popularity.tsv
+#    complex_metrics:
+#    - metric: REO
+#      clustering_name: ItemPopularity
+#      clustering_file: ../data/categorical_dbpedia_ml1m/items_clustering_popularity.tsv
 #    - metric: ItemMADrating
 #      clustering_name: ItemPopularity
 #      clustering_file: ../data/categorical_dbpedia_ml1m/items_clustering_popularity.tsv
@@ -57,10 +57,10 @@ experiment:
 #      user_clustering_file: ../data/categorical_dbpedia_ml1m/user_clustering_happiness.tsv
 #      item_clustering_name: ItemPopularity
 #      item_clustering_file: ../data/categorical_dbpedia_ml1m/items_clustering_popularity.tsv
-    - metric: DSC
-      beta: 2
-    - metric: SRecall
-      feature_data: ../data/categorical_dbpedia_ml1m/map.tsv
+#    - metric: DSC
+#      beta: 2
+#    - metric: SRecall
+#      feature_data: ../data/categorical_dbpedia_ml1m/map.tsv
   gpu: -1 # -1 is not use GPU
   models:
 #    PureSVD:
@@ -98,17 +98,35 @@ experiment:
 #    Random:
 #      meta:
 #        save_recs: True
+#    MultiVAE:
+#      meta:
+#        hyper_max_evals: 3
+#        hyper_opt_alg: tpe
+#        validation_rate: 10
+#        verbose: True
+#        save_weights: True
+#        save_recs: False
+##        restore: True
+#      lr: [loguniform, -10, -1]
+#      epochs: 10
+#      intermediate_dim: [uniform,50,100]
+#      latent_dim: 100
+#      batch_size: -1
+#      dropout_pkeep: 1
+#      reg_lambda: 0.01
+      #e:10_bs:6040_intermediate_dim:91_latent_dim:100_reg_lambda:0.01_lr:0.002718457840118028_dropout_pkeep:0.0
     MultiVAE:
       meta:
-        hyper_max_evals: 3
-        hyper_opt_alg: tpe
-        validation_rate: 10
+#        hyper_max_evals: 3
+#        hyper_opt_alg: tpe
+#        validation_rate: 10
         verbose: True
-        save_weights: False
-        save_recs: False
-      lr: [loguniform, -10, -1]
+#        save_weights: True
+        save_recs: True
+        restore: True
+      lr: 0.002718457840118028
       epochs: 10
-      intermediate_dim: [uniform,50,100]
+      intermediate_dim: 91
       latent_dim: 100
       batch_size: -1
       dropout_pkeep: 1

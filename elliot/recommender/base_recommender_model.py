@@ -2,6 +2,9 @@
 Module description:
 
 """
+from evaluation.evaluator import Evaluator
+from utils import logging
+from utils.folder import build_model_folder
 
 __version__ = '0.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo'
@@ -9,6 +12,8 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
 from abc import ABC
 from abc import abstractmethod
+from functools import wraps
+import numpy as np
 
 
 class BaseRecommenderModel(ABC):
@@ -93,3 +98,22 @@ class BaseRecommenderModel(ABC):
     @abstractmethod
     def get_results(self):
         pass
+
+
+def init_charger(init):
+    @wraps(init)
+    def new_init(self, *args, **kwargs):
+        BaseRecommenderModel.__init__(self, *args, **kwargs)
+
+        self._num_items = self._data.num_items
+        self._num_users = self._data.num_users
+
+        init(self, *args, **kwargs)
+
+        self.evaluator = Evaluator(self._data, self._params)
+        self._params.name = self.name
+        build_model_folder(self._config.path_output_rec_weight, self.name)
+        self._saving_filepath = f'{self._config.path_output_rec_weight}{self.name}/best-weights-{self.name}'
+        self.logger = logging.get_logger(self.__class__.__name__)
+
+    return new_init
