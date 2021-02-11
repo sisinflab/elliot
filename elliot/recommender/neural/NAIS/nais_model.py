@@ -18,28 +18,34 @@ tf.random.set_seed(0)
 tf.random.set_seed(0)
 
 
-class FISM_model(keras.Model):
+class NAIS_model(keras.Model):
 
     def __init__(self,
                  data,
+                 algorithm,
+                 weight_size,
                  factors,
                  lr,
                  l_w,
                  l_b,
                  alpha,
+                 beta,
                  num_users,
                  num_items,
-                 name="FISM",
+                 name="NAIS",
                  **kwargs):
         super().__init__(name=name, **kwargs)
         tf.random.set_seed(42)
 
         self._data = data
+        self._algorithm = algorithm
+        self._weight_size = weight_size
         self._factors = factors
         self._lr = lr
         self._l_w = l_w
         self._l_b = l_b
         self._alpha = alpha
+        self._beta = beta
         self._num_users = num_users
         self._num_items = num_items
 
@@ -53,11 +59,78 @@ class FISM_model(keras.Model):
         self.Gi = tf.Variable(self.initializer(shape=[self._num_items, self._factors]), name='Gi', dtype=tf.float32)
         self.Gj = tf.Variable(self.initializer(shape=[self._num_items, self._factors]), name='Gj', dtype=tf.float32)
 
+        self._mlp_layers = keras.Sequential()
+        if self._algorithm == 'concat':
+            self._mlp_layers.add(
+                keras.layers.Dense(self._factors * 2, activation='relu', kernel_initializer=self.initializer))
+        elif self._algorithm == 'product':
+            self._mlp_layers.add(
+                keras.layers.Dense(self._factors, activation='relu', kernel_initializer=self.initializer))
+        else:
+            raise Exception('Algorithm not found for NAIS. Please select concat of product to use NAIS.')
+        self._mlp_layers.add(
+            keras.layers.Dense(self._weight_size, activation='linear', kernel_initializer=self.initializer))
+        self._mlp_layers.add(
+            keras.layers.Dense(1, activation='linear', kernel_initializer=self.initializer))
+
         self.optimizer = tf.optimizers.Adam(self._lr)
 
         self.loss = keras.losses.BinaryCrossentropy()
 
         self.saver_ckpt = tf.train.Checkpoint(optimizer=self.optimizer, model=self)
+
+    @tf.function
+    def attention(self, user_history, target):
+        # Attention Layers
+        if self._algorithm == 'concat':
+            mlp_input = tf.concat([user_history, tf.broadcast_to(tf.expand_dims(target, axis=1), user_history.shape)],
+                                  axis=2)  # batch_size x max_len x factors*2
+        elif self._algorithm == 'product':
+            mlp_input = user_history * tf.expand_dims(target, axis=1)  # batch_size x max_len x factors
+
+        return tf.squeeze(self._mlp_layers(mlp_input))  # batch_size x max_len
+
+    @tf.function
+    def batch_attention(self, user_history, target):
+        batch_eval = user_history.shape[0]
+        # Attention Layers
+        target = tf.repeat(target, user_history.shape[0], axis=0)
+        user_history = tf.reshape(user_history,
+                                  [user_history.shape[1] * user_history.shape[0], user_history.shape[2],
+                                   user_history.shape[3]])
+        if self._algorithm == 'concat':
+            mlp_input = tf.concat([user_history, tf.broadcast_to(tf.expand_dims(target, axis=1), user_history.shape)],
+                                  axis=2)  # batch_size x max_len x factors*2
+        elif self._algorithm == 'product':
+            mlp_input = user_history * tf.expand_dims(target, axis=1)  # batch_size x max_len x factors
+
+        results = tf.squeeze(self._mlp_layers(mlp_input))
+
+        return tf.reshape(results, [batch_eval, self._num_items, results.shape[1]])  # br x batch_size x max_len
+
+    @tf.function
+    def batch_softmax(self, logits, item_num, similarity, user_bias, item_bias):
+        # Mask Softmax
+        batch_eval = logits.shape[0]
+        exp_logits = tf.exp(logits)  # batch_size x max_len
+        exp_sum = tf.reduce_sum(exp_logits, axis=1, keepdims=True)
+        exp_sum = tf.pow(exp_sum, self._beta)
+        weights = tf.divide(exp_logits, exp_sum)
+        coeff = tf.reshape(tf.pow(tf.cast(item_num, tf.float32), -self._alpha), [batch_eval, self._num_items])
+        prod = coeff * tf.reduce_sum(weights * similarity, axis=2)
+        return 1 / (1 + tf.math.exp(-(prod + tf.reshape(user_bias, prod.shape) + item_bias)))
+
+    @tf.function
+    def softmax(self, logits, item_num, similarity, user_bias, item_bias, batch_mask_mat=None):
+        # Mask Softmax
+        exp_logits = tf.exp(logits)  # batch_size x max_len
+        if batch_mask_mat is not None:
+            exp_logits = batch_mask_mat * exp_logits  # batch_size x max_len
+        exp_sum = tf.reduce_sum(exp_logits, axis=1, keepdims=True)
+        exp_sum = tf.pow(exp_sum, self._beta)
+        weights = tf.divide(exp_logits, exp_sum)
+        coeff = tf.pow(tf.cast(item_num, tf.float32), -self._alpha)
+        return 1 / (1 + tf.math.exp(-(coeff * tf.reduce_sum(weights * similarity, axis=1) + user_bias + item_bias)))
 
     @tf.function
     def call(self, inputs, training=None):
@@ -69,15 +142,15 @@ class FISM_model(keras.Model):
         # batch_mask_mat = self._mask_history_matrix[user]
         batch_mask_mat = tf.nn.embedding_lookup(self._mask_history_matrix, user)
 
-        user_history = tf.squeeze(tf.nn.embedding_lookup(self.Gi, user_inter))  # batch_size x max_len x embedding_size
-        target = tf.squeeze(tf.nn.embedding_lookup(self.Gj, item))  # batch_size x embedding_size
+        user_history = tf.squeeze(tf.nn.embedding_lookup(self.Gi, user_inter))  # batch_size x max_len x factors
+        target = tf.squeeze(tf.nn.embedding_lookup(self.Gj, item))  # batch_size x factors
         user_bias = tf.squeeze(tf.nn.embedding_lookup(self.Bu, user))  # batch_size x 1
         item_bias = tf.squeeze(tf.nn.embedding_lookup(self.Bi, item))
-
         similarity = tf.squeeze(tf.matmul(user_history, tf.expand_dims(target, axis=2)))
-        similarity = tf.convert_to_tensor(batch_mask_mat, dtype=tf.float32) * similarity
-        coeff = tf.pow(item_num, -tf.convert_to_tensor(self._alpha))
-        scores = 1 / (1 + tf.math.exp(-(coeff * tf.reduce_sum(similarity, axis=1) + user_bias + item_bias)))
+
+        logits = self.attention(user_history, target)
+        scores = self.softmax(logits, item_num, similarity, user_bias, item_bias, batch_mask_mat)
+
         return scores, user_bias, item_bias, user_history, target
 
     @tf.function
@@ -116,15 +189,19 @@ class FISM_model(keras.Model):
         item_bias = self.Bi
 
         similarity = tf.squeeze(tf.matmul(user_history, tf.expand_dims(targets, axis=2)))
-        coeff = tf.pow(tf.cast(item_num, tf.float32), -self._alpha)
-        scores = 1 / (1 + tf.math.exp(-(coeff * tf.reduce_sum(similarity, axis=1) + user_bias + item_bias)))
+
+        logits = self.attention(user_history, targets)
+        scores = self.softmax(logits, item_num, similarity, user_bias, item_bias)
 
         return scores
 
     @tf.function
-    def batch_predict(self, user_start, user_stop, **kwargs):
+    def batch_predict(self, user_start, user_stop):
+        # user_inters = self._history_item_matrix[user]
         user_inters = tf.nn.embedding_lookup(self._history_item_matrix, range(user_start, user_stop))
+        # item_num = self._history_lens[user]
         item_num = tf.nn.embedding_lookup(self._history_lens, range(user_start, user_stop))
+        # user_input = user_inters[:item_num]
         user_input = user_inters[:]
         repeats = self._num_items
         user_bias = tf.repeat(tf.nn.embedding_lookup(self.Bu, range(user_start, user_stop)), repeats)
@@ -140,13 +217,10 @@ class FISM_model(keras.Model):
 
         similarity = tf.squeeze(tf.matmul(user_history, tf.expand_dims(targets, axis=2)))
 
-        batch_eval = similarity.shape[0]
-        # coeff = tf.pow(tf.cast(item_num, tf.float32), -self._alpha)
-        # scores = 1 / (1 + tf.math.exp(-(coeff * tf.reduce_sum(similarity, axis=1) + user_bias + item_bias)))
-        coeff = tf.reshape(tf.pow(tf.cast(item_num, tf.float32), -self._alpha), [batch_eval, self._num_items])
-        prod = coeff * tf.reduce_sum(similarity, axis=2)
+        logits = self.batch_attention(user_history, targets)
+        scores = self.batch_softmax(logits, item_num, similarity, user_bias, item_bias)
 
-        return 1 / (1 + tf.math.exp(-(prod + tf.reshape(user_bias, prod.shape) + item_bias)))
+        return scores
 
     def create_history_item_matrix(self):
 
@@ -168,7 +242,7 @@ class FISM_model(keras.Model):
             mask_history_matrix[row_id, history_len[row_id]] = 1
             history_len[row_id] += 1
 
-        # return history_matrix, history_len, mask_history_matrix
+        # return tf.convert_to_tensor(history_matrix), tf.convert_to_tensor(history_len), tf.convert_to_tensor(mask_history_matrix)
         return tf.Variable(history_matrix), tf.Variable(history_len, dtype=tf.float32), tf.Variable(mask_history_matrix,
                                                                                                     dtype=tf.float32)
 

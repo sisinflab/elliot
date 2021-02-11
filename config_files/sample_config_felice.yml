@@ -344,5 +344,26 @@ experiment:
       l_b: 0.005
       alpha: 0.4
       epochs: 1
-      batch_size: 512
+      batch_size: 32
       neg_ratio: 1
+#    NAIS:
+#      meta:
+#        hyper_max_evals: 10
+#        hyper_opt_alg: tpe
+#        validation_rate: 1
+#        verbose: True
+#        save_weights: True
+#        save_recs: True
+#        validation_metric: nDCG
+#        restore_epoch: -1
+#      factors: 25
+#      lr: 0.001
+#      l_w: 0.0025
+#      l_b: 0.005
+#      alpha: 0.4
+#      beta: 0.5
+#      epochs: 1
+#      batch_size: 512
+#      neg_ratio: 1
+#      weight_size: 32
+#      algorithm: concat
