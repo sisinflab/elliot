@@ -18,7 +18,7 @@ from .knowledge_aware import KaHFM, KaHFMBatch, KaHFMEmbeddings
 from .graph_based import NGCF, LightGCN
 from .visual_recommenders import VBPR, DeepStyle
 from .NN import ItemKNN, UserKNN, AttributeItemKNN, AttributeUserKNN
-from .neural import DMF, NeuMF, GMF
+from .neural import DMF, NeuMF, GMF, NAIS
 from .content_based import VSM
 from .algebric import SlopeOne
 # from .attentive import AFM
