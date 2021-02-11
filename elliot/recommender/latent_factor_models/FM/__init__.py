@@ -1,1 +1,1 @@
-from .factorization_machine import FactorizationMachine as FM
+from .factorization_machine import FM

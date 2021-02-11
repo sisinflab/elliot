@@ -9,7 +9,7 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malite
 
 import tensorflow as tf
 
-from recommender.latent_factor_models.NNBPRMF.NNBPRMF_model import NNBPRMF_model
+from elliot.recommender.latent_factor_models.NNBPRMF.NNBPRMF_model import NNBPRMF_model
 
 
 class VBPR_model(NNBPRMF_model):

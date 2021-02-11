@@ -8,18 +8,17 @@ import operator
 
 import numpy as np
 
-from evaluation.evaluator import Evaluator
-from recommender.base_recommender_model import BaseRecommenderModel
-from recommender.recommender_utils_mixin import RecMixin
-from utils import logging
-from utils.folder import build_model_folder
-from utils.write import store_recommendation
+from elliot.evaluation.evaluator import Evaluator
+from elliot.recommender.base_recommender_model import BaseRecommenderModel
+from elliot.recommender.recommender_utils_mixin import RecMixin
+from elliot.utils.write import store_recommendation
+from elliot.recommender.base_recommender_model import init_charger
 
 np.random.seed(0)
 
 
 class MostPop(RecMixin, BaseRecommenderModel):
-
+    @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
         """
         Create a Most Popular recommender.
@@ -28,20 +27,11 @@ class MostPop(RecMixin, BaseRecommenderModel):
         :param path_output_rec_weight: path to the directory rec. model parameters
         :param args: parameters
         """
-        super().__init__(data, config, params, *args, **kwargs)
-        self._num_items = self._data.num_items
-        self._num_users = self._data.num_users
         self._random = np.random
         self.evaluator = Evaluator(self._data, self._params)
 
         self._pop_items = {self._data.private_items[p]: pop for p, pop in enumerate(self._data.sp_i_train.astype(bool).sum(axis=0).tolist()[0])}
         self._sorted_pop_items = dict(sorted(self._pop_items.items(), key=operator.itemgetter(1), reverse=True))
-
-        self._params.name = self.name
-
-        build_model_folder(self._config.path_output_rec_weight, self.name)
-        self._saving_filepath = f'{self._config.path_output_rec_weight}{self.name}/best-weights-{self.name}'
-        self.logger = logging.get_logger(self.__class__.__name__)
 
     @property
     def name(self):
@@ -67,11 +57,7 @@ class MostPop(RecMixin, BaseRecommenderModel):
 
             lui = len(ui)
 
-            local_k = min(top_k, self._num_items - lui)
-
-            # if lui+top_k >= n_items:
-            #     r[u] = l
-            #     continue
+            local_k = min(top_k, n_items - lui)
 
             for item, pop in sorted_pop_items.items():
                 if item in ui:

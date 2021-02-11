@@ -10,7 +10,7 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 import operator
 
 import numpy as np
-from evaluation.metrics.base_metric import BaseMetric
+from elliot.evaluation.metrics.base_metric import BaseMetric
 
 
 class ACLT(BaseMetric):

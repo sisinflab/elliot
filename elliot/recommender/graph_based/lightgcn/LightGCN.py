@@ -10,34 +10,28 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malite
 import scipy.sparse as sp
 from tqdm import tqdm
 
-from utils.write import store_recommendation
+from elliot.utils.write import store_recommendation
 
 import numpy as np
 import random
-from utils import logging
 
-from dataset.samplers import custom_sampler as cs
-from evaluation.evaluator import Evaluator
-from utils.folder import build_model_folder
+from elliot.dataset.samplers import custom_sampler as cs
 
-from recommender import BaseRecommenderModel
-from recommender.recommender_utils_mixin import RecMixin
+from elliot.recommender import BaseRecommenderModel
+from elliot.recommender.recommender_utils_mixin import RecMixin
 
-from recommender.graph_based.lightgcn.LightGCN_model import LightGCNModel
+from elliot.recommender.graph_based.lightgcn.LightGCN_model import LightGCNModel
+from elliot.recommender.base_recommender_model import init_charger
 
 np.random.seed(42)
 random.seed(0)
 
 
 class LightGCN(RecMixin, BaseRecommenderModel):
-
+    @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
         """
         """
-        super().__init__(data, config, params, *args, **kwargs)
-
-        self._num_items = self._data.num_items
-        self._num_users = self._data.num_users
         self._random = np.random
         self._random_p = random
 
@@ -71,12 +65,6 @@ class LightGCN(RecMixin, BaseRecommenderModel):
             adjacency=self._adjacency,
             laplacian=self._laplacian
         )
-
-        self.evaluator = Evaluator(self._data, self._params)
-        self._params.name = self.name
-        build_model_folder(self._config.path_output_rec_weight, self.name)
-        self._saving_filepath = f'{self._config.path_output_rec_weight}{self.name}/best-weights-{self.name}'
-        self.logger = logging.get_logger(self.__class__.__name__)
 
     def _create_adj_mat(self):
         adjacency = sp.dok_matrix((self._num_users + self._num_items,

@@ -18,7 +18,7 @@ experiment:
   top_k: 20
   evaluation:
     cutoff: 10
-    simple_metrics: [AUC, nDCG, Precision, Recall, ItemCoverage, HR, MAP, F1, Gini, SEntropy, EFD, EPC, ARP, APLT, ACLT]
+    simple_metrics: [nDCG, Precision, Recall, ItemCoverage, HR, MAP, F1, Gini, SEntropy, EFD, EPC, ARP, APLT, ACLT]
     relevance_threshold: 3
     paired_ttest: True
 #    complex_metrics:

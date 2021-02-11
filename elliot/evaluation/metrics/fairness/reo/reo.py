@@ -12,8 +12,8 @@ import pandas as pd
 
 from collections import Counter
 
-from evaluation.metrics.base_metric import BaseMetric
-from evaluation.metrics.metrics_utils import ProxyMetric
+from elliot.evaluation.metrics.base_metric import BaseMetric
+from elliot.evaluation.metrics.metrics_utils import ProxyMetric
 
 class REO(BaseMetric):
     """

@@ -8,7 +8,7 @@ __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
 import numpy as np
-from evaluation.metrics.base_metric import BaseMetric
+from elliot.evaluation.metrics.base_metric import BaseMetric
 
 
 class Precision(BaseMetric):
@@ -64,5 +64,5 @@ class Precision(BaseMetric):
         :return: the overall averaged value of Precision
         """
         return {u: Precision.__user_precision(u_r, self._cutoff, self._relevant_items[u])
-             for u, u_r in self._recommendations.items()}
+             for u, u_r in self._recommendations.items() if len(self._relevant_items[u])}
 

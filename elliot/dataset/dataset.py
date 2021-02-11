@@ -13,9 +13,9 @@ import pandas as pd
 import scipy.sparse as sp
 import typing as t
 
-from dataset.abstract_dataset import AbstractDataset
-from splitter.base_splitter import Splitter
-from prefiltering.standard_prefilters import PreFilter
+from elliot.dataset.abstract_dataset import AbstractDataset
+from elliot.splitter.base_splitter import Splitter
+from elliot.prefiltering.standard_prefilters import PreFilter
 
 
 class DataSetLoader:

@@ -2,31 +2,28 @@
 Module description:
 
 """
-from utils.folder import build_model_folder
 
 __version__ = '0.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malitesta@poliba.it'
 
-from operator import itemgetter
 
 import numpy as np
-from utils import logging
 from tqdm import tqdm
 
-from dataset.samplers import custom_sampler as cs
-from evaluation.evaluator import Evaluator
-from utils.write import store_recommendation
+from elliot.dataset.samplers import custom_sampler as cs
+from elliot.utils.write import store_recommendation
 
-from recommender import BaseRecommenderModel
-from recommender.latent_factor_models.NNBPRMF.NNBPRMF_model import NNBPRMF_model
-from recommender.recommender_utils_mixin import RecMixin
+from elliot.recommender import BaseRecommenderModel
+from elliot.recommender.latent_factor_models.NNBPRMF.NNBPRMF_model import NNBPRMF_model
+from elliot.recommender.recommender_utils_mixin import RecMixin
+from elliot.recommender.base_recommender_model import init_charger
 
 np.random.seed(42)
 
 
 class NNBPRMF(RecMixin, BaseRecommenderModel):
-
+    @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
         """
         Create a BPR-MF instance.
@@ -38,10 +35,6 @@ class NNBPRMF(RecMixin, BaseRecommenderModel):
                                       [l_w, l_b]: regularization,
                                       lr: learning rate}
         """
-        super().__init__(data, config, params, *args, **kwargs)
-
-        self._num_items = self._data.num_items
-        self._num_users = self._data.num_users
         self._random = np.random
 
         self._params_list = [
@@ -65,12 +58,6 @@ class NNBPRMF(RecMixin, BaseRecommenderModel):
                                     self._l_b,
                                     self._num_users,
                                     self._num_items)
-
-        self.evaluator = Evaluator(self._data, self._params)
-        self._params.name = self.name
-        build_model_folder(self._config.path_output_rec_weight, self.name)
-        self._saving_filepath = f'{self._config.path_output_rec_weight}{self.name}/best-weights-{self.name}'
-        self.logger = logging.get_logger(self.__class__.__name__)
 
     @property
     def name(self):

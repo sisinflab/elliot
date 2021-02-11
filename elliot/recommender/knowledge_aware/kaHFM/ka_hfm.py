@@ -4,14 +4,12 @@ import pickle
 import typing as t
 
 
-from dataset.samplers import pairwise_sampler as ps
-from evaluation.evaluator import Evaluator
-from recommender.base_recommender_model import BaseRecommenderModel
-from recommender.recommender_utils_mixin import RecMixin
-from utils import logging
-from utils.folder import build_model_folder
-from utils.write import store_recommendation
-from recommender.knowledge_aware.kaHFM.tfidf_utils import TFIDF
+from elliot.dataset.samplers import pairwise_sampler as ps
+from elliot.recommender.base_recommender_model import BaseRecommenderModel
+from elliot.recommender.recommender_utils_mixin import RecMixin
+from elliot.utils.write import store_recommendation
+from elliot.recommender.knowledge_aware.kaHFM.tfidf_utils import TFIDF
+from elliot.recommender.base_recommender_model import init_charger
 
 np.random.seed(42)
 
@@ -152,12 +150,8 @@ class MF(object):
 
 
 class KaHFM(RecMixin, BaseRecommenderModel):
-
+    @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
-        super().__init__(data, config, params, *args, **kwargs)
-
-        self._num_items = self._data.num_items
-        self._num_users = self._data.num_users
         self._random = np.random
         self._sample_negative_items_empirically = True
 
@@ -187,12 +181,6 @@ class KaHFM(RecMixin, BaseRecommenderModel):
         self._model = MF(self._ratings, self._data.side_information_data.feature_map, self._tfidf, self._user_profiles, self._random)
         self._embed_k = self._model.get_factors()
         self._sampler = ps.Sampler(self._ratings, self._data.users, self._data.items)
-
-        self.evaluator = Evaluator(self._data, self._params)
-        self._params.name = self.name
-        build_model_folder(self._config.path_output_rec_weight, self.name)
-        self._saving_filepath = f'{self._config.path_output_rec_weight}{self.name}/best-weights-{self.name}'
-        self.logger = logging.get_logger(self.__class__.__name__)
 
     def get_recommendations(self, k: int = 100):
         return {u: self._model.get_user_recs(u, k) for u in self._ratings.keys()}

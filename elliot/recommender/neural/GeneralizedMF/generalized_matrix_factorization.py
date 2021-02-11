@@ -2,36 +2,28 @@
 Module description:
 
 """
-from utils import logging
 
 __version__ = '0.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malitesta@poliba.it'
 
 import numpy as np
-import pickle
-from ast import literal_eval as make_tuple
 from tqdm import tqdm
 
-from dataset.samplers import pointwise_pos_neg_sampler as pws
-from evaluation.evaluator import Evaluator
-from recommender.neural.GeneralizedMF.generalized_matrix_factorization_model import GeneralizedMatrixFactorizationModel
-from recommender.recommender_utils_mixin import RecMixin
-from utils.folder import build_model_folder
-from utils.write import store_recommendation
+from elliot.dataset.samplers import pointwise_pos_neg_sampler as pws
+from elliot.recommender.neural.GeneralizedMF.generalized_matrix_factorization_model import GeneralizedMatrixFactorizationModel
+from elliot.recommender.recommender_utils_mixin import RecMixin
+from elliot.utils.write import store_recommendation
 
-from recommender.base_recommender_model import BaseRecommenderModel
+from elliot.recommender.base_recommender_model import BaseRecommenderModel
+from elliot.recommender.base_recommender_model import init_charger
 
 np.random.seed(42)
 
 
 class GMF(RecMixin, BaseRecommenderModel):
-
+    @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
-        super().__init__(data, config, params, *args, **kwargs)
-
-        self._num_items = self._data.num_items
-        self._num_users = self._data.num_users
         self._random = np.random
 
         self._sampler = pws.Sampler(self._data.i_train_dict)
@@ -53,12 +45,6 @@ class GMF(RecMixin, BaseRecommenderModel):
                                                           self._mf_factors,
                                                           self._is_edge_weight_train,
                                                           self._learning_rate)
-
-        self.evaluator = Evaluator(self._data, self._params)
-        self._params.name = self.name
-        build_model_folder(self._config.path_output_rec_weight, self.name)
-        self._saving_filepath = f'{self._config.path_output_rec_weight}{self.name}/best-weights-{self.name}'
-        self.logger = logging.get_logger(self.__class__.__name__)
 
     @property
     def name(self):

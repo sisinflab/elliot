@@ -15,7 +15,7 @@ from hyperopt import hp
 from yaml import FullLoader as FullLoader
 from yaml import load
 from collections import OrderedDict
-from utils.folder import manage_directories
+from elliot.utils.folder import manage_directories
 import hyperoptimization as ho
 import re
 

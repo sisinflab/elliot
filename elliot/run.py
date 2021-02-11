@@ -14,11 +14,11 @@ import typing
 from os import path
 from hyperopt import Trials, fmin
 
-from namespace.namespace_model_builder import NameSpaceBuilder
-from result_handler import ResultHandler, HyperParameterStudy
+from elliot.namespace.namespace_model_builder import NameSpaceBuilder
+from elliot.result_handler import ResultHandler, HyperParameterStudy
 import hyperoptimization as ho
 import numpy as np
-from utils import logging as logging_project
+from elliot.utils import logging as logging_project
 
 _rstate = np.random.RandomState(42)
 here = path.abspath(path.dirname(__file__))

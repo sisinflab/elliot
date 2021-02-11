@@ -30,7 +30,7 @@ import numpy as np
 from . import metrics
 from . import relevance
 from . import popularity_utils
-import dataset.dataset as ds
+import elliot.dataset.dataset as ds
 
 
 class Evaluator(object):

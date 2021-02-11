@@ -36,8 +36,8 @@ class Relevance(object):
         :param threshold:
         :return:
         """
-        return {u: {i: 0 if score < self._rel_threshold else 2 ** (score - self._rel_threshold + 1) - 1
-                    for i, score in test_items.items()}
+        return {u: {i: 2 ** (score - self._rel_threshold + 1) - 1
+                    for i, score in test_items.items() if score >= self._rel_threshold}
                 for u, test_items in self._test.items()}
 
     def _binary_relevance_filter(self):
