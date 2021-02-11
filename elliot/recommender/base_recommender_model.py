@@ -2,9 +2,9 @@
 Module description:
 
 """
-from evaluation.evaluator import Evaluator
-from utils import logging
-from utils.folder import build_model_folder
+from elliot.evaluation.evaluator import Evaluator
+from elliot.utils import logging
+from elliot.utils.folder import build_model_folder
 
 __version__ = '0.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo'

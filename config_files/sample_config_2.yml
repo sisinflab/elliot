@@ -13,7 +13,7 @@ experiment:
         map: ../data/{0}/map.tsv
         features: ../data/{0}/features.tsv
         properties: ../data/{0}/properties.conf
-  dataset: example
+  dataset: categorical_dbpedia_ml1m
   external_models_path: ../external/models/__init__.py
   top_k: 20
   evaluation:
@@ -206,23 +206,23 @@ experiment:
 #      update_users: True
 #      update_items: True
 #      update_bias: True
-    PMF:
-      meta:
-        hyper_max_evals: 1
-        hyper_opt_alg: tpe
-        validation_rate: 1
-        verbose: True
-        save_weights: False
-        save_recs: False
-        validation_metric: nDCG@10
-        restore: False
-      lr: 0.001
-      epochs: 10
-      factors: 50
-      batch_size: 512
-      reg: 0.0025
-      reg_b: 0
-      gaussian_variance: 0.1
+#    PMF:
+#      meta:
+#        hyper_max_evals: 1
+#        hyper_opt_alg: tpe
+#        validation_rate: 1
+#        verbose: True
+#        save_weights: False
+#        save_recs: False
+#        validation_metric: nDCG@10
+#        restore: False
+#      lr: 0.001
+#      epochs: 10
+#      factors: 50
+#      batch_size: 512
+#      reg: 0.0025
+#      reg_b: 0
+#      gaussian_variance: 0.1
 ###    KaHFM:
 ###      meta:
 ###        hyper_max_evals: 1
@@ -288,7 +288,7 @@ experiment:
 #      is_mf_train: True
 #      is_mlp_train: True
 #      batch_size: 512
-#      epochs: 10
+#      epochs: 1
 #      lr: 0.001
 #       implementation: aiolli
 #    ItemKNN:
@@ -305,13 +305,13 @@ experiment:
 #      neighbors: 50
 #      similarity: braycurtis
 #      implementation: aiolli
-#    VSM:
-#      meta:
-#        verbose: True
-#        save_recs: False
-#      similarity: cosine
-#      user_profile: binary
-#      item_profile: binary
+    VSM:
+      meta:
+        verbose: True
+        save_recs: False
+      similarity: cosine
+      user_profile: binary
+      item_profile: binary
 #    external.MostPop:
 #      meta:
 #        save_recs: True
@@ -320,7 +320,7 @@ experiment:
 #        verbose: True
 #        save_recs: False
 #        validation_rate: 1
-#      epochs: 10
+#      epochs: 1
 #      lr: 0.001
 #      factors: 50
 #      reg: 0.005

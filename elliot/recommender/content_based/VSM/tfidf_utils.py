@@ -3,6 +3,7 @@ from collections import Counter
 import math
 import numpy as np
 
+
 class TFIDF:
     def __init__(self, map: t.Dict[int, t.List[int]]):
         self.__map = map
