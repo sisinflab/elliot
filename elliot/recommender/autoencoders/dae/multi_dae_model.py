@@ -20,7 +20,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 
 class Encoder(layers.Layer):
-    """Maps MNIST digits to a triplet (z_mean, z_log_var, z)."""
+    """Maps user-item interactions to a triplet (z_mean, z_log_var, z)."""
 
     def __init__(self, latent_dim=200,
                  intermediate_dim=600,
@@ -50,7 +50,7 @@ class Encoder(layers.Layer):
 
 
 class Decoder(layers.Layer):
-    """Converts z, the encoded digit vector, back into a readable digit."""
+    """Converts z, the encoded vector, back into a uaser interaction vector."""
 
     def __init__(self, original_dim, intermediate_dim=600, name="decoder", regularization_lambda=0.01, **kwargs):
         super().__init__(name=name, **kwargs)

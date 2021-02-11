@@ -2,7 +2,7 @@
 Module description:
 
 """
-
+from utils import logging
 
 __version__ = '0.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo'
@@ -26,7 +26,7 @@ from recommender.base_recommender_model import BaseRecommenderModel
 np.random.seed(42)
 
 
-class DeepMatrixFactorization(RecMixin, BaseRecommenderModel):
+class DMF(RecMixin, BaseRecommenderModel):
 
     def __init__(self, data, config, params, *args, **kwargs):
         super().__init__(data, config, params, *args, **kwargs)
@@ -44,12 +44,7 @@ class DeepMatrixFactorization(RecMixin, BaseRecommenderModel):
             ("_similarity", "similarity", "sim", "cosine", None, None)
         ]
         self.autoset_params()
-        # self._learning_rate = self._params.lr
-        # self._user_mlp = list(make_tuple(self._params.user_mlp))
-        # self._item_mlp = list(make_tuple(self._params.item_mlp))
-        # self._neg_ratio = self._params.neg_ratio
-        # self._reg = self._params.reg
-        # self._similarity = self._params.similarity
+
         self._max_ratings = np.max(self._data.sp_i_train_ratings)
         self._transactions_per_epoch = self._data.transactions + self._neg_ratio * self._data.transactions
 
@@ -61,31 +56,18 @@ class DeepMatrixFactorization(RecMixin, BaseRecommenderModel):
         self._ratings = self._data.train_dict
         self._sp_i_train = self._data.sp_i_train
         self._i_items_set = list(range(self._num_items))
-        # self._i_zeros = [list(items_set-set(user_train)) for user_train in self._sp_i_train.tolil().rows]
+
         self._model = DeepMatrixFactorizationModel(self._num_users, self._num_items, self._user_mlp,
                                                    self._item_mlp, self._reg,
                                                    self._similarity, self._max_ratings,
                                                    self._data.sp_i_train_ratings, self._learning_rate)
 
-        self._iteration = 0
-
         self.evaluator = Evaluator(self._data, self._params)
-
         self._params.name = self.name
-
         build_model_folder(self._config.path_output_rec_weight, self.name)
         self._saving_filepath = f'{self._config.path_output_rec_weight}{self.name}/best-weights-{self.name}'
+        self.logger = logging.get_logger(self.__class__.__name__)
 
-    # @property
-    # def name(self):
-    #     return "DMF"\
-    #            + "-e:" + str(self._epochs) \
-    #            + "-lr:" + str(self._learning_rate) \
-    #            + "-user_mlp:" + str(self._params.user_mlp).replace(",","-") \
-    #            + "-item_mlp:" + str(self._params.item_mlp).replace(",","-") \
-    #            + "-neg_ratio:" + str(self._neg_ratio) \
-    #            + "-reg:" + str(self._reg) \
-    #            + "-similarity:" + str(self._similarity)
     @property
     def name(self):
         return "DMF"\
@@ -93,16 +75,13 @@ class DeepMatrixFactorization(RecMixin, BaseRecommenderModel):
                + "_bs:" + str(self._batch_size) \
                + f"_{self.get_params_shortcut()}"
 
-    def predict(self, u: int, i: int):
-        pass
-
     def train(self):
+        if self._restore:
+            return self.restore_weights()
 
         best_metric_value = 0
-        self._update_count = 0
 
         for it in range(self._epochs):
-            self.restore_weights(it)
             loss = 0
             steps = 0
             with tqdm(total=int(self._transactions_per_epoch // self._batch_size), disable=not self._verbose) as t:
@@ -111,7 +90,6 @@ class DeepMatrixFactorization(RecMixin, BaseRecommenderModel):
                     loss += self._model.train_step(batch)
                     t.set_postfix({'loss': f'{loss.numpy() / steps:.5f}'})
                     t.update()
-                    self._update_count += 1
 
             if not (it + 1) % self._validation_rate:
                 recs = self.get_recommendations(self.evaluator.get_needed_recommendations())
@@ -144,14 +122,3 @@ class DeepMatrixFactorization(RecMixin, BaseRecommenderModel):
             predictions_top_k.update(dict(zip(map(self._data.private_users.get,
                                                   range(offset, offset_stop)), items_ratings_pair)))
         return predictions_top_k
-
-    def restore_weights(self, it):
-        if self._restore_epochs == it:
-            try:
-                with open(self._saving_filepath, "rb") as f:
-                    self._model.set_model_state(pickle.load(f))
-                print(f"Model correctly Restored at Epoch: {self._restore_epochs}")
-                return True
-            except Exception as ex:
-                print(f"Error in model restoring operation! {ex}")
-        return False

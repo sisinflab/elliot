@@ -2,38 +2,43 @@
 Module description:
 
 """
+import pickle
+
+from utils.folder import build_model_folder
 
 __version__ = '0.1'
 __author__ = 'Felice Antonio Merra'
 __email__ = 'felice.merra@poliba.it'
+__paper__ = 'FISM: Factored Item Similarity Models for Top-N Recommender Systems by Santosh Kabbur, Xia Ning, and George Karypis'
 
-import pickle
+from operator import itemgetter
 
 import numpy as np
+from utils import logging
 from tqdm import tqdm
 
-from dataset.samplers import custom_sampler as cs
+from dataset.samplers import pointwise_pos_neg_ratio_ratings_sampler as pws
 from evaluation.evaluator import Evaluator
-from recommender import BaseRecommenderModel
-from recommender.latent_factor_models.CML.CML_model import CML_model
-from recommender.recommender_utils_mixin import RecMixin
-from utils import logging
-from utils.folder import build_model_folder
 from utils.write import store_recommendation
+
+from recommender import BaseRecommenderModel
+from recommender.latent_factor_models.FISM.FISM_model import FISM_model
+from recommender.recommender_utils_mixin import RecMixin
 
 np.random.seed(42)
 
 
-class CML(RecMixin, BaseRecommenderModel):
+class FISM(RecMixin, BaseRecommenderModel):
 
     def __init__(self, data, config, params, *args, **kwargs):
         """
-        Create a CML instance.
-        (see https://vision.cornell.edu/se3/wp-content/uploads/2017/03/WWW-fp0554-hsiehA.pdf for details about the algorithm design choices).
+
+        Create a FISM instance.
+        (see http://glaros.dtc.umn.edu/gkhome/node/1068 for details about the algorithm design choices).
 
         Args:
             data: data loader object
-            params: model parameters {embed_k: embedding size,
+            params: model parameters {_factors: embedding size,
                                       [l_w, l_b]: regularization,
                                       lr: learning rate}
         """
@@ -43,31 +48,31 @@ class CML(RecMixin, BaseRecommenderModel):
         self._num_users = self._data.num_users
         self._random = np.random
 
+        self._params.alpha = 0 if self._params.alpha < 0 else 1 if self._params.alpha > 1 else self._params.alpha
+
         self._params_list = [
-            ("_user_factors", "factors", "factors", 100, None, None),
-            ("_learning_rate", "lr", "lr", 0.001, None, None),
+            ("_factors", "factors", "factors", 100, None, None),
+            ("_lr", "lr", "lr", 0.001, None, None),
             ("_l_w", "l_w", "l_w", 0.001, None, None),
             ("_l_b", "l_b", "l_b", 0.001, None, None),
-            ("_margin", "margin", "margin", 0.5, None, None),
+            ("_alpha", "alpha", "alpha", 0.5, None, None),
+            ("_neg_ratio", "neg_ratio", "neg_ratio", 0.5, None, None),
         ]
-
         self.autoset_params()
-
-        self._item_factors = self._user_factors
 
         if self._batch_size < 1:
             self._batch_size = self._data.transactions
 
         self._ratings = self._data.train_dict
 
-        self._sampler = cs.Sampler(self._data.i_train_dict)
+        self._sampler = pws.Sampler(self._data.i_train_dict, self._data.sp_i_train_ratings, self._neg_ratio)
 
-        self._model = CML_model(self._user_factors,
-                                self._item_factors,
-                                self._learning_rate,
+        self._model = FISM_model(self._data,
+                                self._factors,
+                                self._lr,
                                 self._l_w,
                                 self._l_b,
-                                self._margin,
+                                self._alpha,
                                 self._num_users,
                                 self._num_items)
 
@@ -79,7 +84,7 @@ class CML(RecMixin, BaseRecommenderModel):
 
     @property
     def name(self):
-        return "CML" \
+        return "FISM" \
                + "_e:" + str(self._epochs) \
                + "_bs:" + str(self._batch_size) \
                + f"_{self.get_params_shortcut()}"
@@ -88,7 +93,6 @@ class CML(RecMixin, BaseRecommenderModel):
         if self._restore:
             return self.restore_weights()
 
-        best_metric_value = 0
         for it in range(self._epochs):
             loss = 0
             steps = 0
@@ -114,11 +118,11 @@ class CML(RecMixin, BaseRecommenderModel):
                     if self._save_recs:
                         store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}-it:{it + 1}.tsv")
 
-    def get_recommendations(self, k: int = 100):
+    def get_recommendations(self, k: int = 100, auc_compute: bool = False):
         predictions_top_k = {}
-        for index, offset in enumerate(range(0, self._num_users, self._params.batch_size)):
-            offset_stop = min(offset + self._params.batch_size, self._num_users)
-            predictions = self._model.predict(offset, offset_stop)
+        for index, offset in enumerate(range(0, self._num_users, 1)):
+            offset_stop = min(offset + 1, self._num_users)
+            predictions = self._model.predict(offset)
             mask = self.get_train_mask(offset, offset_stop)
             v, i = self._model.get_top_k(predictions, mask, k=k)
             items_ratings_pair = [list(zip(map(self._data.private_items.get, u_list[0]), u_list[1]))
@@ -145,3 +149,4 @@ class CML(RecMixin, BaseRecommenderModel):
             print(f"Error in model restoring operation! {ex}")
 
         return False
+

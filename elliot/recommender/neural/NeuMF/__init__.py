@@ -1,1 +1,1 @@
-from .neural_matrix_factorization import NeuralMatrixFactorization
+from .neural_matrix_factorization import NeuMF

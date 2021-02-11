@@ -279,7 +279,6 @@ class VisualDataObject:
             self.test_dict = self.build_dict(data_tuple[2], self.users)
 
     def read_images(self, images_folder, image_set, size_tuple):
-
         image_dict = {}
         for path in os.listdir(images_folder):
             image_id = int(path.split(".")[0])
@@ -296,7 +295,7 @@ class VisualDataObject:
 
                     image_dict[image_id] = im_pos
                 except ValueError:
-                    print(f'Image at path {os.path.join(images_folder, image_path)}.jpg was not loaded correctly!')
+                    print(f'Image at path {os.path.join(images_folder, path)} was not loaded correctly!')
         return image_dict
 
     def read_images_multiprocessing(self, images_folder, image_set, size_tuple):

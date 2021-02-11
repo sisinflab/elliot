@@ -9,6 +9,7 @@ import numpy as np
 from evaluation.evaluator import Evaluator
 from recommender.base_recommender_model import BaseRecommenderModel
 from recommender.recommender_utils_mixin import RecMixin
+from utils import logging
 from utils.folder import build_model_folder
 from utils.write import store_recommendation
 
@@ -41,6 +42,7 @@ class Random(RecMixin, BaseRecommenderModel):
 
         build_model_folder(self._config.path_output_rec_weight, self.name)
         self._saving_filepath = f'{self._config.path_output_rec_weight}{self.name}/best-weights-{self.name}'
+        self.logger = logging.get_logger(self.__class__.__name__)
 
     @property
     def name(self):
@@ -65,10 +67,11 @@ class Random(RecMixin, BaseRecommenderModel):
             l = []
             ui = set(i_s.keys())
             lui = len(ui)
-            if lui+top_k >= n_items:
-                r[u] = l
-                continue
-            for index in range(top_k):
+            local_k = min(top_k, self._num_items - lui)
+            # if lui+top_k >= n_items:
+            #     r[u] = l
+            #     continue
+            for index in range(local_k):
                 j = items[r_int(n_items)]
                 while j in ui:
                     j = items[r_int(n_items)]

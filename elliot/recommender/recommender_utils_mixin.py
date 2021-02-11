@@ -7,11 +7,12 @@ from utils.write import store_recommendation
 class RecMixin(object):
 
     def train(self):
-        self.logger.critical("Test2")
+        if self._restore:
+            return self.restore_weights()
+
         best_metric_value = 0
 
         for it in range(self._num_iters):
-            self.restore_weights(it)
             loss = 0
             steps = 0
             with tqdm(total=int(self._data.transactions // self._batch_size), disable=not self._verbose) as t:
@@ -23,17 +24,14 @@ class RecMixin(object):
 
             if not (it + 1) % self._validation_rate:
                 recs = self.get_recommendations(self.evaluator.get_needed_recommendations())
-                results, statistical_results, test_results, test_statistical_results = self.evaluator.eval(recs)
-                self._results.append(results)
-                self._statistical_results.append(statistical_results)
-                self._test_results.append(results)
-                self._test_statistical_results.append(statistical_results)
+                result_dict = self.evaluator.eval(recs)
+                self._results.append(result_dict)
 
-                print(f'Epoch {(it + 1)}/{self._num_iters} loss {loss/steps:.5f}')
+                print(f'Epoch {(it + 1)}/{self._epochs} loss {loss/steps:.5f}')
 
-                if self._results[-1][self._validation_metric] > best_metric_value:
+                if self._results[-1][self._validation_k]["val_results"][self._validation_metric] > best_metric_value:
                     print("******************************************")
-                    best_metric_value = self._results[-1][self._validation_metric]
+                    best_metric_value = self._results[-1][self._validation_k]["val_results"][self._validation_metric]
                     if self._save_weights:
                         self._model.save_weights(self._saving_filepath)
                     if self._save_recs:
@@ -51,14 +49,23 @@ class RecMixin(object):
                                                   range(offset, offset_stop)), items_ratings_pair)))
         return predictions_top_k
 
-    def restore_weights(self, it):
-        if self._restore_epochs == it:
-            try:
-                self._model.load_weights(self._saving_filepath)
-                print(f"Model correctly Restored at Epoch: {self._restore_epochs}")
-                return True
-            except Exception as ex:
-                print(f"Error in model restoring operation! {ex}")
+    def restore_weights(self):
+        try:
+            self._model.load_weights(self._saving_filepath)
+            print(f"Model correctly Restored")
+
+            recs = self.get_recommendations(self.evaluator.get_needed_recommendations())
+            result_dict = self.evaluator.eval(recs)
+            self._results.append(result_dict)
+
+            print("******************************************")
+            if self._save_recs:
+                store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}.tsv")
+            return True
+
+        except Exception as ex:
+            print(f"Error in model restoring operation! {ex}")
+
         return False
 
     def get_train_mask(self, start, stop):
@@ -73,15 +80,3 @@ class RecMixin(object):
     def get_results(self):
         val_max = np.argmax([r[self._validation_k]["val_results"][self._validation_metric] for r in self._results])
         return self._results[val_max]
-
-    # def get_test_results(self):
-    #     val_max = np.argmax([r[self._validation_metric] for r in self._results])
-    #     return self._test_results[val_max]
-    #
-    # def get_statistical_results(self):
-    #     val_max = np.argmax([r[self._validation_metric] for r in self._results])
-    #     return self._statistical_results[val_max]
-    #
-    # def get_test_statistical_results(self):
-    #     val_max = np.argmax([r[self._validation_metric] for r in self._results])
-    #     return self._test_statistical_results[val_max]

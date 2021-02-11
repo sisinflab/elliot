@@ -59,3 +59,15 @@ class SlopeOneModel:
         real_indices = indices[partially_ordered_preds_indices]
         local_top_k = real_values.argsort()[::-1]
         return [(real_indices[item], real_values[item]) for item in local_top_k]
+
+    def get_model_state(self):
+        saving_dict = {}
+        saving_dict['freq'] = self.freq
+        saving_dict['dev'] = self.dev
+        saving_dict['user_mean'] = self.user_mean
+        return saving_dict
+
+    def set_model_state(self, saving_dict):
+        self.freq = saving_dict['freq']
+        self.dev = saving_dict['dev']
+        self.user_mean = saving_dict['user_mean']

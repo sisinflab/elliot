@@ -41,7 +41,7 @@ class MultiDAE(RecMixin, BaseRecommenderModel):
         self._ratings = self._data.train_dict
         self._sampler = sp.Sampler(self._data.sp_i_train)
         self._iteration = 0
-        self.evaluator = Evaluator(self._data, self._params)
+
         if self._batch_size < 1:
             self._batch_size = self._num_users
 
@@ -56,13 +56,6 @@ class MultiDAE(RecMixin, BaseRecommenderModel):
         ]
         self.autoset_params()
 
-        self._params.name = self.name
-
-        # self._intermediate_dim = self._params.intermediate_dim
-        # self._latent_dim = self._params.latent_dim
-        #
-        # self._lambda = self._params.reg_lambda
-        # self._learning_rate = self._params.lr
         self._dropout_rate = 1. - self._dropout_rate
 
         self._model = DenoisingAutoEncoder(self._num_items,
@@ -72,6 +65,8 @@ class MultiDAE(RecMixin, BaseRecommenderModel):
                                            self._dropout_rate,
                                            self._lambda)
 
+        self.evaluator = Evaluator(self._data, self._params)
+        self._params.name = self.name
         build_model_folder(self._config.path_output_rec_weight, self.name)
         self._saving_filepath = f'{self._config.path_output_rec_weight}{self.name}/best-weights-{self.name}'
         self.logger = logging.get_logger(self.__class__.__name__)
@@ -84,11 +79,12 @@ class MultiDAE(RecMixin, BaseRecommenderModel):
                + f"_{self.get_params_shortcut()}"
 
     def train(self):
-        self.logger.critical("Test2")
+        if self._restore:
+            return self.restore_weights()
+
         best_metric_value = 0
 
         for it in range(self._epochs):
-            self.restore_weights(it)
             loss = 0
             steps = 0
             with tqdm(total=int(self._num_users // self._batch_size), disable=not self._verbose) as t:

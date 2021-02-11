@@ -42,6 +42,7 @@ class PureSVDModel(object):
 
     def get_user_recs(self, user, k=100):
         user_items = self._data.train_dict[user].keys()
+        k = min(k, self._data.num_items - len(user_items))
         predictions = {i: self.predict(user, i) for i in self._data.items if i not in user_items}
         indices, values = zip(*predictions.items())
         indices = np.array(indices)

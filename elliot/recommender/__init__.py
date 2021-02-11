@@ -9,7 +9,7 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
 from .base_recommender_model import BaseRecommenderModel
 
-from .latent_factor_models import BPRMF, NNBPRMF, WRMF, PureSVD, MF, FunkSVD, PMF, LMF, NonNegMF, FM, LogisticMF, BPRSlim, Slim, CML
+from .latent_factor_models import BPRMF, NNBPRMF, WRMF, PureSVD, MF, FunkSVD, PMF, LMF, NonNegMF, FM, LogisticMF, BPRSlim, Slim, CML, FISM
 from .unpersonalized import Random, MostPop
 # from .adversarial import APR, AMR
 from .autoencoders import MultiDAE
@@ -18,7 +18,7 @@ from .knowledge_aware import KaHFM, KaHFMBatch, KaHFMEmbeddings
 from .graph_based import NGCF, LightGCN
 from .visual_recommenders import VBPR, DeepStyle
 from .NN import ItemKNN, UserKNN, AttributeItemKNN, AttributeUserKNN
-from .neural import DeepMatrixFactorization as DMF, NeuralMatrixFactorization as NeuMF, GeneralizedMF as GMF
+from .neural import DMF, NeuMF, GMF
 from .content_based import VSM
 from .algebric import SlopeOne
 # from .attentive import AFM

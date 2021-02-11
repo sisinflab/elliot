@@ -1,35 +1,30 @@
 experiment:
   data_config:
     strategy: fixed
-#    dataloader: KnowledgeChainsLoader
-    dataloader: VisualLoader
+    dataloader: KnowledgeChainsLoader
+#    dataloader: VisualLoader
     train_path: ../data/{0}/trainingset.tsv
     test_path: ../data/{0}/testset.tsv
     side_information:
-        visual_features: ../data/{0}/ciao.npy
-        item_mapping: ../data/{0}/visual_feats.tsv
-        images_src_folder: ../data/yoyo/
-        output_image_size: (224,224)
-#        map: ../data/{0}/map.tsv
-#        features: ../data/{0}/features.tsv
-#        properties: ../data/{0}/properties.conf
+#        visual_features: ../data/{0}/ciao.npy
+#        item_mapping: ../data/{0}/visual_feats.tsv
+#        images_src_folder: ../data/yoyo/
+#        output_image_size: (224,224)
+        map: ../data/{0}/map.tsv
+        features: ../data/{0}/features.tsv
+        properties: ../data/{0}/properties.conf
   dataset: example
   external_models_path: ../external/models/__init__.py
-#  path_output_rec_result: ../results/{0}/recs/
-#  path_output_rec_weight: ../results/{0}/weights/
-#  path_output_rec_performance: ../results/{0}/performance/
-#  path_logger_config: ./config/logger_config.yml
-#  path_log_folder: ../log/
   top_k: 20
   evaluation:
-    cutoff: [10]
-    simple_metrics: [AUC, nDCG, Precision, Recall, ItemCoverage, HR, MAP, F1, Gini, SEntropy, EFD, EPC, ARP, APLT, ACLT, PopRSP, PopREO, MAR, UserCoverage, NumRetrieved]
+    cutoff: 10
+    simple_metrics: [AUC, nDCG, Precision, Recall, ItemCoverage, HR, MAP, F1, Gini, SEntropy, EFD, EPC, ARP, APLT, ACLT]
     relevance_threshold: 3
     paired_ttest: True
-    complex_metrics:
-    - metric: REO
-      clustering_name: ItemPopularity
-      clustering_file: ../data/categorical_dbpedia_ml1m/items_clustering_popularity.tsv
+#    complex_metrics:
+#    - metric: REO
+#      clustering_name: ItemPopularity
+#      clustering_file: ../data/categorical_dbpedia_ml1m/items_clustering_popularity.tsv
 #    - metric: ItemMADrating
 #      clustering_name: ItemPopularity
 #      clustering_file: ../data/categorical_dbpedia_ml1m/items_clustering_popularity.tsv
@@ -57,10 +52,10 @@ experiment:
 #      user_clustering_file: ../data/categorical_dbpedia_ml1m/user_clustering_happiness.tsv
 #      item_clustering_name: ItemPopularity
 #      item_clustering_file: ../data/categorical_dbpedia_ml1m/items_clustering_popularity.tsv
-    - metric: DSC
-      beta: 2
-    - metric: SRecall
-      feature_data: ../data/categorical_dbpedia_ml1m/map.tsv
+#    - metric: DSC
+#      beta: 2
+#    - metric: SRecall
+#      feature_data: ../data/categorical_dbpedia_ml1m/map.tsv
   gpu: -1 # -1 is not use GPU
   models:
 #    PureSVD:
@@ -71,10 +66,9 @@ experiment:
 #        verbose: True
 #        save_weights: False
 #        save_recs: False
-#        validation_metric: nDCG
-#        restore_epoch: -1
-#      restore: False
-#      embed_k: 10
+#        validation_metric: nDCG@10
+#        restore: False
+#      factors: 10
 #    WRMF:
 #      meta:
 #        hyper_max_evals: 1
@@ -91,43 +85,61 @@ experiment:
 #      reg: 0.1
 #    MostPop:
 #      meta:
-#        save_recs: True
+#        save_recs: False
 #    SlopeOne:
 #      meta:
-#        save_recs: True
+#        save_recs: False
 #    Random:
 #      meta:
-#        save_recs: True
-    MultiVAE:
-      meta:
-        hyper_max_evals: 3
-        hyper_opt_alg: tpe
-        validation_rate: 10
-        verbose: True
-        save_weights: False
-        save_recs: False
-      lr: [loguniform, -10, -1]
-      epochs: 10
-      intermediate_dim: [uniform,50,100]
-      latent_dim: 100
-      batch_size: -1
-      dropout_pkeep: 1
-      reg_lambda: 0.01
-##    KaHFMBatch:
-##      meta:
-##        hyper_max_evals: 20
+#        save_recs: False
+#    MultiVAE:
+#      meta:
+#        hyper_max_evals: 3
+#        hyper_opt_alg: tpe
+#        validation_rate: 10
+#        verbose: True
+#        save_weights: True
+#        save_recs: False
+##        restore: True
+#      lr: [loguniform, -10, -1]
+#      epochs: 10
+#      intermediate_dim: [uniform,50,100]
+#      latent_dim: 100
+#      batch_size: -1
+#      dropout_pkeep: 1
+#      reg_lambda: 0.01
+      #e:10_bs:6040_intermediate_dim:91_latent_dim:100_reg_lambda:0.01_lr:0.002718457840118028_dropout_pkeep:0.0
+#    MultiVAE:
+#      meta:
+##        hyper_max_evals: 3
 ##        hyper_opt_alg: tpe
 ##        validation_rate: 10
-##        verbose: True
-##        save_weights: False
-##        save_recs: True
-##        validation_metric: nDCG
-##        restore_epoch: -1
-##      lr: 0.0001
-##      epochs: 10
-##      batch_size: 512
-##      l_w: 0.005
-##      l_b: 0
+#        verbose: True
+##        save_weights: True
+#        save_recs: True
+#        restore: True
+#      lr: 0.002718457840118028
+#      epochs: 10
+#      intermediate_dim: 91
+#      latent_dim: 100
+#      batch_size: -1
+#      dropout_pkeep: 1
+#      reg_lambda: 0.01
+#    KaHFMBatch:
+#      meta:
+#        hyper_max_evals: 20
+#        hyper_opt_alg: tpe
+#        validation_rate: 10
+#        verbose: True
+#        save_weights: False
+#        save_recs: True
+#        validation_metric: nDCG
+#        restore_epoch: -1
+#      lr: 0.0001
+#      epochs: 10
+#      batch_size: 512
+#      l_w: 0.005
+#      l_b: 0
 #    KaHFMEmbeddings:
 #      meta:
 #        hyper_max_evals: 1
@@ -137,9 +149,9 @@ experiment:
 #        save_weights: False
 #        save_recs: False
 #        validation_metric: nDCG
-#        restore_epoch: -1
+#        restore: False
 #      lr: 0.0001
-#      epochs: 200
+#      epochs: 1
 #      batch_size: 1024
 #      l_w: 0.005
 #      l_b: 0
@@ -173,28 +185,7 @@ experiment:
 #      batch_size: -1
 #      dropout_pkeep: 1
 #      reg_lambda: 0.01
-##    BPRMF:
-##      meta:
-##        hyper_max_evals: 1
-##        hyper_opt_alg: tpe
-##        validation_rate: 1
-##        verbose: True
-##        save_weights: False
-##        save_recs: False
-##        validation_metric: nDCG
-##        restore_epoch: -1
-##      lr: 0.05
-##      epochs: 1
-##      embed_k: 10
-##      bias_regularization: 0
-##      user_regularization: 0.005
-##      positive_item_regularization: 0.0025
-##      negative_item_regularization: 0.00025
-##      update_negative_item_factors: True
-##      update_users: True
-##      update_items: True
-##      update_bias: True
-#    PMF:
+#    BPRMF:
 #      meta:
 #        hyper_max_evals: 1
 #        hyper_opt_alg: tpe
@@ -202,15 +193,36 @@ experiment:
 #        verbose: True
 #        save_weights: False
 #        save_recs: False
-#        validation_metric: nDCG@10
-#        restore_epoch: -1
-#      lr: 0.001
-#      epochs: 10
-#      embed_k: 50
-#      batch_size: 512
-#      reg: 0.0025
-#      reg_b: 0
-#      gaussian_variance: 0.1
+#        validation_metric: nDCG
+#        restore: False
+#      lr: 0.05
+#      epochs: 1
+#      factors: 10
+#      bias_regularization: 0
+#      user_regularization: 0.005
+#      positive_item_regularization: 0.0025
+#      negative_item_regularization: 0.00025
+#      update_negative_item_factors: True
+#      update_users: True
+#      update_items: True
+#      update_bias: True
+    PMF:
+      meta:
+        hyper_max_evals: 1
+        hyper_opt_alg: tpe
+        validation_rate: 1
+        verbose: True
+        save_weights: False
+        save_recs: False
+        validation_metric: nDCG@10
+        restore: False
+      lr: 0.001
+      epochs: 10
+      factors: 50
+      batch_size: 512
+      reg: 0.0025
+      reg_b: 0
+      gaussian_variance: 0.1
 ###    KaHFM:
 ###      meta:
 ###        hyper_max_evals: 1

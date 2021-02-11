@@ -2,12 +2,15 @@
 Module description:
 
 """
+from evaluation.evaluator import Evaluator
+from utils.folder import build_model_folder
 
 __version__ = '0.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malitesta@poliba.it'
 
-import logging
+import logging as log
+from utils import logging
 import os
 
 import numpy as np
@@ -19,7 +22,7 @@ from recommender.visual_recommenders.VBPR.VBPR_model import VBPR_model
 
 np.random.seed(0)
 tf.random.set_seed(0)
-logging.disable(logging.WARNING)
+log.disable(log.WARNING)
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 
@@ -39,30 +42,30 @@ class VBPR(NNBPRMF, VisualLoader):
         super().__init__(data, config, params, *args, **kwargs)
         np.random.seed(42)
 
-        self._l_e = self._params.l_e
-        self._embed_d = self._params.embed_d
-
         self._params_list += [
-            ("_embed_d", "embed_d", "embed_d", 20, None, None),
+            ("_embed_d", "embed_d", "embed_d", 0.001, None, None),
             ("_l_e", "l_e", "l_e", 0.1, None, None)
         ]
-
-        self._params.name = self.name
-
         self.autoset_params()
 
         item_indices = [self._data.item_mapping[self._data.private_items[item]] for item in range(self._num_items)]
 
-        self._model = VBPR_model(self._params.embed_k,
-                                 self._params.embed_d,
-                                 self._params.lr,
-                                 self._params.l_w,
-                                 self._params.l_b,
-                                 self._params.l_e,
+        self._model = VBPR_model(self._factors,
+                                 self._embed_d,
+                                 self._learning_rate,
+                                 self._l_w,
+                                 self._l_b,
+                                 self._l_e,
                                  self._data.visual_features[item_indices],
                                  self._data.visual_features.shape[1],
                                  self._num_users,
                                  self._num_items)
+
+        self.evaluator = Evaluator(self._data, self._params)
+        self._params.name = self.name
+        build_model_folder(self._config.path_output_rec_weight, self.name)
+        self._saving_filepath = f'{self._config.path_output_rec_weight}{self.name}/best-weights-{self.name}'
+        self.logger = logging.get_logger(self.__class__.__name__)
 
     @property
     def name(self):
