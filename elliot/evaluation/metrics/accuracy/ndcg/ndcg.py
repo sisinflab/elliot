@@ -11,7 +11,8 @@ import typing as t
 import numpy as np
 import math
 
-from evaluation.metrics.base_metric import BaseMetric
+from elliot.evaluation.metrics.base_metric import BaseMetric
+
 
 class NDCG(BaseMetric):
     """
@@ -99,7 +100,7 @@ class NDCG(BaseMetric):
 
         return np.average(
             [NDCG.__user_ndcg(u_r, self._relevance_map[u], self._cutoff)
-             for u, u_r in self._recommendations.items()]
+             for u, u_r in self._recommendations.items() if len(self._relevance_map[u])]
         )
 
     def eval_user_metric(self):
@@ -109,7 +110,7 @@ class NDCG(BaseMetric):
         """
 
         return {u: NDCG.__user_ndcg(u_r, self._relevance_map[u], self._cutoff)
-             for u, u_r in self._recommendations.items()}
+             for u, u_r in self._recommendations.items() if len(self._relevance_map[u])}
 
 
 

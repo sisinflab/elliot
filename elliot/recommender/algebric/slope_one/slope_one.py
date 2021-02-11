@@ -12,13 +12,13 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 import numpy as np
 import pickle
 
-from evaluation.evaluator import Evaluator
-from recommender.recommender_utils_mixin import RecMixin
-from utils.folder import build_model_folder
-from utils.write import store_recommendation
+from elliot.evaluation.evaluator import Evaluator
+from elliot.recommender.recommender_utils_mixin import RecMixin
+from elliot.utils.folder import build_model_folder
+from elliot.utils.write import store_recommendation
 
-from recommender.base_recommender_model import BaseRecommenderModel
-from recommender.algebric.slope_one.slope_one_model import SlopeOneModel
+from elliot.recommender.base_recommender_model import BaseRecommenderModel
+from elliot.recommender.algebric.slope_one.slope_one_model import SlopeOneModel
 
 np.random.seed(42)
 

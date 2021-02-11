@@ -2,7 +2,6 @@
 Module description:
 
 """
-from utils import logging
 
 __version__ = '0.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo'
@@ -17,7 +16,7 @@ from recommender import BaseRecommenderModel
 from recommender.base_recommender_model import init_charger
 from utils.write import store_recommendation
 
-from recommender.autoencoders.vae.multi_vae_utils import VariationalAutoEncoder
+from recommender.autoencoders.vae.multi_vae_model import VariationalAutoEncoder
 from recommender.recommender_utils_mixin import RecMixin
 
 np.random.seed(42)

@@ -18,9 +18,9 @@ from PIL import Image
 from types import SimpleNamespace
 import concurrent.futures as c
 
-from dataset.abstract_dataset import AbstractDataset
-from splitter.base_splitter import Splitter
-from prefiltering.standard_prefilters import PreFilter
+from elliot.dataset.abstract_dataset import AbstractDataset
+from elliot.splitter.base_splitter import Splitter
+from elliot.prefiltering.standard_prefilters import PreFilter
 
 """
 [(train_0,test_0)]

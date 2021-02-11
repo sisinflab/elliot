@@ -1,1 +1,1 @@
-from .matrix_factorization import MatrixFactorization as MF
+from .matrix_factorization import MF

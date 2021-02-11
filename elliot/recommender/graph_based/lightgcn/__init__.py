@@ -1,1 +1,1 @@
-from .LightGCN import LightGCNModel as LightGCN
+from .LightGCN import LightGCN

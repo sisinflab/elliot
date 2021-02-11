@@ -1,1 +1,1 @@
-from .NGCF import NGCFModel as NGCF
+from .NGCF import NGCF

@@ -1,7 +1,7 @@
 import numpy as np
 from tqdm import tqdm
 
-from utils.write import store_recommendation
+from elliot.utils.write import store_recommendation
 
 
 class RecMixin(object):

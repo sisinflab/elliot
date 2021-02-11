@@ -14,27 +14,20 @@ import time
 import typing as t
 import scipy.sparse as sp
 
-from evaluation.evaluator import Evaluator
-from recommender.recommender_utils_mixin import RecMixin
-from utils.folder import build_model_folder
-from utils.write import store_recommendation
+from elliot.recommender.recommender_utils_mixin import RecMixin
+from elliot.utils.write import store_recommendation
 
-from recommender.base_recommender_model import BaseRecommenderModel
-from recommender.content_based.VSM.vector_space_model_similarity import Similarity
-from recommender.content_based.VSM.tfidf_utils import TFIDF
-from ast import literal_eval as make_tuple
+from elliot.recommender.base_recommender_model import BaseRecommenderModel
+from elliot.recommender.content_based.VSM.vector_space_model_similarity import Similarity
+from elliot.recommender.content_based.VSM.tfidf_utils import TFIDF
+from elliot.recommender.base_recommender_model import init_charger
 
 np.random.seed(42)
 
 
 class VSM(RecMixin, BaseRecommenderModel):
-
+    @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
-        super().__init__(data, config, params, *args, **kwargs)
-
-        self._restore = getattr(self._params, "restore", False)
-        self._num_items = self._data.num_items
-        self._num_users = self._data.num_users
         self._random = np.random
 
         self._params_list = [
@@ -72,12 +65,6 @@ class VSM(RecMixin, BaseRecommenderModel):
             self._sp_i_item_features = self.build_feature_sparse(self._i_item_feature_dict, self._num_items)
 
         self._model = Similarity(self._data, self._sp_i_user_features, self._sp_i_item_features, self._similarity)
-
-        self.evaluator = Evaluator(self._data, self._params)
-        self._params.name = self.name
-        build_model_folder(self._config.path_output_rec_weight, self.name)
-        self._saving_filepath = f'{self._config.path_output_rec_weight}{self.name}/best-weights-{self.name}'
-        self.logger = logging.get_logger(self.__class__.__name__)
 
     def get_recommendations(self, k: int = 100):
         return {u: self._model.get_user_recs(u, k) for u in self._ratings.keys()}

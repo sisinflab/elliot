@@ -9,32 +9,29 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
 import numpy as np
 import random
-from utils import logging
+from elliot.utils import logging
 from tqdm import tqdm
 
-from dataset.samplers import sparse_sampler as sp
-from evaluation.evaluator import Evaluator
-from utils.folder import build_model_folder
+from elliot.dataset.samplers import sparse_sampler as sp
+from elliot.evaluation.evaluator import Evaluator
+from elliot.utils.folder import build_model_folder
 
-from recommender import BaseRecommenderModel
-from recommender.recommender_utils_mixin import RecMixin
-from utils.write import store_recommendation
+from elliot.recommender import BaseRecommenderModel
+from elliot.recommender.recommender_utils_mixin import RecMixin
+from elliot.utils.write import store_recommendation
+from recommender.base_recommender_model import init_charger
 
-from recommender.autoencoders.dae.multi_dae_model import DenoisingAutoEncoder
+from elliot.recommender.autoencoders.dae.multi_dae_model import DenoisingAutoEncoder
 
 np.random.seed(42)
 random.seed(0)
 
 
 class MultiDAE(RecMixin, BaseRecommenderModel):
-
+    @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
         """
         """
-        super().__init__(data, config, params, *args, **kwargs)
-
-        self._num_items = self._data.num_items
-        self._num_users = self._data.num_users
         self._random = np.random
         self._random_p = random
 
@@ -64,12 +61,6 @@ class MultiDAE(RecMixin, BaseRecommenderModel):
                                            self._learning_rate,
                                            self._dropout_rate,
                                            self._lambda)
-
-        self.evaluator = Evaluator(self._data, self._params)
-        self._params.name = self.name
-        build_model_folder(self._config.path_output_rec_weight, self.name)
-        self._saving_filepath = f'{self._config.path_output_rec_weight}{self.name}/best-weights-{self.name}'
-        self.logger = logging.get_logger(self.__class__.__name__)
 
     @property
     def name(self):

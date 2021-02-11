@@ -16,9 +16,9 @@ from .autoencoders import MultiDAE
 from .autoencoders import MultiVAE
 from .knowledge_aware import KaHFM, KaHFMBatch, KaHFMEmbeddings
 from .graph_based import NGCF, LightGCN
-from .visual_recommenders import VBPR
+from .visual_recommenders import VBPR, DeepStyle
 from .NN import ItemKNN, UserKNN, AttributeItemKNN, AttributeUserKNN
-from .neural import DeepMatrixFactorization as DMF, NeuralMatrixFactorization as NeuMF, GeneralizedMF as GMF, NAIS
+from .neural import DMF, NeuMF, GMF
 from .content_based import VSM
 from .algebric import SlopeOne
 # from .attentive import AFM

@@ -1,9 +1,8 @@
 
 import numpy as np
-from sklearn.metrics.pairwise import cosine_similarity, euclidean_distances, haversine_distances, chi2_kernel, manhattan_distances
 from sklearn.metrics import pairwise_distances
-
-
+from sklearn.metrics.pairwise import cosine_similarity, euclidean_distances, haversine_distances, chi2_kernel, \
+    manhattan_distances
 
 
 class Similarity(object):

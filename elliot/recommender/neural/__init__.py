@@ -1,4 +1,3 @@
-from .NeuMF import NeuralMatrixFactorization
-from .DMF import DeepMatrixFactorization
-from .GeneralizedMF import GeneralizedMF
-from .NAIS import NAIS
+from .NeuMF import NeuMF
+from .DMF import DMF
+from .GeneralizedMF import GMF

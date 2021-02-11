@@ -12,20 +12,18 @@ import pickle
 import numpy as np
 from tqdm import tqdm
 
-from dataset.samplers import custom_sampler as cs
-from evaluation.evaluator import Evaluator
-from recommender import BaseRecommenderModel
-from recommender.latent_factor_models.CML.CML_model import CML_model
-from recommender.recommender_utils_mixin import RecMixin
-from utils import logging
-from utils.folder import build_model_folder
-from utils.write import store_recommendation
+from elliot.dataset.samplers import custom_sampler as cs
+from elliot.recommender import BaseRecommenderModel
+from elliot.recommender.latent_factor_models.CML.CML_model import CML_model
+from elliot.recommender.recommender_utils_mixin import RecMixin
+from elliot.utils.write import store_recommendation
+from elliot.recommender.base_recommender_model import init_charger
 
 np.random.seed(42)
 
 
 class CML(RecMixin, BaseRecommenderModel):
-
+    @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
         """
         Create a CML instance.
@@ -37,10 +35,6 @@ class CML(RecMixin, BaseRecommenderModel):
                                       [l_w, l_b]: regularization,
                                       lr: learning rate}
         """
-        super().__init__(data, config, params, *args, **kwargs)
-
-        self._num_items = self._data.num_items
-        self._num_users = self._data.num_users
         self._random = np.random
 
         self._params_list = [
@@ -70,12 +64,6 @@ class CML(RecMixin, BaseRecommenderModel):
                                 self._margin,
                                 self._num_users,
                                 self._num_items)
-
-        self.evaluator = Evaluator(self._data, self._params)
-        self._params.name = self.name
-        build_model_folder(self._config.path_output_rec_weight, self.name)
-        self._saving_filepath = f'{self._config.path_output_rec_weight}{self.name}/best-weights-{self.name}'
-        self.logger = logging.get_logger(self.__class__.__name__)
 
     @property
     def name(self):

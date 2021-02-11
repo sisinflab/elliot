@@ -2,7 +2,6 @@
 Module description:
 
 """
-from utils import logging
 
 __version__ = '0.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo'
@@ -12,25 +11,20 @@ import numpy as np
 import pickle
 import time
 
-from evaluation.evaluator import Evaluator
-from recommender.recommender_utils_mixin import RecMixin
-from utils.folder import build_model_folder
-from utils.write import store_recommendation
+from elliot.recommender.recommender_utils_mixin import RecMixin
+from elliot.utils.write import store_recommendation
 import scipy.sparse as sp
 
-from recommender.base_recommender_model import BaseRecommenderModel
-from recommender.NN.attribute_item_knn.attribute_item_knn_similarity import Similarity
+from elliot.recommender.base_recommender_model import BaseRecommenderModel
+from elliot.recommender.NN.attribute_item_knn.attribute_item_knn_similarity import Similarity
+from elliot.recommender.base_recommender_model import init_charger
 
 np.random.seed(42)
 
 
 class AttributeItemKNN(RecMixin, BaseRecommenderModel):
-
+    @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
-        super().__init__(data, config, params, *args, **kwargs)
-
-        self._num_items = self._data.num_items
-        self._num_users = self._data.num_users
         self._random = np.random
 
         self._params_list = [
@@ -45,12 +39,6 @@ class AttributeItemKNN(RecMixin, BaseRecommenderModel):
         self._sp_i_features = self.build_feature_sparse()
 
         self._model = Similarity(self._data, self._sp_i_features, self._num_neighbors, self._similarity)
-
-        self.evaluator = Evaluator(self._data, self._params)
-        self._params.name = self.name
-        build_model_folder(self._config.path_output_rec_weight, self.name)
-        self._saving_filepath = f'{self._config.path_output_rec_weight}{self.name}/best-weights-{self.name}'
-        self.logger = logging.get_logger(self.__class__.__name__)
 
     def get_recommendations(self, k: int = 100):
         return {u: self._model.get_user_recs(u, k) for u in self._ratings.keys()}

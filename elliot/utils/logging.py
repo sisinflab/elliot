@@ -5,7 +5,7 @@ import os
 import yaml
 import re
 
-from utils.folder import build_log_folder
+from elliot.utils.folder import build_log_folder
 
 
 def init(path_config, folder_log, log_level=logging.WARNING):

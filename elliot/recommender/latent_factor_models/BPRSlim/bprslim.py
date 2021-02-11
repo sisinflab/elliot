@@ -20,17 +20,13 @@ from utils.folder import build_model_folder
 from utils.write import store_recommendation
 
 from recommender.base_recommender_model import BaseRecommenderModel
-
+from elliot.recommender.base_recommender_model import init_charger
 np.random.seed(42)
 
 
 class BPRSlim(RecMixin, BaseRecommenderModel):
-
+    @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
-        super().__init__(data, config, params, *args, **kwargs)
-
-        self._num_items = self._data.num_items
-        self._num_users = self._data.num_users
         self._random = np.random
 
         self._params_list = [
@@ -51,12 +47,6 @@ class BPRSlim(RecMixin, BaseRecommenderModel):
         self._sampler = cs.Sampler(self._data.i_train_dict)
 
         self._model = BPRSlimModel(self._data, self._num_users, self._num_items, self._lr, self._lj_reg, self._li_reg, self._sampler, random_seed=42)
-
-        self.evaluator = Evaluator(self._data, self._params)
-        self._params.name = self.name
-        build_model_folder(self._config.path_output_rec_weight, self.name)
-        self._saving_filepath = f'{self._config.path_output_rec_weight}{self.name}/best-weights-{self.name}'
-        self.logger = logging.get_logger(self.__class__.__name__)
 
     @property
     def name(self):

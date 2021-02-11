@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 from datetime import datetime
 
-from evaluation.statistical_significance import PairedTTest
+from elliot.evaluation.statistical_significance import PairedTTest
 
 _eval_results = "test_results"
 _eval_statistical_results = "test_statistical_results"

@@ -128,7 +128,23 @@ experiment:
 #      batch_size: 512
 #      l_w: 0.0025
 #      l_b: 0
-    VBPR:
+#    VBPR:
+#      meta:
+#        verbose: True
+#        validation_rate: 10
+#        save_weights: False
+#        save_recs: False
+#        validation_metric: nDCG@10
+#        restore_epoch: -1
+#      lr: 0.0005
+#      epochs: 50
+#      embed_k: 100
+#      embed_d: 20
+#      batch_size: 128
+#      l_w: 0.000025
+#      l_b: 0
+#      l_e: 0.002
+    DeepStyle:
       meta:
         verbose: True
         validation_rate: 10
@@ -139,11 +155,8 @@ experiment:
       lr: 0.0005
       epochs: 50
       embed_k: 100
-      embed_d: 20
       batch_size: 128
       l_w: 0.000025
-      l_b: 0
-      l_e: 0.002
 #    KaHFM:
 #      meta:
 #        hyper_max_evals: 1

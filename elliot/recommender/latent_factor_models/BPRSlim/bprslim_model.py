@@ -7,10 +7,7 @@ __version__ = '0.1'
 __author__ = 'Felice Antonio Merra'
 __email__ = 'felice.merra@poliba.it'
 
-import os
-import time
 import numpy as np
-from sklearn.utils.extmath import randomized_svd
 
 
 class BPRSlimModel(object):

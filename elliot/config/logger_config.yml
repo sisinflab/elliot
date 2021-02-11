@@ -19,7 +19,7 @@ handlers:
     filename: !CUSTOM ${log_path_exp}
     formatter: simple
   queue_listener:
-    class: utils.logger_util.QueueListenerHandler
+    class: elliot.utils.logger_util.QueueListenerHandler
     handlers:
       - cfg://handlers.console
       - cfg://handlers.file
