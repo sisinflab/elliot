@@ -39,11 +39,11 @@ class VBPR(NNBPRMF, VisualLoader):
         super().__init__(data, config, params, *args, **kwargs)
         np.random.seed(42)
 
-        self._embed_d = self._params.embed_d
         self._l_e = self._params.l_e
+        self._embed_d = self._params.embed_d
 
         self._params_list += [
-            ("_embed_d", "embed_d", "embed_d", 0.001, None, None),
+            ("_embed_d", "embed_d", "embed_d", 20, None, None),
             ("_l_e", "l_e", "l_e", 0.1, None, None)
         ]
 
