@@ -105,11 +105,12 @@ class UserMADranking(BaseMetric):
         :return: the overall averaged value of User MAD ranking
         """
         for u, u_r in self._recommendations.items():
-            v = UserMADranking.__user_mad(u_r, self._relevance_map[u], self._cutoff)
-            cluster = self._user_clustering.get(u, None)
-            if cluster is not None:
-                self._sum[cluster] += v
-                self._n_users[cluster] += 1
+            if len(self._relevance_map[u]):
+                v = UserMADranking.__user_mad(u_r, self._relevance_map[u], self._cutoff)
+                cluster = self._user_clustering.get(u, None)
+                if cluster is not None:
+                    self._sum[cluster] += v
+                    self._n_users[cluster] += 1
 
         avg = [self._sum[i]/self._n_users[i] for i in range(self._n_clusters)]
         differences = []

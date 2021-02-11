@@ -66,7 +66,8 @@ class ItemMADrating(BaseMetric):
         """
 
         for u, u_r in self._recommendations.items():
-            self.__item_mad(u_r, self._cutoff, self._relevant_items[u])
+            if len(self._relevant_items[u]):
+                self.__item_mad(u_r, self._cutoff, self._relevant_items[u])
 
         for item, gain in self._item_gain.items():
             v = gain/self._item_count[item]

@@ -39,14 +39,12 @@ class FISM(RecMixin, BaseRecommenderModel):
         """
         self._random = np.random
 
-        self._params.alpha = 0 if self._params.alpha < 0 else 1 if self._params.alpha > 1 else self._params.alpha
-
         self._params_list = [
             ("_factors", "factors", "factors", 100, None, None),
             ("_lr", "lr", "lr", 0.001, None, None),
             ("_l_w", "l_w", "l_w", 0.001, None, None),
             ("_l_b", "l_b", "l_b", 0.001, None, None),
-            ("_alpha", "alpha", "alpha", 0.5, None, None),
+            ("_alpha", "alpha", "alpha", 0.5, lambda x: min(max(0, x), 1), None),
             ("_neg_ratio", "neg_ratio", "neg_ratio", 0.5, None, None),
         ]
         self.autoset_params()

@@ -86,7 +86,8 @@ class REO(BaseMetric):
         """
 
         for u, u_r in self._recommendations.items():
-            self.__user_pop_reo(u_r, set(self._train[u].keys()), self._cutoff, set(self._relevant_items[u]))
+            if len(self._relevant_items[u]):
+                self.__user_pop_reo(u_r, set(self._train[u].keys()), self._cutoff, set(self._relevant_items[u]))
 
         PR = self._num / self._den
 

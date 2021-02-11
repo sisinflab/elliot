@@ -80,7 +80,7 @@ class EFD(BaseMetric):
         self._item_novelty_dict = {i: -math.log(v / norm) / math.log(2) for i, v in self._item_count.items()}
 
         return np.average([self.__user_EFD(u_r, self._cutoff, self._relevant_items[u])
-             for u, u_r in self._recommendations.items()])
+             for u, u_r in self._recommendations.items() if len(self._relevant_items[u])])
 
     def eval_user_metric(self):
         """
@@ -99,5 +99,5 @@ class EFD(BaseMetric):
         self._item_novelty_dict = {i: -math.log(v / norm) / math.log(2) for i, v in self._item_count.items()}
 
         return {u: self.__user_EFD(u_r, self._cutoff, self._relevant_items[u])
-                for u, u_r in self._recommendations.items()}
+                for u, u_r in self._recommendations.items() if len(self._relevant_items[u])}
 

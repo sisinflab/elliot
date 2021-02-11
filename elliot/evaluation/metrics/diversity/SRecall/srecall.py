@@ -58,7 +58,7 @@ class SRecall(BaseMetric):
         """
         return np.average(
             [SRecall.__user_srecall(u_r, self._cutoff, self._relevant_items[u], self._feature_map,self._total_features)
-             for u, u_r in self._recommendations.items()]
+             for u, u_r in self._recommendations.items() if len(self._relevant_items[u])]
         )
 
     def eval_user_metric(self):
@@ -67,7 +67,7 @@ class SRecall(BaseMetric):
         :return: the overall averaged value of SRecall
         """
         return {u: SRecall.__user_srecall(u_r, self._cutoff, self._relevant_items[u], self._feature_map, self._total_features)
-             for u, u_r in self._recommendations.items()}
+             for u, u_r in self._recommendations.items() if len(self._relevant_items[u])}
 
     @staticmethod
     def _load_attribute_file(attribute_file, separator='\t'):

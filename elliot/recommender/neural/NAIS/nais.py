@@ -2,35 +2,30 @@
 Module description:
 
 """
-import pickle
-
-from utils.folder import build_model_folder
 
 __version__ = '0.1'
 __author__ = 'Felice Antonio Merra'
 __email__ = 'felice.merra@poliba.it'
 __paper__ = 'FISM: Factored Item Similarity Models for Top-N Recommender Systems by Santosh Kabbur, Xia Ning, and George Karypis'
 
-from operator import itemgetter
 
 import numpy as np
-from utils import logging
 from tqdm import tqdm
-from ast import literal_eval as make_tuple
+import pickle
 
-from dataset.samplers import pointwise_pos_neg_ratio_ratings_sampler as pws
-from evaluation.evaluator import Evaluator
-from utils.write import store_recommendation
+from elliot.dataset.samplers import pointwise_pos_neg_ratio_ratings_sampler as pws
+from elliot.utils.write import store_recommendation
 
-from recommender import BaseRecommenderModel
-from recommender.neural.NAIS.nais_model import NAIS_model
-from recommender.recommender_utils_mixin import RecMixin
+from elliot.recommender import BaseRecommenderModel
+from elliot.recommender.neural.NAIS.nais_model import NAIS_model
+from elliot.recommender.recommender_utils_mixin import RecMixin
+from elliot.recommender.base_recommender_model import init_charger
 
 np.random.seed(42)
 
 
 class NAIS(RecMixin, BaseRecommenderModel):
-
+    @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
         """
 
@@ -43,13 +38,7 @@ class NAIS(RecMixin, BaseRecommenderModel):
                                       [l_w, l_b]: regularization,
                                       lr: learning rate}
         """
-        super().__init__(data, config, params, *args, **kwargs)
-
-        self._num_items = self._data.num_items
-        self._num_users = self._data.num_users
         self._random = np.random
-
-        self._params.alpha = 0 if self._params.alpha < 0 else 1 if self._params.alpha > 1 else self._params.alpha
 
         self._params_list = [
             ("_factors", "factors", "factors", 100, None, None),
@@ -58,7 +47,7 @@ class NAIS(RecMixin, BaseRecommenderModel):
             ("_lr", "lr", "lr", 0.001, None, None),
             ("_l_w", "l_w", "l_w", 0.001, None, None),
             ("_l_b", "l_b", "l_b", 0.001, None, None),
-            ("_alpha", "alpha", "alpha", 0.5, None, None),
+            ("_alpha", "alpha", "alpha", 0.5, lambda x: min(max(0, x), 1), None),
             ("_beta", "beta", "beta", 0.5, None, None),
             ("_neg_ratio", "neg_ratio", "neg_ratio", 0.5, None, None),
         ]
@@ -82,12 +71,6 @@ class NAIS(RecMixin, BaseRecommenderModel):
                                  self._beta,
                                  self._num_users,
                                  self._num_items)
-
-        self.evaluator = Evaluator(self._data, self._params)
-        self._params.name = self.name
-        build_model_folder(self._config.path_output_rec_weight, self.name)
-        self._saving_filepath = f'{self._config.path_output_rec_weight}{self.name}/best-weights-{self.name}'
-        self.logger = logging.get_logger(self.__class__.__name__)
 
     @property
     def name(self):

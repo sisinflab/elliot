@@ -36,7 +36,6 @@ class BiasDisparityBR(BaseMetric):
         """
         super().__init__(recommendations, config, params, eval_objects, additional_data)
         self._cutoff = self._evaluation_objects.cutoff
-        self._relevant_items = self._evaluation_objects.relevance.get_binary_relevance()
 
         self._item_clustering_path = self._additional_data.get("item_clustering_file", False)
 
@@ -79,7 +78,6 @@ class BiasDisparityBR(BaseMetric):
         Per User Bias Disparity - Bias Recommendations
         :param user_recommendations: list of user recommendation in the form [(item1,value1),...]
         :param cutoff: numerical threshold to limit the recommendation list
-        :param user_relevant_items: list of user relevant items in the form [item1,...]
         :return: the value of the Bias Disparity - Bias Recommendations metric for the specific user
         """
         user_group = self._user_clustering.get(user, None if self._user_clustering else 0)

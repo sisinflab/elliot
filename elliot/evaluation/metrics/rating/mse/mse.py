@@ -58,7 +58,7 @@ class MSE(BaseMetric):
         """
         return sum(
             [MSE.__user_MSE(u_r, self._test[u], self._relevant_items[u])
-             for u, u_r in self._recommendations.items()]
+             for u, u_r in self._recommendations.items() if len(self._relevant_items[u])]
         ) / self._total_relevant_items
 
     def eval_user_metric(self):
@@ -67,7 +67,7 @@ class MSE(BaseMetric):
         :return: the overall averaged value of Mean Squared Error per user
         """
         return {u: MSE.__user_MSE(u_r, self._test[u], self._relevant_items[u])/len(self._relevant_items[u])
-             for u, u_r in self._recommendations.items()}
+             for u, u_r in self._recommendations.items() if len(self._relevant_items[u])}
 
     @staticmethod
     def needs_full_recommendations():

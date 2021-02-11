@@ -78,7 +78,7 @@ class EPC(BaseMetric):
         self._item_novelty_dict = {i: 1 - (v / num_users) for i, v in item_count.items()}
 
         a = [self.__user_EPC(u_r, self._cutoff, self._relevant_items[u])
-             for u, u_r in self._recommendations.items()]
+             for u, u_r in self._recommendations.items() if len(self._relevant_items[u])]
         return np.average(a)
 
     def eval_user_metric(self):
@@ -97,5 +97,5 @@ class EPC(BaseMetric):
         self._item_novelty_dict = {i: 1 - (v / num_users) for i, v in item_count.items()}
 
         return {u: self.__user_EPC(u_r, self._cutoff, self._relevant_items[u])
-                for u, u_r in self._recommendations.items()}
+                for u, u_r in self._recommendations.items() if len(self._relevant_items[u])}
 

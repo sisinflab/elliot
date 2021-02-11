@@ -58,7 +58,7 @@ class RMSE(BaseMetric):
         """
         return np.sqrt(sum(
             [RMSE.__user_RMSE(u_r, self._test[u], self._relevant_items[u])
-             for u, u_r in self._recommendations.items()]
+             for u, u_r in self._recommendations.items() if len(self._relevant_items[u])]
         ) / self._total_relevant_items)
 
     def eval_user_metric(self):
@@ -67,7 +67,7 @@ class RMSE(BaseMetric):
         :return: the overall averaged value of Root Mean Squared Error
         """
         return {u: np.sqrt(RMSE.__user_RMSE(u_r, self._test[u], self._relevant_items[u])/len(self._relevant_items[u]))
-             for u, u_r in self._recommendations.items()}
+             for u, u_r in self._recommendations.items() if len(self._relevant_items[u])}
 
     @staticmethod
     def needs_full_recommendations():

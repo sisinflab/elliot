@@ -67,9 +67,10 @@ class PopREO(BaseMetric):
         :return: the overall averaged value of PopREO
         """
         for u, u_r in self._recommendations.items():
-            num_h, num_t, den_h, den_t = self.__user_pop_reo(u_r, self._cutoff, self._long_tail, self._short_head, set(self._train[u].keys()), set(self._relevant_items[u]))
-            self._num.append([num_h, num_t])
-            self._den.append([den_h, den_t])
+            if len(self._relevant_items[u]):
+                num_h, num_t, den_h, den_t = self.__user_pop_reo(u_r, self._cutoff, self._long_tail, self._short_head, set(self._train[u].keys()), set(self._relevant_items[u]))
+                self._num.append([num_h, num_t])
+                self._den.append([den_h, den_t])
         self._num = np.sum(np.array(self._num), axis=0)
         self._den = np.sum(np.array(self._den), axis=0)
         pr = self._num / self._den

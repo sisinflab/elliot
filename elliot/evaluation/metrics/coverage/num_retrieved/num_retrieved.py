@@ -55,7 +55,7 @@ class NumRetrieved(BaseMetric):
         """
         return np.average(
             [NumRetrieved.__user_num_retrieved(u_r, self._cutoff)
-             for u, u_r in self._recommendations.items()]
+             for u, u_r in self._recommendations.items() if len(self._relevant_items[u])]
         )
 
     def eval_user_metric(self):
@@ -64,5 +64,5 @@ class NumRetrieved(BaseMetric):
         :return: the overall averaged value of NumRetrieved
         """
         return {u: NumRetrieved.__user_num_retrieved(u_r, self._cutoff)
-             for u, u_r in self._recommendations.items()}
+             for u, u_r in self._recommendations.items() if len(self._relevant_items[u])}
 
