@@ -265,17 +265,18 @@ experiment:
 #      neg_ratio: 5
 #      reg: 0.005
 #      similarity: dot
-#    PMF:
-#      meta:
-#        verbose: True
-#        save_recs: False
-#        validation_rate: 1
-#      epochs: 10
-#      lr: 0.001
-#      factors: 50
-#      reg: 0.005
-#      gaussian_variance: 0.01
-#      batch_size: 512
+    PMF:
+      meta:
+#        hyper_opt_alg: grid
+        verbose: False
+        save_recs: False
+        validation_rate: 1
+      epochs: 1
+      lr: [0.001,0.1]
+      factors: 10
+      reg: 0.005
+      gaussian_variance: 0.01
+      batch_size: 512
 #    NeuMF:
 #      meta:
 #        verbose: True
@@ -305,13 +306,13 @@ experiment:
 #      neighbors: 50
 #      similarity: braycurtis
 #      implementation: aiolli
-    VSM:
-      meta:
-        verbose: True
-        save_recs: False
-      similarity: cosine
-      user_profile: binary
-      item_profile: binary
+#    VSM:
+#      meta:
+#        verbose: True
+#        save_recs: False
+#      similarity: [cosine,correlation]
+#      user_profile: binary
+#      item_profile: binary
 #    external.MostPop:
 #      meta:
 #        save_recs: True

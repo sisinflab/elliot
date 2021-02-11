@@ -101,6 +101,7 @@ def run_experiment(config_path: str = './config/config.yml'):
     # res_handler.save_results(output=base.base_namespace.path_output_rec_performance)
     hyper_handler.save_trials(output=base.base_namespace.path_output_rec_performance)
     res_handler.save_best_results(output=base.base_namespace.path_output_rec_performance)
+    res_handler.save_best_models(output=base.base_namespace.path_output_rec_performance)
     if base.base_namespace.evaluation.paired_ttest:
         res_handler.save_best_statistical_results(output=base.base_namespace.path_output_rec_performance)
 

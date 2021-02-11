@@ -7,9 +7,9 @@ __version__ = '0.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
-import numpy as np
 import pandas as pd
 from datetime import datetime
+import json
 
 from elliot.evaluation.statistical_significance import PairedTTest
 
@@ -23,47 +23,11 @@ class ResultHandler:
         self.ks = set()
         self.rel_threshold = rel_threshold
 
-    # def add_multishot_recommender(self, obj):
-    #     name = obj.results[0]["params"]["name"].split("_")[0]
-    #     self.multishot_recommenders[name] = obj.results
-
-
     def add_oneshot_recommender(self, **kwargs):
         self.ks.update(set(kwargs["test_results"].keys()))
         self.oneshot_recommenders[kwargs["name"].split("_")[0]] = [kwargs]
 
-    # def get_best_result(self):
-    #     bests = {}
-    #     for recommender in self.multishot_recommenders.keys():
-    #         min_val = np.argmin([i["loss"] for i in self.multishot_recommenders[recommender]])
-    #         best_model_loss = self.multishot_recommenders[recommender][min_val]["loss"]
-    #         best_model_params = self.multishot_recommenders[recommender][min_val]["params"]
-    #         best_model_results = self.multishot_recommenders[recommender][min_val]["results"]
-    #         best_model_statistical_results = self.multishot_recommenders[recommender][min_val]["statistical_results"]
-    #         best_test_model_results = self.multishot_recommenders[recommender][min_val]["test_results"]
-    #         best_test_model_statistical_results = self.multishot_recommenders[recommender][min_val]["test_statistical_results"]
-    #         bests[recommender] = [{"loss": best_model_loss,
-    #                                "params": best_model_params,
-    #                                "results": best_model_results,
-    #                                "statistical_results": best_model_statistical_results,
-    #                                "test_results": best_test_model_results,
-    #                                "test_statistical_results": best_test_model_statistical_results}]
-    #     return bests
-
-    # def save_results(self, output='../results/', best=False):
-    #     global_results = dict(self.oneshot_recommenders,
-    #                           **self.get_best_result() if best else self.multishot_recommenders)
-    #     for rec in global_results.keys():
-    #         results = {}
-    #         for result in global_results[rec]:
-    #             results.update({result['params']['name']: result[_eval_results]})
-    #         info = pd.DataFrame.from_dict(results, orient='index')
-    #         info.insert(0, 'model', info.index)
-    #         info.to_csv(f'{output}rec_{rec}_{datetime.now().strftime("%Y_%m_%d_%H_%M_%S")}.tsv', sep='\t', index=False)
-
-
     def save_best_results(self, output='../results/'):
-        # global_results = dict(self.oneshot_recommenders, **self.get_best_result())
         global_results = dict(self.oneshot_recommenders)
         for k in self.ks:
             results = {}
@@ -74,8 +38,18 @@ class ResultHandler:
             info.insert(0, 'model', info.index)
             info.to_csv(f'{output}rec_cutoff_{k}_relthreshold_{self.rel_threshold}_{datetime.now().strftime("%Y_%m_%d_%H_%M_%S")}.tsv', sep='\t', index=False)
 
+    def save_best_models(self, output='../results/'):
+        global_results = dict(self.oneshot_recommenders)
+        for k in self.ks:
+            models = []
+            for rec in global_results.keys():
+                for model in global_results[rec]:
+                    model["params"].update({"meta": model["params"]["meta"].__dict__, "recommender": rec})
+                    models.append(model["params"])
+            with open(f'{output}bestmodelparams_cutoff_{k}_relthreshold_{self.rel_threshold}_{datetime.now().strftime("%Y_%m_%d_%H_%M_%S")}.json', mode='w') as f:
+                json.dump(models, f, indent=4)
+
     def save_best_statistical_results(self, output='../results/'):
-        # global_results = dict(self.oneshot_recommenders, **self.get_best_result())
         global_results = dict(self.oneshot_recommenders)
         for k in self.ks:
             results = []

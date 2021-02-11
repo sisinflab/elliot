@@ -8,8 +8,10 @@ __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
 import os
+import sys
 from types import SimpleNamespace
 from ast import literal_eval
+from functools import reduce
 
 from hyperopt import hp
 from yaml import FullLoader as FullLoader
@@ -158,7 +160,18 @@ class NameSpaceModel:
                 space_list = []
                 for k, value in self.config[_experiment][_models][key].items():
                     if isinstance(value, list):
-                        if isinstance(value[0], str):
+                        valid_functions = ["choice",
+                             "randint",
+                             "uniform",
+                             "quniform",
+                             "loguniform",
+                             "qloguniform",
+                             "normal",
+                             "qnormal",
+                             "lognormal",
+                             "qlognormal"
+                             ]
+                        if isinstance(value[0], str) and value[0] in valid_functions:
                             func_ = getattr(hp, value[0].replace(" ","").split("(")[0])
                             val_string = value[0].replace(" ","").split("(")[1].split(")")[0] if len(value[0].replace(" ","").split("(")) > 1 else None
                             val = [literal_eval(val_string) if val_string else None]
@@ -168,8 +181,11 @@ class NameSpaceModel:
                         else:
                             space_list.append((k, hp.choice(k, value)))
                 _SPACE = OrderedDict(space_list)
-                _max_evals = meta_model[_hyper_max_evals]
-                _opt_alg = ho.parse_algorithms(meta_model[_hyper_opt_alg])
+                _estimated_evals = reduce(lambda x, y: x*y, [len(param.pos_args) - 1 for _, param in _SPACE.items()], 1)
+                if _estimated_evals <= 0:
+                    raise Exception("Only pure value lists can be used without hyper_max_evals option. Please define hyper_max_evals in model/meta configuration.")
+                _max_evals = meta_model.get(_hyper_max_evals, _estimated_evals)
+                _opt_alg = ho.parse_algorithms(meta_model.get(_hyper_opt_alg, "grid"))
                 yield key, (model_name_space, _SPACE, _max_evals, _opt_alg)
             else:
                 yield key, model_name_space
