@@ -66,16 +66,19 @@ class MostPop(RecMixin, BaseRecommenderModel):
             ui = set(i_s.keys())
 
             lui = len(ui)
-            if lui+top_k >= n_items:
-                r[u] = l
-                continue
+
+            local_k = min(top_k, self._num_items - lui)
+
+            # if lui+top_k >= n_items:
+            #     r[u] = l
+            #     continue
 
             for item, pop in sorted_pop_items.items():
                 if item in ui:
                     continue
                 else:
                     l.append((item, pop))
-                if len(l) >= top_k:
+                if len(l) >= local_k:
                     break
             r[u] = l
         return r

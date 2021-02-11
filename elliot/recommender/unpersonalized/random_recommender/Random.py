@@ -67,10 +67,11 @@ class Random(RecMixin, BaseRecommenderModel):
             l = []
             ui = set(i_s.keys())
             lui = len(ui)
-            if lui+top_k >= n_items:
-                r[u] = l
-                continue
-            for index in range(top_k):
+            local_k = min(top_k, self._num_items - lui)
+            # if lui+top_k >= n_items:
+            #     r[u] = l
+            #     continue
+            for index in range(local_k):
                 j = items[r_int(n_items)]
                 while j in ui:
                     j = items[r_int(n_items)]

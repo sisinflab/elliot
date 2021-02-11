@@ -26,7 +26,6 @@ class PureSVD(RecMixin, BaseRecommenderModel):
     def __init__(self, data, config, params, *args, **kwargs):
         super().__init__(data, config, params, *args, **kwargs)
 
-        self._restore = getattr(self._params, "restore", False)
         self._num_items = self._data.num_items
         self._num_users = self._data.num_users
         self._random = np.random
