@@ -7,7 +7,11 @@ __version__ = '0.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malitesta@poliba.it'
 
-import logging
+from evaluation.evaluator import Evaluator
+from utils.folder import build_model_folder
+
+import logging as log
+from utils import logging
 import os
 
 import numpy as np
@@ -19,7 +23,7 @@ from recommender.visual_recommenders.DeepStyle.DeepStyle_model import DeepStyle_
 
 np.random.seed(0)
 tf.random.set_seed(0)
-logging.disable(logging.WARNING)
+log.disable(log.WARNING)
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 
@@ -42,6 +46,12 @@ class DeepStyle(NNBPRMF, VisualLoader):
                                       self._data.visual_features.shape[1],
                                       self._num_users,
                                       self._num_items)
+
+        self.evaluator = Evaluator(self._data, self._params)
+        self._params.name = self.name
+        build_model_folder(self._config.path_output_rec_weight, self.name)
+        self._saving_filepath = f'{self._config.path_output_rec_weight}{self.name}/best-weights-{self.name}'
+        self.logger = logging.get_logger(self.__class__.__name__)
 
     @property
     def name(self):
