@@ -17,7 +17,6 @@ tf.random.set_seed(0)
 
 
 class Encoder(tf.keras.layers.Layer):
-
     def __init__(self, hidden_neuron=200,
                  regularization=0.01,
                  name="encoder",
@@ -36,11 +35,10 @@ class Encoder(tf.keras.layers.Layer):
 
 
 class Decoder(tf.keras.layers.Layer):
-
-    def __init__(self, num_items, name="decoder", regularization=0.01, **kwargs):
+    def __init__(self, num_users, name="decoder", regularization=0.01, **kwargs):
         super().__init__(name=name, **kwargs)
-        self.dense_output = tf.keras.layers.Dense(num_items,
-                                                  activation='linear',
+        self.dense_output = tf.keras.layers.Dense(num_users,
+                                                  activation='sigmoid',
                                                   kernel_initializer=keras.initializers.GlorotNormal(),
                                                   kernel_regularizer=keras.regularizers.l2(regularization),
                                                   bias_initializer=keras.initializers.Ones())
@@ -51,7 +49,7 @@ class Decoder(tf.keras.layers.Layer):
         return x
 
 
-class UserAutoRecModel(keras.Model):
+class ItemAutoRecModel(keras.Model):
     def __init__(self,
                  data,
                  num_users,
@@ -59,7 +57,7 @@ class UserAutoRecModel(keras.Model):
                  lr,
                  hidden_neuron,
                  l_w,
-                 name="UserAutoRec",
+                 name="ItemAutoRec",
                  **kwargs):
         super().__init__(name=name, **kwargs)
         tf.random.set_seed(42)
@@ -74,7 +72,7 @@ class UserAutoRecModel(keras.Model):
         self.encoder = Encoder(hidden_neuron=self.hidden_neuron,
                                regularization=self.l_w
                                )
-        self.decoder = Decoder(num_items=self.num_items,
+        self.decoder = Decoder(num_users=self.num_users,
                                regularization=self.l_w)
 
         self.optimizer = tf.optimizers.Adam(self.lr)
@@ -120,3 +118,14 @@ class UserAutoRecModel(keras.Model):
     @tf.function
     def get_top_k(self, preds, train_mask, k=100):
         return tf.nn.top_k(tf.where(train_mask, preds, -np.inf), k=k, sorted=True)
+
+    @tf.function
+    def get_recs(self, inputs, training=False, **kwargs):
+        """
+        Get full predictions on the whole users/items matrix. [Is Inverted]
+
+        Returns:
+            The matrix of predicted values.
+        """
+
+        return self.predict(inputs)

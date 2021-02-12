@@ -367,7 +367,20 @@ experiment:
 #      neg_ratio: 1
 #      weight_size: 32
 #      algorithm: concat
-    UserAutoRec:
+#    UserAutoRec:
+#      meta:
+#        validation_rate: 1
+#        verbose: True
+#        save_weights: True
+#        save_recs: True
+#        validation_metric: nDCG
+#        restore: False
+#      hidden_neuron: 500
+#      lr: 0.001
+#      l_w: 0.0025
+#      epochs: 25
+#      batch_size: 512
+    ItemAutoRec:
       meta:
         validation_rate: 1
         verbose: True
@@ -379,4 +392,4 @@ experiment:
       lr: 0.001
       l_w: 0.0025
       epochs: 25
-      batch_size: 512
+      batch_size: 2
