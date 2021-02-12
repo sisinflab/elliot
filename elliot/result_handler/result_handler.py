@@ -36,7 +36,9 @@ class ResultHandler:
                     results.update({result['params']['name']: result[_eval_results][k]})
             info = pd.DataFrame.from_dict(results, orient='index')
             info.insert(0, 'model', info.index)
-            info.to_csv(f'{output}rec_cutoff_{k}_relthreshold_{self.rel_threshold}_{datetime.now().strftime("%Y_%m_%d_%H_%M_%S")}.tsv', sep='\t', index=False)
+            info.to_csv(
+                f'{output}rec_cutoff_{k}_relthreshold_{self.rel_threshold}_{datetime.now().strftime("%Y_%m_%d_%H_%M_%S")}.tsv',
+                sep='\t', index=False)
 
     def save_best_models(self, output='../results/'):
         global_results = dict(self.oneshot_recommenders)
@@ -44,9 +46,12 @@ class ResultHandler:
             models = []
             for rec in global_results.keys():
                 for model in global_results[rec]:
-                    model["params"].update({"meta": model["params"]["meta"].__dict__, "recommender": rec})
-                    models.append(model["params"])
-            with open(f'{output}bestmodelparams_cutoff_{k}_relthreshold_{self.rel_threshold}_{datetime.now().strftime("%Y_%m_%d_%H_%M_%S")}.json', mode='w') as f:
+                    models.append({"meta": model["params"]["meta"].__dict__, "recommender": rec,
+                                   "configuration": {key: value for key, value in model["params"].items() if
+                                                     key != 'meta'}})
+            with open(
+                    f'{output}bestmodelparams_cutoff_{k}_relthreshold_{self.rel_threshold}_{datetime.now().strftime("%Y_%m_%d_%H_%M_%S")}.json',
+                    mode='w') as f:
                 json.dump(models, f, indent=4)
 
     def save_best_statistical_results(self, output='../results/'):
@@ -80,7 +85,9 @@ class ResultHandler:
                                             metric_name,
                                             p_value))
 
-            with open(f'{output}stat_cutoff_{k}_relthreshold_{self.rel_threshold}_{datetime.now().strftime("%Y_%m_%d_%H_%M_%S")}.tsv', "w") as f:
+            with open(
+                    f'{output}stat_cutoff_{k}_relthreshold_{self.rel_threshold}_{datetime.now().strftime("%Y_%m_%d_%H_%M_%S")}.tsv',
+                    "w") as f:
                 for tup in results:
                     f.write(f"{tup[0]}\t{tup[1]}\t{tup[2]}\t{tup[3]}\n")
 
@@ -104,4 +111,6 @@ class HyperParameterStudy:
                     results.update({result['params']['name']: result[_eval_results][k]})
                 info = pd.DataFrame.from_dict(results, orient='index')
                 info.insert(0, 'model', info.index)
-                info.to_csv(f'{output}rec_{rec}_cutoff_{k}_relthreshold_{self.rel_threshold}_{datetime.now().strftime("%Y_%m_%d_%H_%M_%S")}.tsv', sep='\t', index=False)
+                info.to_csv(
+                    f'{output}rec_{rec}_cutoff_{k}_relthreshold_{self.rel_threshold}_{datetime.now().strftime("%Y_%m_%d_%H_%M_%S")}.tsv',
+                    sep='\t', index=False)
