@@ -10,6 +10,7 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malite
 
 import numpy as np
 from tqdm import tqdm
+import pickle
 
 from elliot.dataset.samplers import custom_sampler as cs
 from elliot.utils.write import store_recommendation
