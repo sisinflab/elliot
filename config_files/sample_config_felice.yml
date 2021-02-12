@@ -380,7 +380,20 @@ experiment:
 #      l_w: 0.0025
 #      epochs: 25
 #      batch_size: 512
-    ItemAutoRec:
+#    ItemAutoRec:
+#      meta:
+#        validation_rate: 1
+#        verbose: True
+#        save_weights: True
+#        save_recs: True
+#        validation_metric: nDCG
+#        restore: False
+#      hidden_neuron: 500
+#      lr: 0.001
+#      l_w: 0.0025
+#      epochs: 25
+#      batch_size: 2
+    ConvNeuMF:
       meta:
         validation_rate: 1
         verbose: True
@@ -388,8 +401,13 @@ experiment:
         save_recs: True
         validation_metric: nDCG
         restore: False
-      hidden_neuron: 500
       lr: 0.001
-      l_w: 0.0025
+      embedding_size: 100
+      cnn_channels: (1, 32, 32)
+      cnn_kernels: (2, 2)
+      cnn_strides: (2,2)
+      dropout_prob: 0.2
+      l_w: 0.0001
+      l_b: 0.0001
       epochs: 25
       batch_size: 2
