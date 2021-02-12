@@ -2,11 +2,10 @@
 Module description:
 
 """
-from utils import logging
 
 __version__ = '0.1'
-__author__ = 'Vito Walter Anelli, Claudio Pomo'
-__email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
+__author__ = 'Felice Antonio Merra'
+__email__ = 'felice.merra@poliba.it'
 
 import numpy as np
 from ast import literal_eval as make_tuple
@@ -25,6 +24,16 @@ np.random.seed(42)
 class UserAutoRec(RecMixin, BaseRecommenderModel):
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
+        """
+        AutoRec: Autoencoders Meet Collaborative Filtering
+        Link: https://users.cecs.anu.edu.au/~akmenon/papers/autorec/autorec-paper.pdf
+        Args:
+            data:
+            config:
+            params:
+            *args:
+            **kwargs:
+        """
         self._random = np.random
 
         self._params_list = [
