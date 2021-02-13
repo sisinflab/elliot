@@ -5,8 +5,8 @@ objects:
     maxsize: 10000
 formatters:
   simple:
-    format: '%(asctime)-15s %(levelname)s %(message)s'
-    datefmt: '%a %d %b %Y %H:%M:%S'
+    format: '%(asctime)-15s %(levelname)-.1s %(message)s'
+    datefmt: '%Y-%m-%d %H:%M:%S.%s'
 handlers:
   console:
     class: logging.StreamHandler
@@ -54,7 +54,7 @@ loggers:
     level: FATAL
     handlers:
       - queue_listener
-  'hyperparam':
+  'ModelCoordinator':
     level: FATAL
     handlers:
       - queue_listener

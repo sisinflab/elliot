@@ -7,7 +7,7 @@ import tensorflow as tf
 from recommender.visual_recommenders.VBPR.VBPR import VBPR
 
 np.random.seed(0)
-logging.disable(logging.WARNING)
+# logging.disable(logging.WARNING)
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 

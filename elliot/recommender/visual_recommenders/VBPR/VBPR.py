@@ -7,12 +7,16 @@ __version__ = '0.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malitesta@poliba.it'
 
+import os
+
 import numpy as np
 import tensorflow as tf
 
 from elliot.recommender.latent_factor_models.NNBPRMF.NNBPRMF import NNBPRMF
 from elliot.recommender.visual_recommenders.VBPR.VBPR_model import VBPR_model
 from elliot.recommender.base_recommender_model import init_charger
+
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 np.random.seed(0)
 tf.random.set_seed(0)

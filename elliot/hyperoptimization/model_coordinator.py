@@ -11,6 +11,8 @@ from types import SimpleNamespace
 import typing as t
 import numpy as np
 
+from elliot.utils import logging
+
 from hyperopt import STATUS_OK
 
 
@@ -27,6 +29,7 @@ class ModelCoordinator(object):
         :param params: a SimpleNamespace that contains the hyper-parameters of the model
         :param model_class: the class of the recommendation model
         """
+        self.logger = logging.get_logger(self.__class__.__name__)
         self.data_objs = data_objs
         self.base = base
         self.params = params
@@ -42,12 +45,10 @@ class ModelCoordinator(object):
         sampled_namespace = SimpleNamespace(**args)
         model_params = SimpleNamespace(**self.params[0].__dict__)
 
-        print("\n************")
-        print("Hyperparameter tuning exploration:")
+        self.logger.info("Hyperparameter tuning exploration:")
         for k, v in sampled_namespace.__dict__.items():
             model_params.__setattr__(k, v)
-            print(f"{k} set to {model_params.__getattribute__(k)}")
-        print("************\n")
+            self.logger.info(f"{k} set to {model_params.__getattribute__(k)}")
 
         losses = []
         results = []

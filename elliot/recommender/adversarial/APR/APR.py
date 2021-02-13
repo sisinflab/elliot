@@ -17,7 +17,7 @@ from utils.read import find_checkpoint
 from utils.write import save_obj
 
 np.random.seed(0)
-logging.disable(logging.WARNING)
+# logging.disable(logging.WARNING)
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 

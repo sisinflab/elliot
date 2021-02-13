@@ -14,7 +14,7 @@ from tensorflow import keras
 from tensorflow.keras import layers
 import numpy as np
 
-logging.disable(logging.WARNING)
+# logging.disable(logging.WARNING)
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 
