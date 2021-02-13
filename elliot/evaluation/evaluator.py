@@ -22,15 +22,16 @@ __version__ = '0.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
-import warnings
 from time import time
 from types import SimpleNamespace
+
 import numpy as np
 
-from . import metrics
-from . import relevance
-from . import popularity_utils
 import elliot.dataset.dataset as ds
+from elliot.utils import logging
+from . import metrics
+from . import popularity_utils
+from . import relevance
 
 
 class Evaluator(object):
@@ -40,6 +41,7 @@ class Evaluator(object):
         :param data: dataset object
         :param k: top-k evaluation
         """
+        self.logger = logging.get_logger(self.__class__.__name__)
         self._data = data
         self._params = params
         self._k = getattr(data.config.evaluation, "cutoff", [data.config.top_k])
@@ -143,9 +145,9 @@ class Evaluator(object):
         full_recommendations_metrics = any([m.needs_full_recommendations() for m in self._metrics])
         full_recommendations_additional_metrics = any([metrics.parse_metric(metric["metric"]).needs_full_recommendations() for metric in self._complex_metrics])
         if full_recommendations_metrics:
-            warnings.warn("*** WARNING: At least one basic metric requires full length recommendations")
+            self.logger.warn("*** WARNING: At least one basic metric requires full length recommendations")
         if full_recommendations_additional_metrics:
-            warnings.warn("*** WARNING: At least one additional metric requires full length recommendations", None, 1, None)
+            self.logger.warn("*** WARNING: At least one additional metric requires full length recommendations", None, 1, None)
         if full_recommendations_metrics or full_recommendations_metrics:
             return self._data.num_items
         else:

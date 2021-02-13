@@ -10,12 +10,12 @@ formatters:
 handlers:
   console:
     class: logging.StreamHandler
-    level: WARNING
+    level: FATAL
     formatter: simple
     stream: ext://sys.stdout
   file:
     class: logging.FileHandler
-    level: WARNING
+    level: FATAL
     filename: !CUSTOM ${log_path_exp}
     formatter: simple
   queue_listener:
@@ -26,28 +26,56 @@ handlers:
     queue: cfg://objects.queue
 loggers:
   'recommender':
-    level: WARNING
+    level: FATAL
     handlers:
       - queue_listener
     propagate: false
-  'dataloader':
-    level: WARNING
+  'DataSet':
+    level: FATAL
     handlers:
       - queue_listener
-  'evaluator':
-    level: WARNING
+  'KnowledgeChainsLoader':
+    level: FATAL
+    handlers:
+      - queue_listener
+  'KnowledgeChainsDataObject':
+    level: FATAL
+    handlers:
+      - queue_listener
+  'DataSetLoader':
+    level: FATAL
+    handlers:
+      - queue_listener
+  'Evaluator':
+    level: FATAL
+    handlers:
+      - queue_listener
+  'namespace':
+    level: FATAL
     handlers:
       - queue_listener
   'hyperparam':
-    level: WARNING
+    level: FATAL
+    handlers:
+      - queue_listener
+  'prefiltering':
+    level: FATAL
+    handlers:
+      - queue_listener
+  'splitter':
+    level: FATAL
+    handlers:
+      - queue_listener
+  'result_handler':
+    level: FATAL
     handlers:
       - queue_listener
   __main__:
-    level: WARNING
+    level: FATAL
     handlers:
       - queue_listener
     propagate: false
 root:
-  level: WARNING
+  level: FATAL
   handlers:
     - console

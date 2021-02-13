@@ -10,7 +10,6 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malite
 import numpy as np
 import tensorflow as tf
 
-from elliot.recommender.visual_recommenders.visual_mixins.visual_loader_mixin import VisualLoader
 from elliot.recommender.latent_factor_models.NNBPRMF.NNBPRMF import NNBPRMF
 from elliot.recommender.visual_recommenders.VBPR.VBPR_model import VBPR_model
 from elliot.recommender.base_recommender_model import init_charger
@@ -19,7 +18,7 @@ np.random.seed(0)
 tf.random.set_seed(0)
 
 
-class VBPR(NNBPRMF, VisualLoader):
+class VBPR(NNBPRMF):
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
         """

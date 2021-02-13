@@ -16,6 +16,7 @@ import typing as t
 from elliot.dataset.abstract_dataset import AbstractDataset
 from elliot.splitter.base_splitter import Splitter
 from elliot.prefiltering.standard_prefilters import PreFilter
+from elliot.utils import logging
 
 
 class DataSetLoader:
@@ -30,6 +31,7 @@ class DataSetLoader:
         :param path_test_data: relative path for test file
         """
 
+        self.logger = logging.get_logger(self.__class__.__name__)
         self.args = args
         self.kwargs = kwargs
         self.config = config
@@ -44,7 +46,7 @@ class DataSetLoader:
 
             self.train_dataframe = self.check_timestamp(self.train_dataframe)
 
-            print('{0} - Loaded'.format(path_train_data))
+            self.logger.info(f"{path_train_data} - Loaded")
 
             self.test_dataframe = pd.read_csv(path_test_data, sep="\t", header=None, names=self.column_names)
 
@@ -118,6 +120,7 @@ class DataSetLoader:
                 data_list.append([single_dataobject])
         return data_list
 
+
 class DataSet(AbstractDataset):
     """
     Load train and test dataset
@@ -129,6 +132,7 @@ class DataSet(AbstractDataset):
         :param path_train_data: relative path for train file
         :param path_test_data: relative path for test file
         """
+        self.logger = logging.get_logger(self.__class__.__name__)
         self.config = config
         self.args = args
         self.kwargs = kwargs
@@ -169,13 +173,8 @@ class DataSet(AbstractDataset):
         n_items = len({k for a in ratings.values() for k in a.keys()})
         transactions = sum([len(a) for a in ratings.values()])
         sparsity = 1 - (transactions / (n_users * n_items))
-        print()
-        print("********** Statistics")
-        print(f'Users:\t{n_users}')
-        print(f'Items:\t{n_items}', )
-        print(f'Transactions:\t{transactions}')
-        print(f'Sparsity:\t{sparsity}')
-        print("********** ")
+        self.logger.info(f"********** Statistics\nUsers:\t{n_users}\nItems:\t{n_items}\nTransactions:\t{transactions}\n"
+                         f"Sparsity:\t{sparsity}\n**********")
         return ratings
 
     def build_dict(self, dataframe, users):

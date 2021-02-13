@@ -13,7 +13,6 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 from abc import ABC
 from abc import abstractmethod
 from functools import wraps
-import numpy as np
 
 
 class BaseRecommenderModel(ABC):

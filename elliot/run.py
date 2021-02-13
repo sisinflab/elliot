@@ -23,12 +23,13 @@ from elliot.utils import logging as logging_project
 _rstate = np.random.RandomState(42)
 here = path.abspath(path.dirname(__file__))
 
+
 def run_experiment(config_path: str = './config/config.yml'):
     builder = NameSpaceBuilder(config_path, here, path.abspath(path.dirname(config_path)))
     base = builder.base
     logging_project.init(base.base_namespace.path_logger_config, base.base_namespace.path_log_folder)
     logger = logging_project.get_logger("__main__")
-    logger.warning("Test")
+    logger.info("Start experiment")
     base.base_namespace.evaluation.relevance_threshold = getattr(base.base_namespace.evaluation, "relevance_threshold", 0)
     res_handler = ResultHandler(rel_threshold=base.base_namespace.evaluation.relevance_threshold)
     hyper_handler = HyperParameterStudy(rel_threshold=base.base_namespace.evaluation.relevance_threshold)
@@ -49,8 +50,8 @@ def run_experiment(config_path: str = './config/config.yml'):
                 model_class = getattr(importlib.import_module("external"), key.split(".", 1)[1])
             else:
                 model_class = getattr(importlib.import_module("recommender"), key)
-            print("\n********************************")
-            print(f"Tuning begun for {model_class.__name__}\n")
+
+            logger.info(f"Tuning begun for {model_class.__name__}\n")
             model_placeholder = ho.ModelCoordinator(data_test, base.base_namespace, model_base, model_class)
             if isinstance(model_base, tuple):
                 trials = Trials()
@@ -104,6 +105,8 @@ def run_experiment(config_path: str = './config/config.yml'):
     res_handler.save_best_models(output=base.base_namespace.path_output_rec_performance)
     if base.base_namespace.evaluation.paired_ttest:
         res_handler.save_best_statistical_results(output=base.base_namespace.path_output_rec_performance)
+
+    logger.debug("End experiment")
 
 
 if __name__ == '__main__':

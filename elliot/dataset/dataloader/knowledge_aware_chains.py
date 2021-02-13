@@ -15,7 +15,7 @@ import scipy.sparse as sp
 from collections import Counter
 from types import SimpleNamespace
 
-from elliot.dataset.abstract_dataset import AbstractDataset
+from elliot.utils import logging
 from elliot.splitter.base_splitter import Splitter
 from elliot.prefiltering.standard_prefilters import PreFilter
 
@@ -56,6 +56,7 @@ class KnowledgeChainsLoader:
         :param path_test_data: relative path for test file
         """
 
+        self.logger = logging.get_logger(self.__class__.__name__)
         self.args = args
         self.kwargs = kwargs
         self.config = config
@@ -78,7 +79,7 @@ class KnowledgeChainsLoader:
                                                                                                        path_properties)
             self.train_dataframe = self.check_timestamp(self.train_dataframe)
 
-            print('{0} - Loaded'.format(path_train_data))
+            self.logger.info(f"{path_train_data} - Loaded")
 
             self.test_dataframe = pd.read_csv(path_test_data, sep="\t", header=None, names=self.column_names)
             self.test_dataframe = self.check_timestamp(self.test_dataframe)
@@ -264,19 +265,18 @@ class KnowledgeChainsLoader:
                     if feature[1][0] not in properties:
                         acceptable_features.add(int(feature[0]))
 
-        print(f"Acceptable Features:\t{len(acceptable_features)}", )
-        print(f"Mapped items:\t{len(map)}")
+        self.logger.info(f"Acceptable Features:\t{len(acceptable_features)}\nMapped items:\t{len(map)}")
 
         nmap = {k: v for k, v in map.items() if k in items}
 
         feature_occurrences_dict = Counter([x for xs in nmap.values() for x in xs  if x in acceptable_features])
         features_popularity = {k: v for k, v in feature_occurrences_dict.items() if v > threshold}
 
-        print(f"Features above threshold:\t{len(features_popularity)}")
+        self.logger.info(f"Features above threshold:\t{len(features_popularity)}")
 
         new_map = {k:[value for value in v if value in features_popularity.keys()] for k,v in nmap.items()}
         new_map = {k:v for k,v in new_map.items() if len(v)>0}
-        print(f"Final #items:\t{len(new_map.keys())}")
+        self.logger.info(f"Final #items:\t{len(new_map.keys())}")
 
         return new_map
 
@@ -293,6 +293,7 @@ class KnowledgeChainsDataObject:
     """
 
     def __init__(self, config, data_tuple, side_information_data, *args, **kwargs):
+        self.logger = logging.get_logger(self.__class__.__name__)
         self.config = config
         self.side_information_data = side_information_data
         self.args = args
@@ -338,13 +339,8 @@ class KnowledgeChainsDataObject:
         n_items = len({k for a in ratings.values() for k in a.keys()})
         transactions = sum([len(a) for a in ratings.values()])
         sparsity = 1 - (transactions / (n_users * n_items))
-        print()
-        print("********** Statistics")
-        print(f'Users:\t{n_users}')
-        print(f'Items:\t{n_items}', )
-        print(f'Transactions:\t{transactions}')
-        print(f'Sparsity:\t{sparsity}')
-        print("********** ")
+        self.logger.info(f"********** Statistics\nUsers:\t{n_users}\nItems:\t{n_items}\nTransactions:\t{transactions}\n"
+                         f"Sparsity:\t{sparsity}\n**********")
         return ratings
 
     def build_dict(self, dataframe, users):

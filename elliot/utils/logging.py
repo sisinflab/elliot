@@ -56,13 +56,16 @@ def init(path_config, folder_log, log_level=logging.WARNING):
         log.setLevel(log_level)
 
 
-def get_logger(name, log_level=logging.WARNING):
-    logger = logging.root.manager.loggerDict[name]
+def get_logger(name, log_level=logging.DEBUG):
+    if name not in logging.root.manager.loggerDict:
+        logger = logging.getLogger(name)
+    else:
+        logger = logging.root.manager.loggerDict[name]
     logger.setLevel(log_level)
     return logger
 
 
-def prepare_logger(name, path, log_level=logging.WARNING):
+def prepare_logger(name, path, log_level=logging.DEBUG):
     logger = logging.getLogger(name)
     logger.setLevel(log_level)
     logfilepath = f'''{path}/{name}-{datetime.datetime.now().strftime('%b-%d-%Y_%H-%M-%S')}.log'''
