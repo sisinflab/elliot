@@ -44,7 +44,7 @@ class Evaluator(object):
         self.logger = logging.get_logger(self.__class__.__name__)
         self._data = data
         self._params = params
-        self._k = getattr(data.config.evaluation, "cutoff", [data.config.top_k])
+        self._k = getattr(data.config.evaluation, "cutoffs", [data.config.top_k])
         self._k = self._k if isinstance(self._k, list) else [self._k]
         if any(np.array(self._k) > data.config.top_k):
             raise Exception("Cutoff values must be smaller than recommendation list length (top_k)")
