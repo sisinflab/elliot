@@ -31,10 +31,11 @@ class BaseRecommenderModel(ABC):
 
         self._restore = getattr(self._params.meta, "restore", False)
         self._validation_metric = getattr(self._params.meta, "validation_metric", "nDCG@10").split("@")
-        self._validation_k = int(self._validation_metric[1]) if len(self._validation_metric) > 1 else 10
 
         _cutoff_k = getattr(data.config.evaluation, "cutoff", [data.config.top_k])
         _cutoff_k = _cutoff_k if isinstance(_cutoff_k, list) else [_cutoff_k]
+        self._validation_k = int(self._validation_metric[1]) if len(self._validation_metric) > 1 else _cutoff_k[0]
+
         if self._validation_k not in _cutoff_k:
             raise Exception("Validation cutoff must be in general cutoff values")
 

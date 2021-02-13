@@ -38,6 +38,7 @@ _log_folder = 'path_log_folder'
 _verbose = 'verbose'
 _recs = 'path_output_rec_result'
 _top_k = 'top_k'
+_print_triplets = 'print_results_as_triplets'
 _metrics = 'metrics'
 _relevance_threshold = 'relevance_threshold'
 _paired_ttest = 'paired_ttest'
@@ -96,7 +97,7 @@ class NameSpaceModel:
                            self.config[_experiment][_performance])
 
         for p in [_data_config, _weights, _recs, _dataset, _top_k, _paired_ttest, _performance, _logger_config,
-                  _log_folder, _dataloader, _splitting, _prefiltering, _evaluation, _external_models_path]:
+                  _log_folder, _dataloader, _splitting, _prefiltering, _evaluation, _external_models_path, _print_triplets]:
             if p == _data_config:
                 side_information = self.config[_experiment][p].get("side_information", {})
                 side_information.update({k: self._set_path(self._base_folder_path_config,
@@ -179,7 +180,7 @@ class NameSpaceModel:
                             val = [v for v in val if v is not None]
                             space_list.append((k, func_(k, *val)))
                         else:
-                            space_list.append((k, hp.choice(k, value)))
+                            space_list.append((k, hp.choice(k, literal_eval("["+str(",".join([str(v) for v in value]))+"]"))))
                 _SPACE = OrderedDict(space_list)
                 _estimated_evals = reduce(lambda x, y: x*y, [len(param.pos_args) - 1 for _, param in _SPACE.items()], 1)
                 if _estimated_evals <= 0:

@@ -15,9 +15,10 @@ experiment:
         properties: ../data/{0}/properties.conf
   dataset: categorical_dbpedia_ml1m
   external_models_path: ../external/models/__init__.py
+  print_results_as_triplets: True
   top_k: 20
   evaluation:
-    cutoff: 10
+    cutoff: [5, 10]
     simple_metrics: [nDCG, Precision, Recall, ItemCoverage, HR, MAP, F1, Gini, SEntropy, EFD, EPC, ARP, APLT, ACLT]
     relevance_threshold: 3
     paired_ttest: True
@@ -254,14 +255,14 @@ experiment:
 #      similarity: cosine
 #    DMF:
 #      meta:
-#        verbose: True
+#        verbose: False
 #        save_recs: False
 #        validation_rate: 1
 #      lr: 0.0001
-#      user_mlp: (64, 32)
+#      user_mlp: [(64,32), (32,32)]
 #      item_mlp: (64, 32)
 #      batch_size: 64
-#      epochs: 10
+#      epochs: 2
 #      neg_ratio: 5
 #      reg: 0.005
 #      similarity: dot
@@ -272,25 +273,25 @@ experiment:
         save_recs: False
         validation_rate: 1
       epochs: 1
-      lr: [0.001,0.1]
+      lr: [0.001, 0.01]
       factors: 10
       reg: 0.005
       gaussian_variance: 0.01
       batch_size: 512
-#    NeuMF:
-#      meta:
-#        verbose: True
-#        save_recs: False
-#        validation_rate: 1
-#      mf_factors: 10
-#      mlp_factors: 10
-#      mlp_hidden_size: (5, 3, 2)
-#      dropout: 0.2
-#      is_mf_train: True
-#      is_mlp_train: True
-#      batch_size: 512
-#      epochs: 1
-#      lr: 0.001
+    NeuMF:
+      meta:
+        verbose: True
+        save_recs: False
+        validation_rate: 1
+      mf_factors: 10
+      mlp_factors: 10
+      mlp_hidden_size: [(5, 3, 2),(5,2)]
+      dropout: 0.2
+      is_mf_train: True
+      is_mlp_train: True
+      batch_size: 512
+      epochs: 1
+      lr: 0.001
 #       implementation: aiolli
 #    ItemKNN:
 #      meta:

@@ -40,6 +40,20 @@ class ResultHandler:
                 f'{output}rec_cutoff_{k}_relthreshold_{self.rel_threshold}_{datetime.now().strftime("%Y_%m_%d_%H_%M_%S")}.tsv',
                 sep='\t', index=False)
 
+    def save_best_results_as_triplets(self, output='../results/'):
+        global_results = dict(self.oneshot_recommenders)
+        for k in self.ks:
+            results = {}
+            for rec in global_results.keys():
+                for result in global_results[rec]:
+                    results.update({result['params']['name']: result[_eval_results][k]})
+            info = pd.DataFrame.from_dict(results, orient='index')
+            info.insert(0, 'model', info.index)
+            triplets = info.set_index("model").stack().reset_index()
+            triplets.to_csv(
+                f'{output}triplets_rec_cutoff_{k}_relthreshold_{self.rel_threshold}_{datetime.now().strftime("%Y_%m_%d_%H_%M_%S")}.tsv',
+                sep='\t', index=False, header=["model", "metric", "value"])
+
     def save_best_models(self, output='../results/'):
         global_results = dict(self.oneshot_recommenders)
         for k in self.ks:
@@ -114,3 +128,16 @@ class HyperParameterStudy:
                 info.to_csv(
                     f'{output}rec_{rec}_cutoff_{k}_relthreshold_{self.rel_threshold}_{datetime.now().strftime("%Y_%m_%d_%H_%M_%S")}.tsv',
                     sep='\t', index=False)
+
+    def save_trials_as_triplets(self, output='../results/'):
+        for k in self.ks:
+            for rec, performance in self.trials.items():
+                results = {}
+                for result in performance:
+                    results.update({result['params']['name']: result[_eval_results][k]})
+                info = pd.DataFrame.from_dict(results, orient='index')
+                info.insert(0, 'model', info.index)
+                triplets = info.set_index("model").stack().reset_index()
+                triplets.to_csv(
+                    f'{output}triplets_rec_{rec}_cutoff_{k}_relthreshold_{self.rel_threshold}_{datetime.now().strftime("%Y_%m_%d_%H_%M_%S")}.tsv',
+                    sep='\t', index=False, header=["model", "metric", "value"])
