@@ -11,8 +11,8 @@ experiment:
       visual_features: ../data/{0}/original/features.npy
 #      dir_visual_features: ../data/{0}/original/features/
       item_mapping: ../data/{0}/visual_feats.tsv
-      images_src_folder: ../data/{0}/original/images/
-      output_image_size: (224,224)
+#      images_src_folder: ../data/{0}/original/images/
+#      output_image_size: (224,224)
 #  splitting:
 #    save_on_disk: True
 #    save_folder: ../data/{0}/splitting/
@@ -173,20 +173,39 @@ experiment:
 #      l_w: 0.000025
 #      layers_component: (64, 1)
 #      layers_item: (64, 1)
-    DVBPR:
-      meta:
-        verbose: True
-        validation_rate: 10
-        save_weights: False
-        save_recs: False
-        validation_metric: nDCG@10
-        restore_epoch: -1
-      lr: 0.0005
-      epochs: 50
-      factors: 100
-      batch_size: 128
-      lambda_1: 0.000025
-      lambda_2: 0.000025
+#    DVBPR:
+#      meta:
+#        verbose: True
+#        validation_rate: 10
+#        save_weights: False
+#        save_recs: False
+#        validation_metric: nDCG@10
+#        restore_epoch: -1
+#      lr: 0.0005
+#      epochs: 50
+#      factors: 100
+#      batch_size: 128
+#      lambda_1: 0.000025
+#      lambda_2: 0.000025
+      AMR:
+        meta:
+          verbose: True
+          validation_rate: 1
+          save_weights: False
+          save_recs: False
+          validation_metric: nDCG
+          restore_epoch: -1
+        lr: 0.0005
+        epochs: 2
+        adversarial_epochs: 1
+        eps: 0.5
+        factors: 100
+        factors_d: 20
+        batch_size: 128
+        l_w: 0.000025
+        l_b: 0
+        l_e: 0.002
+        l_adv: 0.001
 #    KaHFM:
 #      meta:
 #        hyper_max_evals: 1

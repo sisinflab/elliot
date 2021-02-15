@@ -74,7 +74,6 @@ class VBPR(RecMixin, BaseRecommenderModel):
                                  self._l_b,
                                  self._l_e,
                                  self._data.visual_features[item_indices],
-                                 self._data.visual_features.shape[1],
                                  self._num_users,
                                  self._num_items)
 
