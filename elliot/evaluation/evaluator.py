@@ -126,9 +126,11 @@ class Evaluator(object):
             results = {m.name(): m.eval() for m in metric_objects}
 
             str_results = {k: str(round(v, rounding_factor)) for k, v in results.items()}
-            res_print = "\t".join([":".join(e) for e in str_results.items()])
-            self.logger.info(f"Cut-off: {eval_objs.cutoff}\tEval Time: {time() - eval_start_time}"
-                             f"\tResults\t{res_print}")
+            # res_print = "\t".join([":".join(e) for e in str_results.items()])
+            self.logger.info(f"\nCut-off: {eval_objs.cutoff}")
+            self.logger.info(f"Eval Time: {time() - eval_start_time}\n")
+            self.logger.info(f"Results")
+            [self.logger.info("\t".join(e)) for e in str_results.items()]
 
             statistical_results = {}
             if self._paired_ttest:

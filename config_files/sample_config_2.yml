@@ -23,10 +23,10 @@ experiment:
     relevance_threshold: 3
     paired_ttest: True
     wilcoxon_test: True
-#    complex_metrics:
-#    - metric: ExtendedF1
-#      metric_0: Precision
-#      metric_1: Recall
+    complex_metrics:
+    - metric: ExtendedF1
+      metric_0: Precision
+      metric_1: Recall
 #    - metric: ExtendedPopREO
 #      pop_ratio: 0.2
 #    - metric: ExtendedPopRSP
@@ -62,10 +62,10 @@ experiment:
 #      user_clustering_file: ../data/categorical_dbpedia_ml1m/user_clustering_happiness.tsv
 #      item_clustering_name: ItemPopularity
 #      item_clustering_file: ../data/categorical_dbpedia_ml1m/items_clustering_popularity.tsv
-#    - metric: DSC
-#      beta: 1
-#      metric_0: Precision
-#      metric_1: Recall
+    - metric: DSC
+      beta: 1
+      metric_0: Precision
+      metric_1: Recall
 #    - metric: SRecall
 #      feature_data: ../data/categorical_dbpedia_ml1m/map.tsv
   gpu: -1 # -1 is not use GPU

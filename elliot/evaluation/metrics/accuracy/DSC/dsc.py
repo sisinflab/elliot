@@ -7,9 +7,9 @@ __version__ = '0.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo, Alejandro Bellogín'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, alejandro.bellogin@uam.es'
 
-import numpy as np
+import importlib
 from elliot.evaluation.metrics.base_metric import BaseMetric
-import elliot.evaluation.metrics as metrics
+# import elliot.evaluation.metrics as metrics
 
 
 class DSC(BaseMetric):
@@ -32,18 +32,21 @@ class DSC(BaseMetric):
 
         self._beta = self._additional_data.get("beta", 1)
         self._squared_beta = self._beta**2
+
+        metric_lib = importlib.import_module("elliot.evaluation.metrics")
+
         self._metric_0 = self._additional_data.get("metric_0", False)
         self._metric_1 = self._additional_data.get("metric_1", False)
 
         if self._metric_0:
-            self._metric_0 = metrics.parse_metric(self._metric_0)(recommendations, config, params, eval_objects)
+            self._metric_0 = metric_lib.parse_metric(self._metric_0)(recommendations, config, params, eval_objects)
         else:
-            self._metric_0 = metrics.Precision(recommendations, config, params, eval_objects)
+            self._metric_0 = metric_lib.Precision(recommendations, config, params, eval_objects)
 
         if self._metric_1:
-            self._metric_1 = metrics.parse_metric(self._metric_1)(recommendations, config, params, eval_objects)
+            self._metric_1 = metric_lib.parse_metric(self._metric_1)(recommendations, config, params, eval_objects)
         else:
-            self._metric_1 = metrics.Recall(recommendations, config, params, eval_objects)
+            self._metric_1 = metric_lib.Recall(recommendations, config, params, eval_objects)
 
     @staticmethod
     def name():
