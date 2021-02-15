@@ -9,4 +9,5 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
 from .VBPR import VBPR
 from .DeepStyle import DeepStyle
-# from .DVBPR import DVBPR
+from .ACF import ACF
+from .DVBPR import DVBPR

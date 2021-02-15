@@ -7,20 +7,16 @@ __version__ = '0.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malitesta@poliba.it'
 
-import os
-
 import tensorflow as tf
+from tensorflow import keras
 
-from elliot.recommender.latent_factor_models.NNBPRMF.NNBPRMF_model import NNBPRMF_model
+from recommender.latent_factor_models.NNBPRMF.NNBPRMF_model import NNBPRMF_model
 
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-
-class VBPR_model(NNBPRMF_model):
-    def __init__(self,  factors=200, factors_d=20,
+class VBPR_model(keras.Model):
+    def __init__(self, factors=200, factors_d=20,
                  learning_rate=0.001,
                  l_w=0, l_b=0, l_e=0,
                  emb_image=None,
-                 num_image_feature=0,
                  num_users=100,
                  num_items=100,
                  name="VBPRMF",
@@ -35,11 +31,12 @@ class VBPR_model(NNBPRMF_model):
         self.l_b = l_b
         self.l_e = l_e
         self.emb_image = emb_image
-        self.num_image_feature = num_image_feature
+        self.num_image_feature = self.emb_image.shape[1]
         self._num_items = num_items
         self._num_users = num_users
 
         self.initializer = tf.initializers.GlorotUniform()
+
         self.Bi = tf.Variable(tf.zeros(self._num_items), name='Bi', dtype=tf.float32)
         self.Gu = tf.Variable(self.initializer(shape=[self._num_users, self._factors]), name='Gu', dtype=tf.float32)
         self.Gi = tf.Variable(self.initializer(shape=[self._num_items, self._factors]), name='Gi', dtype=tf.float32)

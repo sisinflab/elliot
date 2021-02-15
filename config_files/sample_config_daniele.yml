@@ -9,9 +9,10 @@ experiment:
     test_path: ../data/{0}/testset.tsv
     side_information:
       visual_features: ../data/{0}/original/features.npy
+#      dir_visual_features: ../data/{0}/original/features/
       item_mapping: ../data/{0}/visual_feats.tsv
-#      images_src_folder: ../data/{0}/original/images/
-#      output_image_size: (224,224)
+      images_src_folder: ../data/{0}/original/images/
+      output_image_size: (224,224)
 #  splitting:
 #    save_on_disk: True
 #    save_folder: ../data/{0}/splitting/
@@ -53,7 +54,7 @@ experiment:
       beta: 2
     - metric: SRecall
       feature_data: ../data/example/map.tsv
-  gpu: 0 # -1 is not use GPU
+  gpu: -1 # -1 is not use GPU
   models:
 #    MostPop:
 #      meta:
@@ -138,13 +139,41 @@ experiment:
 #        restore_epoch: -1
 #      lr: 0.0005
 #      epochs: 50
-#      embed_k: 100
-#      embed_d: 20
+#      factors: 100
+#      factors_d: 20
 #      batch_size: 128
 #      l_w: 0.000025
 #      l_b: 0
 #      l_e: 0.002
-    DeepStyle:
+#    DeepStyle:
+#      meta:
+#        verbose: True
+#        validation_rate: 10
+#        save_weights: False
+#        save_recs: False
+#        validation_metric: nDCG@10
+#        restore_epoch: -1
+#      lr: 0.0005
+#      epochs: 50
+#      factors: 100
+#      batch_size: 128
+#      l_w: 0.000025
+#    ACF:
+#      meta:
+#        verbose: True
+#        validation_rate: 10
+#        save_weights: False
+#        save_recs: False
+#        validation_metric: nDCG@10
+#        restore_epoch: -1
+#      lr: 0.0005
+#      epochs: 50
+#      factors: 200
+#      batch_size: 128
+#      l_w: 0.000025
+#      layers_component: (64, 1)
+#      layers_item: (64, 1)
+    DVBPR:
       meta:
         verbose: True
         validation_rate: 10
@@ -154,9 +183,10 @@ experiment:
         restore_epoch: -1
       lr: 0.0005
       epochs: 50
-      embed_k: 100
+      factors: 100
       batch_size: 128
-      l_w: 0.000025
+      lambda_1: 0.000025
+      lambda_2: 0.000025
 #    KaHFM:
 #      meta:
 #        hyper_max_evals: 1

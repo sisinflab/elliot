@@ -10,8 +10,8 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malite
 import os
 
 import tensorflow as tf
+from tensorflow import keras
 
-from recommender.latent_factor_models.NNBPRMF.NNBPRMF_model import NNBPRMF_model
 import numpy as np
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
@@ -19,13 +19,12 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 tf.random.set_seed(42)
 
 
-class DeepStyle_model(NNBPRMF_model):
+class DeepStyle_model(keras.Model):
     def __init__(self,
                  factors=20,
                  learning_rate=0.001,
                  l_w=0,
                  emb_image=None,
-                 num_image_feature=0,
                  num_users=100,
                  num_items=100,
                  name="DeepStyle",
@@ -36,7 +35,7 @@ class DeepStyle_model(NNBPRMF_model):
         self._learning_rate = learning_rate
         self.l_w = l_w
         self._emb_image = emb_image
-        self._num_image_feature = num_image_feature
+        self._num_image_feature = self._emb_image.shape[1]
         self._num_items = num_items
         self._num_users = num_users
 
@@ -44,7 +43,6 @@ class DeepStyle_model(NNBPRMF_model):
 
         self.Gu = tf.Variable(self.initializer(shape=[self._num_users, self._factors]), name='Gu', dtype=tf.float32)
         self.Gi = tf.Variable(self.initializer(shape=[self._num_items, self._factors]), name='Gi', dtype=tf.float32)
-
         self.L = tf.Variable(
             self.initializer(shape=[self._num_items, self._factors]),
             name='L', dtype=tf.float32)
