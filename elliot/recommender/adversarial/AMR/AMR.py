@@ -4,32 +4,40 @@ Module description:
 """
 
 __version__ = '0.1'
-__author__ = 'Felice Antonio Merra, Vito Walter Anelli, Claudio Pomo, Daniele Malitesta'
-__email__ = 'felice.merra@poliba.it, vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malitesta@poliba.it'
+__author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta'
+__email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malitesta@poliba.it'
 
-import pickle
+from evaluation.evaluator import Evaluator
+from utils.folder import build_model_folder
+from utils.write import store_recommendation
+
+import logging as log
+from utils import logging
+import os
 
 import numpy as np
+import tensorflow as tf
 from tqdm import tqdm
-import pickle
 
-from elliot.dataset.samplers import custom_sampler as cs
-from elliot.utils.write import store_recommendation
-
-from elliot.recommender import BaseRecommenderModel
-from elliot.recommender.adversarial.AMF.AMF_model import AMF_model
-from elliot.recommender.recommender_utils_mixin import RecMixin
 from elliot.recommender.base_recommender_model import init_charger
+from recommender import BaseRecommenderModel
+from recommender.recommender_utils_mixin import RecMixin
+from recommender.adversarial.AMR.AMR_model import AMR_model
 
-np.random.seed(42)
+from dataset.samplers import custom_sampler as cs
+
+np.random.seed(0)
+tf.random.set_seed(0)
+log.disable(log.WARNING)
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 
-class AMF(RecMixin, BaseRecommenderModel):
+class AMR(RecMixin, BaseRecommenderModel):
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
         """
-        Create a APR-MF (AMF) instance.
-        (see https://arxiv.org/abs/1808.03908 for details about the algorithm design choices).
+        Create a AMR instance.
+        (see https://arxiv.org/pdf/1809.07062.pdf for details about the algorithm design choices).
 
         Args:
             data: data loader object
@@ -38,18 +46,23 @@ class AMF(RecMixin, BaseRecommenderModel):
                                       [eps, l_adv]: adversarial budget perturbation and adversarial regularization parameter,
                                       lr: learning rate}
         """
+        super().__init__(data, config, params, *args, **kwargs)
+
+        self._num_items = self._data.num_items
+        self._num_users = self._data.num_users
         self._random = np.random
 
         self._params_list = [
-            ("_factors", "factors", "factors", 10, None, None),
+            ("_factors", "factors", "factors", 200, None, None),
+            ("_factors_d", "factors_d", "factors_d", 20, None, None),
             ("_learning_rate", "lr", "lr", 0.001, None, None),
             ("_l_w", "l_w", "l_w", 0.1, None, None),
             ("_l_b", "l_b", "l_b", 0.001, None, None),
+            ("_l_e", "l_e", "l_e", 0.1, None, None),
             ("_eps", "eps", "eps", 0.1, None, None),
             ("_l_adv", "l_adv", "l_adv", 0.001, None, None),
-            ("_adversarial_epochs", "adversarial_epochs", "adv_epochs", self._epochs//2, None, None)
+            ("_adversarial_epochs", "adversarial_epochs", "adv_epochs", self._epochs // 2, None, None)
         ]
-
         self.autoset_params()
 
         if self._adversarial_epochs > self._epochs:
@@ -63,18 +76,30 @@ class AMF(RecMixin, BaseRecommenderModel):
 
         self._sampler = cs.Sampler(self._data.i_train_dict)
 
-        self._model = AMF_model(self._factors,
-                                    self._learning_rate,
-                                    self._l_w,
-                                    self._l_b,
-                                    self._eps,
-                                    self._l_adv,
-                                    self._num_users,
-                                    self._num_items)
+        item_indices = [self._data.item_mapping[self._data.private_items[item]] for item in range(self._num_items)]
+
+        self._model = AMR_model(self._factors,
+                                self._factors_d,
+                                self._learning_rate,
+                                self._l_w,
+                                self._l_b,
+                                self._l_e,
+                                self._eps,
+                                self._l_adv,
+                                self._data.visual_features[item_indices],
+                                self._data.visual_features.shape[1],
+                                self._num_users,
+                                self._num_items)
+
+        self.evaluator = Evaluator(self._data, self._params)
+        self._params.name = self.name
+        build_model_folder(self._config.path_output_rec_weight, self.name)
+        self._saving_filepath = f'{self._config.path_output_rec_weight}{self.name}/best-weights-{self.name}'
+        self.logger = logging.get_logger(self.__class__.__name__)
 
     @property
     def name(self):
-        return "AMF" \
+        return "AMR" \
                + "_e:" + str(self._epochs) \
                + "_bs:" + str(self._batch_size) \
                + f"_{self.get_params_shortcut()}"
@@ -101,7 +126,7 @@ class AMF(RecMixin, BaseRecommenderModel):
                 result_dict = self.evaluator.eval(recs)
                 self._results.append(result_dict)
 
-                print(f'Epoch {(it + 1)}/{self._epochs} loss {loss  / steps:.3f}')
+                print(f'Epoch {(it + 1)}/{self._epochs} loss {loss / steps:.3f}')
 
                 if self._results[-1][self._validation_k]["val_results"][self._validation_metric] > best_metric_value:
                     print("******************************************")
@@ -114,7 +139,7 @@ class AMF(RecMixin, BaseRecommenderModel):
     def get_recommendations(self, k: int = 100):
         predictions_top_k = {}
         for index, offset in enumerate(range(0, self._num_users, self._params.batch_size)):
-            offset_stop = min(offset+self._params.batch_size, self._num_users)
+            offset_stop = min(offset + self._params.batch_size, self._num_users)
             predictions = self._model.predict(offset, offset_stop)
             mask = self.get_train_mask(offset, offset_stop)
             v, i = self._model.get_top_k(predictions, mask, k=k)
@@ -122,23 +147,3 @@ class AMF(RecMixin, BaseRecommenderModel):
                                   for u_list in list(zip(i.numpy(), v.numpy()))]
             predictions_top_k.update(dict(zip(range(offset, offset_stop), items_ratings_pair)))
         return predictions_top_k
-
-    def restore_weights(self):
-        try:
-            with open(self._saving_filepath, "rb") as f:
-                self._model.set_model_state(pickle.load(f))
-            print(f"Model correctly Restored")
-
-            recs = self.get_recommendations(self.evaluator.get_needed_recommendations())
-            result_dict = self.evaluator.eval(recs)
-            self._results.append(result_dict)
-
-            print("******************************************")
-            if self._save_recs:
-                store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}.tsv")
-            return True
-
-        except Exception as ex:
-            print(f"Error in model restoring operation! {ex}")
-
-        return False
