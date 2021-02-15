@@ -12,13 +12,12 @@ from .base_recommender_model import BaseRecommenderModel
 from .latent_factor_models import BPRMF, NNBPRMF, WRMF, PureSVD, MF, FunkSVD, PMF, LMF, NonNegMF, FM, LogisticMF, \
     BPRSlim, Slim, CML, FISM
 from .unpersonalized import Random, MostPop
-# from .adversarial import APR, AMR
 from .autoencoders import MultiDAE, MultiVAE
 from .knowledge_aware import KaHFM, KaHFMBatch, KaHFMEmbeddings
 from .graph_based import NGCF, LightGCN
 from .visual_recommenders import VBPR, DeepStyle
 from .NN import ItemKNN, UserKNN, AttributeItemKNN, AttributeUserKNN
-from .neural import DMF, NeuMF, GMF, NAIS, UserAutoRec, ItemAutoRec
+from .neural import DMF, NeuMF, GMF, NAIS, UserAutoRec, ItemAutoRec, ConvNeuMF
 from .content_based import VSM
 from .algebric import SlopeOne
 # from .attentive import AFM
