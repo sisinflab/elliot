@@ -28,7 +28,6 @@ class RMSE(BaseMetric):
         :param eval_objects: list of objects that may be useful for the computation of the different metrics
         """
         super().__init__(recommendations, config, params, eval_objects)
-        self._cutoff = self._evaluation_objects.cutoff
         self._relevant_items = self._evaluation_objects.relevance.get_binary_relevance()
         self._total_relevant_items = sum([len(self._relevant_items[u]) for u, _ in self._recommendations.items()])
         self._test = self._evaluation_objects.relevance.get_test()
