@@ -5,19 +5,24 @@ objects:
     maxsize: 10000
 formatters:
   simple:
-    format: '%(asctime)-15s: %(levelname)-.1s %(message)s'
-    datefmt: '%Y-%m-%d %H:%M:%S.%s'
+    format: '%(time_filter)-15s: %(levelname)-.1s %(message)s'
+    datefmt: '%Y-%m-%d %H:%M:%S'
+filters:
+  time_filter:
+    (): elliot.utils.logging.TimeFilter
 handlers:
   console:
     class: logging.StreamHandler
     level: FATAL
     formatter: simple
     stream: ext://sys.stdout
+    filters: [time_filter]
   file:
     class: logging.FileHandler
     level: FATAL
     filename: !CUSTOM ${log_path_exp}
     formatter: simple
+    filters: [time_filter]
   queue_listener:
     class: elliot.utils.logger_util.QueueListenerHandler
     handlers:

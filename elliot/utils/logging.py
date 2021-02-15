@@ -10,6 +10,12 @@ import re
 from elliot.utils.folder import build_log_folder
 
 
+class TimeFilter(logging.Filter):
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        record.time_filter = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S.%f")
+        return True
+
 def init(path_config, folder_log, log_level=logging.WARNING):
     # Pull in Logging Config
     path = os.path.join(path_config)
@@ -69,15 +75,16 @@ def get_logger(name, log_level=logging.DEBUG):
 
 def prepare_logger(name, path, log_level=logging.DEBUG):
     logger = logging.getLogger(name)
+    logger.addFilter(TimeFilter())
     logger.setLevel(log_level)
     logfilepath = f'''{path}/{name}-{datetime.datetime.now().strftime('%b-%d-%Y_%H-%M-%S')}.log'''
     fh = logging.FileHandler(logfilepath)
     sh = logging.StreamHandler(sys.stdout)
     fh.setLevel(log_level)
     sh.setLevel(log_level)
-    filefmt = "%(asctime)-15s: %(levelname)-.1s %(message)s"
-    filedatefmt = "%Y-%m-%d %H:%M:%S.%s"
-    formatter = logging.Formatter(filefmt, filedatefmt)
+    filefmt = "%(time_filter)-15s: %(levelname)-.1s %(message)s"
+    # filedatefmt = "%Y-%m-%d %H:%M:%S"
+    formatter = logging.Formatter(filefmt)
     fh.setFormatter(formatter)
     sh.setFormatter(formatter)
     logger.addHandler(fh)
