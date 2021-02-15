@@ -8,6 +8,7 @@ __author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malitesta@poliba.it, daniele.malitesta@poliba.it'
 
 import tensorflow as tf
+import numpy as np
 from tensorflow import keras
 
 
@@ -48,25 +49,25 @@ class AMR_model(keras.Model):
             self.initializer(shape=[self._num_users, self._factors_d]),
             name='Tu', dtype=tf.float32)
         self.F = tf.Variable(
-            self.emb_image, dtype=tf.float32, trainable=False)
+            self.emb_image, dtype=tf.float32, trainable=True)
         self.E = tf.Variable(
             self.initializer(shape=[self.num_image_feature, self._factors_d]),
             name='E', dtype=tf.float32)
 
         # Initialize the perturbation with 0 values
-        self._Delta_F = tf.Variable(tf.zeros(shape=[self.emb_image]), dtype=tf.float32, trainable=False)
+        self._Delta_F = tf.Variable(tf.zeros(shape=[self._num_items, self.num_image_feature]), dtype=tf.float32, trainable=False)
 
         self.optimizer = tf.optimizers.Adam(self._learning_rate)
         # self.saver_ckpt = tf.train.Checkpoint(optimizer=self.optimizer, model=self)
 
     #@tf.function
-    def call(self, inputs, training=None):
+    def call(self, inputs, training=None, mask=None):
         user, item = inputs
         beta_i = tf.squeeze(tf.nn.embedding_lookup(self.Bi, item))
         gamma_u = tf.squeeze(tf.nn.embedding_lookup(self.Gu, user))
         theta_u = tf.squeeze(tf.nn.embedding_lookup(self.Tu, user))
         gamma_i = tf.squeeze(tf.nn.embedding_lookup(self.Gi, item))
-        feature_i = tf.squeeze(tf.nn.embedding_lookup(self.F, item)) + self._Delta_F
+        feature_i = tf.squeeze(tf.nn.embedding_lookup(self.F, item)) + tf.squeeze(tf.nn.embedding_lookup(self._Delta_F, item))
 
         xui = beta_i + tf.reduce_sum((gamma_u * gamma_i), axis=1) + \
               tf.reduce_sum((theta_u * tf.matmul(feature_i, self.E)), axis=1) + \
@@ -102,8 +103,8 @@ class AMR_model(keras.Model):
                 self.build_perturbation(batch)
 
                 # Clean Inference
-                adv_xu_pos, _, _, _ = self(inputs=(user, pos), training=True)
-                adv_xu_neg, _, _, _ = self(inputs=(user, neg), training=True)
+                adv_xu_pos, _, _, _, _, _ = self(inputs=(user, pos), training=True)
+                adv_xu_neg, _, _, _, _, _ = self(inputs=(user, neg), training=True)
 
                 adv_difference = tf.clip_by_value(adv_xu_pos - adv_xu_neg, -80.0, 1e8)
                 adv_loss = tf.reduce_sum(tf.nn.softplus(-adv_difference))
@@ -152,7 +153,11 @@ class AMR_model(keras.Model):
             # Loss to be optimized
             loss += reg_loss
 
-        grad_F = tape_adv.gradient(loss, self.F)
-        self.optimizer.apply_gradients(zip(grad_F, self.F))
+        grad_F = tape_adv.gradient(loss, [self.F])
+        grad_F = tf.stop_gradient(grad_F[0])
 
         self._Delta_F = tf.nn.l2_normalize(grad_F, 1) * self._eps
+
+    @tf.function
+    def get_top_k(self, preds, train_mask, k=100):
+        return tf.nn.top_k(tf.where(train_mask, preds, -np.inf), k=k, sorted=True)

@@ -275,5 +275,9 @@ class ACF_model(keras.Model):
 
         return tf.matmul(gamma_u_p[1:], self.Gi, transpose_b=True)
 
+    @tf.function
+    def get_top_k(self, preds, train_mask, k=100):
+        return tf.nn.top_k(tf.where(train_mask, preds, -np.inf), k=k, sorted=True)
+
     def get_config(self):
         raise NotImplementedError
