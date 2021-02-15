@@ -42,6 +42,7 @@ _print_triplets = 'print_results_as_triplets'
 _metrics = 'metrics'
 _relevance_threshold = 'relevance_threshold'
 _paired_ttest = 'paired_ttest'
+_wilcoxon_test = 'wilcoxon_test'
 _models = 'models'
 _recommender = 'recommender'
 _gpu = 'gpu'
@@ -90,7 +91,7 @@ class NameSpaceModel:
             .get(_performance, self._set_path(self._base_folder_path_config, "../results/{0}/performance/")) \
             .format(self.config[_experiment][_dataset])
 
-        self.config[_experiment][_paired_ttest] = self.config[_experiment].get(_paired_ttest, False)
+        # self.config[_experiment][_paired_ttest] = self.config[_experiment].get(_paired_ttest, False)
         self.config[_experiment][_dataloader] = self.config[_experiment].get(_dataloader, "DataSetLoader")
 
         manage_directories(self.config[_experiment][_recs], self.config[_experiment][_weights],
@@ -183,9 +184,9 @@ class NameSpaceModel:
                             space_list.append((k, hp.choice(k, literal_eval("["+str(",".join([str(v) for v in value]))+"]"))))
                 _SPACE = OrderedDict(space_list)
                 _estimated_evals = reduce(lambda x, y: x*y, [len(param.pos_args) - 1 for _, param in _SPACE.items()], 1)
-                if _estimated_evals <= 0:
-                    raise Exception("Only pure value lists can be used without hyper_max_evals option. Please define hyper_max_evals in model/meta configuration.")
                 _max_evals = meta_model.get(_hyper_max_evals, _estimated_evals)
+                if _max_evals <= 0:
+                    raise Exception("Only pure value lists can be used without hyper_max_evals option. Please define hyper_max_evals in model/meta configuration.")
                 _opt_alg = ho.parse_algorithms(meta_model.get(_hyper_opt_alg, "grid"))
                 yield key, (model_name_space, _SPACE, _max_evals, _opt_alg)
             else:

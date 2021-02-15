@@ -4,15 +4,14 @@ It proceeds from a user-wise computation, and average the values over the users.
 """
 
 __version__ = '0.1'
-__author__ = 'Vito Walter Anelli, Claudio Pomo'
-__email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
+__author__ = 'Vito Walter Anelli, Claudio Pomo, Alejandro Bellogín'
+__email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, alejandro.bellogin@uam.es'
 
 import typing as t
-import numpy as np
-import math
 
 from elliot.evaluation.metrics.base_metric import BaseMetric
 from elliot.evaluation.relevance import Relevance
+
 
 class NDCG(BaseMetric):
     """
@@ -92,16 +91,16 @@ class NDCG(BaseMetric):
 
         return ndcg
 
-    def eval(self):
-        """
-        Evaluation function
-        :return: the overall averaged value of normalized Discounted Cumulative Gain
-        """
-
-        return np.average(
-            [NDCG.__user_ndcg(u_r, self._relevance_map[u], self._cutoff)
-             for u, u_r in self._recommendations.items() if len(self._relevance_map[u])]
-        )
+    # def eval(self):
+    #     """
+    #     Evaluation function
+    #     :return: the overall averaged value of normalized Discounted Cumulative Gain
+    #     """
+    #
+    #     return np.average(
+    #         [NDCG.__user_ndcg(u_r, self._relevance_map[u], self._cutoff)
+    #          for u, u_r in self._recommendations.items() if len(self._relevance_map[u])]
+    #     )
 
     def eval_user_metric(self):
         """

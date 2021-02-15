@@ -54,15 +54,15 @@ class APLT(BaseMetric):
         """
         return len(set([i for i,v in user_recommendations[:cutoff]]) & set(long_tail)) / len(user_recommendations[:cutoff])
 
-    def eval(self):
-        """
-        Evaluation function
-        :return: the overall averaged value of APLT
-        """
-        return np.average(
-            [APLT.__user_aplt(u_r, self._cutoff, self._long_tail)
-             for u, u_r in self._recommendations.items()]
-        )
+    # def eval(self):
+    #     """
+    #     Evaluation function
+    #     :return: the overall averaged value of APLT
+    #     """
+    #     return np.average(
+    #         [APLT.__user_aplt(u_r, self._cutoff, self._long_tail)
+    #          for u, u_r in self._recommendations.items()]
+    #     )
 
     def eval_user_metric(self):
         """

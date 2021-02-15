@@ -51,15 +51,15 @@ class SRecall(BaseMetric):
         subtopics = len({topic for i, _ in user_recommendations[:cutoff] if i in user_relevant_items for topic in feature_map.get(i, [])})
         return subtopics/total_features if total_features != 0 else 0
 
-    def eval(self):
-        """
-        Evaluation function
-        :return: the overall averaged value of SRecall
-        """
-        return np.average(
-            [SRecall.__user_srecall(u_r, self._cutoff, self._relevant_items[u], self._feature_map,self._total_features)
-             for u, u_r in self._recommendations.items() if len(self._relevant_items[u])]
-        )
+    # def eval(self):
+    #     """
+    #     Evaluation function
+    #     :return: the overall averaged value of SRecall
+    #     """
+    #     return np.average(
+    #         [SRecall.__user_srecall(u_r, self._cutoff, self._relevant_items[u], self._feature_map,self._total_features)
+    #          for u, u_r in self._recommendations.items() if len(self._relevant_items[u])]
+    #     )
 
     def eval_user_metric(self):
         """

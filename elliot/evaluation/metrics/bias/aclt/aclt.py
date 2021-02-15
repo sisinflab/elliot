@@ -55,15 +55,15 @@ class ACLT(BaseMetric):
         """
         return len(set([i for i,v in user_recommendations[:cutoff]]) & set(long_tail))
 
-    def eval(self):
-        """
-        Evaluation function
-        :return: the overall averaged value of ACLT
-        """
-        return np.average(
-            [ACLT.__user_aclt(u_r, self._cutoff, self._long_tail)
-             for u, u_r in self._recommendations.items()]
-        )
+    # def eval(self):
+    #     """
+    #     Evaluation function
+    #     :return: the overall averaged value of ACLT
+    #     """
+    #     return np.average(
+    #         [ACLT.__user_aclt(u_r, self._cutoff, self._long_tail)
+    #          for u, u_r in self._recommendations.items()]
+    #     )
 
     def eval_user_metric(self):
         """

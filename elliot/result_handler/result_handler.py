@@ -10,11 +10,17 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 import pandas as pd
 from datetime import datetime
 import json
+from enum import Enum
 
-from elliot.evaluation.statistical_significance import PairedTTest
+from elliot.evaluation.statistical_significance import PairedTTest, WilcoxonTest
 
 _eval_results = "test_results"
 _eval_statistical_results = "test_statistical_results"
+
+
+class StatTest(Enum):
+    PairedTTest = [PairedTTest, "paired_ttest"]
+    WilcoxonTest = [WilcoxonTest, "wilcoxon_test"]
 
 
 class ResultHandler:
@@ -68,7 +74,7 @@ class ResultHandler:
                     mode='w') as f:
                 json.dump(models, f, indent=4)
 
-    def save_best_statistical_results(self, output='../results/'):
+    def save_best_statistical_results(self, stat_test, output='../results/'):
         global_results = dict(self.oneshot_recommenders)
         for k in self.ks:
             results = []
@@ -86,9 +92,9 @@ class ResultHandler:
                             array_0 = rec_0_model[0][_eval_statistical_results][k][metric_name]
                             array_1 = rec_1_model[0][_eval_statistical_results][k][metric_name]
 
-                            common_users = PairedTTest.common_users(array_0, array_1)
+                            common_users = stat_test.value[0].common_users(array_0, array_1)
 
-                            p_value = PairedTTest.compare(array_0, array_1, common_users)
+                            p_value = stat_test.value[0].compare(array_0, array_1, common_users)
 
                             results.append((rec_0_model[0]['params']['name'],
                                             rec_1_model[0]['params']['name'],
@@ -100,7 +106,7 @@ class ResultHandler:
                                             p_value))
 
             with open(
-                    f'{output}stat_cutoff_{k}_relthreshold_{self.rel_threshold}_{datetime.now().strftime("%Y_%m_%d_%H_%M_%S")}.tsv',
+                    f'{output}stat_{stat_test.value[1]}_cutoff_{k}_relthreshold_{self.rel_threshold}_{datetime.now().strftime("%Y_%m_%d_%H_%M_%S")}.tsv',
                     "w") as f:
                 for tup in results:
                     f.write(f"{tup[0]}\t{tup[1]}\t{tup[2]}\t{tup[3]}\n")

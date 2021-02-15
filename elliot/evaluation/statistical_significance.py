@@ -1,4 +1,10 @@
+"""
+Module description:
+"""
 
+__version__ = '0.1'
+__author__ = 'Vito Walter Anelli, Claudio Pomo, Alejandro Bellogín'
+__email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, alejandro.bellogin@uam.es'
 
 from scipy import stats
 import typing as t

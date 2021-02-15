@@ -59,15 +59,15 @@ class MAP(BaseMetric):
         """
         return sum([1 for i in user_recommendations[:cutoff] if i[0] in user_relevant_items]) / cutoff
 
-    def eval(self):
-        """
-        Evaluation function
-        :return: the overall averaged value of Mean Average Precision
-        """
-        return np.average(
-            [MAP.__user_ap(u_r, self._cutoff, self._relevant_items[u])
-             for u, u_r in self._recommendations.items() if len(self._relevant_items[u])]
-        )
+    # def eval(self):
+    #     """
+    #     Evaluation function
+    #     :return: the overall averaged value of Mean Average Precision
+    #     """
+    #     return np.average(
+    #         [MAP.__user_ap(u_r, self._cutoff, self._relevant_items[u])
+    #          for u, u_r in self._recommendations.items() if len(self._relevant_items[u])]
+    #     )
 
     def eval_user_metric(self):
         """

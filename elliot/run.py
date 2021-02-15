@@ -15,7 +15,7 @@ from os import path
 from hyperopt import Trials, fmin
 
 from elliot.namespace.namespace_model_builder import NameSpaceBuilder
-from elliot.result_handler import ResultHandler, HyperParameterStudy
+from elliot.result_handler.result_handler import ResultHandler, HyperParameterStudy, StatTest
 import hyperoptimization as ho
 import numpy as np
 from elliot.utils import logging as logging_project
@@ -109,8 +109,10 @@ def run_experiment(config_path: str = './config/config.yml'):
     if hasattr(base.base_namespace, "print_results_as_triplets") and base.base_namespace.print_results_as_triplets == True:
         res_handler.save_best_results_as_triplets(output=base.base_namespace.path_output_rec_performance)
         hyper_handler.save_trials_as_triplets(output=base.base_namespace.path_output_rec_performance)
-    if base.base_namespace.evaluation.paired_ttest:
-        res_handler.save_best_statistical_results(output=base.base_namespace.path_output_rec_performance)
+    if hasattr(base.base_namespace.evaluation, "paired_ttest") and base.base_namespace.evaluation.paired_ttest:
+        res_handler.save_best_statistical_results(stat_test=StatTest.PairedTTest, output=base.base_namespace.path_output_rec_performance)
+    if hasattr(base.base_namespace.evaluation, "wilcoxon_test") and base.base_namespace.evaluation.wilcoxon_test:
+        res_handler.save_best_statistical_results(stat_test=StatTest.WilcoxonTest, output=base.base_namespace.path_output_rec_performance)
 
     logger.debug("End experiment")
 

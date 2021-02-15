@@ -1,11 +1,11 @@
 """
 Module description:
-
+This module provides a popularity class based on number of users who have experienced an item (user-item repetitions in the dataset are counted once)
 """
 
 __version__ = '0.1'
-__author__ = 'Vito Walter Anelli, Claudio Pomo'
-__email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
+__author__ = 'Vito Walter Anelli, Claudio Pomo, Alejandro Bellogín'
+__email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, alejandro.bellogin@uam.es'
 
 import operator
 
@@ -13,12 +13,13 @@ import typing as t
 
 
 class Popularity(object):
-    def __init__(self, data):
+    def __init__(self, data, pop_ratio=0.8):
         self._data = data
         self._pop_items = {}
         self._sorted_pop_items = {}
         self._short_head = []
         self._long_tail = []
+        self._pop_ratio = pop_ratio
 
     def get_pop_items(self):
         if not self._pop_items:
@@ -35,7 +36,7 @@ class Popularity(object):
     def get_short_head(self):
         if not self._short_head:
             self.get_sorted_pop_items()
-            short_head_limit = self._data.transactions * 0.8
+            short_head_limit = self._data.transactions * self._pop_ratio
             self._short_head = []
             for i, pop in self._sorted_pop_items.items():
                 self._short_head.append(i)
@@ -49,5 +50,8 @@ class Popularity(object):
             self.get_short_head()
             self._long_tail = [i for i in self._sorted_pop_items.keys() if i not in self._short_head]
         return self._long_tail
+
+    def get_custom_pop_obj(self, pop_ratio=.8):
+        return Popularity(self._data, pop_ratio)
 
 

@@ -51,15 +51,15 @@ class ARP(BaseMetric):
         """
         return sum([pop_items[i] for i, v in user_recommendations[:cutoff]]) / len(user_recommendations[:cutoff])
 
-    def eval(self):
-        """
-        Evaluation function
-        :return: the overall averaged value of ARP
-        """
-        return np.average(
-            [ARP.__user_arp(u_r, self._cutoff, self._pop_items)
-             for u, u_r in self._recommendations.items()]
-        )
+    # def eval(self):
+    #     """
+    #     Evaluation function
+    #     :return: the overall averaged value of ARP
+    #     """
+    #     return np.average(
+    #         [ARP.__user_arp(u_r, self._cutoff, self._pop_items)
+    #          for u, u_r in self._recommendations.items()]
+    #     )
 
     def eval_user_metric(self):
         """

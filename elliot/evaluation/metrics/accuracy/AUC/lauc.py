@@ -52,16 +52,16 @@ class LAUC(BaseMetric):
         pos_ranks = [r for r, (i, _) in enumerate(user_recommendations[:cutoff]) if i in user_relevant_items]
         return sum([(neg_num - r_r + p_r)/(neg_num) for p_r, r_r in enumerate(pos_ranks)])/min(cutoff, len(user_relevant_items))
 
-    def eval(self):
-        """
-        Evaluation function
-        :return: the overall averaged value of LAUC
-        """
-
-        return np.average(
-            [LAUC.__user_auc_at_k(u_r, self._cutoff, self._relevant_items[u], self._num_items, len(self._evaluation_objects.data.train_dict[u]))
-             for u, u_r in self._recommendations.items() if len(self._relevant_items[u])]
-        )
+    # def eval(self):
+    #     """
+    #     Evaluation function
+    #     :return: the overall averaged value of LAUC
+    #     """
+    #
+    #     return np.average(
+    #         [LAUC.__user_auc_at_k(u_r, self._cutoff, self._relevant_items[u], self._num_items, len(self._evaluation_objects.data.train_dict[u]))
+    #          for u, u_r in self._recommendations.items() if len(self._relevant_items[u])]
+    #     )
 
     def eval_user_metric(self):
         """

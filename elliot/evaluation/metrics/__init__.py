@@ -19,7 +19,7 @@ from elliot.evaluation.metrics.accuracy.hit_rate import HR
 from elliot.evaluation.metrics.accuracy.mrr import MRR
 from elliot.evaluation.metrics.accuracy.map import MAP
 from elliot.evaluation.metrics.accuracy.mar import MAR
-from elliot.evaluation.metrics.accuracy.f1 import F1
+from elliot.evaluation.metrics.accuracy.f1 import F1, ExtendedF1
 from elliot.evaluation.metrics.accuracy.DSC import DSC
 from elliot.evaluation.metrics.accuracy.AUC import LAUC, AUC, GAUC
 
@@ -27,7 +27,7 @@ from elliot.evaluation.metrics.rating.mae import MAE
 from elliot.evaluation.metrics.rating.mse import MSE
 from elliot.evaluation.metrics.rating.rmse import RMSE
 
-from elliot.evaluation.metrics.coverage import ItemCoverage, UserCoverage, NumRetrieved
+from elliot.evaluation.metrics.coverage import ItemCoverage, UserCoverage, NumRetrieved, UserCoverageAtN
 
 from elliot.evaluation.metrics.diversity.gini_index import GiniIndex
 from elliot.evaluation.metrics.diversity.shannon_entropy import ShannonEntropy
@@ -36,7 +36,7 @@ from elliot.evaluation.metrics.diversity.SRecall import SRecall
 from elliot.evaluation.metrics.novelty.EFD import EFD
 from elliot.evaluation.metrics.novelty.EPC import EPC
 
-from elliot.evaluation.metrics.bias import ARP, APLT, ACLT, PopRSP, PopREO
+from elliot.evaluation.metrics.bias import ARP, APLT, ACLT, PopRSP, PopREO, ExtendedPopRSP, ExtendedPopREO
 
 from elliot.evaluation.metrics.fairness.MAD import UserMADrating, ItemMADrating, UserMADranking, ItemMADranking
 from elliot.evaluation.metrics.fairness.BiasDisparity import BiasDisparityBR, BiasDisparityBS, BiasDisparityBD
@@ -54,12 +54,14 @@ _metric_dictionary = {
     "MAP": MAP,
     "MAR": MAR,
     "F1": F1,
+    "ExtendedF1": ExtendedF1,
     "DSC": DSC,
     "LAUC": LAUC,
     "GAUC": GAUC,
     "AUC": AUC,
     "ItemCoverage": ItemCoverage,
     "UserCoverage": UserCoverage,
+    "UserCoverageAtN": UserCoverageAtN,
     "NumRetrieved": NumRetrieved,
     "Gini": GiniIndex,
     "SEntropy": ShannonEntropy,
@@ -81,6 +83,8 @@ _metric_dictionary = {
     "ACLT": ACLT,
     "PopRSP": PopRSP,
     "PopREO": PopREO,
+    "ExtendedPopRSP": ExtendedPopRSP,
+    "ExtendedPopREO": ExtendedPopREO,
     "RSP": RSP,
     "REO": REO
 }

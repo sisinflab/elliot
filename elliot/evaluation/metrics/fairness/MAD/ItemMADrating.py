@@ -31,9 +31,17 @@ class ItemMADrating(BaseMetric):
         super().__init__(recommendations, config, params, eval_objects, additional_data)
         self._cutoff = self._evaluation_objects.cutoff
         self._relevant_items = self._evaluation_objects.relevance.get_binary_relevance()
-        self._item_clustering = pd.read_csv(self._additional_data["clustering_file"], sep="\t", header=None)
-        self._n_clusters = self._item_clustering[1].nunique()
-        self._item_clustering = dict(zip(self._item_clustering[0], self._item_clustering[1]))
+
+        self._item_clustering_path = self._additional_data.get("clustering_file", False)
+        self._item_clustering_name = self._additional_data.get("clustering_name", "")
+        if self._item_clustering_path:
+            self._item_clustering = pd.read_csv(self._additional_data["clustering_file"], sep="\t", header=None)
+            self._n_clusters = self._item_clustering[1].nunique()
+            self._item_clustering = dict(zip(self._item_clustering[0], self._item_clustering[1]))
+        else:
+            self._n_clusters = 1
+            self._item_clustering = {}
+
         self._sum = np.zeros(self._n_clusters)
         self._n_items = np.zeros(self._n_clusters)
 
@@ -45,7 +53,7 @@ class ItemMADrating(BaseMetric):
         Metric Name Getter
         :return: returns the public name of the metric
         """
-        return f"ItemMADrating_{self._additional_data['clustering_name']}"
+        return f"ItemMADrating_{self._item_clustering_name}"
 
     def __item_mad(self, user_recommendations, cutoff, user_relevant_items):
         """

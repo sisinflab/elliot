@@ -4,11 +4,12 @@ It proceeds from a user-wise computation, and average the values over the users.
 """
 
 __version__ = '0.1'
-__author__ = 'Vito Walter Anelli, Claudio Pomo'
-__email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
+__author__ = 'Vito Walter Anelli, Claudio Pomo, Alejandro Bellogín'
+__email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, alejandro.bellogin@uam.es'
 
 import numpy as np
 from elliot.evaluation.metrics.base_metric import BaseMetric
+import elliot.evaluation.metrics as metrics
 
 
 class DSC(BaseMetric):
@@ -28,8 +29,21 @@ class DSC(BaseMetric):
         super().__init__(recommendations, config, params, eval_objects, additional_data)
         self._cutoff = self._evaluation_objects.cutoff
         self._relevant_items = self._evaluation_objects.relevance.get_binary_relevance()
-        self._beta = self._additional_data['beta']
+
+        self._beta = self._additional_data.get("beta", 1)
         self._squared_beta = self._beta**2
+        self._metric_0 = self._additional_data.get("metric_0", False)
+        self._metric_1 = self._additional_data.get("metric_1", False)
+
+        if self._metric_0:
+            self._metric_0 = metrics.parse_metric(self._metric_0)(recommendations, config, params, eval_objects)
+        else:
+            self._metric_0 = metrics.Precision(recommendations, config, params, eval_objects)
+
+        if self._metric_1:
+            self._metric_1 = metrics.parse_metric(self._metric_1)(recommendations, config, params, eval_objects)
+        else:
+            self._metric_1 = metrics.Recall(recommendations, config, params, eval_objects)
 
     @staticmethod
     def name():
@@ -40,7 +54,7 @@ class DSC(BaseMetric):
         return "DSC"
 
     @staticmethod
-    def __user_dsc(user_recommendations, cutoff, user_relevant_items, squared_beta):
+    def __user_dsc(metric_0_value, metric_1_value, squared_beta):
         """
         Per User Sørensen–Dice coefficient
         :param user_recommendations: list of user recommendation in the form [(item1,value1),...]
@@ -48,27 +62,29 @@ class DSC(BaseMetric):
         :param user_relevant_items: list of user relevant items in the form [item1,...]
         :return: the value of the Precision metric for the specific user
         """
-        p = sum([1 for i in user_recommendations[:cutoff] if i[0] in user_relevant_items]) / cutoff
-        r = sum([1 for i in user_recommendations[:cutoff] if i[0] in user_relevant_items]) / min(len(user_relevant_items), cutoff)
-        num = (1 + squared_beta) * p * r
-        den = (squared_beta * p) + r
-        return num/den if den != 0 else 0
+        num = (1 + squared_beta) * metric_0_value * metric_1_value
+        den = (squared_beta * metric_0_value) + metric_1_value
+        return num / den if den != 0 else 0
 
-    def eval(self):
-        """
-        Evaluation function
-        :return: the overall averaged value of Sørensen–Dice coefficient
-        """
-        return np.average(
-            [DSC.__user_dsc(u_r, self._cutoff, self._relevant_items[u], self._squared_beta)
-             for u, u_r in self._recommendations.items() if len(self._relevant_items[u])]
-        )
+    # def eval(self):
+    #     """
+    #     Evaluation function
+    #     :return: the overall averaged value of Sørensen–Dice coefficient
+    #     """
+    #     return np.average(
+    #         [DSC.__user_dsc(u_r, self._cutoff, self._relevant_items[u], self._squared_beta)
+    #          for u, u_r in self._recommendations.items() if len(self._relevant_items[u])]
+    #     )
 
     def eval_user_metric(self):
         """
         Evaluation function
         :return: the overall averaged value of Sørensen–Dice coefficient per user
         """
-        return {u: DSC.__user_dsc(u_r, self._cutoff, self._relevant_items[u], self._squared_beta)
-             for u, u_r in self._recommendations.items() if len(self._relevant_items[u])}
+
+        metric_0_res = self._metric_0.eval_user_metric()
+        metric_1_res = self._metric_1.eval_user_metric()
+
+        return {u: DSC.__user_dsc(metric_0_res.get(u), metric_1_res.get(u), self._squared_beta)
+                    for u in (set(metric_0_res.keys()) and set(metric_1_res.keys()))}
 

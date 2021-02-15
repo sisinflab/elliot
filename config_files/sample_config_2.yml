@@ -19,10 +19,18 @@ experiment:
   top_k: 20
   evaluation:
     cutoffs: [10, 5]
-    simple_metrics: [nDCG, Precision, Recall, ItemCoverage, HR, MAP, F1, Gini, SEntropy, EFD, EPC, ARP, APLT, ACLT]
+    simple_metrics: [nDCG, Precision, Recall, ItemCoverage, HR, MAP, F1, Gini, SEntropy, EFD, EPC, ARP, APLT, ACLT, PopREO, PopRSP]
     relevance_threshold: 3
     paired_ttest: True
     wilcoxon_test: True
+#    complex_metrics:
+#    - metric: ExtendedF1
+#      metric_0: Precision
+#      metric_1: Recall
+#    - metric: ExtendedPopREO
+#      pop_ratio: 0.2
+#    - metric: ExtendedPopRSP
+#      pop_ratio: 0.2
 #    complex_metrics:
 #    - metric: REO
 #      clustering_name: ItemPopularity
@@ -55,7 +63,9 @@ experiment:
 #      item_clustering_name: ItemPopularity
 #      item_clustering_file: ../data/categorical_dbpedia_ml1m/items_clustering_popularity.tsv
 #    - metric: DSC
-#      beta: 2
+#      beta: 1
+#      metric_0: Precision
+#      metric_1: Recall
 #    - metric: SRecall
 #      feature_data: ../data/categorical_dbpedia_ml1m/map.tsv
   gpu: -1 # -1 is not use GPU
@@ -85,31 +95,31 @@ experiment:
 #      embed_k: 10
 #      alpha: 1
 #      reg: 0.1
-    MostPop:
-      meta:
-        save_recs: False
+#    MostPop:
+#      meta:
+#        save_recs: False
 #    SlopeOne:
 #      meta:
 #        save_recs: False
 #    Random:
 #      meta:
 #        save_recs: False
-#    MultiVAE:
-#      meta:
-#        hyper_max_evals: 3
-#        hyper_opt_alg: tpe
-#        validation_rate: 10
-#        verbose: True
-#        save_weights: True
-#        save_recs: False
-##        restore: True
-#      lr: [loguniform, -10, -1]
-#      epochs: 10
-#      intermediate_dim: [uniform,50,100]
-#      latent_dim: 100
-#      batch_size: -1
-#      dropout_pkeep: 1
-#      reg_lambda: 0.01
+    MultiVAE:
+      meta:
+        hyper_max_evals: 1
+        hyper_opt_alg: tpe
+        validation_rate: 10
+        verbose: True
+        save_weights: True
+        save_recs: False
+#        restore: True
+      lr: [loguniform, -10, -1]
+      epochs: 10
+      intermediate_dim: [uniform,50,100]
+      latent_dim: 100
+      batch_size: -1
+      dropout_pkeep: 1
+      reg_lambda: 0.01
       #e:10_bs:6040_intermediate_dim:91_latent_dim:100_reg_lambda:0.01_lr:0.002718457840118028_dropout_pkeep:0.0
 #    MultiVAE:
 #      meta:
@@ -172,21 +182,21 @@ experiment:
 #      batch_size: 64
 #      dropout_pkeep: [1, 0.9]
 #      reg_lambda: [0.0001, 0]
-#    MultiDAE:
-#      meta:
-#        hyper_max_evals: 1
-#        hyper_opt_alg: tpe
-#        validation_rate: 1
-#        verbose: True
-#        save_weights: False
-#        save_recs: False
-#      lr: 0.001
-#      epochs: 1
-#      intermediate_dim: 600
-#      latent_dim: 200
-#      batch_size: -1
-#      dropout_pkeep: 1
-#      reg_lambda: 0.01
+    MultiDAE:
+      meta:
+        hyper_max_evals: 1
+        hyper_opt_alg: tpe
+        validation_rate: 1
+        verbose: True
+        save_weights: False
+        save_recs: False
+      lr: 0.001
+      epochs: 1
+      intermediate_dim: 300
+      latent_dim: 200
+      batch_size: -1
+      dropout_pkeep: 1
+      reg_lambda: 0.01
 #    BPRMF:
 #      meta:
 #        hyper_max_evals: 1
