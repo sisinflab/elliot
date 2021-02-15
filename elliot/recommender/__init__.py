@@ -20,4 +20,5 @@ from .NN import ItemKNN, UserKNN, AttributeItemKNN, AttributeUserKNN
 from .neural import DMF, NeuMF, GMF, NAIS, UserAutoRec, ItemAutoRec, ConvNeuMF
 from .content_based import VSM
 from .algebric import SlopeOne
+from .adversarial import AMF
 # from .attentive import AFM
