@@ -51,9 +51,10 @@ def run_experiment(config_path: str = './config/config.yml'):
             else:
                 model_class = getattr(importlib.import_module("recommender"), key)
 
-            logger.info(f"Tuning begun for {model_class.__name__}\n")
+
             model_placeholder = ho.ModelCoordinator(data_test, base.base_namespace, model_base, model_class)
             if isinstance(model_base, tuple):
+                logger.info(f"Tuning begun for {model_class.__name__}\n")
                 trials = Trials()
                 best = fmin(model_placeholder.objective,
                             space=model_base[1],
@@ -73,7 +74,9 @@ def run_experiment(config_path: str = './config/config.yml'):
                 # aggiunta a lista performance test
                 test_results.append(trials._trials[min_val]["result"])
                 test_trials.append(trials)
+                print(f"\nTuning ended for {model_class.__name__}")
             else:
+                logger.info(f"Training begun for {model_class.__name__}\n")
                 single = model_placeholder.single()
 
                 ############################################
@@ -84,11 +87,11 @@ def run_experiment(config_path: str = './config/config.yml'):
 
                 # aggiunta a lista performance test
                 test_results.append(single)
+                print(f"\nTraining ended for {model_class.__name__}")
 
             print(f"Loss: {best_model_loss}")
             print(f"Best Model params: {best_model_params}")
             print(f"Best Model results: {best_model_results}")
-            print(f"\nTuning ended for {model_class.__name__}")
             print("********************************\n")
 
         # Migliore sui test, aggiunta a performance totali
