@@ -21,4 +21,5 @@ from .neural import DMF, NeuMF, GMF, NAIS, UserAutoRec, ItemAutoRec, ConvNeuMF
 from .content_based import VSM
 from .algebric import SlopeOne
 from .adversarial import AMF, AMR
+from .gan import IRGAN
 # from .attentive import AFM

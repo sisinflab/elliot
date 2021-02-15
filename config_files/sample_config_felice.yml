@@ -428,3 +428,23 @@ experiment:
 #      l_b: 0
 #      l_adv: 0.05
 #      eps: 0.5
+    IRGAN:
+      meta:
+        validation_rate: 1
+        verbose: True
+        save_weights: False
+        save_recs: True
+        validation_metric: nDCG
+        restore_epoch: -1
+      lr: 0.001
+      epochs: 2
+      g_pretrain_epochs: 0
+      d_pretrain_epochs: 0
+      g_epochs: 1
+      d_epochs: 1
+      sample_lambda: 0.2
+      embed_k: 50
+      batch_size: 512
+      l_w: 0.0025
+      l_b: 0
+      predict_model: generator # or discriminator

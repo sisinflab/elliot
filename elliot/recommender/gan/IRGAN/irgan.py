@@ -1,0 +1,147 @@
+"""
+Module description:
+
+"""
+
+__version__ = '0.1'
+__author__ = 'Felice Antonio Merra, Vito Walter Anelli, Claudio Pomo'
+__email__ = 'felice.merra@poliba.it, vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
+
+import pickle
+
+import numpy as np
+from tqdm import tqdm
+import pickle
+
+from elliot.dataset.samplers import pointwise_pos_neg_sampler as pws
+from elliot.utils.write import store_recommendation
+
+from elliot.recommender import BaseRecommenderModel
+from elliot.recommender.gan.IRGAN.irgan_model import IRGAN_model
+from elliot.recommender.recommender_utils_mixin import RecMixin
+from elliot.recommender.base_recommender_model import init_charger
+
+np.random.seed(42)
+
+
+class IRGAN(RecMixin, BaseRecommenderModel):
+    @init_charger
+    def __init__(self, data, config, params, *args, **kwargs):
+        """
+        Create a BPR-MF instance.
+        (see https://arxiv.org/abs/1705.10513 for details about the algorithm design choices).
+
+        Args:
+            data: data loader object
+            params: model parameters {embed_k: embedding size,
+                                      [l_w, l_b]: regularization,
+                                      lr: learning rate}
+        """
+        self._random = np.random
+
+        self._params_list = [
+            ("_predict_model", "predict_model", "predict_model", "generator", None, None),
+            ("_factors", "factors", "factors", 10, None, None),
+            ("_learning_rate", "lr", "lr", 0.001, None, None),
+            ("_l_w", "l_w", "l_w", 0.1, None, None),
+            ("_l_b", "l_b", "l_b", 0.001, None, None),
+            ("_l_gan", "l_gan", "l_gan", 0.001, None, None),
+            ("_g_epochs", "g_epochs", "g_epochs", 5, None, None),
+            ("_d_epochs", "d_epochs", "d_epochs", 1, None, None),
+            ("_g_pretrain_epochs", "g_pretrain_epochs", "g_pt_ep", 1, None, None),
+            ("_d_pretrain_epochs", "d_pretrain_epochs", "d_pt_ep", 1, None, None),
+            ("_sample_lambda", "sample_lambda", "sample_lambda", 0.2, None, None)
+        ]
+        self.autoset_params()
+
+        if self._batch_size < 1:
+            self._batch_size = self._data.transactions
+
+        if self._predict_model not in ["generator", "discriminator"]:
+            raise Exception(f"It is necessary to specify the model component to use as recommender (generator/discriminator)")
+
+        self._ratings = self._data.train_dict
+
+        self._sampler = pws.Sampler(self._data.i_train_dict)
+
+        self._model = IRGAN_model(self._predict_model,
+                                  self._data,
+                                  self._batch_size,
+                                  self._factors,
+                                  self._learning_rate,
+                                  self._l_w,
+                                  self._l_b,
+                                  self._l_gan,
+                                  self._num_users,
+                                  self._num_items,
+                                  self._g_pretrain_epochs,
+                                  self._d_pretrain_epochs,
+                                  self._g_epochs,
+                                  self._d_epochs,
+                                  self._sample_lambda)
+
+    @property
+    def name(self):
+        return "IRGAN" \
+               + "_e:" + str(self._epochs) \
+               + "_bs:" + str(self._batch_size) \
+               + f"_{self.get_params_shortcut()}"
+
+    def train(self):
+        if self._restore:
+            return self.restore_weights()
+
+        best_metric_value = 0
+        for it in range(self._epochs):
+            loss = 0
+            with tqdm(total=1, disable=not self._verbose) as t:
+                loss += self._model.train_step()
+                t.set_postfix({'Gan loss (avg. across users)': f'{loss.numpy() / self._num_users:.5f}'})
+                t.update()
+
+            if not (it + 1) % self._validation_rate:
+                recs = self.get_recommendations(self.evaluator.get_needed_recommendations())
+                result_dict = self.evaluator.eval(recs)
+                self._results.append(result_dict)
+
+                print(f'Epoch {(it + 1)}/{self._epochs} Gan loss (avg. across users) {loss/self._num_users:.3f}')
+
+                if self._results[-1][self._validation_k]["val_results"][self._validation_metric] > best_metric_value:
+                    print("******************************************")
+                    best_metric_value = self._results[-1][self._validation_k]["val_results"][self._validation_metric]
+                    if self._save_weights:
+                        self._model.save_weights(self._saving_filepath)
+                    if self._save_recs:
+                        store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}-it:{it + 1}.tsv")
+
+    def get_recommendations(self, k: int = 100):
+        predictions_top_k = {}
+        for index, offset in enumerate(range(0, self._num_users, self._params.batch_size)):
+            offset_stop = min(offset + self._params.batch_size, self._num_users)
+            predictions = self._model.predict(offset, offset_stop)
+            mask = self.get_train_mask(offset, offset_stop)
+            v, i = self._model.get_top_k(predictions, mask, k=k)
+            items_ratings_pair = [list(zip(map(self._data.private_items.get, u_list[0]), u_list[1]))
+                                  for u_list in list(zip(i.numpy(), v.numpy()))]
+            predictions_top_k.update(dict(zip(range(offset, offset_stop), items_ratings_pair)))
+        return predictions_top_k
+
+    def restore_weights(self):
+        try:
+            with open(self._saving_filepath, "rb") as f:
+                self._model.set_model_state(pickle.load(f))
+            print(f"Model correctly Restored")
+
+            recs = self.get_recommendations(self.evaluator.get_needed_recommendations())
+            result_dict = self.evaluator.eval(recs)
+            self._results.append(result_dict)
+
+            print("******************************************")
+            if self._save_recs:
+                store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}.tsv")
+            return True
+
+        except Exception as ex:
+            print(f"Error in model restoring operation! {ex}")
+
+        return False
