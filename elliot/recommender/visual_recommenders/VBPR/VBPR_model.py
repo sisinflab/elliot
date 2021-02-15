@@ -10,7 +10,6 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malite
 import tensorflow as tf
 from tensorflow import keras
 
-from recommender.latent_factor_models.NNBPRMF.NNBPRMF_model import NNBPRMF_model
 
 class VBPR_model(keras.Model):
     def __init__(self, factors=200, factors_d=20,

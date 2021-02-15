@@ -96,7 +96,7 @@ class KnowledgeChainsLoader:
             self.tuple_list = self.read_splitting(config.data_config.root_folder)
 
         elif config.data_config.strategy == "dataset":
-            print("There will be the splitting")
+            self.logger.info("There will be the splitting")
             path_dataset = config.data_config.dataset_path
 
             path_map = config.data_config.side_information.map
@@ -113,7 +113,7 @@ class KnowledgeChainsLoader:
                                                                                                  self.column_names)
             self.dataframe = self.check_timestamp(self.dataframe)
 
-            print('{0} - Loaded'.format(path_dataset))
+            self.logger.info('{0} - Loaded'.format(path_dataset))
 
             self.dataframe = PreFilter.filter(self.dataframe, self.config.prefiltering)
 
@@ -185,13 +185,8 @@ class KnowledgeChainsLoader:
         n_items = len({k for a in ratings.values() for k in a.keys()})
         transactions = sum([len(a) for a in ratings.values()])
         sparsity = 1 - (transactions / (n_users * n_items))
-        print()
-        print("********** Statistics")
-        print(f'Users:\t{n_users}')
-        print(f'Items:\t{n_items}', )
-        print(f'Transactions:\t{transactions}')
-        print(f'Sparsity:\t{sparsity}')
-        print("********** ")
+        self.logger.info(f"Statistics\tUsers:\t{n_users}\tItems:\t{n_items}\tTransactions:\t{transactions}\t"
+                         f"Sparsity:\t{sparsity}")
         return ratings, map
 
     def load_dataset_dataframe(self, file_ratings,
@@ -265,7 +260,7 @@ class KnowledgeChainsLoader:
                     if feature[1][0] not in properties:
                         acceptable_features.add(int(feature[0]))
 
-        self.logger.info(f"Acceptable Features:\t{len(acceptable_features)}\nMapped items:\t{len(map)}")
+        self.logger.info(f"Acceptable Features:\t{len(acceptable_features)}\tMapped items:\t{len(map)}")
 
         nmap = {k: v for k, v in map.items() if k in items}
 
@@ -339,8 +334,8 @@ class KnowledgeChainsDataObject:
         n_items = len({k for a in ratings.values() for k in a.keys()})
         transactions = sum([len(a) for a in ratings.values()])
         sparsity = 1 - (transactions / (n_users * n_items))
-        self.logger.info(f"********** Statistics\nUsers:\t{n_users}\nItems:\t{n_items}\nTransactions:\t{transactions}\n"
-                         f"Sparsity:\t{sparsity}\n**********")
+        self.logger.info(f"Statistics\tUsers:\t{n_users}\tItems:\t{n_items}\tTransactions:\t{transactions}\t"
+                         f"Sparsity:\t{sparsity}")
         return ratings
 
     def build_dict(self, dataframe, users):

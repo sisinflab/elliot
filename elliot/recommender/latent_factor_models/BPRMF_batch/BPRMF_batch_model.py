@@ -16,7 +16,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 tf.random.set_seed(0)
 
 
-class NNBPRMF_model(keras.Model):
+class BPRMF_batch_model(keras.Model):
 
     def __init__(self,
                  factors=200,
@@ -31,8 +31,8 @@ class NNBPRMF_model(keras.Model):
 
         self._factors = factors
         self._learning_rate = learning_rate
-        self.l_w = l_w
-        self.l_b = l_b
+        self._l_w = l_w
+        self._l_b = l_b
         self._num_items = num_items
         self._num_users = num_users
 
@@ -66,11 +66,11 @@ class NNBPRMF_model(keras.Model):
             difference = tf.clip_by_value(xu_pos - xu_neg, -80.0, 1e8)
             loss = tf.reduce_sum(tf.nn.softplus(-difference))
             # Regularization Component
-            reg_loss = self.l_w * tf.reduce_sum([tf.nn.l2_loss(gamma_u),
+            reg_loss = self._l_w * tf.reduce_sum([tf.nn.l2_loss(gamma_u),
                                                  tf.nn.l2_loss(gamma_pos),
                                                  tf.nn.l2_loss(gamma_neg)]) \
-                       + self.l_b * tf.nn.l2_loss(beta_pos) \
-                       + self.l_b * tf.nn.l2_loss(beta_neg) / 10
+                       + self._l_b * tf.nn.l2_loss(beta_pos) \
+                       + self._l_b * tf.nn.l2_loss(beta_neg) / 10
 
             # Loss to be optimized
             loss += reg_loss

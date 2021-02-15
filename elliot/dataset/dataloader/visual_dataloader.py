@@ -18,7 +18,7 @@ from PIL import Image
 from types import SimpleNamespace
 import concurrent.futures as c
 
-from elliot.dataset.abstract_dataset import AbstractDataset
+from elliot.utils import logging
 from elliot.splitter.base_splitter import Splitter
 from elliot.prefiltering.standard_prefilters import PreFilter
 
@@ -59,6 +59,7 @@ class VisualLoader:
         :param path_test_data: relative path for test file
         """
 
+        self.logger = logging.get_logger(self.__class__.__name__)
         self.args = args
         self.kwargs = kwargs
         self.config = config
@@ -106,7 +107,7 @@ class VisualLoader:
 
             self.train_dataframe = self.check_timestamp(self.train_dataframe)
 
-            print('{0} - Loaded'.format(path_train_data))
+            self.logger.info('{0} - Loaded'.format(path_train_data))
 
             self.test_dataframe = pd.read_csv(path_test_data, sep="\t", header=None, names=self.column_names)
             self.test_dataframe = self.check_timestamp(self.test_dataframe)
@@ -123,7 +124,7 @@ class VisualLoader:
             self.tuple_list = self.read_splitting(config.data_config.root_folder)
 
         elif config.data_config.strategy == "dataset":
-            print("There will be the splitting")
+            self.logger.info("There will be the splitting")
             path_dataset = config.data_config.dataset_path
 
             visual_feature_path = getattr(config.data_config.side_information, "visual_features", None)
@@ -164,7 +165,7 @@ class VisualLoader:
 
             self.dataframe = self.check_timestamp(self.dataframe)
 
-            print('{0} - Loaded'.format(path_dataset))
+            self.logger.info('{0} - Loaded'.format(path_dataset))
 
             self.dataframe = PreFilter.filter(self.dataframe, self.config.prefiltering)
 
@@ -239,6 +240,7 @@ class VisualDataObject:
     """
 
     def __init__(self, config, data_tuple, side_information_data, *args, **kwargs):
+        self.logger = logging.get_logger(self.__class__.__name__)
         self.config = config
         self.side_information_data = side_information_data
         self.args = args
@@ -295,7 +297,7 @@ class VisualDataObject:
 
                     image_dict[image_id] = im_pos
                 except ValueError:
-                    print(f'Image at path {os.path.join(images_folder, path)} was not loaded correctly!')
+                    self.logger.error(f'Image at path {os.path.join(images_folder, path)} was not loaded correctly!')
         return image_dict
 
     def read_images_multiprocessing(self, images_folder, image_set, size_tuple):
@@ -336,8 +338,9 @@ class VisualDataObject:
 
                 return {image_id: im_pos}
             except (ValueError, PIL.UnidentifiedImageError) as er:
-                print(f'Image at path {os.path.join(images_folder, image_path)} was not loaded correctly!')
-                print(er)
+                _logger = logging.get_logger(__class__.__name__)
+                _logger.error(f'Image at path {os.path.join(images_folder, image_path)} was not loaded correctly!')
+                _logger.error(er)
 
 
     def dataframe_to_dict(self, data):
@@ -352,13 +355,8 @@ class VisualDataObject:
         n_items = len({k for a in ratings.values() for k in a.keys()})
         transactions = sum([len(a) for a in ratings.values()])
         sparsity = 1 - (transactions / (n_users * n_items))
-        print()
-        print("********** Statistics")
-        print(f'Users:\t{n_users}')
-        print(f'Items:\t{n_items}', )
-        print(f'Transactions:\t{transactions}')
-        print(f'Sparsity:\t{sparsity}')
-        print("********** ")
+        self.logger.info(f"Statistics\tUsers:\t{n_users}\tItems:\t{n_items}\tTransactions:\t{transactions}\t"
+                         f"Sparsity:\t{sparsity}")
         return ratings
 
     def build_dict(self, dataframe, users):

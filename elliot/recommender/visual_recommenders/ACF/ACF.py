@@ -10,7 +10,7 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malite
 from evaluation.evaluator import Evaluator
 from utils.folder import build_model_folder
 from utils.write import store_recommendation
-import dataset.samplers.custom_sparse_sampler as css
+import elliot.dataset.samplers.custom_sparse_sampler as css
 
 import logging as log
 from utils import logging
@@ -27,7 +27,7 @@ from recommender.visual_recommenders.ACF.ACF_model import ACF_model
 
 np.random.seed(0)
 tf.random.set_seed(0)
-log.disable(log.WARNING)
+
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 

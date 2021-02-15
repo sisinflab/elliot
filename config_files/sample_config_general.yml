@@ -114,7 +114,7 @@ experiment:
       update_users: True
       update_items: True
       update_bias: True
-    NNBPRMF:
+    BPRMF_batch:
       meta:
         hyper_max_evals: 10
         hyper_opt_alg: tpe

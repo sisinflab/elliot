@@ -65,5 +65,5 @@ class AUC(BaseMetric):
     @staticmethod
     def needs_full_recommendations():
         _logger = logging.get_logger("Evaluator")
-        _logger.info("\n*** WARNING: AUC metric requires full length recommendations")
+        _logger.warn("AUC metric requires full length recommendations")
         return True

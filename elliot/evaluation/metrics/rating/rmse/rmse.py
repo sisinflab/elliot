@@ -2,14 +2,15 @@
 This is the implementation of the Root Mean Squared Error metric.
 It proceeds from a user-wise computation, and average the values over the users.
 """
-import warnings
 
 __version__ = '0.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
 import numpy as np
+
 from elliot.evaluation.metrics.base_metric import BaseMetric
+from elliot.utils import logging
 
 
 class RMSE(BaseMetric):
@@ -71,5 +72,6 @@ class RMSE(BaseMetric):
 
     @staticmethod
     def needs_full_recommendations():
-        warnings.warn("\n*** WARNING: Root Mean Squared Error metric requires full length recommendations")
+        _logger = logging.get_logger("Evaluator")
+        _logger.warn("WARNING: Mean Absolute Error metric requires full length recommendations")
         return True

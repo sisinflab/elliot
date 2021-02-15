@@ -19,7 +19,7 @@ experiment:
   top_k: 20
   evaluation:
     cutoffs: [10, 5]
-    simple_metrics: [nDCG, Precision, Recall, ItemCoverage, HR, MAP, F1, Gini, SEntropy, EFD, EPC, ARP, APLT, ACLT]
+    simple_metrics: [AUC, nDCG, Precision, Recall, ItemCoverage, HR, MAP, F1, Gini, SEntropy, EFD, EPC, ARP, APLT, ACLT]
     relevance_threshold: 3
     paired_ttest: True
 #    complex_metrics:
@@ -171,21 +171,21 @@ experiment:
 #      batch_size: 64
 #      dropout_pkeep: [1, 0.9]
 #      reg_lambda: [0.0001, 0]
-#    MultiDAE:
-#      meta:
-#        hyper_max_evals: 1
-#        hyper_opt_alg: tpe
-#        validation_rate: 1
-#        verbose: True
-#        save_weights: False
-#        save_recs: False
-#      lr: 0.001
-#      epochs: 1
-#      intermediate_dim: 600
-#      latent_dim: 200
-#      batch_size: -1
-#      dropout_pkeep: 1
-#      reg_lambda: 0.01
+    MultiDAE:
+      meta:
+        hyper_max_evals: 1
+        hyper_opt_alg: tpe
+        validation_rate: 1
+        verbose: True
+        save_weights: False
+        save_recs: False
+      lr: 0.001
+      epochs: 1
+      intermediate_dim: 600
+      latent_dim: 200
+      batch_size: -1
+      dropout_pkeep: 1
+      reg_lambda: 0.01
 #    BPRMF:
 #      meta:
 #        hyper_max_evals: 1
@@ -266,32 +266,32 @@ experiment:
 #      neg_ratio: 5
 #      reg: 0.005
 #      similarity: dot
-    PMF:
-      meta:
-#        hyper_opt_alg: grid
-        verbose: False
-        save_recs: False
-        validation_rate: 1
-      epochs: 1
-      lr: [0.001, 0.01]
-      factors: 10
-      reg: 0.005
-      gaussian_variance: 0.01
-      batch_size: 512
-    NeuMF:
-      meta:
-        verbose: True
-        save_recs: False
-        validation_rate: 1
-      mf_factors: 10
-      mlp_factors: 10
-      mlp_hidden_size: [(5, 3, 2),(5,2)]
-      dropout: 0.2
-      is_mf_train: True
-      is_mlp_train: True
-      batch_size: 512
-      epochs: 1
-      lr: 0.001
+#    PMF:
+#      meta:
+##        hyper_opt_alg: grid
+#        verbose: False
+#        save_recs: False
+#        validation_rate: 1
+#      epochs: 1
+#      lr: [0.001]
+#      factors: 10
+#      reg: 0.005
+#      gaussian_variance: 0.01
+#      batch_size: 512
+#    NeuMF:
+#      meta:
+#        verbose: True
+#        save_recs: False
+#        validation_rate: 1
+#      mf_factors: 10
+#      mlp_factors: 10
+#      mlp_hidden_size: [(5, 3, 2),(5,2)]
+#      dropout: 0.2
+#      is_mf_train: True
+#      is_mlp_train: True
+#      batch_size: 512
+#      epochs: 1
+#      lr: 0.001
 #       implementation: aiolli
 #    ItemKNN:
 #      meta:
@@ -323,7 +323,7 @@ experiment:
 #        save_recs: False
 #        validation_rate: 1
 #      epochs: 1
-#      lr: 0.001
+#      lr: [0.001]
 #      factors: 50
 #      reg: 0.005
 #      batch_size: 512

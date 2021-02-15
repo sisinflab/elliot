@@ -42,6 +42,14 @@ loggers:
     level: FATAL
     handlers:
       - queue_listener
+  'VisualLoader':
+    level: FATAL
+    handlers:
+      - queue_listener
+  'VisualDataObject':
+    level: FATAL
+    handlers:
+      - queue_listener
   'DataSetLoader':
     level: FATAL
     handlers:

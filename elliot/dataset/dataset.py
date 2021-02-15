@@ -64,14 +64,14 @@ class DataSetLoader:
             self.tuple_list = self.read_splitting(config.data_config.root_folder)
 
         elif config.data_config.strategy == "dataset":
-            print("There will be the splitting")
+            self.logger.info("There will be the splitting")
             path_dataset = config.data_config.dataset_path
 
             self.dataframe = pd.read_csv(path_dataset, sep="\t", header=None, names=self.column_names)
 
             self.dataframe = self.check_timestamp(self.dataframe)
 
-            print('{0} - Loaded'.format(path_dataset))
+            self.logger.info(('{0} - Loaded'.format(path_dataset)))
 
             self.dataframe = PreFilter.filter(self.dataframe, self.config)
 
@@ -173,8 +173,8 @@ class DataSet(AbstractDataset):
         n_items = len({k for a in ratings.values() for k in a.keys()})
         transactions = sum([len(a) for a in ratings.values()])
         sparsity = 1 - (transactions / (n_users * n_items))
-        self.logger.info(f"********** Statistics\nUsers:\t{n_users}\nItems:\t{n_items}\nTransactions:\t{transactions}\n"
-                         f"Sparsity:\t{sparsity}\n**********")
+        self.logger.info(f"Statistics\tUsers:\t{n_users}\tItems:\t{n_items}\tTransactions:\t{transactions}\t"
+                         f"Sparsity:\t{sparsity}")
         return ratings
 
     def build_dict(self, dataframe, users):

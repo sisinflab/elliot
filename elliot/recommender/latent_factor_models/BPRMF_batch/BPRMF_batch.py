@@ -17,14 +17,14 @@ from elliot.dataset.samplers import custom_sampler as cs
 from elliot.utils.write import store_recommendation
 
 from elliot.recommender import BaseRecommenderModel
-from elliot.recommender.latent_factor_models.NNBPRMF.NNBPRMF_model import NNBPRMF_model
+from elliot.recommender.latent_factor_models.BPRMF_batch.BPRMF_batch_model import BPRMF_batch_model
 from elliot.recommender.recommender_utils_mixin import RecMixin
 from elliot.recommender.base_recommender_model import init_charger
 
 np.random.seed(42)
 
 
-class NNBPRMF(RecMixin, BaseRecommenderModel):
+class BPRMF_batch(RecMixin, BaseRecommenderModel):
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
         """
@@ -54,7 +54,7 @@ class NNBPRMF(RecMixin, BaseRecommenderModel):
 
         self._sampler = cs.Sampler(self._data.i_train_dict)
 
-        self._model = NNBPRMF_model(self._factors,
+        self._model = BPRMF_batch_model(self._factors,
                                     self._learning_rate,
                                     self._l_w,
                                     self._l_b,

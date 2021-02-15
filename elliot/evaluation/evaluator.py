@@ -145,9 +145,9 @@ class Evaluator(object):
         full_recommendations_metrics = any([m.needs_full_recommendations() for m in self._metrics])
         full_recommendations_additional_metrics = any([metrics.parse_metric(metric["metric"]).needs_full_recommendations() for metric in self._complex_metrics])
         if full_recommendations_metrics:
-            self.logger.warn("*** WARNING: At least one basic metric requires full length recommendations")
+            self.logger.warn("At least one basic metric requires full length recommendations")
         if full_recommendations_additional_metrics:
-            self.logger.warn("*** WARNING: At least one additional metric requires full length recommendations", None, 1, None)
+            self.logger.warn("At least one additional metric requires full length recommendations", None, 1, None)
         if full_recommendations_metrics or full_recommendations_metrics:
             return self._data.num_items
         else:

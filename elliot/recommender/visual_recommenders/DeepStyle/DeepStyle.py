@@ -7,27 +7,24 @@ __version__ = '0.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malitesta@poliba.it'
 
-from evaluation.evaluator import Evaluator
-from utils.folder import build_model_folder
-from utils.write import store_recommendation
-
-import logging as log
-from utils import logging
 import os
 
 import numpy as np
 import tensorflow as tf
 from tqdm import tqdm
 
-from recommender import BaseRecommenderModel
-from recommender.recommender_utils_mixin import RecMixin
-from recommender.visual_recommenders.DeepStyle.DeepStyle_model import DeepStyle_model
-
 from dataset.samplers import custom_sampler as cs
+from elliot.recommender import BaseRecommenderModel
 from elliot.recommender.base_recommender_model import init_charger
+from elliot.recommender.recommender_utils_mixin import RecMixin
+from elliot.recommender.visual_recommenders.DeepStyle.DeepStyle_model import DeepStyle_model
+from evaluation.evaluator import Evaluator
+from utils import logging
+from utils.folder import build_model_folder
+from utils.write import store_recommendation
+
 np.random.seed(0)
 tf.random.set_seed(0)
-log.disable(log.WARNING)
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 
