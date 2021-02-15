@@ -393,21 +393,38 @@ experiment:
 #      l_w: 0.0025
 #      epochs: 25
 #      batch_size: 2
-    ConvNeuMF:
-      meta:
-        validation_rate: 1
-        verbose: True
-        save_weights: True
-        save_recs: True
-        validation_metric: nDCG
-        restore: False
-      lr: 0.05
-      embedding_size: 64
-      cnn_channels: (1, 32, 32)
-      cnn_kernels: (2, 2)
-      cnn_strides: (2,2)
-      dropout_prob: 0.2
-      l_w: 0.0001
-      l_b: 0.0001
-      epochs: 1
-      batch_size: 512
+#    ConvNeuMF:
+#      meta:
+#        validation_rate: 1
+#        verbose: True
+#        save_weights: True
+#        save_recs: True
+#        validation_metric: nDCG
+#        restore: False
+#      lr: 0.05
+#      embedding_size: 64
+#      cnn_channels: (1, 32, 32)
+#      cnn_kernels: (2, 2)
+#      cnn_strides: (2,2)
+#      dropout_prob: 0.2
+#      l_w: 0.0001
+#      l_b: 0.0001
+#      epochs: 1
+#      batch_size: 512
+#    AMF:
+#      meta:
+#        validation_rate: 1
+#        verbose: True
+#        save_weights: False
+#        save_recs: True
+#        validation_metric: nDCG
+#        restore_epoch: False
+#      lr: 0.001
+#      epochs: [2,3]
+#      adversarial_epochs: [1,2]
+#      embed_k: 50
+#      batch_size: 512
+#      l_w: 0.0025
+#      l_b: 0
+#      l_adv: 0.05
+#      eps: 0.5
