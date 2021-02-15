@@ -12,7 +12,7 @@ import numpy as np
 import math
 
 from elliot.evaluation.metrics.base_metric import BaseMetric
-
+from elliot.evaluation.relevance import Relevance
 
 class NDCG(BaseMetric):
     """
@@ -48,7 +48,7 @@ class NDCG(BaseMetric):
         :param k:
         :return:
         """
-        return 1 / math.log(k + 2) * math.log(2)
+        return Relevance.logarithmic_ranking_discount(k)
 
     @staticmethod
     def compute_idcg(gain_map: t.Dict, cutoff: int) -> float:

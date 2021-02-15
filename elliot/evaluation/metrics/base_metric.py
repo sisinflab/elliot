@@ -9,6 +9,7 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
 import typing as t
 from abc import ABC, abstractmethod
+import numpy as np
 
 
 class BaseMetric(ABC):
@@ -34,9 +35,8 @@ class BaseMetric(ABC):
     def name(self):
         pass
 
-    @abstractmethod
     def eval(self):
-        pass
+        return np.average(list(self.eval_user_metric().values()))
 
     @staticmethod
     def needs_full_recommendations():

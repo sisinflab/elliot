@@ -48,15 +48,15 @@ class Precision(BaseMetric):
         """
         return sum([1 for i in user_recommendations[:cutoff] if i[0] in user_relevant_items]) / cutoff
 
-    def eval(self):
-        """
-        Evaluation function
-        :return: the overall averaged value of Precision
-        """
-        return np.average(
-            [Precision.__user_precision(u_r, self._cutoff, self._relevant_items[u])
-             for u, u_r in self._recommendations.items() if len(self._relevant_items[u])]
-        )
+    # def eval(self):
+    #     """
+    #     Evaluation function
+    #     :return: the overall averaged value of Precision
+    #     """
+    #     return np.average(
+    #         [Precision.__user_precision(u_r, self._cutoff, self._relevant_items[u])
+    #          for u, u_r in self._recommendations.items() if len(self._relevant_items[u])]
+    #     )
 
     def eval_user_metric(self):
         """

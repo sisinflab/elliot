@@ -19,9 +19,10 @@ experiment:
   top_k: 20
   evaluation:
     cutoffs: [10, 5]
-    simple_metrics: [AUC, nDCG, Precision, Recall, ItemCoverage, HR, MAP, F1, Gini, SEntropy, EFD, EPC, ARP, APLT, ACLT]
+    simple_metrics: [nDCG, Precision, Recall, ItemCoverage, HR, MAP, F1, Gini, SEntropy, EFD, EPC, ARP, APLT, ACLT]
     relevance_threshold: 3
     paired_ttest: True
+    wilcoxon_test: True
 #    complex_metrics:
 #    - metric: REO
 #      clustering_name: ItemPopularity
@@ -84,9 +85,9 @@ experiment:
 #      embed_k: 10
 #      alpha: 1
 #      reg: 0.1
-#    MostPop:
-#      meta:
-#        save_recs: False
+    MostPop:
+      meta:
+        save_recs: False
 #    SlopeOne:
 #      meta:
 #        save_recs: False
@@ -171,21 +172,21 @@ experiment:
 #      batch_size: 64
 #      dropout_pkeep: [1, 0.9]
 #      reg_lambda: [0.0001, 0]
-    MultiDAE:
-      meta:
-        hyper_max_evals: 1
-        hyper_opt_alg: tpe
-        validation_rate: 1
-        verbose: True
-        save_weights: False
-        save_recs: False
-      lr: 0.001
-      epochs: 1
-      intermediate_dim: 600
-      latent_dim: 200
-      batch_size: -1
-      dropout_pkeep: 1
-      reg_lambda: 0.01
+#    MultiDAE:
+#      meta:
+#        hyper_max_evals: 1
+#        hyper_opt_alg: tpe
+#        validation_rate: 1
+#        verbose: True
+#        save_weights: False
+#        save_recs: False
+#      lr: 0.001
+#      epochs: 1
+#      intermediate_dim: 600
+#      latent_dim: 200
+#      batch_size: -1
+#      dropout_pkeep: 1
+#      reg_lambda: 0.01
 #    BPRMF:
 #      meta:
 #        hyper_max_evals: 1
