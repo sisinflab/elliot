@@ -16,6 +16,7 @@ class TimeFilter(logging.Filter):
         record.time_filter = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S.%f")
         return True
 
+
 def init(path_config, folder_log, log_level=logging.WARNING):
     # Pull in Logging Config
     path = os.path.join(path_config)
