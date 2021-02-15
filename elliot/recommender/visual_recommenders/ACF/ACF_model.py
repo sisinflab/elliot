@@ -7,10 +7,9 @@ __version__ = '0.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malitesta@poliba.it'
 
+import numpy as np
 import tensorflow as tf
 from tensorflow import keras
-import numpy as np
-import concurrent.futures
 
 
 class ACF_model(keras.Model):

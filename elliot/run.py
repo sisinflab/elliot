@@ -74,7 +74,7 @@ def run_experiment(config_path: str = './config/config.yml'):
                 # aggiunta a lista performance test
                 test_results.append(trials._trials[min_val]["result"])
                 test_trials.append(trials)
-                print(f"\nTuning ended for {model_class.__name__}")
+                logger.info(f"Tuning ended for {model_class.__name__}")
             else:
                 logger.info(f"Training begun for {model_class.__name__}\n")
                 single = model_placeholder.single()
@@ -87,12 +87,11 @@ def run_experiment(config_path: str = './config/config.yml'):
 
                 # aggiunta a lista performance test
                 test_results.append(single)
-                print(f"\nTraining ended for {model_class.__name__}")
+                logger.info(f"Training ended for {model_class.__name__}")
 
-            print(f"Loss: {best_model_loss}")
-            print(f"Best Model params: {best_model_params}")
-            print(f"Best Model results: {best_model_results}")
-            print("********************************\n")
+            logger.info(f"Loss:\t{best_model_loss}")
+            logger.info(f"Best Model params:\t{best_model_params}")
+            logger.info(f"Best Model results:\t{best_model_results}")
 
         # Migliore sui test, aggiunta a performance totali
         min_val = np.argmin([i["loss"] for i in test_results])
@@ -114,7 +113,7 @@ def run_experiment(config_path: str = './config/config.yml'):
     if hasattr(base.base_namespace.evaluation, "wilcoxon_test") and base.base_namespace.evaluation.wilcoxon_test:
         res_handler.save_best_statistical_results(stat_test=StatTest.WilcoxonTest, output=base.base_namespace.path_output_rec_performance)
 
-    logger.debug("End experiment")
+    logger.info("End experiment")
 
 
 if __name__ == '__main__':

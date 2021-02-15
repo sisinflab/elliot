@@ -121,16 +121,14 @@ class Evaluator(object):
 
             metric_objects = [m(recommendations, self._data.config, self._params, eval_objs) for m in self._metrics]
             for metric in self._complex_metrics:
-                metric_objects.extend(metrics.parse_metric(metric["metric"])(recommendations, self._data.config, self._params, eval_objs, metric).get())
+                metric_objects.extend(metrics.parse_metric(metric["metric"])(recommendations, self._data.config,
+                                                                             self._params, eval_objs, metric).get())
             results = {m.name(): m.eval() for m in metric_objects}
 
             str_results = {k: str(round(v, rounding_factor)) for k, v in results.items()}
-            print(f"\nCut-off: {eval_objs.cutoff}")
-            print(f"Eval Time: {time() - eval_start_time}")
-
-            res_print = "\n".join(["\t".join(e) for e in str_results.items()])
-
-            print(f"*** Results ***\n{res_print}\n***************\n")
+            res_print = "\t".join([":".join(e) for e in str_results.items()])
+            self.logger.info(f"Cut-off: {eval_objs.cutoff}\tEval Time: {time() - eval_start_time}"
+                             f"\tResults\t{res_print}")
 
             statistical_results = {}
             if self._paired_ttest:

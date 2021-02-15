@@ -28,7 +28,7 @@ from dataset.samplers import custom_sampler as cs
 
 np.random.seed(0)
 tf.random.set_seed(0)
-log.disable(log.WARNING)
+
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 

@@ -86,7 +86,7 @@ class MultiDAE(RecMixin, BaseRecommenderModel):
                 result_dict = self.evaluator.eval(recs)
                 self._results.append(result_dict)
 
-                print(f'Epoch {(it + 1)}/{self._epochs} loss {loss/steps:.5f}')
+                self.logger.info(f'Epoch {(it + 1)}/{self._epochs} loss {loss/steps:.5f}')
 
                 if self._results[-1][self._validation_k]["val_results"][self._validation_metric] > best_metric_value:
                     print("******************************************")

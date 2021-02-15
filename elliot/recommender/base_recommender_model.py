@@ -13,6 +13,7 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 from abc import ABC
 from abc import abstractmethod
 from functools import wraps
+from elliot.utils import logging
 
 
 class BaseRecommenderModel(ABC):
@@ -69,15 +70,15 @@ class BaseRecommenderModel(ABC):
             ("_mlpunits", "mlp_units", "mlpunits", "(1,2,3)", lambda x: list(make_tuple(x)), lambda x: str(x).replace(",", "-")),
         ]
         """
-        print("\nLoading parameters: ")
+        self.logger.info("Loading parameters")
         for variable_name, public_name, shortcut, default, reading_function, _ in self._params_list:
             if reading_function is None:
                 setattr(self, variable_name, getattr(self._params, public_name, default))
             else:
                 setattr(self, variable_name, reading_function(getattr(self._params, public_name, default)))
-            print(f"Parameter {public_name} set to {getattr(self, variable_name)}")
+            self.logger.info(f"Parameter {public_name} set to {getattr(self, variable_name)}")
         if not self._params_list:
-            print("No parameters defined")
+            self.logger.info("No parameters defined")
 
     @abstractmethod
     def train(self):
@@ -104,7 +105,7 @@ def init_charger(init):
     @wraps(init)
     def new_init(self, *args, **kwargs):
         BaseRecommenderModel.__init__(self, *args, **kwargs)
-
+        self.logger = logging.get_logger(self.__class__.__name__)
         self._num_items = self._data.num_items
         self._num_users = self._data.num_users
 
@@ -114,6 +115,5 @@ def init_charger(init):
         self._params.name = self.name
         build_model_folder(self._config.path_output_rec_weight, self.name)
         self._saving_filepath = f'{self._config.path_output_rec_weight}{self.name}/best-weights-{self.name}'
-        self.logger = logging.get_logger(self.__class__.__name__)
 
     return new_init

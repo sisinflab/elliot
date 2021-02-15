@@ -2,6 +2,8 @@ import datetime
 import logging
 import logging.config as cfg
 import os
+import sys
+
 import yaml
 import re
 
@@ -70,10 +72,14 @@ def prepare_logger(name, path, log_level=logging.DEBUG):
     logger.setLevel(log_level)
     logfilepath = f'''{path}/{name}-{datetime.datetime.now().strftime('%b-%d-%Y_%H-%M-%S')}.log'''
     fh = logging.FileHandler(logfilepath)
+    sh = logging.StreamHandler(sys.stdout)
     fh.setLevel(log_level)
-    filefmt = "%(asctime)-15s %(levelname)s %(message)s"
-    filedatefmt = "%a %d %b %Y %H:%M:%S"
+    sh.setLevel(log_level)
+    filefmt = "%(asctime)-15s: %(levelname)-.1s %(message)s"
+    filedatefmt = "%Y-%m-%d %H:%M:%S.%s"
     formatter = logging.Formatter(filefmt, filedatefmt)
     fh.setFormatter(formatter)
+    sh.setFormatter(formatter)
     logger.addHandler(fh)
+    logger.addHandler(sh)
     return logger

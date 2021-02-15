@@ -5,7 +5,7 @@ objects:
     maxsize: 10000
 formatters:
   simple:
-    format: '%(asctime)-15s %(levelname)-.1s %(message)s'
+    format: '%(asctime)-15s: %(levelname)-.1s %(message)s'
     datefmt: '%Y-%m-%d %H:%M:%S.%s'
 handlers:
   console:
