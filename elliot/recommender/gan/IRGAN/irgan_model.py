@@ -162,18 +162,16 @@ class Discriminator(keras.Model):
         with tf.GradientTape() as tape:
             # Clean Inference
             xui, beta_i, gamma_u, gamma_i = self(inputs=(user, pos), training=True)
-            # loss = tf.reduce_sum(tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.cast(label, tf.float32), logits=xui))
-            #
-            # reg_loss = self._l_w * tf.reduce_sum([tf.nn.l2_loss(gamma_u),
-            #                                       tf.nn.l2_loss(gamma_i)]) \
-            #            + self._l_b * tf.nn.l2_loss(beta_i)
             loss = tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.cast(label, tf.float32), logits=xui)
-            reg_loss = self._l_w * tf.nn.l2_loss(gamma_u) + tf.nn.l2_loss(gamma_i) + self._l_b * tf.nn.l2_loss(beta_i)
+            reg_loss = self._l_w * tf.nn.l2_loss(gamma_u) + self._l_w * tf.nn.l2_loss(
+                gamma_i) + self._l_b * tf.nn.l2_loss(beta_i)
 
             loss += reg_loss
 
         grads = tape.gradient(loss, self.trainable_weights)
         self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
+
+        return tf.reduce_sum(loss)
 
 
 class IRGAN_model(keras.Model):
@@ -241,8 +239,7 @@ class IRGAN_model(keras.Model):
         # Pretrain of G
         self.pre_train_generator()
 
-        self.optimizer = tf.optimizers.Adam(self._learning_rate)
-        self.saver_ckpt = tf.train.Checkpoint(optimizer=self.optimizer, model=self)
+        # self.saver_ckpt = tf.train.Checkpoint(optimizer=self.optimizer, model=self)
 
     # @tf.function
     def call(self, inputs, training=None):
@@ -252,9 +249,11 @@ class IRGAN_model(keras.Model):
     def train_step(self):
         for d_epoch in range(self._d_epochs):
             # print(f'\n***** Train D - Epoch{d_epoch + 1}/{self._d_epochs}')
+            dis_loss, step = 0, 0
             for batch in self._discriminator.sampler.step(self._discriminator.data.transactions, self._batch_size):
-                self._discriminator.train_step(batch)
-                break
+                dis_loss += self._discriminator.train_step(batch)
+                step += 1
+            dis_loss /= step
 
         for g_epoch in range(self._g_epochs):
             # print(f'***** Train G - Epoch{g_epoch + 1}/{self._g_epochs}')
@@ -266,8 +265,6 @@ class IRGAN_model(keras.Model):
                     inputs=(np.repeat(user, self._num_items), np.zeros_like(self._num_items)))
                 exp_pred_score = np.exp(pred_score)
                 prob = exp_pred_score / np.sum(exp_pred_score)
-                # exp_pred_score = tf.exp(pred_score)
-                # prob = exp_pred_score / tf.reduce_sum(exp_pred_score)
 
                 # Here is the importance sampling.
                 pn = (1 - self._sample_lambda) * prob
@@ -281,8 +278,9 @@ class IRGAN_model(keras.Model):
 
                 # Update G
                 gan_loss += self._generator.train_step_with_reward(batch=(np.repeat(user, len(sample)), sample, reward))
+            gan_loss /= self._num_users
 
-        return gan_loss
+        return dis_loss, gan_loss
 
     # @tf.function
     def predict(self, start, stop, **kwargs):

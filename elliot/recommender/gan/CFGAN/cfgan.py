@@ -13,34 +13,39 @@ import numpy as np
 from tqdm import tqdm
 import pickle
 
-from elliot.dataset.samplers import pointwise_pos_neg_sampler as pws
+from elliot.dataset.samplers import pointwise_cfgan_sampler as pwcfgans
 from elliot.utils.write import store_recommendation
 
 from elliot.recommender import BaseRecommenderModel
-from elliot.recommender.gan.IRGAN.irgan_model import IRGAN_model
+from elliot.recommender.gan.CFGAN.cfgan_model import CFGAN_model
 from elliot.recommender.recommender_utils_mixin import RecMixin
 from elliot.recommender.base_recommender_model import init_charger
 
 np.random.seed(42)
 
 
-class IRGAN(RecMixin, BaseRecommenderModel):
+class CFGAN(RecMixin, BaseRecommenderModel):
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
         """
-        Create a BPR-MF instance.
-        (see https://arxiv.org/abs/1705.10513 for details about the algorithm design choices).
+        Create a CFGAN instance.
+        (see https://dl.acm.org/doi/10.1145/3269206.3271743 for details about the algorithm design choices).
 
         Args:
             data: data loader object
             params: model parameters {embed_k: embedding size,
-                                      [l_w, l_b]: regularization,
-                                      lr: learning rate}
+                                      lr: learning rate
+                                      embed_k: 50
+                                      [ l_w, l_b]: regularization
+                                      predict_model: generator # or discriminator
+                                      s_zr: sampling parameter of zero-reconstruction
+                                      s_pm: sampling parameter of partial-masking
+                                      l_gan: gan regularization coeff
+                                      }
         """
         self._random = np.random
 
         self._params_list = [
-            ("_predict_model", "predict_model", "predict_model", "generator", None, None),
             ("_factors", "factors", "factors", 10, None, None),
             ("_learning_rate", "lr", "lr", 0.001, None, None),
             ("_l_w", "l_w", "l_w", 0.1, None, None),
@@ -48,9 +53,8 @@ class IRGAN(RecMixin, BaseRecommenderModel):
             ("_l_gan", "l_gan", "l_gan", 0.001, None, None),
             ("_g_epochs", "g_epochs", "g_epochs", 5, None, None),
             ("_d_epochs", "d_epochs", "d_epochs", 1, None, None),
-            ("_g_pretrain_epochs", "g_pretrain_epochs", "g_pt_ep", 1, None, None),
-            ("_d_pretrain_epochs", "d_pretrain_epochs", "d_pt_ep", 1, None, None),
-            ("_sample_lambda", "sample_lambda", "sample_lambda", 0.2, None, None)
+            ("_s_zr", "s_zr", "s_zr", 0.001, None, None),  # sampling parameter of zero-reconstruction
+            ("_s_pm", "s_pm", "s_pm", 0.001, None, None)  # sampling parameter of partial-masking
         ]
         self.autoset_params()
 
@@ -58,31 +62,30 @@ class IRGAN(RecMixin, BaseRecommenderModel):
             self._batch_size = self._data.transactions
 
         if self._predict_model not in ["generator", "discriminator"]:
-            raise Exception(f"It is necessary to specify the model component to use as recommender (generator/discriminator)")
+            raise Exception(
+                f"It is necessary to specify the model component to use as recommender (generator/discriminator)")
 
         self._ratings = self._data.train_dict
 
-        self._sampler = pws.Sampler(self._data.i_train_dict)
+        self._sampler = pwcfgans.Sampler(self._data.i_train_dict, self._data.sp_i_train, self._s_zr, self._s_pm)
 
-        self._model = IRGAN_model(self._predict_model,
-                                  self._data,
+        self._model = CFGAN_model(self._data,
                                   self._batch_size,
-                                  self._factors,
                                   self._learning_rate,
                                   self._l_w,
                                   self._l_b,
                                   self._l_gan,
                                   self._num_users,
                                   self._num_items,
-                                  self._g_pretrain_epochs,
-                                  self._d_pretrain_epochs,
                                   self._g_epochs,
                                   self._d_epochs,
-                                  self._sample_lambda)
+                                  self._s_zr,
+                                  self._s_pm
+                                  )
 
     @property
     def name(self):
-        return "IRGAN" \
+        return "CFGAN" \
                + "_e:" + str(self._epochs) \
                + "_bs:" + str(self._batch_size) \
                + f"_{self.get_params_shortcut()}"
@@ -92,22 +95,25 @@ class IRGAN(RecMixin, BaseRecommenderModel):
             return self.restore_weights()
 
         best_metric_value = 0
+
         for it in range(self._epochs):
             dis_loss, gen_loss = 0, 0
-            with tqdm(total=1, disable=not self._verbose) as t:
-                update_dis_loss, update_gen_loss = self._model.train_step()
-                dis_loss += update_dis_loss
-                gen_loss += update_gen_loss
-                t.set_postfix(
-                    {'Dis loss': f'{dis_loss.numpy():.5f}', 'Gen loss': f'{gen_loss.numpy():.5f}'})
-                t.update()
+            steps = 0
+            with tqdm(total=int(self._data.transactions // self._batch_size), disable=not self._verbose) as t:
+                for batch in self._sampler.step(self._data.transactions, self._batch_size):
+                    steps += 1
+                    update_dis_loss, update_gen_loss = self._model.train_step(batch)
+                    dis_loss += update_dis_loss
+                    gen_loss += update_gen_loss
+                    t.set_postfix({'Dis loss': f'{dis_loss.numpy() / steps:.5f}', 'Gen loss': f'{gen_loss.numpy() / steps:.5f}'})
+                    t.update()
 
             if not (it + 1) % self._validation_rate:
                 recs = self.get_recommendations(self.evaluator.get_needed_recommendations())
                 result_dict = self.evaluator.eval(recs)
                 self._results.append(result_dict)
 
-                print(f'Epoch {(it + 1)}/{self._epochs} Dis loss: {dis_loss.numpy():.5f}, Gen loss: {gen_loss.numpy():.5f}')
+                print(f'Epoch {(it + 1)}/{self._epochs} Dis loss: {dis_loss.numpy() / steps:.5f}, Gen loss: {gen_loss.numpy() / steps:.5f}')
 
                 if self._results[-1][self._validation_k]["val_results"][self._validation_metric] > best_metric_value:
                     print("******************************************")
@@ -120,7 +126,7 @@ class IRGAN(RecMixin, BaseRecommenderModel):
     def get_recommendations(self, k: int = 100):
         predictions_top_k = {}
         for index, offset in enumerate(range(0, self._num_users, self._params.batch_size)):
-            offset_stop = min(offset + self._params.batch_size, self._num_users)
+            offset_stop = min(offset+self._params.batch_size, self._num_users)
             predictions = self._model.predict(offset, offset_stop)
             mask = self.get_train_mask(offset, offset_stop)
             v, i = self._model.get_top_k(predictions, mask, k=k)

@@ -42,7 +42,7 @@ class BPRMF_batch_model(keras.Model):
         self.Gi = tf.Variable(self.initializer(shape=[self._num_items, self._factors]), name='Gi', dtype=tf.float32)
 
         self.optimizer = tf.optimizers.Adam(self._learning_rate)
-        self.saver_ckpt = tf.train.Checkpoint(optimizer=self.optimizer, model=self)
+        #self.saver_ckpt = tf.train.Checkpoint(optimizer=self.optimizer, model=self)
 
     @tf.function
     def call(self, inputs, training=None):
