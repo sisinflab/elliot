@@ -20,6 +20,11 @@ class ItemMADrating(BaseMetric):
     .. _ItemMADrating: "Fairness-aware tensor-based recommendation."
     Zhu, Ziwei, Xia Hu, and James Caverlee.
     Proceedings of the 27th ACM International Conference on Information and Knowledge Management. 2018.
+
+    .. math::
+        \mathrm {MAD}={avg}_{i, j}({MAD}(R^{(i)}, R^{(j)}))
+
+    :math: {MAD}={avg}_{i, j}({MAD}\left(R^{(i)}, R^{(j)}))
     """
 
     def __init__(self, recommendations, config, params, eval_objects, additional_data):
