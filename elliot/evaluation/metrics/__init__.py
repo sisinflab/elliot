@@ -33,8 +33,8 @@ from elliot.evaluation.metrics.diversity.gini_index import GiniIndex
 from elliot.evaluation.metrics.diversity.shannon_entropy import ShannonEntropy
 from elliot.evaluation.metrics.diversity.SRecall import SRecall
 
-from elliot.evaluation.metrics.novelty.EFD import EFD
-from elliot.evaluation.metrics.novelty.EPC import EPC
+from elliot.evaluation.metrics.novelty.EFD import EFD, ExtendedEFD
+from elliot.evaluation.metrics.novelty.EPC import EPC, ExtendedEPC
 
 from elliot.evaluation.metrics.bias import ARP, APLT, ACLT, PopRSP, PopREO, ExtendedPopRSP, ExtendedPopREO
 
@@ -66,7 +66,9 @@ _metric_dictionary = {
     "Gini": GiniIndex,
     "SEntropy": ShannonEntropy,
     "EFD": EFD,
+    "ExtendedEFD": ExtendedEFD,
     "EPC": EPC,
+    "ExtendedEPC": ExtendedEPC,
     "MAE": MAE,
     "MSE": MSE,
     "RMSE": RMSE,

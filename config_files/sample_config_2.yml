@@ -68,6 +68,10 @@ experiment:
       metric_1: Recall
     - metric: SRecall
       feature_data: ../data/categorical_dbpedia_ml1m/map.tsv
+    - metric: ExtendedEPC
+      relevance: discounted
+    - metric: ExtendedEFD
+      relevance: discounted
   gpu: -1 # -1 is not use GPU
   models:
 #    PureSVD:
