@@ -28,7 +28,7 @@ class EFD(BaseMetric):
         """
         super().__init__(recommendations, config, params, eval_objects)
         self._cutoff = self._evaluation_objects.cutoff
-        self._relevant_items = self._evaluation_objects.relevance.get_binary_relevance()
+        self._relevance = self._evaluation_objects.relevance.binary_relevance
 
     @staticmethod
     def name():
@@ -38,7 +38,7 @@ class EFD(BaseMetric):
         """
         return "EFD"
 
-    def __user_EFD(self, user_recommendations, cutoff, user_relevant_items):
+    def __user_EFD(self, user_recommendations, user, cutoff):
         """
         Per User Expected Free Discovery
         :param user_recommendations: list of user recommendation in the form [(item1,value1),...]
@@ -50,37 +50,36 @@ class EFD(BaseMetric):
         nov = 0
         norm = 0
         for r, (i, _) in enumerate(user_recommendations[:cutoff]):
-            if i in user_relevant_items:
-                nov += EFD.__discount_k(r) * self._item_novelty_dict.get(i, self._max_nov)
-            norm += EFD.__discount_k(r)
+            nov += self._relevance.get_rel(user, i) * self._relevance.logarithmic_ranking_discount(r) * self._item_novelty_dict.get(i, self._max_nov)
+            norm += self._relevance.logarithmic_ranking_discount(r)
 
         if norm > 0:
             nov /= norm
 
         return nov
 
-    @staticmethod
-    def __discount_k(k):
-        return (1 / math.log(k + 2)) * math.log(2)
+    # @staticmethod
+    # def __discount_k(k):
+    #     return (1 / math.log(k + 2)) * math.log(2)
 
-    def eval(self):
-        """
-        Evaluation function
-        :return: the overall averaged value of Expected Free Discovery
-        """
-
-        self._item_count = {}
-        for u_h in self._evaluation_objects.data.train_dict.values():
-            for i in u_h.keys():
-                self._item_count[i] = self._item_count.get(i, 0) + 1
-
-        novelty_profile = self._item_count.values()
-        norm = sum(novelty_profile)
-        self._max_nov = -math.log(min(novelty_profile) / norm) / math.log(2)
-        self._item_novelty_dict = {i: -math.log(v / norm) / math.log(2) for i, v in self._item_count.items()}
-
-        return np.average([self.__user_EFD(u_r, self._cutoff, self._relevant_items[u])
-             for u, u_r in self._recommendations.items() if len(self._relevant_items[u])])
+    # def eval(self):
+    #     """
+    #     Evaluation function
+    #     :return: the overall averaged value of Expected Free Discovery
+    #     """
+    #
+    #     self._item_count = {}
+    #     for u_h in self._evaluation_objects.data.train_dict.values():
+    #         for i in u_h.keys():
+    #             self._item_count[i] = self._item_count.get(i, 0) + 1
+    #
+    #     novelty_profile = self._item_count.values()
+    #     norm = sum(novelty_profile)
+    #     self._max_nov = -math.log(min(novelty_profile) / norm) / math.log(2)
+    #     self._item_novelty_dict = {i: -math.log(v / norm) / math.log(2) for i, v in self._item_count.items()}
+    #
+    #     return np.average([self.__user_EFD(u_r, self._cutoff, self._relevant_items[u])
+    #          for u, u_r in self._recommendations.items() if len(self._relevant_items[u])])
 
     def eval_user_metric(self):
         """
@@ -98,6 +97,6 @@ class EFD(BaseMetric):
         self._max_nov = -math.log(min(novelty_profile) / norm) / math.log(2)
         self._item_novelty_dict = {i: -math.log(v / norm) / math.log(2) for i, v in self._item_count.items()}
 
-        return {u: self.__user_EFD(u_r, self._cutoff, self._relevant_items[u])
-                for u, u_r in self._recommendations.items() if len(self._relevant_items[u])}
+        return {u: self.__user_EFD(u_r, u, self._cutoff)
+                for u, u_r in self._recommendations.items() if len(self._relevance.get_user_rel(u))}
 

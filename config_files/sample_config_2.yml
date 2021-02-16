@@ -27,47 +27,47 @@ experiment:
     - metric: ExtendedF1
       metric_0: Precision
       metric_1: Recall
-#    - metric: ExtendedPopREO
-#      pop_ratio: 0.2
-#    - metric: ExtendedPopRSP
-#      pop_ratio: 0.2
+    - metric: ExtendedPopREO
+      pop_ratio: 0.2
+    - metric: ExtendedPopRSP
+      pop_ratio: 0.2
 #    complex_metrics:
-#    - metric: REO
-#      clustering_name: ItemPopularity
-#      clustering_file: ../data/categorical_dbpedia_ml1m/items_clustering_popularity.tsv
-#    - metric: ItemMADrating
-#      clustering_name: ItemPopularity
-#      clustering_file: ../data/categorical_dbpedia_ml1m/items_clustering_popularity.tsv
-#    - metric: ItemMADranking
-#      clustering_name: ItemPopularity
-#      clustering_file: ../data/categorical_dbpedia_ml1m/items_clustering_popularity.tsv
-#    - metric: UserMADrating
-#      clustering_name: Happiness
-#      clustering_file: ../data/categorical_dbpedia_ml1m/user_clustering_happiness.tsv
-#    - metric: UserMADranking
-#      clustering_name: Happiness
-#      clustering_file: ../data/categorical_dbpedia_ml1m/user_clustering_happiness.tsv
-#    - metric: BiasDisparityBR
-#      user_clustering_name: Happiness
-#      user_clustering_file: ../data/categorical_dbpedia_ml1m/user_clustering_happiness.tsv
-#      item_clustering_name: ItemPopularity
-#      item_clustering_file: ../data/categorical_dbpedia_ml1m/items_clustering_popularity.tsv
-#    - metric: BiasDisparityBS
-#      user_clustering_name: Happiness
-#      user_clustering_file: ../data/categorical_dbpedia_ml1m/user_clustering_happiness.tsv
-#      item_clustering_name: ItemPopularity
-#      item_clustering_file: ../data/categorical_dbpedia_ml1m/items_clustering_popularity.tsv
-#    - metric: BiasDisparityBD
-#      user_clustering_name: Happiness
-#      user_clustering_file: ../data/categorical_dbpedia_ml1m/user_clustering_happiness.tsv
-#      item_clustering_name: ItemPopularity
-#      item_clustering_file: ../data/categorical_dbpedia_ml1m/items_clustering_popularity.tsv
+    - metric: REO
+      clustering_name: ItemPopularity
+      clustering_file: ../data/categorical_dbpedia_ml1m/items_clustering_popularity.tsv
+    - metric: ItemMADrating
+      clustering_name: ItemPopularity
+      clustering_file: ../data/categorical_dbpedia_ml1m/items_clustering_popularity.tsv
+    - metric: ItemMADranking
+      clustering_name: ItemPopularity
+      clustering_file: ../data/categorical_dbpedia_ml1m/items_clustering_popularity.tsv
+    - metric: UserMADrating
+      clustering_name: Happiness
+      clustering_file: ../data/categorical_dbpedia_ml1m/user_clustering_happiness.tsv
+    - metric: UserMADranking
+      clustering_name: Happiness
+      clustering_file: ../data/categorical_dbpedia_ml1m/user_clustering_happiness.tsv
+    - metric: BiasDisparityBR
+      user_clustering_name: Happiness
+      user_clustering_file: ../data/categorical_dbpedia_ml1m/user_clustering_happiness.tsv
+      item_clustering_name: ItemPopularity
+      item_clustering_file: ../data/categorical_dbpedia_ml1m/items_clustering_popularity.tsv
+    - metric: BiasDisparityBS
+      user_clustering_name: Happiness
+      user_clustering_file: ../data/categorical_dbpedia_ml1m/user_clustering_happiness.tsv
+      item_clustering_name: ItemPopularity
+      item_clustering_file: ../data/categorical_dbpedia_ml1m/items_clustering_popularity.tsv
+    - metric: BiasDisparityBD
+      user_clustering_name: Happiness
+      user_clustering_file: ../data/categorical_dbpedia_ml1m/user_clustering_happiness.tsv
+      item_clustering_name: ItemPopularity
+      item_clustering_file: ../data/categorical_dbpedia_ml1m/items_clustering_popularity.tsv
     - metric: DSC
       beta: 1
       metric_0: Precision
       metric_1: Recall
-#    - metric: SRecall
-#      feature_data: ../data/categorical_dbpedia_ml1m/map.tsv
+    - metric: SRecall
+      feature_data: ../data/categorical_dbpedia_ml1m/map.tsv
   gpu: -1 # -1 is not use GPU
   models:
 #    PureSVD:
@@ -109,7 +109,7 @@ experiment:
         hyper_max_evals: 1
         hyper_opt_alg: tpe
         validation_rate: 10
-        verbose: True
+        verbose: False
         save_weights: True
         save_recs: False
 #        restore: True

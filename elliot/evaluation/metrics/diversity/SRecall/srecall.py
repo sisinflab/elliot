@@ -27,7 +27,7 @@ class SRecall(BaseMetric):
         """
         super().__init__(recommendations, config, params, eval_objects, additional_data)
         self._cutoff = self._evaluation_objects.cutoff
-        self._relevant_items = self._evaluation_objects.relevance.get_binary_relevance()
+        self._relevance = self._evaluation_objects.relevance.binary_relevance
         self._feature_map = SRecall._load_attribute_file(additional_data["feature_data"])
         self._total_features = len({topic for item in eval_objects.data.items for topic in self._feature_map.get(item, [])})
 
@@ -66,8 +66,8 @@ class SRecall(BaseMetric):
         Evaluation function
         :return: the overall averaged value of SRecall
         """
-        return {u: SRecall.__user_srecall(u_r, self._cutoff, self._relevant_items[u], self._feature_map, self._total_features)
-             for u, u_r in self._recommendations.items() if len(self._relevant_items[u])}
+        return {u: SRecall.__user_srecall(u_r, self._cutoff, self._relevance.get_user_rel(u), self._feature_map, self._total_features)
+             for u, u_r in self._recommendations.items() if len(self._relevance.get_user_rel(u))}
 
     @staticmethod
     def _load_attribute_file(attribute_file, separator='\t'):

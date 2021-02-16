@@ -27,7 +27,7 @@ class F1(BaseMetric):
         """
         super().__init__(recommendations, config, params, eval_objects)
         self._cutoff = self._evaluation_objects.cutoff
-        self._relevant_items = self._evaluation_objects.relevance.get_binary_relevance()
+        self._relevance = self._evaluation_objects.relevance.binary_relevance
         self._beta = 1 # F-score is the Sørensen-Dice (DSC) coefficient with beta equal to 1
         self._squared_beta = self._beta**2
 
@@ -69,6 +69,6 @@ class F1(BaseMetric):
         Evaluation function
         :return: the overall averaged value of F-score
         """
-        return {u: F1.__user_f1(u_r, self._cutoff, self._relevant_items[u], self._squared_beta)
-             for u, u_r in self._recommendations.items() if len(self._relevant_items[u])}
+        return {u: F1.__user_f1(u_r, self._cutoff, self._relevance.get_user_rel(u), self._squared_beta)
+             for u, u_r in self._recommendations.items() if len(self._relevance.get_user_rel(u))}
 

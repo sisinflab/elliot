@@ -28,7 +28,7 @@ class AUC(BaseMetric):
         """
         super().__init__(recommendations, config, params, eval_objects)
         self._cutoff = self._evaluation_objects.cutoff
-        self._relevant_items = self._evaluation_objects.relevance.get_binary_relevance()
+        self._relevance = self._evaluation_objects.relevance.binary_relevance
         self._num_items = self._evaluation_objects.num_items
 
     @staticmethod
@@ -58,8 +58,8 @@ class AUC(BaseMetric):
         Evaluation function
         :return: the overall value of AUC
         """
-        list_of_lists = [AUC.__user_auc(u_r, self._relevant_items[u], self._num_items, len(self._evaluation_objects.data.train_dict[u]))
-             for u, u_r in self._recommendations.items() if len(self._relevant_items[u])]
+        list_of_lists = [AUC.__user_auc(u_r, self._relevance.get_user_rel(u), self._num_items, len(self._evaluation_objects.data.train_dict[u]))
+             for u, u_r in self._recommendations.items() if len(self._relevance.get_user_rel(u))]
         return np.average([item for sublist in list_of_lists for item in sublist])
 
     @staticmethod

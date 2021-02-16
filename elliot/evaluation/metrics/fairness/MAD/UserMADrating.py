@@ -30,7 +30,7 @@ class UserMADrating(BaseMetric):
         """
         super().__init__(recommendations, config, params, eval_objects, additional_data)
         self._cutoff = self._evaluation_objects.cutoff
-        self._relevant_items = self._evaluation_objects.relevance.get_binary_relevance()
+        self._relevance = self._evaluation_objects.relevance.binary_relevance
 
         self._user_clustering_path = self._additional_data.get("clustering_file", False)
         self._user_clustering_name = self._additional_data.get("clustering_name", "")
@@ -70,8 +70,8 @@ class UserMADrating(BaseMetric):
         :return: the overall averaged value of User MAD rating
         """
         for u, u_r in self._recommendations.items():
-            if len(self._relevant_items[u]):
-                v = UserMADrating.__user_mad(u_r, self._cutoff, self._relevant_items[u])
+            if len(self._relevance.get_user_rel(u)):
+                v = UserMADrating.__user_mad(u_r, self._cutoff, self._relevance.get_user_rel(u))
                 cluster = self._user_clustering.get(u, None)
                 if cluster is not None:
                     self._sum[cluster] += v

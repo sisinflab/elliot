@@ -28,7 +28,7 @@ class LAUC(BaseMetric):
         super().__init__(recommendations, config, params, eval_objects)
         self.logger = logging.get_logger("Evaluator")
         self._cutoff = self._evaluation_objects.cutoff
-        self._relevant_items = self._evaluation_objects.relevance.get_binary_relevance()
+        self._relevance = self._evaluation_objects.relevance.binary_relevance
         self._num_items = self._evaluation_objects.num_items
 
     @staticmethod
@@ -68,6 +68,6 @@ class LAUC(BaseMetric):
         Evaluation function
         :return: the overall averaged value of LAUC per user
         """
-        return {u: LAUC.__user_auc_at_k(u_r, self._cutoff, self._relevant_items[u], self._num_items, len(self._evaluation_objects.data.train_dict[u]))
-             for u, u_r in self._recommendations.items() if len(self._relevant_items[u])}
+        return {u: LAUC.__user_auc_at_k(u_r, self._cutoff, self._relevance.get_user_rel(u), self._num_items, len(self._evaluation_objects.data.train_dict[u]))
+             for u, u_r in self._recommendations.items() if len(self._relevance.get_user_rel(u))}
 

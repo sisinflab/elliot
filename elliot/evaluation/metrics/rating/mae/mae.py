@@ -26,8 +26,8 @@ class MAE(BaseMetric):
         :param eval_objects: list of objects that may be useful for the computation of the different metrics
         """
         super().__init__(recommendations, config, params, eval_objects)
-        self._relevant_items = self._evaluation_objects.relevance.get_binary_relevance()
-        self._total_relevant_items = sum([len(self._relevant_items[u]) for u, _ in self._recommendations.items()])
+        self._relevance = self._evaluation_objects.relevance.binary_relevance
+        self._total_relevant_items = sum([len(self._relevance.get_user_rel(u)) for u, _ in self._recommendations.items()])
         self._test = self._evaluation_objects.relevance.get_test()
 
     @staticmethod
@@ -55,8 +55,8 @@ class MAE(BaseMetric):
         :return: the overall averaged value of Mean Absolute Error
         """
         return sum(
-            [MAE.__user_MAE(u_r, self._test[u], self._relevant_items[u])
-             for u, u_r in self._recommendations.items() if len(self._relevant_items[u])]
+            [MAE.__user_MAE(u_r, self._test[u], self._relevance.get_user_rel(u))
+             for u, u_r in self._recommendations.items() if len(self._relevance.get_user_rel(u))]
         ) / self._total_relevant_items
 
     def eval_user_metric(self):
@@ -64,8 +64,8 @@ class MAE(BaseMetric):
         Evaluation function
         :return: the overall averaged value of Mean Absolute Error per user
         """
-        return {u: MAE.__user_MAE(u_r, self._test[u], self._relevant_items[u])/len(self._relevant_items[u])
-             for u, u_r in self._recommendations.items() if len(self._relevant_items[u])}
+        return {u: MAE.__user_MAE(u_r, self._test[u], self._relevance.get_user_rel(u))/len(self._relevance.get_user_rel(u))
+             for u, u_r in self._recommendations.items() if len(self._relevance.get_user_rel(u))}
 
     @staticmethod
     def needs_full_recommendations():

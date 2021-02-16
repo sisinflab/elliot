@@ -10,7 +10,6 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, alejandro.bell
 import typing as t
 
 from elliot.evaluation.metrics.base_metric import BaseMetric
-from elliot.evaluation.relevance import Relevance
 
 
 class NDCG(BaseMetric):
@@ -29,8 +28,8 @@ class NDCG(BaseMetric):
         """
         super().__init__(recommendations, config, params, eval_objects)
         self._cutoff = self._evaluation_objects.cutoff
-        self._relevance_map = self._evaluation_objects.relevance.get_discounted_relevance()
-        self.rel_threshold = self._evaluation_objects.relevance._rel_threshold
+        self._relevance = self._evaluation_objects.relevance.discounted_relevance
+        self._rel_threshold = self._evaluation_objects.relevance._rel_threshold
 
     @staticmethod
     def name():
@@ -40,30 +39,19 @@ class NDCG(BaseMetric):
         """
         return "nDCG"
 
-    @staticmethod
-    def compute_discount(k: int) -> float:
-        """
-        Method to compute logarithmic discount
-        :param k:
-        :return:
-        """
-        return Relevance.logarithmic_ranking_discount(k)
-
-    @staticmethod
-    def compute_idcg(gain_map: t.Dict, cutoff: int) -> float:
+    def compute_idcg(self, user, cutoff: int) -> float:
         """
         Method to compute Ideal Discounted Cumulative Gain
         :param gain_map:
         :param cutoff:
         :return:
         """
-        gains: t.List = sorted(list(gain_map.values()))
+        gains: t.List = sorted(list(self._relevance.get_user_rel_gains(user).values()))
         n: int = min(len(gains), cutoff)
         m: int = len(gains)
-        return sum(map(lambda g, r: gains[m - r - 1] * NDCG.compute_discount(r), gains, range(n)))
+        return sum(map(lambda g, r: gains[m - r - 1] * self._relevance.logarithmic_ranking_discount(r), gains, range(n)))
 
-    @staticmethod
-    def compute_user_ndcg(user_recommendations: t.List, user_gain_map: t.Dict, cutoff: int) -> float:
+    def compute_user_ndcg(self, user_recommendations: t.List, user, cutoff: int) -> float:
         """
         Method to compute normalized Discounted Cumulative Gain
         :param sorted_item_predictions:
@@ -71,14 +59,13 @@ class NDCG(BaseMetric):
         :param cutoff:
         :return:
         """
-        idcg: float = NDCG.compute_idcg(user_gain_map, cutoff)
+        idcg: float = self.compute_idcg(user, cutoff)
         dcg: float = sum(
-            [user_gain_map.get(x, 0) * NDCG.compute_discount(r)
+            [self._relevance.get_rel(user, x) * self._relevance.logarithmic_ranking_discount(r)
              for r, x in enumerate([item for item, _ in user_recommendations]) if r < cutoff])
         return dcg / idcg if dcg > 0 else 0
 
-    @staticmethod
-    def __user_ndcg(user_recommendations: t.List, user_gain_map: t.Dict, cutoff: int):
+    def __user_ndcg(self, user_recommendations: t.List, user, cutoff: int):
         """
         Per User normalized Discounted Cumulative Gain
         :param user_recommendations: list of user recommendation in the form [(item1,value1),...]
@@ -87,7 +74,7 @@ class NDCG(BaseMetric):
         :return: the value of the nDCG metric for the specific user
         """
 
-        ndcg: float = NDCG.compute_user_ndcg(user_recommendations[:cutoff], user_gain_map, cutoff)
+        ndcg: float = self.compute_user_ndcg(user_recommendations[:cutoff], user, cutoff)
 
         return ndcg
 
@@ -108,8 +95,8 @@ class NDCG(BaseMetric):
         :return: the overall averaged value of normalized Discounted Cumulative Gain per user
         """
 
-        return {u: NDCG.__user_ndcg(u_r, self._relevance_map[u], self._cutoff)
-             for u, u_r in self._recommendations.items() if len(self._relevance_map[u])}
+        return {u: self.__user_ndcg(u_r, u, self._cutoff)
+             for u, u_r in self._recommendations.items() if len(self._relevance.get_user_rel(u))}
 
 
 

@@ -32,7 +32,7 @@ class ItemMADranking(BaseMetric):
         """
         super().__init__(recommendations, config, params, eval_objects, additional_data)
         self._cutoff = self._evaluation_objects.cutoff
-        self._relevance_map = self._evaluation_objects.relevance.get_discounted_relevance()
+        self._relevance = self._evaluation_objects.relevance.discounted_relevance
 
         self._item_clustering_path = self._additional_data.get("clustering_file", False)
         self._item_clustering_name = self._additional_data.get("clustering_name", "")
@@ -57,7 +57,7 @@ class ItemMADranking(BaseMetric):
         """
         return f"ItemMADranking_{self._item_clustering_name}"
 
-    def __item_mad(self, user_recommendations, cutoff, user_gain_map):
+    def __item_mad(self, user_recommendations, user, cutoff):
         """
         Per User Item MAD ranking
         :param user_recommendations: list of user recommendation in the form [(item1,value1),...]
@@ -67,7 +67,7 @@ class ItemMADranking(BaseMetric):
         """
         for i, r in user_recommendations[:cutoff]:
             self._item_count[i] = self._item_count.get(i, 0) + 1
-            self._item_gain[i] = self._item_gain.get(i, 0) + user_gain_map.get(i, 0)
+            self._item_gain[i] = self._item_gain.get(i, 0) + self._relevance.get_rel(user, i)
 
     def eval(self):
         """
@@ -76,8 +76,8 @@ class ItemMADranking(BaseMetric):
         """
 
         for u, u_r in self._recommendations.items():
-            if len(self._relevance_map[u]):
-                self.__item_mad(u_r, self._cutoff, self._relevance_map[u])
+            if len(self._relevance.get_user_rel(u)):
+                self.__item_mad(u_r, u, self._cutoff)
 
         for item, gain in self._item_gain.items():
             v = gain/self._item_count[item]

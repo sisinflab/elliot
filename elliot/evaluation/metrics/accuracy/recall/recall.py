@@ -27,7 +27,7 @@ class Recall(BaseMetric):
         """
         super().__init__(recommendations, config, params, eval_objects)
         self._cutoff = self._evaluation_objects.cutoff
-        self._relevant_items = self._evaluation_objects.relevance.get_binary_relevance()
+        self._relevance = self._evaluation_objects.relevance.binary_relevance
 
     @staticmethod
     def name():
@@ -37,8 +37,7 @@ class Recall(BaseMetric):
         """
         return "Recall"
 
-    @staticmethod
-    def __user_recall(user_recommendations, cutoff, user_relevant_items):
+    def __user_recall(self, user_recommendations, user, cutoff):
         """
         Per User Recall
         :param user_recommendations: list of user recommendation in the form [(item1,value1),...]
@@ -46,7 +45,7 @@ class Recall(BaseMetric):
         :param user_relevant_items: list of user relevant items in the form [item1,...]
         :return: the value of the Recall metric for the specific user
         """
-        return sum([1 for i in user_recommendations[:cutoff] if i[0] in user_relevant_items]) / len(user_relevant_items)
+        return sum([self._relevance.get_rel(user, i) for i, _ in user_recommendations[:cutoff]]) / len(self._relevance.get_user_rel(user))
 
     # def eval(self):
     #     """
@@ -63,5 +62,5 @@ class Recall(BaseMetric):
         Evaluation Function
         :return: the overall averaged value of Recall per user
         """
-        return {u: Recall.__user_recall(u_r, self._cutoff, self._relevant_items[u])
-             for u, u_r in self._recommendations.items() if len(self._relevant_items[u])}
+        return {u: self.__user_recall(u_r, u, self._cutoff)
+             for u, u_r in self._recommendations.items() if len(self._relevance.get_user_rel(u))}

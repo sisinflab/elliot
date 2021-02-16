@@ -29,8 +29,7 @@ class ExtendedF1(BaseMetric):
         :param eval_objects: list of objects that may be useful for the computation of the different metrics
         """
         super().__init__(recommendations, config, params, eval_objects, additional_data)
-        self._cutoff = self._evaluation_objects.cutoff
-        self._relevant_items = self._evaluation_objects.relevance.get_binary_relevance()
+
         self._beta = 1 # F-score is the Sørensen-Dice (DSC) coefficient with beta equal to 1
         self._squared_beta = self._beta**2
 

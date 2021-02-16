@@ -34,7 +34,7 @@ class REO(BaseMetric):
         """
         super().__init__(recommendations, config, params, eval_objects, additional_data)
         self._cutoff = self._evaluation_objects.cutoff
-        self._relevant_items = self._evaluation_objects.relevance.get_binary_relevance()
+        self._relevance = self._evaluation_objects.relevance.binary_relevance
 
         self._train = self._evaluation_objects.data.train_dict
 
@@ -86,8 +86,8 @@ class REO(BaseMetric):
         """
 
         for u, u_r in self._recommendations.items():
-            if len(self._relevant_items[u]):
-                self.__user_pop_reo(u_r, set(self._train[u].keys()), self._cutoff, set(self._relevant_items[u]))
+            if len(self._relevance.get_user_rel(u)):
+                self.__user_pop_reo(u_r, set(self._train[u].keys()), self._cutoff, set(self._relevance.get_user_rel(u)))
 
         PR = self._num / self._den
 

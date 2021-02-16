@@ -35,8 +35,8 @@ class UserMADranking(BaseMetric):
         """
         super().__init__(recommendations, config, params, eval_objects, additional_data)
         self._cutoff = self._evaluation_objects.cutoff
-        self._relevance_map = self._evaluation_objects.relevance.get_discounted_relevance()
-        self.rel_threshold = self._evaluation_objects.relevance._rel_threshold
+        self._relevance = self._evaluation_objects.relevance.discounted_relevance
+        # self.rel_threshold = self._evaluation_objects.relevance._rel_threshold
 
         self._user_clustering_path = self._additional_data.get("clustering_file", False)
         self._user_clustering_name = self._additional_data.get("clustering_name", "")
@@ -58,8 +58,7 @@ class UserMADranking(BaseMetric):
         """
         return f"UserMADranking_{self._user_clustering_name}"
 
-    @staticmethod
-    def __user_mad(user_recommendations, relevance_map, cutoff):
+    def __user_mad(self, user_recommendations, user, cutoff):
         """
         Per User User MAD ranking
         :param user_recommendations: list of user recommendation in the form [(item1,value1),...]
@@ -67,32 +66,30 @@ class UserMADranking(BaseMetric):
         :param user_relevant_items: list of user relevant items in the form [item1,...]
         :return: the value of the Precision metric for the specific user
         """
-        return UserMADranking.compute_user_ndcg(user_recommendations, relevance_map, cutoff)
+        return self.compute_user_ndcg(user_recommendations, user, cutoff)
 
-    @staticmethod
-    def compute_discount(k: int) -> float:
-        """
-        Method to compute logarithmic discount
-        :param k:
-        :return:
-        """
-        return 1 / math.log(k + 2) * math.log(2)
+    # @staticmethod
+    # def compute_discount(k: int) -> float:
+    #     """
+    #     Method to compute logarithmic discount
+    #     :param k:
+    #     :return:
+    #     """
+    #     return 1 / math.log(k + 2) * math.log(2)
 
-    @staticmethod
-    def compute_idcg(gain_map: t.Dict, cutoff: int) -> float:
+    def compute_idcg(self, user: int, cutoff: int) -> float:
         """
         Method to compute Ideal Discounted Cumulative Gain
         :param gain_map:
         :param cutoff:
         :return:
         """
-        gains: t.List = sorted(list(gain_map.values()))
+        gains: t.List = sorted(list(self._relevance.get_user_rel_gains(user).values()))
         n: int = min(len(gains), cutoff)
         m: int = len(gains)
-        return sum(map(lambda g, r: gains[m - r - 1] * UserMADranking.compute_discount(r), gains, range(n)))
+        return sum(map(lambda g, r: gains[m - r - 1] * self._relevance.logarithmic_ranking_discount(r), gains, range(n)))
 
-    @staticmethod
-    def compute_user_ndcg(user_recommendations: t.List, user_gain_map: t.Dict, cutoff: int) -> float:
+    def compute_user_ndcg(self, user_recommendations: t.List, user: int, cutoff: int) -> float:
         """
         Method to compute normalized Discounted Cumulative Gain
         :param sorted_item_predictions:
@@ -100,9 +97,9 @@ class UserMADranking(BaseMetric):
         :param cutoff:
         :return:
         """
-        idcg: float = UserMADranking.compute_idcg(user_gain_map, cutoff)
+        idcg: float = self.compute_idcg(user, cutoff)
         dcg: float = sum(
-            [user_gain_map.get(x, 0) * UserMADranking.compute_discount(r)
+            [self._relevance.get_rel(user, x) * self._relevance.logarithmic_ranking_discount(r)
              for r, x in enumerate([item for item, _ in user_recommendations]) if r < cutoff])
         return dcg / idcg if dcg > 0 else 0
 
@@ -112,8 +109,8 @@ class UserMADranking(BaseMetric):
         :return: the overall averaged value of User MAD ranking
         """
         for u, u_r in self._recommendations.items():
-            if len(self._relevance_map[u]):
-                v = UserMADranking.__user_mad(u_r, self._relevance_map[u], self._cutoff)
+            if len(self._relevance.get_user_rel(u)):
+                v = self.__user_mad(u_r, u, self._cutoff)
                 cluster = self._user_clustering.get(u, None)
                 if cluster is not None:
                     self._sum[cluster] += v

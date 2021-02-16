@@ -27,7 +27,7 @@ class MRR(BaseMetric):
         """
         super().__init__(recommendations, config, params, eval_objects)
         self._cutoff = self._evaluation_objects.cutoff
-        self._relevant_items = self._evaluation_objects.relevance.get_binary_relevance()
+        self._relevance = self._evaluation_objects.relevance.binary_relevance
 
     @staticmethod
     def name():
@@ -70,6 +70,6 @@ class MRR(BaseMetric):
         Evaluation function
         :return: the overall averaged value of Mean Reciprocal Rank per user
         """
-        return {u: MRR.__user_mrr(u_r, self._cutoff, self._relevant_items[u])
-             for u, u_r in self._recommendations.items() if len(self._relevant_items[u])}
+        return {u: MRR.__user_mrr(u_r, self._cutoff, self._relevance.get_user_rel(u))
+             for u, u_r in self._recommendations.items() if len(self._relevance.get_user_rel(u))}
 

@@ -31,7 +31,7 @@ class ExtendedPopREO(BaseMetric):
         """
         super().__init__(recommendations, config, params, eval_objects, additional_data)
         self._cutoff = self._evaluation_objects.cutoff
-        self._relevant_items = self._evaluation_objects.relevance.get_binary_relevance()
+        self._relevance = self._evaluation_objects.relevance.binary_relevance
 
         self._pop_ratio = self._additional_data.get("pop_ratio", 0.8)
         self._pop_obj = self._evaluation_objects.pop.get_custom_pop_obj(self._pop_ratio)
@@ -71,8 +71,8 @@ class ExtendedPopREO(BaseMetric):
         :return: the overall averaged value of PopREO
         """
         for u, u_r in self._recommendations.items():
-            if len(self._relevant_items[u]):
-                num_h, num_t, den_h, den_t = self.__user_pop_reo(u_r, self._cutoff, self._long_tail, self._short_head, set(self._train[u].keys()), set(self._relevant_items[u]))
+            if len(self._relevance.get_user_rel(u)):
+                num_h, num_t, den_h, den_t = self.__user_pop_reo(u_r, self._cutoff, self._long_tail, self._short_head, set(self._train[u].keys()), set(self._relevance.get_user_rel(u)))
                 self._num.append([num_h, num_t])
                 self._den.append([den_h, den_t])
         self._num = np.sum(np.array(self._num), axis=0)

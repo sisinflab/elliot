@@ -29,7 +29,7 @@ class GAUC(BaseMetric):
         """
         super().__init__(recommendations, config, params, eval_objects)
         self._cutoff = self._evaluation_objects.cutoff
-        self._relevant_items = self._evaluation_objects.relevance.get_binary_relevance()
+        self._relevance = self._evaluation_objects.relevance.binary_relevance
         self._num_items = self._evaluation_objects.num_items
 
     @staticmethod
@@ -60,8 +60,8 @@ class GAUC(BaseMetric):
         """
 
         return np.average(
-            [GAUC.__user_gauc(u_r, self._relevant_items[u], self._num_items, len(self._evaluation_objects.data.train_dict[u]))
-             for u, u_r in self._recommendations.items() if len(self._relevant_items[u])]
+            [GAUC.__user_gauc(u_r, self._relevance.get_user_rel(u), self._num_items, len(self._evaluation_objects.data.train_dict[u]))
+             for u, u_r in self._recommendations.items() if len(self._relevance.get_user_rel(u))]
         )
 
     def eval_user_metric(self):
@@ -69,8 +69,8 @@ class GAUC(BaseMetric):
         Evaluation function
         :return: the overall averaged value of AUC per user
         """
-        return {u: GAUC.__user_gauc(u_r, self._relevant_items[u], self._num_items, len(self._evaluation_objects.data.train_dict[u]))
-             for u, u_r in self._recommendations.items() if len(self._relevant_items[u])}
+        return {u: GAUC.__user_gauc(u_r, self._relevance.get_user_rel(u), self._num_items, len(self._evaluation_objects.data.train_dict[u]))
+             for u, u_r in self._recommendations.items() if len(self._relevance.get_user_rel(u))}
 
 
     @staticmethod
