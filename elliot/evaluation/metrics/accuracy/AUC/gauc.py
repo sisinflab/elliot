@@ -14,9 +14,26 @@ from elliot.utils import logging
 
 
 class GAUC(BaseMetric):
-    """
+    r"""
     This class represents the implementation of the GroupAUC recommendation metric.
     Passing 'GAUC' to the metrics list will enable the computation of the metric.
+
+    .. _GAUC: "Deep Interest Network for Click-Through Rate Prediction" KDD '18 by Zhou, et al.
+
+    Note:
+        It calculates the AUC score of each user, and finally obtains GAUC by weighting the user AUC.
+        It is also not limited to k. Due to our padding for `scores_tensor` in `RankEvaluator` with
+        `-np.inf`, the padding value will influence the ranks of origin items. Therefore, we use
+        descending sort here and make an identity transformation  to the formula of `AUC`, which is
+        shown in `auc_` function. For readability, we didn't do simplification in the code.
+
+    .. math::
+        \mathrm {GAUC} = \frac {{{M} \times {(M+N+1)} - \frac{M \times (M+1)}{2}} -
+        \sum\limits_{i=1}^M rank_{i}} {{M} \times {N}}
+    :math:`M` is the number of positive samples.
+    :math:`N` is the number of negative samples.
+    :math:`rank_i` is the descending rank of the ith positive sample.
+
     """
 
     def __init__(self, recommendations, config, params, eval_objects):

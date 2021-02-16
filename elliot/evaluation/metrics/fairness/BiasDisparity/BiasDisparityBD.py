@@ -17,15 +17,20 @@ from . import BiasDisparityBR, BiasDisparityBS
 from elliot.evaluation.metrics.base_metric import BaseMetric
 from elliot.evaluation.metrics.metrics_utils import ProxyMetric
 
+
 class BiasDisparityBD(BaseMetric):
-    """
+    r"""
     This class represents the implementation of the Bias Disparity recommendation metric.
     Passing 'BiasDisparityBD' to the metrics list will enable the computation of the metric.
 
-    Tsintzou, Virginia, Evaggelia Pitoura, and Panayiotis Tsaparas. "Bias disparity in recommendation systems.
+
+    .. _BiasDisparityBD: "Bias disparity in recommendation systems."
+    Tsintzou, Virginia, Evaggelia Pitoura, and Panayiotis Tsaparas.
     Proceedings of the Workshop on Recommendation in Multi-stakeholder
-               Environments co-located with the 13th {ACM} Conference on Recommender
-               Systems (RecSys 2019)
+    Environments co-located with the 13th {ACM} Conference on Recommender Systems (RecSys 2019)
+
+    .. math::
+        \mathrm {BD(G, C)}=\frac{B_{R}(G, C)-B_{S}(G, C)}{B_{S}(G, C)}
     """
 
     def __init__(self, recommendations, config, params, eval_objects, additional_data):

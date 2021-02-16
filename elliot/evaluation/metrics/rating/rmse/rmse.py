@@ -14,9 +14,17 @@ from elliot.utils import logging
 
 
 class RMSE(BaseMetric):
-    """
+    r"""
     This class represents the implementation of the Root Mean Squared Error recommendation metric.
     Passing 'RMSE' to the metrics list will enable the computation of the metric.
+
+    .. _RMSE: https://en.wikipedia.org/wiki/Root-mean-square_deviation
+
+    .. math::
+        \mathrm{RMSE} = \sqrt{\frac{1}{|{T}|} \sum_{(u, i) \in {T}}(\hat{r}_{u i}-r_{u i})^{2}}
+    :math:`T` is the test set, :math:`\hat{r}_{u i}` is the score predicted by the model,
+    and :math:`r_{u i}` the actual score of the test set.
+
     """
 
     def __init__(self, recommendations, config, params, eval_objects):

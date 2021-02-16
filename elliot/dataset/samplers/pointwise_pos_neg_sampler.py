@@ -36,15 +36,15 @@ class Sampler:
             lui = lui_dict[u]
             if lui == n_items:
                 sample()
-            j = random.getrandbits(1)
-            if j:
+            b = random.getrandbits(1)
+            if b:
                 i = ui[r_int(lui)]
             else:
                 i = r_int(n_items)
                 while i in ui:
                     i = r_int(n_items)
-            return u, i, j
+            return u, i, b
 
         for batch_start in range(0, events, batch_size):
-            bui, bii, bij = map(np.array, zip(*[sample() for _ in range(batch_start, min(batch_start + batch_size, events))]))
-            yield bui, bii, bij
+            u, i, b = map(np.array, zip(*[sample() for _ in range(batch_start, min(batch_start + batch_size, events))]))
+            yield u, i, b

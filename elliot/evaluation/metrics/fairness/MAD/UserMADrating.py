@@ -17,7 +17,9 @@ class UserMADrating(BaseMetric):
     This class represents the implementation of the User MAD rating recommendation metric.
     Passing 'UserMADrating' to the metrics list will enable the computation of the metric.
 
-    Zhu, Ziwei, Xia Hu, and James Caverlee. "Fairness-aware tensor-based recommendation." Proceedings of the 27th ACM International Conference on Information and Knowledge Management. 2018.
+    .. _UserMADrating: "Fairness-aware tensor-based recommendation."
+    Zhu, Ziwei, Xia Hu, and James Caverlee.
+    Proceedings of the 27th ACM International Conference on Information and Knowledge Management. 2018.
     """
 
     def __init__(self, recommendations, config, params, eval_objects, additional_data):

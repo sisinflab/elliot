@@ -7,14 +7,20 @@ __version__ = '0.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
-import numpy as np
 from elliot.evaluation.metrics.base_metric import BaseMetric
 
 
 class SRecall(BaseMetric):
-    """
+    r"""
     This class represents the implementation of the SRecall recommendation metric.
     Passing 'SRecall' to the metrics list will enable the computation of the metric.
+
+    .. _SRecall: "Beyond Independent relevance: methods and evaluation metrics for subtopic retrieval"
+    C. X. Zhai, W. W. Cohen, and J. Lafferty, 2003
+
+    .. math::
+        \mathrm {SRecall}=\frac{\left|\cup_{i=1}^{K} {subtopics}\left(d_{i}\right)\right|}{n_{A}}
+
     """
 
     def __init__(self, recommendations, config, params, eval_objects, additional_data):

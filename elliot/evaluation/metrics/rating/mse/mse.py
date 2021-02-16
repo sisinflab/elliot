@@ -15,6 +15,14 @@ class MSE(BaseMetric):
     """
     This class represents the implementation of the Mean Squared Error recommendation metric.
     Passing 'MSE' to the metrics list will enable the computation of the metric.
+
+     .. _MSE: https://en.wikipedia.org/wiki/Mean_squared_error
+
+    .. math::
+        \mathrm{MSE} = \frac{1}{|{T}|} \sum_{(u, i) \in {T}}(\hat{r}_{u i}-r_{u i})^{2}
+
+    :math:`T` is the test set, :math:`\hat{r}_{u i}` is the score predicted by the model,
+    and :math:`r_{u i}` the actual score of the test set.
     """
 
     def __init__(self, recommendations, config, params, eval_objects):

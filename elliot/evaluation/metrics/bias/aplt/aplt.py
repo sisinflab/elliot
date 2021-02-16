@@ -14,13 +14,21 @@ from elliot.evaluation.metrics.base_metric import BaseMetric
 
 
 class APLT(BaseMetric):
-    """
+    r"""
     This class represents the implementation of the Average percentage of long tail items recommendation metric.
     Passing 'APLT' to the metrics list will enable the computation of the metric.
 
-    Abdollahpouri, H.; Burke, R.; and Mobasher, B. 2017.
-    Controlling popularity bias in learning-to-rank recommendation.
-    In Proceedings of the Eleventh ACM Conference on Recommender Systems
+
+    .. _APLT:  Controlling popularity bias in learning-to-rank recommendation
+    Abdollahpouri, H.; Burke, R.; and Mobasher
+    Proceedings of the Eleventh ACM Conference on Recommender Systems, 2017
+
+    .. math::
+        \mathrm {ACLT}=\frac{1}{\left|U_{t}\right|} \sum_{u \in U_{t}} \frac{|\{i, i \in(L(u) \cap \sim \Phi)\}|}{|L(u)|}
+    :math:`U_{t}` is the number of users in the test set.
+    :math:`L_{u}` is the recommended list of items for user u.
+    :math:`\sim \Phi`   medium-tail items.
+
     """
 
     def __init__(self, recommendations, config, params, eval_objects):

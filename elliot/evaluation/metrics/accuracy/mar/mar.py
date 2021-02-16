@@ -12,9 +12,17 @@ from elliot.evaluation.metrics.base_metric import BaseMetric
 
 
 class MAR(BaseMetric):
-    """
+    r"""
     This class represents the implementation of the Mean Average Recall recommendation metric.
     Passing 'MAR' to the metrics list will enable the computation of the metric.
+
+    .. _MAP: http://sdsawtelle.github.io/blog/output/mean-average-precision-MAP-for-recommender-systems.html#So-Why-Did-I-Bother-Defining-Recall?
+
+    .. math::
+        \begin{align*}
+        \mathrm{Recall@N} &= \frac{1}{\mathrm{min}(m,|rel(k)|)}\sum_{k=1}^N P(k) \cdot rel(k) \\
+        \mathrm{MAR@N}& = \frac{1}{|U|}\sum_{u=1}^{|U|}(\mathrm{Recall@N})_u
+        \end{align*}
     """
 
     def __init__(self, recommendations, config, params, eval_objects):

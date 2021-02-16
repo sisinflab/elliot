@@ -14,11 +14,28 @@ from elliot.evaluation.metrics.base_metric import BaseMetric
 
 
 class PopRSP(BaseMetric):
-    """
+    r"""
     This class represents the implementation of the Popularity-based Ranking-based Statistical Parity (RSP) recommendation metric.
     Passing 'PopRSP' to the metrics list will enable the computation of the metric.
 
-    Zhu, Ziwei, Jianling Wang, and James Caverlee. "Measuring and Mitigating Item Under-Recommendation Bias in Personalized Ranking Systems." Proceedings of the 43rd International ACM SIGIR Conference on Research and Development in Information Retrieval. 2020.
+
+     .. _PopRSP:   "Measuring and Mitigating Item Under-Recommendation Bias in Personalized Ranking Systems."
+    Zhu, Ziwei, Jianling Wang, and James Caverlee.
+    Proceedings of the 43rd International ACM SIGIR
+    Conference on Research and Development in Information Retrieval. 2020.
+
+     .. math::
+        \mathrm {RSP}=\frac{{std}\left(P\left(R @ k \mid g=g_{1}\right), \ldots, P\left(R @ k \mid g=g_{A}\right)\right)}
+        {{mean}\left(P\left(R @ k \mid g=g_{1}\right), \ldots, P\left(R @ k \mid g=g_{A}\right)\right)}
+
+    :math:`P\left(R @ k \mid g=g_{a}\right)}` is `\frac{\sum_{u=1}^{N} \sum_{i=1}^{k} G_{g_{a}}\left(R_{u, i}\right)}
+    {\sum_{u=1}^{N} \sum_{i \in I \backslash I_{u}^{+}} G_{g_{a}}(i)}`
+
+    :math:`\sum_{i=1}^{k} G_{g_{a}}\left(R_{u, i}\right)` calculates how many un-interacted items
+    from group `{g_a}` are ranked in top-𝑘 for user u.
+
+    :math:`\sum_{i \in I \backslash I_{u}^{+}} G_{g_{a}}(i)`
+    calculates how many un-interacted items belong to group `{g_a}` for u
     """
 
     def __init__(self, recommendations, config, params, eval_objects):

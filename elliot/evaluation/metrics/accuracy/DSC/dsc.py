@@ -13,9 +13,16 @@ from elliot.evaluation.metrics.base_metric import BaseMetric
 
 
 class DSC(BaseMetric):
-    """
+    r"""
     This class represents the implementation of the Sørensen–Dice coefficient recommendation metric.
     Passing 'DSC' to the metrics list will enable the computation of the metric.
+
+    .. _DSC: https://en.wikipedia.org/wiki/S%C3%B8rensen%E2%80%93Dice_coefficient
+
+    . math::
+        \mathrm {F1@K} = \frac{1+\beta^{2}}{\frac{1}{\text { precision@k }}+\frac{\beta^{2}}{\text { recall@k }}}
+
+
     """
 
     def __init__(self, recommendations, config, params, eval_objects, additional_data):
