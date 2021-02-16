@@ -12,9 +12,16 @@ from elliot.evaluation.metrics.base_metric import BaseMetric
 
 
 class MRR(BaseMetric):
-    """
+    r"""
     This class represents the implementation of the Mean Reciprocal Rank recommendation metric.
     Passing 'MRR' to the metrics list will enable the computation of the metric.
+
+    .. _MRR: https://en.wikipedia.org/wiki/Mean_reciprocal_rank
+
+    .. math::
+        \mathrm {MRR} = \frac{1}{|{U}|} \sum_{i=1}^{|{U}|} \frac{1}{rank_i}
+    :math:`U` is the number of users, :math:`rank_i` is the rank of the first item in the recommendation list
+    in the test set results for user :math:`i`.
     """
 
     def __init__(self, recommendations, config, params, eval_objects):

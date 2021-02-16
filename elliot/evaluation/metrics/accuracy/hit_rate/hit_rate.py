@@ -13,9 +13,16 @@ from elliot.evaluation.metrics.base_metric import BaseMetric
 
 
 class HR(BaseMetric):
-    """
+    r"""
     This class represents the implementation of the Hit Rate recommendation metric.
     Passing 'HR' to the metrics list will enable the computation of the metric.
+
+    .. _HR: https://medium.com/@rishabhbhatia315/recommendation-system-evaluation-metrics-3f6739288870
+
+    .. math::
+        \mathrm {HR@K} =\frac{Number \space of \space Hits @K}{|GT|}
+    :math:`HR` is the number of users with a positive sample in the recommendation list.
+    :math:`GT` is the total number of samples in the test set.
     """
 
     def __init__(self, recommendations: t.Dict[int, t.List[t.Tuple[int, float]]], config, params, eval_objects):

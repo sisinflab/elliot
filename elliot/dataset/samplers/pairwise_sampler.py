@@ -38,8 +38,8 @@ class Sampler:
                 continue
             i = list(ui)[r_int(lui)]
 
-            j = items[r_int(n_items)]
-            while j in ui:
-                j = items[r_int(n_items)]
+            v = items[r_int(n_items)]
+            while v in ui:
+                v = items[r_int(n_items)]
 
-            yield u, i, j
+            yield u, i, v

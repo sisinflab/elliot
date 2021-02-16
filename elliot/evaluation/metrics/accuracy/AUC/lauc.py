@@ -12,9 +12,12 @@ from elliot.evaluation.metrics.base_metric import BaseMetric
 from elliot.utils import logging
 
 class LAUC(BaseMetric):
-    """
+    r"""
     This class represents the implementation of the Limited AUC recommendation metric.
     Passing 'LAUC' to the metrics list will enable the computation of the metric.
+
+    .. _LAUC: "Setting Goals and Choosing Metrics for Recommender System Evaluations" by Gunnar Schröder, et al.
+
     """
 
     def __init__(self, recommendations, config, params, eval_objects):

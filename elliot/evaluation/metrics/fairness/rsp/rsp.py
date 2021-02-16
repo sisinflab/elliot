@@ -20,7 +20,23 @@ class RSP(BaseMetric):
     This class represents the implementation of the Ranking-based Statistical Parity (RSP) recommendation metric.
     Passing 'RSP' to the metrics list will enable the computation of the metric.
 
-    Zhu, Ziwei, Jianling Wang, and James Caverlee. "Measuring and Mitigating Item Under-Recommendation Bias in Personalized Ranking Systems." Proceedings of the 43rd International ACM SIGIR Conference on Research and Development in Information Retrieval. 2020.
+    .. _PopRSP:   "Measuring and Mitigating Item Under-Recommendation Bias in Personalized Ranking Systems."
+    Zhu, Ziwei, Jianling Wang, and James Caverlee.
+    Proceedings of the 43rd International ACM SIGIR
+    Conference on Research and Development in Information Retrieval. 2020.
+
+     .. math::
+        \mathrm {RSP}=\frac{{std}(P(R @ k \mid g=g_{1}), \ldots, P(R @ k \mid g=g_{A}))}
+        {{mean}(P(R @ k \mid g=g_{1}), \ldots, P(R @ k \mid g=g_{A}))}
+
+    :math:`P(R @ k \mid g=g_{a})}` is `\frac{\sum_{u=1}^{N} \sum_{i=1}^{k} G_{g_{a}}(R_{u, i})}
+    {\sum_{u=1}^{N} \sum_{i \in I \backslash I_{u}^{+}} G_{g_{a}}(i)}`
+
+    :math:`\sum_{i=1}^{k} G_{g_{a}}(R_{u, i})` calculates how many un-interacted items
+    from group `{g_a}` are ranked in top-𝑘 for user u.
+
+    :math:`\sum_{i \in I \backslash I_{u}^{+}} G_{g_{a}}(i)`
+    calculates how many un-interacted items belong to group `{g_a}` for u
     """
 
     def __init__(self, recommendations, config, params, eval_objects, additional_data):

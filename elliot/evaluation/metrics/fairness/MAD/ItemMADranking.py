@@ -13,13 +13,20 @@ from elliot.evaluation.metrics.base_metric import BaseMetric
 
 
 class ItemMADranking(BaseMetric):
-    """
+    r"""
     This class represents the implementation of the Item MAD ranking recommendation metric.
     Passing 'ItemMADranking' to the metrics list will enable the computation of the metric.
 
-    Deldjoo, Yashar, Vito Walter Anelli, Hamed Zamani, Alejandro Bellogin, and Tommaso Di Noia.
-    "A flexible framework for evaluating user and item fairness in recommender systems."
-    User Modeling and User-Adapted Interaction (2020): 1-47.
+
+     .. _ItemMADranking: "A flexible framework for evaluating user and item fairness in recommender systems."
+     Deldjoo, Yashar, Vito Walter Anelli, Hamed Zamani, Alejandro Bellogin, and Tommaso Di Noia.
+     User Modeling and User-Adapted Interaction (2020): 1-47.
+
+     .. math::
+        \mathrm {MAD}={avg}_{i, j}({MAD}(R^{(i)}, R^{(j)}))
+
+    :math: {MAD}={avg}_{i, j}({MAD}\left(R^{(i)}, R^{(j)}))
+
     """
 
     def __init__(self, recommendations, config, params, eval_objects, additional_data):

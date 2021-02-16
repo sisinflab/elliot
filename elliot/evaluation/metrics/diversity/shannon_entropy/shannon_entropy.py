@@ -13,9 +13,16 @@ from elliot.evaluation.metrics.base_metric import BaseMetric
 
 
 class ShannonEntropy(BaseMetric):
-    """
+    r"""
     This class represents the implementation of the Shannon Entropy recommendation metric.
     Passing 'SEntropy' to the metrics list will enable the computation of the metric.
+
+    .. _ShannonEntropy: "Recommender systems handbook. Springer, Berlin"
+    Ricci F, Rokach L, Shapira B, Kantor P. 2015
+
+    .. math::
+        \mathrm {ShannonEntropy}=-\sum_{i=1}^{n} p(i) \log p(i)
+
     """
 
     def __init__(self, recommendations, config, params, eval_objects):
