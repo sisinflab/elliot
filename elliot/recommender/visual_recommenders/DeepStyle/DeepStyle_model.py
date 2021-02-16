@@ -54,7 +54,7 @@ class DeepStyle_model(keras.Model):
             name='E', dtype=tf.float32)
 
         self.optimizer = tf.optimizers.Adam(self._learning_rate)
-        self.saver_ckpt = tf.train.Checkpoint(optimizer=self.optimizer, model=self)
+        #self.saver_ckpt = tf.train.Checkpoint(optimizer=self.optimizer, model=self)
 
     @tf.function
     def call(self, inputs, training=None):
