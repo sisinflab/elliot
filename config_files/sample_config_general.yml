@@ -85,7 +85,7 @@ experiment:
         save_weights: False
         save_recs: False
         validation_metric: nDCG@10
-        restore_epoch: False
+        restore: False
       lr: 0.01
       epochs: [50,20]
       intermediate_dim: 300
@@ -102,7 +102,7 @@ experiment:
         save_weights: False
         save_recs: True
         validation_metric: nDCG@10
-        restore_epoch: False
+        restore: False
       lr: 0.05
       epochs: 50
       embed_k: [10,50,100,125,150,200]
@@ -123,7 +123,7 @@ experiment:
         save_weights: False
         save_recs: True
         validation_metric: nDCG
-        restore_epoch: False
+        restore: False
       lr: [0.001]
       epochs: 50
       embed_k: [50,100,125,150,200]
@@ -136,7 +136,7 @@ experiment:
         save_weights: True
         save_recs: True
         validation_metric: nDCG
-        restore_epoch: False
+        restore: False
       lr: 0.005
       epochs: 20
       embed_k: 100
@@ -154,7 +154,7 @@ experiment:
         save_weights: False
         save_recs: False
         validation_metric: nDCG
-        restore_epoch: False
+        restore: False
       lr: [0.001, 0.0005, 0.0001]
       epochs: 100
       batch_size: [512,1024, 2048]
@@ -169,7 +169,7 @@ experiment:
         save_weights: False
         save_recs: True
         validation_metric: nDCG
-        restore_epoch: False
+        restore: False
       lr: 0.05
       epochs: 10
       bias_regularization: 0
@@ -189,7 +189,7 @@ experiment:
         save_weights: False
         save_recs: False
         validation_metric: nDCG
-        restore_epoch: False
+        restore: False
       lr: [0.001, 0.0005, 0.0001]
       epochs: 100
       batch_size: [512,1024, 2048]
@@ -221,7 +221,7 @@ experiment:
         save_weights: False
         save_recs: False
         validation_metric: nDCG
-        restore_epoch: False
+        restore: False
       restore: False
       factors: 10
     WRMF:
@@ -233,7 +233,7 @@ experiment:
         save_weights: False
         save_recs: False
         validation_metric: nDCG
-        restore_epoch: False
+        restore: False
       epochs: 2
       factors: 10
       alpha: 1
@@ -294,7 +294,7 @@ experiment:
         save_weights: False
         save_recs: False
         validation_metric: nDCG
-        restore_epoch: False
+        restore: False
       epochs: 2
       restore: False
       factors: 10
@@ -310,7 +310,7 @@ experiment:
         save_weights: False
         save_recs: False
         validation_metric: nDCG
-        restore_epoch: False
+        restore: False
       epochs: 2
       restore: False
       factors: 10

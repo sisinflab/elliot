@@ -104,7 +104,7 @@ experiment:
 #        save_weights: False
 #        save_recs: True
 #        validation_metric: nDCG
-#        restore_epoch: -1
+#        restore: -1
 #      lr: 0.05
 #      epochs: 50
 #      embed_k: [10,50,100,125,150,200]
@@ -125,7 +125,7 @@ experiment:
 #        save_weights: False
 #        save_recs: True
 #        validation_metric: nDCG
-#        restore_epoch: -1
+#        restore: -1
 #      lr: [0.001]
 #      epochs: 50
 #      embed_k: [50,100,125,150,200]
@@ -138,7 +138,7 @@ experiment:
 #        save_weights: True
 #        save_recs: True
 #        validation_metric: nDCG
-#        restore_epoch: -1
+#        restore: -1
 #      lr: 0.005
 #      epochs: 20
 #      embed_k: 100
@@ -156,7 +156,7 @@ experiment:
 #        save_weights: False
 #        save_recs: True
 #        validation_metric: nDCG
-#        restore_epoch: -1
+#        restore: -1
 #      lr: 0.05
 #      epochs: 10
 #      bias_regularization: 0
@@ -176,7 +176,7 @@ experiment:
 #        save_weights: False
 #        save_recs: False
 #        validation_metric: nDCG
-#        restore_epoch: -1
+#        restore: -1
 #      lr: [0.001, 0.0005, 0.0001]
 #      epochs: 100
 #      batch_size: [512,1024, 2048]
