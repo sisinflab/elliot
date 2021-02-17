@@ -71,7 +71,6 @@ class MF(RecMixin, BaseRecommenderModel):
                     loss += self._model.train_step(batch)
                     t.set_postfix({'loss': f'{loss.numpy() / steps:.5f}'})
                     t.update()
-                    self._update_count += 1
 
             if not (it + 1) % self._validation_rate:
                 recs = self.get_recommendations(self.evaluator.get_needed_recommendations())
@@ -92,7 +91,7 @@ class MF(RecMixin, BaseRecommenderModel):
         predictions_top_k = {}
         for index, offset in enumerate(range(0, self._num_users, self._batch_size)):
             offset_stop = min(offset + self._batch_size, self._num_users)
-            predictions = self._model.get_recs(
+            predictions = self._model.predict(
                 (
                     np.repeat(np.array(list(range(offset,offset_stop)))[:, None], repeats=self._num_items,axis=1),
                  np.array([self._i_items_set for _ in range(offset,offset_stop)])

@@ -43,9 +43,6 @@ class MatrixFactorizationModel(keras.Model):
                                                         embeddings_initializer=self.initializer, name='I_MF',
                                                         dtype=tf.float32)
 
-        self.predict_layer = keras.layers.Dense(1, input_dim=self.embed_mf_size)
-
-        self.activate = keras.activations.linear
         self.loss = keras.losses.MeanSquaredError()
 
         self.optimizer = tf.optimizers.Adam(learning_rate)
@@ -56,9 +53,7 @@ class MatrixFactorizationModel(keras.Model):
         user_mf_e = self.user_mf_embedding(user)
         item_mf_e = self.item_mf_embedding(item)
 
-        mf_output = user_mf_e * item_mf_e  # [batch_size, embedding_size]
-
-        output = self.activate(self.predict_layer(mf_output))
+        output = tf.reduce_sum(user_mf_e * item_mf_e, axis=-1)
 
         return output
 
@@ -83,26 +78,10 @@ class MatrixFactorizationModel(keras.Model):
         Returns:
             The matrix of predicted values.
         """
+
         output = self.call(inputs=inputs, training=training)
+
         return output
-
-    @tf.function
-    def get_recs(self, inputs, training=False, **kwargs):
-        """
-        Get full predictions on the whole users/items matrix.
-
-        Returns:
-            The matrix of predicted values.
-        """
-        user, item = inputs
-        user_mf_e = self.user_mf_embedding(user)
-        item_mf_e = self.item_mf_embedding(item)
-
-        mf_output = user_mf_e * item_mf_e  # [batch_size, embedding_size]
-
-        output = self.activate(self.predict_layer(mf_output))
-
-        return tf.squeeze(output)
 
     @tf.function
     def get_top_k(self, preds, train_mask, k=100):

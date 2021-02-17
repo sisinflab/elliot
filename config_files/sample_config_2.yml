@@ -108,22 +108,22 @@ experiment:
 #    Random:
 #      meta:
 #        save_recs: False
-    MultiVAE:
-      meta:
-        hyper_max_evals: 1
-        hyper_opt_alg: tpe
-        validation_rate: 10
-        verbose: False
-        save_weights: True
-        save_recs: False
-#        restore: True
-      lr: [loguniform, -10, -1]
-      epochs: 10
-      intermediate_dim: [uniform,50,100]
-      latent_dim: 100
-      batch_size: -1
-      dropout_pkeep: 1
-      reg_lambda: 0.01
+#    MultiVAE:
+#      meta:
+#        hyper_max_evals: 1
+#        hyper_opt_alg: tpe
+#        validation_rate: 10
+#        verbose: False
+#        save_weights: True
+#        save_recs: False
+##        restore: True
+#      lr: [loguniform, -10, -1]
+#      epochs: 10
+#      intermediate_dim: [uniform,50,100]
+#      latent_dim: 100
+#      batch_size: -1
+#      dropout_pkeep: 1
+#      reg_lambda: 0.01
       #e:10_bs:6040_intermediate_dim:91_latent_dim:100_reg_lambda:0.01_lr:0.002718457840118028_dropout_pkeep:0.0
 #    MultiVAE:
 #      meta:
@@ -186,21 +186,21 @@ experiment:
 #      batch_size: 64
 #      dropout_pkeep: [1, 0.9]
 #      reg_lambda: [0.0001, 0]
-    MultiDAE:
-      meta:
-        hyper_max_evals: 1
-        hyper_opt_alg: tpe
-        validation_rate: 1
-        verbose: True
-        save_weights: False
-        save_recs: False
-      lr: 0.001
-      epochs: 1
-      intermediate_dim: 300
-      latent_dim: 200
-      batch_size: -1
-      dropout_pkeep: 1
-      reg_lambda: 0.01
+#    MultiDAE:
+#      meta:
+#        hyper_max_evals: 1
+#        hyper_opt_alg: tpe
+#        validation_rate: 1
+#        verbose: True
+#        save_weights: False
+#        save_recs: False
+#      lr: 0.001
+#      epochs: 1
+#      intermediate_dim: 300
+#      latent_dim: 200
+#      batch_size: -1
+#      dropout_pkeep: 1
+#      reg_lambda: 0.01
 #    BPRMF:
 #      meta:
 #        hyper_max_evals: 1
@@ -342,3 +342,18 @@ experiment:
 #      factors: 50
 #      reg: 0.005
 #      batch_size: 512
+    MF:
+      meta:
+        hyper_max_evals: 1
+        hyper_opt_alg: tpe
+        validation_rate: 1
+        verbose: True
+        save_weights: False
+        save_recs: False
+        validation_metric: nDCG
+        restore: False
+      epochs: 1
+      batch_size: 512
+      factors: 10
+      reg: 0.1
+      lr: 0.001
