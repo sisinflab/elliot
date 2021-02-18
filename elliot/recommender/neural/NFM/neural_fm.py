@@ -14,26 +14,34 @@ import pickle
 import numpy as np
 from tqdm import tqdm
 
+from ast import literal_eval as make_tuple
+
 from elliot.dataset.samplers import pointwise_pos_neg_sampler as pws
 from elliot.recommender.base_recommender_model import BaseRecommenderModel
-from elliot.recommender.latent_factor_models.FM.factorization_machine_model import FactorizationMachineModel
+from elliot.recommender.neural.NFM.neural_fm_model import NeuralFactorizationMachineModel
 from elliot.recommender.recommender_utils_mixin import RecMixin
 from elliot.utils.write import store_recommendation
 from elliot.recommender.base_recommender_model import init_charger
 np.random.seed(42)
 
 
-class FM(RecMixin, BaseRecommenderModel):
+class NFM(RecMixin, BaseRecommenderModel):
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
         self._random = np.random
 
         self._params_list = [
             ("_factors", "factors", "factors", 10, None, None),
+            ("_hidden_neurons", "hidden_neurons", "hidden_neurons", "(64,32)", lambda x: list(make_tuple(x)),
+             lambda x: str(x).replace(",", "-")),
+            ("_hidden_activations", "hidden_activations", "hidden_activations", "('relu','relu')", lambda x: list(make_tuple(x)),
+             lambda x: str(x).replace(",", "-")),
             ("_learning_rate", "lr", "lr", 0.001, None, None),
             ("_l_w", "reg", "reg", 0.1, None, None)
         ]
         self.autoset_params()
+
+
 
         if self._batch_size < 1:
             self._batch_size = self._data.transactions
@@ -44,12 +52,13 @@ class FM(RecMixin, BaseRecommenderModel):
 
         self._sampler = pws.Sampler(self._data.i_train_dict)
 
-        self._model = FactorizationMachineModel(self._num_users, self._num_items, self._factors,
-                                               self._l_w, self._learning_rate)
+        self._model = NeuralFactorizationMachineModel(self._num_users, self._num_items, self._factors,
+                                               tuple(m for m in zip(self._hidden_neurons, self._hidden_activations)),
+                                                      self._l_w, self._learning_rate)
 
     @property
     def name(self):
-        return "FM" \
+        return "NFM" \
                + "_e:" + str(self._epochs) \
                + "_bs:" + str(self._batch_size) \
                + f"_{self.get_params_shortcut()}"

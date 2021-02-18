@@ -1,16 +1,16 @@
 experiment:
   data_config:
     strategy: fixed
-    dataloader: VisualLoader
+    #dataloader: DataSetLoader
     dataset_path: ../data/{0}/trainingset.tsv
     root_folder: ../data/{0}/splitting/
     train_path: ../data/{0}/trainingset.tsv
 #    validation_path: ../data/{0}/trainingset.tsv
     test_path: ../data/{0}/testset.tsv
-    side_information:
-      visual_features: ../data/{0}/original/features.npy
+    #side_information:
+      #visual_features: ../data/{0}/original/features.npy
 #      dir_visual_features: ../data/{0}/original/features/
-      item_mapping: ../data/{0}/visual_feats.tsv
+      #item_mapping: ../data/{0}/visual_feats.tsv
 #      images_src_folder: ../data/{0}/original/images/
 #      output_image_size: (224,224)
 #  splitting:
@@ -34,13 +34,13 @@ experiment:
 #    core: 5
 #    rounds: 2
 #  dataset: categorical_dbpedia_ml1m
-  dataset: amazon_men
+  dataset: example
 #  path_output_rec_result: ../results/{0}/recs/
 #  path_output_rec_weight: ../results/{0}/weights/
 #  path_output_rec_performance: ../results/{0}/performance/
 #  path_logger_config: ./config/logger_config.yml
 #  path_log_folder: ../log/
-  top_k: 50
+  top_k: 1
   evaluation:
     cutoff: [10]
     simple_metrics: [ nDCG, Precision, Recall, ItemCoverage, HR, MRR, MAP, F1, Gini, SEntropy, EFD, EPC, LAUC]
@@ -187,25 +187,25 @@ experiment:
 #      batch_size: 128
 #      lambda_1: 0.000025
 #      lambda_2: 0.000025
-      AMR:
-        meta:
-          verbose: True
-          validation_rate: 1
-          save_weights: False
-          save_recs: False
-          validation_metric: nDCG
-          restore_epoch: -1
-        lr: 0.0005
-        epochs: 2
-        adversarial_epochs: 1
-        eps: 0.5
-        factors: 100
-        factors_d: 20
-        batch_size: 128
-        l_w: 0.000025
-        l_b: 0
-        l_e: 0.002
-        l_adv: 0.001
+#      AMR:
+#        meta:
+#          verbose: True
+#          validation_rate: 1
+#          save_weights: False
+#          save_recs: False
+#          validation_metric: nDCG
+#          restore_epoch: -1
+#        lr: 0.0005
+#        epochs: 2
+#        adversarial_epochs: 1
+#        eps: 0.5
+#        factors: 100
+#        factors_d: 20
+#        batch_size: 128
+#        l_w: 0.000025
+#        l_b: 0
+#        l_e: 0.002
+#        l_adv: 0.001
 #    KaHFM:
 #      meta:
 #        hyper_max_evals: 1
@@ -381,6 +381,38 @@ experiment:
 #      factors: 10
 #      reg: 0.1
 #      lr: 0.001
+#    FM:
+#      meta:
+#        hyper_max_evals: 1
+#        hyper_opt_alg: tpe
+#        validation_rate: 1
+#        verbose: True
+#        save_weights: False
+#        save_recs: False
+#        validation_metric: nDCG
+#        restore_epoch: -1
+#      epochs: 2
+#      batch_size: 128
+#      restore: False
+#      factors: 50
+#      lr: 0.001
+    NFM:
+      meta:
+        hyper_max_evals: 1
+        hyper_opt_alg: tpe
+        validation_rate: 1
+        verbose: True
+        save_weights: False
+        save_recs: False
+        validation_metric: nDCG
+        restore_epoch: -1
+      epochs: 2
+      batch_size: 128
+      restore: False
+      factors: 50
+      hidden_neurons: (64, 32)
+      hidden_activations: ('relu', 'relu')
+      lr: 0.001
 #    LMF:
 #      meta:
 #        hyper_max_evals: 1

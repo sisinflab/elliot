@@ -4,8 +4,9 @@ Module description:
 """
 
 __version__ = '0.1'
-__author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta'
-__email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
+__author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta, Antonio Ferrara'
+__email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it,' \
+            'daniele.malitesta@poliba.it, antonio.ferrara@poliba.it'
 
 import os
 import numpy as np
@@ -21,8 +22,7 @@ class FactorizationMachineModel(keras.Model):
                  num_users,
                  num_items,
                  embed_mf_size,
-                 lambda_weights_1,
-                 lambda_weights_2,
+                 lambda_weights,
                  learning_rate=0.01,
                  name="FM",
                  **kwargs):
@@ -31,34 +31,28 @@ class FactorizationMachineModel(keras.Model):
         self.num_users = num_users
         self.num_items = num_items
         self.embed_mf_size = embed_mf_size
-        self.lambda_weights_1 = lambda_weights_1
-        self.lambda_weights_2 = lambda_weights_2
+        self.lambda_weights = lambda_weights
 
         self.initializer = tf.initializers.GlorotUniform()
 
         self.user_mf_embedding = keras.layers.Embedding(input_dim=self.num_users, output_dim=self.embed_mf_size,
-                                                        embeddings_regularizer=tf.keras.regularizers
-                                                        .l1_l2(self.lambda_weights_1, self.lambda_weights_2),
                                                         embeddings_initializer=self.initializer, name='U_MF',
+                                                        embeddings_regularizer=keras.regularizers.l2(self.lambda_weights),
                                                         dtype=tf.float32)
         self.item_mf_embedding = keras.layers.Embedding(input_dim=self.num_items, output_dim=self.embed_mf_size,
-                                                        embeddings_regularizer=tf.keras.regularizers
-                                                        .l1_l2(self.lambda_weights_1, self.lambda_weights_2),
+                                                        embeddings_regularizer=keras.regularizers.l2(self.lambda_weights),
                                                         embeddings_initializer=self.initializer, name='I_MF',
                                                         dtype=tf.float32)
 
         self.u_bias = keras.layers.Embedding(input_dim=self.num_users, output_dim=1,
-                                             embeddings_initializer=keras.initializers.Zeros(), name='B_U_MF',
+                                             embeddings_initializer=self.initializer, name='B_U_MF',
                                              dtype=tf.float32)
         self.i_bias = keras.layers.Embedding(input_dim=self.num_items, output_dim=1,
-                                             embeddings_initializer=keras.initializers.Zeros(), name='B_I_MF',
+                                             embeddings_initializer=self.initializer, name='B_I_MF',
                                              dtype=tf.float32)
 
         self.bias_ = tf.Variable(0., name='GB')
 
-        self.predict_layer = keras.layers.Dense(1, input_dim=self.embed_mf_size)
-
-        self.activate = keras.activations.linear
         self.loss = keras.losses.MeanSquaredError()
 
         self.optimizer = tf.optimizers.Adam(learning_rate)
@@ -68,13 +62,9 @@ class FactorizationMachineModel(keras.Model):
         user, item = inputs
         user_mf_e = self.user_mf_embedding(user)
         item_mf_e = self.item_mf_embedding(item)
+        mf_output = tf.reduce_sum(user_mf_e * item_mf_e, axis=-1)
 
-        mf_output = user_mf_e * item_mf_e  # [batch_size, embedding_size]
-
-        output = self.activate(self.predict_layer(mf_output))
-        output += self.u_bias(user) + self.i_bias(item) + self.bias_
-
-        return output
+        return mf_output + self.bias_ + self.u_bias(user) + self.i_bias(item)
 
     @tf.function
     def train_step(self, batch):
@@ -111,12 +101,9 @@ class FactorizationMachineModel(keras.Model):
         user, item = inputs
         user_mf_e = self.user_mf_embedding(user)
         item_mf_e = self.item_mf_embedding(item)
+        mf_output = tf.expand_dims(tf.reduce_sum(user_mf_e * item_mf_e, axis=-1), -1)
 
-        mf_output = user_mf_e * item_mf_e  # [batch_size, embedding_size]
-
-        output = self.activate(self.predict_layer(mf_output))
-
-        return tf.squeeze(output)
+        return tf.squeeze(mf_output + self.bias_ + self.u_bias(user) + self.i_bias(item))
 
     @tf.function
     def get_top_k(self, preds, train_mask, k=100):
