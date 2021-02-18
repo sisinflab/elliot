@@ -8,6 +8,7 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, alejandro.bell
 
 from scipy import stats
 import typing as t
+import numpy as np
 
 
 class PairedTTest:
@@ -31,5 +32,6 @@ class WilcoxonTest:
     def compare(arr_0: t.Dict[int, float], arr_1:  t.Dict[int, float], users: t.List[int]):
         list_0 = list(map(arr_0.get, users))
         list_1 = list(map(arr_1.get, users))
-        return stats.wilcoxon(list_0, list_1)[1]
+        return stats.wilcoxon(list_0, list_1)[1] if any(np.array(list_0) - np.array(list_1)) else np.nan
+
 
