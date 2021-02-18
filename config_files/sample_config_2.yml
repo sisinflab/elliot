@@ -222,23 +222,23 @@ experiment:
 #      update_users: True
 #      update_items: True
 #      update_bias: True
-    PMF:
-      meta:
-        hyper_max_evals: 3
-        hyper_opt_alg: tpe
-        validation_rate: 1
-        verbose: False
-        save_weights: False
-        save_recs: False
-        validation_metric: nDCG
-        restore: False
-      lr: [loguniform, -10, -1]
-      epochs: 2
-      factors: 50
-      batch_size: 512
-      reg: [0.0025, 0.005, 0.01]
-      reg_b: 0
-      gaussian_variance: 0.1
+#    PMF:
+#      meta:
+#        hyper_max_evals: 3
+#        hyper_opt_alg: tpe
+#        validation_rate: 1
+#        verbose: False
+#        save_weights: False
+#        save_recs: False
+#        validation_metric: nDCG
+#        restore: False
+#      lr: [loguniform, -10, -1]
+#      epochs: 2
+#      factors: 50
+#      batch_size: 512
+#      reg: [0.0025, 0.005, 0.01]
+#      reg_b: 0
+#      gaussian_variance: 0.1
 ###    KaHFM:
 ###      meta:
 ###        hyper_max_evals: 1
@@ -293,20 +293,20 @@ experiment:
 #      reg: 0.005
 #      gaussian_variance: 0.01
 #      batch_size: 512
-    NeuMF:
-      meta:
-        verbose: False
-        save_recs: False
-        validation_rate: 1
-      mf_factors: [10, 20]
-      mlp_factors: 10
-      mlp_hidden_size: [(5, 3, 2),(5,2)]
-      dropout: 0.2
-      is_mf_train: True
-      is_mlp_train: True
-      batch_size: 512
-      epochs: 2
-      lr: 0.001
+#    NeuMF:
+#      meta:
+#        verbose: False
+#        save_recs: False
+#        validation_rate: 1
+#      mf_factors: [10, 20]
+#      mlp_factors: 10
+#      mlp_hidden_size: [(5, 3, 2),(5,2)]
+#      dropout: 0.2
+#      is_mf_train: True
+#      is_mlp_train: True
+#      batch_size: 512
+#      epochs: 2
+#      lr: 0.001
 #    ItemKNN:
 #      meta:
 #        verbose: True
@@ -328,10 +328,10 @@ experiment:
 #      similarity: [cosine,correlation]
 #      user_profile: binary
 #      item_profile: binary
-    external.MostPop:
-      meta:
-        verbose: False
-        save_recs: True
+#    external.MostPop:
+#      meta:
+#        verbose: False
+#        save_recs: True
 #    NonNegMF:
 #      meta:
 #        verbose: True
@@ -357,3 +357,20 @@ experiment:
 #      factors: 10
 #      reg: 0.1
 #      lr: 0.001
+    SVDpp:
+      meta:
+        hyper_max_evals: 1
+        hyper_opt_alg: tpe
+        validation_rate: 1
+        verbose: True
+        save_weights: False
+        save_recs: False
+        validation_metric: nDCG
+        restore: False
+      epochs: 2
+      batch_size: 512
+      restore: False
+      factors: 10
+      reg_w: 0.001
+      reg_b: 0
+      lr: 0.0001

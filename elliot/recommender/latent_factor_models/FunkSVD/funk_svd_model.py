@@ -53,9 +53,6 @@ class FunkSVDModel(keras.Model):
                                                           embeddings_regularizer=keras.regularizers.l2(self.lambda_bias),
                                                           dtype=tf.float32)
 
-        self.predict_layer = keras.layers.Dense(1, input_dim=self.embed_mf_size + 1)
-
-        self.activate = keras.activations.linear
         self.loss = keras.losses.MeanSquaredError()
 
         self.optimizer = tf.optimizers.Adam(learning_rate)
@@ -68,9 +65,7 @@ class FunkSVDModel(keras.Model):
         user_bias_e = self.user_bias_embedding(user)
         item_bias_e = self.item_bias_embedding(item)
 
-        mf_output = user_mf_e * item_mf_e + user_bias_e + item_bias_e
-
-        output = self.activate(self.predict_layer(mf_output))
+        output = tf.reduce_sum(user_mf_e * item_mf_e, axis = -1) + user_bias_e + item_bias_e
 
         return output
 
@@ -112,9 +107,7 @@ class FunkSVDModel(keras.Model):
         user_bias_e = self.user_bias_embedding(user)
         item_bias_e = self.item_bias_embedding(item)
 
-        mf_output = user_mf_e * item_mf_e + user_bias_e + item_bias_e
-
-        output = self.activate(self.predict_layer(mf_output))
+        output = tf.reduce_sum(user_mf_e * item_mf_e, axis = -1) + user_bias_e + item_bias_e
 
         return tf.squeeze(output)
 
