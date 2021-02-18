@@ -26,11 +26,12 @@ class StatTest(Enum):
 class ResultHandler:
     def __init__(self, rel_threshold=1):
         self.oneshot_recommenders = {}
-        self.ks = set()
+        self.ks = list()
         self.rel_threshold = rel_threshold
 
     def add_oneshot_recommender(self, **kwargs):
-        self.ks.update(set(kwargs["test_results"].keys()))
+        new_ks = set(kwargs["test_results"].keys())
+        [self.ks.append(k) for k in new_ks if k not in self.ks]
         self.oneshot_recommenders[kwargs["name"].split("_")[0]] = [kwargs]
 
     def save_best_results(self, output='../results/'):
@@ -62,17 +63,20 @@ class ResultHandler:
 
     def save_best_models(self, output='../results/'):
         global_results = dict(self.oneshot_recommenders)
-        for k in self.ks:
-            models = []
-            for rec in global_results.keys():
-                for model in global_results[rec]:
-                    models.append({"meta": model["params"]["meta"].__dict__, "recommender": rec,
-                                   "configuration": {key: value for key, value in model["params"].items() if
-                                                     key != 'meta'}})
-            with open(
-                    f'{output}bestmodelparams_cutoff_{k}_relthreshold_{self.rel_threshold}_{datetime.now().strftime("%Y_%m_%d_%H_%M_%S")}.json',
-                    mode='w') as f:
-                json.dump(models, f, indent=4)
+        k = self.ks[0]
+        default_metric = 'nDCG'
+        models = [{"default_validation_metric": default_metric,
+                   "default_validation_cutoff": k,
+                   "rel_threshold": self.rel_threshold}]
+        for rec in global_results.keys():
+            for model in global_results[rec]:
+                models.append({"meta": model["params"]["meta"].__dict__, "recommender": rec,
+                               "configuration": {key: value for key, value in model["params"].items() if
+                                                 key != 'meta'}})
+        with open(
+                f'{output}bestmodelparams_cutoff_{k}_relthreshold_{self.rel_threshold}_{datetime.now().strftime("%Y_%m_%d_%H_%M_%S")}.json',
+                mode='w') as f:
+            json.dump(models, f, indent=4)
 
     def save_best_statistical_results(self, stat_test, output='../results/'):
         global_results = dict(self.oneshot_recommenders)

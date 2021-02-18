@@ -1,6 +1,7 @@
 """
 Module description:
-This module provides a popularity class based on number of users who have experienced an item (user-item repetitions in the dataset are counted once)
+This module provides a popularity class based on number of users who have experienced an item (user-item repetitions in
+the dataset are counted once)
 """
 
 __version__ = '0.1'
