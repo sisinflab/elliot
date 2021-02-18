@@ -1,5 +1,6 @@
 from .NeuMF import NeuMF
 from .NFM import NFM
+from .DeepFM import DeepFM
 from .DMF import DMF
 from .GeneralizedMF import GMF
 from .NAIS import NAIS

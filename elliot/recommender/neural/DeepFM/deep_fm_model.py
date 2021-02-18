@@ -17,7 +17,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 tf.random.set_seed(0)
 
 
-class NeuralFactorizationMachineModel(keras.Model):
+class DeepFMModel(keras.Model):
     def __init__(self,
                  num_users,
                  num_items,
@@ -25,7 +25,7 @@ class NeuralFactorizationMachineModel(keras.Model):
                  hidden_layers,
                  lambda_weights,
                  learning_rate=0.01,
-                 name="NFM",
+                 name="DeepFM",
                  **kwargs):
         super().__init__(name=name, **kwargs)
         tf.random.set_seed(42)
@@ -59,13 +59,13 @@ class NeuralFactorizationMachineModel(keras.Model):
 
         self.hidden = tf.keras.Sequential(
             [tf.keras.layers.Dense(self.hidden_layers[0][0],
-                                   activation=self.hidden_layers[0][1], input_dim=self.embed_mf_size)] +
+                                   activation=self.hidden_layers[0][1], input_dim=2*self.embed_mf_size)] +
             [tf.keras.layers.Dense(n, activation=act) for n, act in self.hidden_layers[1:]]
         )
 
-        self.prediction_layer = tf.keras.layers.Dense(1, input_dim=self.hidden_layers[-1][0], use_bias=False)
+        self.prediction_layer = tf.keras.layers.Dense(1, input_dim=self.hidden_layers[-1][0], activation='sigmoid')
 
-        self.loss = keras.losses.MeanSquaredError()
+        self.loss = keras.losses.BinaryCrossentropy()
 
         self.optimizer = tf.optimizers.Adam(learning_rate)
 
@@ -74,11 +74,13 @@ class NeuralFactorizationMachineModel(keras.Model):
         user, item = inputs
         user_mf_e = self.user_mf_embedding(user)
         item_mf_e = self.item_mf_embedding(item)
-        interaction_output = user_mf_e * item_mf_e
-        interaction_output = self.hidden(interaction_output)
-        interaction_output = self.prediction_layer(interaction_output)
+        fm_output = tf.reduce_sum(user_mf_e * item_mf_e, axis=-1)
+        fm_output += self.bias_ + self.u_bias(user) + self.i_bias(item)
+        nn_input = tf.concat([user_mf_e, item_mf_e], axis=-1)
+        hidden_output = self.hidden(nn_input)
+        nn_output = self.prediction_layer(hidden_output)
 
-        return interaction_output + self.bias_ + self.u_bias(user) + self.i_bias(item)
+        return tf.sigmoid(fm_output + nn_output)
 
     @tf.function
     def train_step(self, batch):
@@ -115,11 +117,13 @@ class NeuralFactorizationMachineModel(keras.Model):
         user, item = inputs
         user_mf_e = self.user_mf_embedding(user)
         item_mf_e = self.item_mf_embedding(item)
-        interaction_output = user_mf_e * item_mf_e
-        interaction_output = self.hidden(interaction_output)
-        interaction_output = self.prediction_layer(interaction_output)
+        fm_output = tf.expand_dims(tf.reduce_sum(user_mf_e * item_mf_e, axis=-1), -1)
+        fm_output += self.bias_ + self.u_bias(user) + self.i_bias(item)
+        nn_input = tf.concat([user_mf_e, item_mf_e], axis=-1)
+        hidden_output = self.hidden(nn_input)
+        nn_output = self.prediction_layer(hidden_output)
 
-        return tf.squeeze(interaction_output + self.bias_ + self.u_bias(user) + self.i_bias(item))
+        return tf.squeeze(tf.sigmoid(fm_output + nn_output))
 
     @tf.function
     def get_top_k(self, preds, train_mask, k=100):

@@ -396,7 +396,7 @@ experiment:
 #      restore: False
 #      factors: 50
 #      lr: 0.001
-    NFM:
+    DeepFM:
       meta:
         hyper_max_evals: 1
         hyper_opt_alg: tpe
