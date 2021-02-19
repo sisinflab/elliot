@@ -80,6 +80,12 @@ class BaseRecommenderModel(ABC):
         if not self._params_list:
             self.logger.info("No parameters defined")
 
+    @staticmethod
+    def _batch_remove(original_str: str, char_list):
+        for c in char_list:
+            original_str = original_str.replace(c, "")
+        return original_str
+
     @abstractmethod
     def train(self):
         pass

@@ -23,56 +23,56 @@ experiment:
     relevance_threshold: 3
     paired_ttest: True
     wilcoxon_test: True
-    complex_metrics:
-    - metric: ExtendedF1
-      metric_0: Precision
-      metric_1: Recall
-    - metric: ExtendedPopREO
-      pop_ratio: 0.2
-    - metric: ExtendedPopRSP
-      pop_ratio: 0.2
 #    complex_metrics:
-    - metric: REO
-      clustering_name: ItemPopularity
-      clustering_file: ../data/categorical_dbpedia_ml1m/items_clustering_popularity.tsv
-    - metric: ItemMADrating
-      clustering_name: ItemPopularity
-      clustering_file: ../data/categorical_dbpedia_ml1m/items_clustering_popularity.tsv
-    - metric: ItemMADranking
-      clustering_name: ItemPopularity
-      clustering_file: ../data/categorical_dbpedia_ml1m/items_clustering_popularity.tsv
-    - metric: UserMADrating
-      clustering_name: Happiness
-      clustering_file: ../data/categorical_dbpedia_ml1m/user_clustering_happiness.tsv
-    - metric: UserMADranking
-      clustering_name: Happiness
-      clustering_file: ../data/categorical_dbpedia_ml1m/user_clustering_happiness.tsv
-    - metric: BiasDisparityBR
-      user_clustering_name: Happiness
-      user_clustering_file: ../data/categorical_dbpedia_ml1m/user_clustering_happiness.tsv
-      item_clustering_name: ItemPopularity
-      item_clustering_file: ../data/categorical_dbpedia_ml1m/items_clustering_popularity.tsv
-    - metric: BiasDisparityBS
-      user_clustering_name: Happiness
-      user_clustering_file: ../data/categorical_dbpedia_ml1m/user_clustering_happiness.tsv
-      item_clustering_name: ItemPopularity
-      item_clustering_file: ../data/categorical_dbpedia_ml1m/items_clustering_popularity.tsv
-    - metric: BiasDisparityBD
-      user_clustering_name: Happiness
-      user_clustering_file: ../data/categorical_dbpedia_ml1m/user_clustering_happiness.tsv
-      item_clustering_name: ItemPopularity
-      item_clustering_file: ../data/categorical_dbpedia_ml1m/items_clustering_popularity.tsv
-    - metric: DSC
-      beta: 1
-      metric_0: Precision
-      metric_1: Recall
-    - metric: SRecall
-      feature_data: ../data/categorical_dbpedia_ml1m/map.tsv
-    - metric: ExtendedEPC
-      relevance: discounted
-    - metric: ExtendedEFD
-      relevance: discounted
-  gpu: -1 # -1 is not use GPU
+#    - metric: ExtendedF1
+#      metric_0: Precision
+#      metric_1: Recall
+#    - metric: ExtendedPopREO
+#      pop_ratio: 0.2
+#    - metric: ExtendedPopRSP
+#      pop_ratio: 0.2
+##    complex_metrics:
+#    - metric: REO
+#      clustering_name: ItemPopularity
+#      clustering_file: ../data/categorical_dbpedia_ml1m/items_clustering_popularity.tsv
+#    - metric: ItemMADrating
+#      clustering_name: ItemPopularity
+#      clustering_file: ../data/categorical_dbpedia_ml1m/items_clustering_popularity.tsv
+#    - metric: ItemMADranking
+#      clustering_name: ItemPopularity
+#      clustering_file: ../data/categorical_dbpedia_ml1m/items_clustering_popularity.tsv
+#    - metric: UserMADrating
+#      clustering_name: Happiness
+#      clustering_file: ../data/categorical_dbpedia_ml1m/user_clustering_happiness.tsv
+#    - metric: UserMADranking
+#      clustering_name: Happiness
+#      clustering_file: ../data/categorical_dbpedia_ml1m/user_clustering_happiness.tsv
+#    - metric: BiasDisparityBR
+#      user_clustering_name: Happiness
+#      user_clustering_file: ../data/categorical_dbpedia_ml1m/user_clustering_happiness.tsv
+#      item_clustering_name: ItemPopularity
+#      item_clustering_file: ../data/categorical_dbpedia_ml1m/items_clustering_popularity.tsv
+#    - metric: BiasDisparityBS
+#      user_clustering_name: Happiness
+#      user_clustering_file: ../data/categorical_dbpedia_ml1m/user_clustering_happiness.tsv
+#      item_clustering_name: ItemPopularity
+#      item_clustering_file: ../data/categorical_dbpedia_ml1m/items_clustering_popularity.tsv
+#    - metric: BiasDisparityBD
+#      user_clustering_name: Happiness
+#      user_clustering_file: ../data/categorical_dbpedia_ml1m/user_clustering_happiness.tsv
+#      item_clustering_name: ItemPopularity
+#      item_clustering_file: ../data/categorical_dbpedia_ml1m/items_clustering_popularity.tsv
+#    - metric: DSC
+#      beta: 1
+#      metric_0: Precision
+#      metric_1: Recall
+#    - metric: SRecall
+#      feature_data: ../data/categorical_dbpedia_ml1m/map.tsv
+#    - metric: ExtendedEPC
+#      relevance: discounted
+#    - metric: ExtendedEFD
+#      relevance: discounted
+  gpu: 1 # -1 is not use GPU
   models:
 #    PureSVD:
 #      meta:
@@ -293,20 +293,22 @@ experiment:
 #      reg: 0.005
 #      gaussian_variance: 0.01
 #      batch_size: 512
-#    NeuMF:
-#      meta:
-#        verbose: False
-#        save_recs: False
-#        validation_rate: 1
-#      mf_factors: [10, 20]
-#      mlp_factors: 10
-#      mlp_hidden_size: [(5, 3, 2),(5,2)]
-#      dropout: 0.2
-#      is_mf_train: True
-#      is_mlp_train: True
-#      batch_size: 512
-#      epochs: 2
-#      lr: 0.001
+    NeuMF:
+      meta:
+        verbose: False
+        save_recs: False
+        validation_rate: 1
+#        save_weights: True
+        restore: True
+      mf_factors: [10, 20]
+      mlp_factors: 10
+      mlp_hidden_size: [(5, 3, 2),(5,2)]
+      dropout: 0.2
+      is_mf_train: True
+      is_mlp_train: True
+      batch_size: 512
+      epochs: 1
+      lr: 0.001
 #    ItemKNN:
 #      meta:
 #        verbose: True
@@ -357,20 +359,20 @@ experiment:
 #      factors: 10
 #      reg: 0.1
 #      lr: 0.001
-    SVDpp:
-      meta:
-        hyper_max_evals: 1
-        hyper_opt_alg: tpe
-        validation_rate: 1
-        verbose: True
-        save_weights: False
-        save_recs: False
-        validation_metric: nDCG
-        restore: False
-      epochs: 2
-      batch_size: 512
-      restore: False
-      factors: 10
-      reg_w: 0.001
-      reg_b: 0
-      lr: 0.0001
+#    SVDpp:
+#      meta:
+#        hyper_max_evals: 1
+#        hyper_opt_alg: tpe
+#        validation_rate: 1
+#        verbose: True
+#        save_weights: False
+#        save_recs: False
+#        validation_metric: nDCG
+#        restore: False
+#      epochs: 2
+#      batch_size: 512
+#      restore: False
+#      factors: 10
+#      reg_w: 0.001
+#      reg_b: 0
+#      lr: 0.0001

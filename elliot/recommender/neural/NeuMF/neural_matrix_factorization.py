@@ -33,7 +33,7 @@ class NeuMF(RecMixin, BaseRecommenderModel):
             ("_learning_rate", "lr", "lr", 0.001, None, None),
             ("_mf_factors", "mf_factors", "mffactors", 10, None, None),
             ("_mlp_factors", "mlp_factors", "mlpfactors", 10, None, None),
-            ("_mlp_hidden_size", "mlp_hidden_size", "mlpunits", "(64,32)", lambda x: list(make_tuple(str(x))), lambda x: str(x).replace(",", "-")),
+            ("_mlp_hidden_size", "mlp_hidden_size", "mlpunits", "(64,32)", lambda x: list(make_tuple(str(x))), lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
             ("_dropout", "dropout", "drop", 0, None, None),
             ("_is_mf_train", "is_mf_train", "mftrain", True, None, None),
             ("_is_mlp_train", "is_mlp_train", "mlptrain", True, None, None),
