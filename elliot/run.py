@@ -9,7 +9,7 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
 import importlib
 import sys
-import typing
+import logging
 
 from os import path
 from hyperopt import Trials, fmin
@@ -27,6 +27,7 @@ here = path.abspath(path.dirname(__file__))
 def run_experiment(config_path: str = './config/config.yml'):
     builder = NameSpaceBuilder(config_path, here, path.abspath(path.dirname(config_path)))
     base = builder.base
+    config_test(builder, base)
     logging_project.init(base.base_namespace.path_logger_config, base.base_namespace.path_log_folder)
     logger = logging_project.get_logger("__main__")
     logger.info("Start experiment")
@@ -60,6 +61,7 @@ def run_experiment(config_path: str = './config/config.yml'):
                             space=model_base[1],
                             algo=model_base[3],
                             trials=trials,
+                            verbose=False,
                             rstate=_rstate,
                             max_evals=model_base[2])
 
@@ -115,6 +117,74 @@ def run_experiment(config_path: str = './config/config.yml'):
 
     logger.info("End experiment")
 
+
+def _reset_verbose_option(model):
+    if isinstance(model, tuple):
+        model[0].meta.verbose = False
+        model[0].meta.save_recs = False
+        model[0].meta.save_weights = False
+    else:
+        model.meta.verbose = False
+        model.meta.save_recs = False
+        model.meta.save_weights = False
+    return model
+
+
+def config_test(builder, base):
+    if base.base_namespace.config_test:
+        logging_project.init(base.base_namespace.path_logger_config, base.base_namespace.path_log_folder)
+        logger = logging_project.get_logger("__main__")
+        logger.info("Start config test")
+        base.base_namespace.evaluation.relevance_threshold = getattr(base.base_namespace.evaluation, "relevance_threshold", 0)
+        res_handler = ResultHandler(rel_threshold=base.base_namespace.evaluation.relevance_threshold)
+        hyper_handler = HyperParameterStudy(rel_threshold=base.base_namespace.evaluation.relevance_threshold)
+        dataloader_class = getattr(importlib.import_module("dataset"), base.base_namespace.data_config.dataloader)
+        dataloader = dataloader_class(config=base.base_namespace)
+        data_test_list = dataloader.generate_dataobjects_mock()
+        for key, model_base in builder.models():
+            test_results = []
+            test_trials = []
+            for data_test in data_test_list:
+                if key.startswith("external."):
+                    spec = importlib.util.spec_from_file_location("external",
+                                                                  path.relpath(base.base_namespace.external_models_path))
+                    external = importlib.util.module_from_spec(spec)
+                    sys.modules[spec.name] = external
+                    spec.loader.exec_module(external)
+                    model_class = getattr(importlib.import_module("external"), key.split(".", 1)[1])
+                else:
+                    model_class = getattr(importlib.import_module("recommender"), key)
+
+                model_base_mock = model_base
+                model_base_mock = _reset_verbose_option(model_base_mock)
+                model_placeholder = ho.ModelCoordinator(data_test, base.base_namespace, model_base_mock, model_class)
+                if isinstance(model_base, tuple):
+                    logger.info(f"Tuning begun for {model_class.__name__}\n")
+                    trials = Trials()
+                    fmin(model_placeholder.objective,
+                                space=model_base_mock[1],
+                                algo=model_base_mock[3],
+                                trials=trials,
+                                rstate=_rstate,
+                                max_evals=model_base_mock[2])
+
+                    min_val = np.argmin([i["result"]["loss"] for i in trials._trials])
+
+                    test_results.append(trials._trials[min_val]["result"])
+                    test_trials.append(trials)
+                else:
+                    single = model_placeholder.single()
+
+                    test_results.append(single)
+
+            min_val = np.argmin([i["loss"] for i in test_results])
+
+            res_handler.add_oneshot_recommender(**test_results[min_val])
+
+            if isinstance(model_base, tuple):
+                hyper_handler.add_trials(test_trials[min_val])
+        logger.info("End config test without issues")
+    base.base_namespace.config_test = False
 
 if __name__ == '__main__':
     run_experiment("./config/config.yml")

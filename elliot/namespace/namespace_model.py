@@ -38,6 +38,7 @@ _log_folder = 'path_log_folder'
 _verbose = 'verbose'
 _recs = 'path_output_rec_result'
 _top_k = 'top_k'
+_config_test = 'config_test'
 _print_triplets = 'print_results_as_triplets'
 _metrics = 'metrics'
 _relevance_threshold = 'relevance_threshold'
@@ -98,7 +99,8 @@ class NameSpaceModel:
                            self.config[_experiment][_performance])
 
         for p in [_data_config, _weights, _recs, _dataset, _top_k, _paired_ttest, _performance, _logger_config,
-                  _log_folder, _dataloader, _splitting, _prefiltering, _evaluation, _external_models_path, _print_triplets]:
+                  _log_folder, _dataloader, _splitting, _prefiltering, _evaluation, _external_models_path,
+                  _print_triplets, _config_test]:
             if p == _data_config:
                 side_information = self.config[_experiment][p].get("side_information", {})
                 side_information.update({k: self._set_path(self._base_folder_path_config,
@@ -149,6 +151,8 @@ class NameSpaceModel:
             elif p == _external_models_path and self.config[_experiment].get(p, False):
                 self.config[_experiment][p] = self._set_path(self._base_folder_path_config, self.config[_experiment][p])
                 setattr(self.base_namespace, p, self.config[_experiment][p])
+            elif p == _config_test:
+                setattr(self.base_namespace, p, self.config[_experiment].get(p, False))
             else:
                 if self.config[_experiment].get(p):
                     setattr(self.base_namespace, p, self.config[_experiment][p])
