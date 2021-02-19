@@ -2,8 +2,8 @@
 Module description:
 
 """
+import logging as pylog
 from elliot.evaluation.evaluator import Evaluator
-from elliot.utils import logging
 from elliot.utils.folder import build_model_folder
 
 __version__ = '0.1'
@@ -105,7 +105,8 @@ def init_charger(init):
     @wraps(init)
     def new_init(self, *args, **kwargs):
         BaseRecommenderModel.__init__(self, *args, **kwargs)
-        self.logger = logging.get_logger(self.__class__.__name__)
+        self.logger = logging.get_logger(self.__class__.__name__, pylog.CRITICAL if self._config.config_test else
+                                         pylog.DEBUG)
         self._num_items = self._data.num_items
         self._num_users = self._data.num_users
 

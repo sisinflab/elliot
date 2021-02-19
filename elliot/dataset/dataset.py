@@ -12,6 +12,7 @@ import numpy as np
 import pandas as pd
 import scipy.sparse as sp
 import typing as t
+import logging as pylog
 
 from elliot.dataset.abstract_dataset import AbstractDataset
 from elliot.splitter.base_splitter import Splitter
@@ -36,7 +37,8 @@ class DataSetLoader:
         self.kwargs = kwargs
         self.config = config
         self.column_names = ['userId', 'itemId', 'rating', 'timestamp']
-
+        if config.config_test:
+            return
         if config.data_config.strategy == "fixed":
             path_train_data = config.data_config.train_path
             path_val_data = getattr(config.data_config, "validation_path", None)
@@ -120,6 +122,16 @@ class DataSetLoader:
                 data_list.append([single_dataobject])
         return data_list
 
+    def generate_dataobjects_mock(self) -> t.List[object]:
+        _column_names = ['userId', 'itemId', 'rating']
+        training_set = np.random.randint(0, self.config.top_k*10, size=(self.config.top_k*2, 3))
+        test_set = np.random.randint(0, self.config.top_k*10, size=(self.config.top_k*2, 3))
+
+        training_set = pd.DataFrame(np.array(training_set), columns=_column_names)
+        test_set = pd.DataFrame(np.array(test_set), columns=_column_names)
+        data_list = [[DataSet(self.config, (training_set, test_set), self.args, self.kwargs)]]
+
+        return data_list
 
 class DataSet(AbstractDataset):
     """
@@ -132,7 +144,8 @@ class DataSet(AbstractDataset):
         :param path_train_data: relative path for train file
         :param path_test_data: relative path for test file
         """
-        self.logger = logging.get_logger(self.__class__.__name__)
+        self.logger = logging.get_logger(self.__class__.__name__, pylog.CRITICAL if config.config_test else
+                                         pylog.DEBUG)
         self.config = config
         self.args = args
         self.kwargs = kwargs

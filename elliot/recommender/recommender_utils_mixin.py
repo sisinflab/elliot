@@ -64,7 +64,7 @@ class RecMixin(object):
             return True
 
         except Exception as ex:
-            print(f"Error in model restoring operation! {ex}")
+            raise Exception(f"Error in model restoring operation! {ex}")
 
         return False
 
