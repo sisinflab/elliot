@@ -12,9 +12,9 @@ from ast import literal_eval as make_tuple
 from tqdm import tqdm
 import pickle
 
-from elliot.dataset.samplers import custom_sampler as cs
-from elliot.recommender.neural.ConvNeuMF.convolutional_neural_matrix_factorization_model import \
-    ConvNeuralMatrixFactorizationModel
+from elliot.dataset.samplers import pointwise_pos_neg_sampler as pws
+from elliot.recommender.neural.ConvMF.convolutional_matrix_factorization_model import \
+    ConvMatrixFactorizationModel
 from elliot.recommender.recommender_utils_mixin import RecMixin
 from elliot.utils.write import store_recommendation
 
@@ -24,12 +24,21 @@ from elliot.recommender.base_recommender_model import init_charger
 np.random.seed(42)
 
 
-class ConvNeuMF(RecMixin, BaseRecommenderModel):
+class ConvMF(RecMixin, BaseRecommenderModel):
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
+        """
+        http://dm.postech.ac.kr/~cartopy/ConvMF/ConvMF_RecSys16_for_public.pdf
+        Args:
+            data:
+            config:
+            params:
+            *args:
+            **kwargs:
+        """
         self._random = np.random
 
-        self._sampler = cs.Sampler(self._data.i_train_dict)
+        self._sampler = pws.Sampler(self._data.i_train_dict)
 
         self._params_list = [
             ("_lr", "lr", "lr", 0.001, None, None),
@@ -53,14 +62,14 @@ class ConvNeuMF(RecMixin, BaseRecommenderModel):
         self._sp_i_train = self._data.sp_i_train
         self._i_items_set = list(range(self._num_items))
 
-        self._model = ConvNeuralMatrixFactorizationModel(self._num_users, self._num_items, self._embedding_size,
+        self._model = ConvMatrixFactorizationModel(self._num_users, self._num_items, self._embedding_size,
                                                          self._lr, self._cnn_channels, self._cnn_kernels,
                                                          self._cnn_strides, self._dropout_prob, self._l_w, self._l_b
                                                          )
 
     @property
     def name(self):
-        return "ConvNeuMF" \
+        return "ConvMF" \
                + "_e:" + str(self._epochs) \
                + "_bs:" + str(self._batch_size) \
                + f"_{self.get_params_shortcut()}"
@@ -100,17 +109,11 @@ class ConvNeuMF(RecMixin, BaseRecommenderModel):
 
     def get_recommendations(self, k: int = 100):
         predictions_top_k = {}
-
-        for index, offset in enumerate(range(0, self._num_users, 1)):
-            # print(f'****{index}/{self._num_users}')
-            offset_stop = min(offset + self._batch_size, 1)
+        for index, offset in enumerate(range(0, self._num_users, self._batch_size)):
+            offset_stop = min(offset + self._batch_size, self._num_users)
             predictions = self._model.get_recs(
-                (
-                    np.repeat(np.array(list(range(offset, offset_stop)))[:, None], repeats=self._num_items,
-                              axis=1),
-                    np.array([self._i_items_set for _ in range(offset, offset_stop)])
-                )
-            )
+                (np.repeat(np.array(list(range(offset, offset_stop)))[:, None], repeats=self._num_items, axis=1),
+                 np.array([self._i_items_set for _ in range(offset, offset_stop)])))
             v, i = self._model.get_top_k(predictions, self.get_train_mask(offset, offset_stop), k=k)
             items_ratings_pair = [list(zip(map(self._data.private_items.get, u_list[0]), u_list[1]))
                                   for u_list in list(zip(i.numpy(), v.numpy()))]
