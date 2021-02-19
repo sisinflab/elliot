@@ -14,6 +14,7 @@ import pandas as pd
 import scipy.sparse as sp
 from collections import Counter
 from types import SimpleNamespace
+import logging as pylog
 
 from elliot.utils import logging
 from elliot.splitter.base_splitter import Splitter
@@ -61,6 +62,8 @@ class KnowledgeChainsLoader:
         self.kwargs = kwargs
         self.config = config
         self.column_names = ['userId', 'itemId', 'rating', 'timestamp']
+        if config.config_test:
+            return
 
         if config.data_config.strategy == "fixed":
             path_train_data = config.data_config.train_path
@@ -160,6 +163,24 @@ class KnowledgeChainsLoader:
                 single_dataobject = KnowledgeChainsDataObject(self.config, (train_val, test), self.side_information_data, self.args,
                                                               self.kwargs)
                 data_list.append([single_dataobject])
+        return data_list
+
+    def generate_dataobjects_mock(self) -> t.List[object]:
+        _column_names = ['userId', 'itemId', 'rating']
+        training_set = np.random.randint(0, self.config.top_k*10, size=(self.config.top_k*2, 3))
+        test_set = np.random.randint(0, self.config.top_k*10, size=(self.config.top_k*2, 3))
+
+        side_information_data = SimpleNamespace()
+
+        training_set = pd.DataFrame(np.array(training_set), columns=_column_names)
+        test_set = pd.DataFrame(np.array(test_set), columns=_column_names)
+
+        side_information_data.feature_map = {item: np.random.randint(0, 10, size=np.random.randint(0, 20)).tolist()
+                                             for item in training_set['itemId'].unique()}
+
+        data_list = [[KnowledgeChainsDataObject(self.config, (training_set, test_set), side_information_data,
+                                                self.args, self.kwargs)]]
+
         return data_list
 
     def load_dataset_dict(self, file_ratings, separator='\t', attribute_file=None, feature_file=None, properties_file=None,
@@ -288,7 +309,8 @@ class KnowledgeChainsDataObject:
     """
 
     def __init__(self, config, data_tuple, side_information_data, *args, **kwargs):
-        self.logger = logging.get_logger(self.__class__.__name__)
+        self.logger = logging.get_logger(self.__class__.__name__, pylog.CRITICAL if config.config_test else
+        pylog.DEBUG)
         self.config = config
         self.side_information_data = side_information_data
         self.args = args
