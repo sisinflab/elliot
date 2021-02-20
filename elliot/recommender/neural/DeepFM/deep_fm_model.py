@@ -57,6 +57,11 @@ class DeepFMModel(keras.Model):
 
         self.bias_ = tf.Variable(0., name='GB')
 
+        self.user_mf_embedding(0)
+        self.item_mf_embedding(0)
+        self.u_bias(0)
+        self.i_bias(0)
+
         self.hidden = tf.keras.Sequential(
             [tf.keras.layers.Dense(self.hidden_layers[0][0],
                                    activation=self.hidden_layers[0][1], input_dim=2*self.embed_mf_size)] +

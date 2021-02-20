@@ -49,6 +49,10 @@ class NeuralMatrixFactorizationModel(keras.Model):
         self.item_mlp_embedding = keras.layers.Embedding(input_dim=self.num_items, output_dim=self.embed_mlp_size,
                                                          embeddings_initializer=self.initializer, name='I_MLP',
                                                          dtype=tf.float32)
+        self.user_mf_embedding(0)
+        self.user_mlp_embedding(0)
+        self.item_mf_embedding(0)
+        self.item_mlp_embedding(0)
 
         self.mlp_layers = keras.Sequential()
 

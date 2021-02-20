@@ -46,6 +46,9 @@ class ProbabilisticMatrixFactorizationModel(keras.Model):
                                                         embeddings_initializer=self.initializer, name='I_MF',
                                                         dtype=tf.float32)
 
+        self.user_mf_embedding(0)
+        self.item_mf_embedding(0)
+
         self.predict_layer = self.dot_prod
         self.noise = keras.layers.GaussianNoise(gaussian_variance, input_dim=1)
 

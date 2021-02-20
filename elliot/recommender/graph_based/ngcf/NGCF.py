@@ -51,11 +51,11 @@ class NGCF(RecMixin, BaseRecommenderModel):
             ("_factors", "latent_dim", "factors", 64, None, None),
             ("_l_w", "l_w", "l_w", 0.01, None, None),
             ("_weight_size", "weight_size", "weight_size", "(64,32)", lambda x: list(make_tuple(x)),
-             lambda x: str(x).replace(",", "-")),
+             lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
             ("_node_dropout", "node_dropout", "node_dropout", "(64,32)", lambda x: list(make_tuple(x)),
-             lambda x: str(x).replace(",", "-")),
+             lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
             ("_message_dropout", "message_dropout", "message_dropout", "(64,32)", lambda x: list(make_tuple(x)),
-             lambda x: str(x).replace(",", "-")),
+             lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
             ("_n_fold", "n_fold", "n_fold", 1, None, None),
         ]
         self.autoset_params()

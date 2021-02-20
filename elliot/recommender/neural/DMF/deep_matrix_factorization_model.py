@@ -48,6 +48,9 @@ class DeepMatrixFactorizationModel(keras.Model):
         self.item_embedding = keras.layers.Embedding(input_dim=self.num_items, output_dim=self.num_users,
                                                      weights=[sp_i_train_ratings.T.toarray()],
                                                      trainable=False, dtype=tf.float32)
+        self.user_embedding(0)
+        self.item_embedding(0)
+
         self.user_mlp_layers = keras.Sequential()
         for units in user_mlp[:-1]:
             self.user_mlp_layers.add(keras.layers.Dense(units, activation='relu', kernel_initializer=self.initializer))

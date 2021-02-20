@@ -54,6 +54,10 @@ class NeuralFactorizationMachineModel(keras.Model):
         self.i_bias = keras.layers.Embedding(input_dim=self.num_items, output_dim=1,
                                              embeddings_initializer=self.initializer, name='B_I_MF',
                                              dtype=tf.float32)
+        self.user_mf_embedding(0)
+        self.item_mf_embedding(0)
+        self.u_bias(0)
+        self.i_bias(0)
 
         self.bias_ = tf.Variable(0., name='GB')
 

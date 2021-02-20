@@ -42,6 +42,8 @@ class MatrixFactorizationModel(keras.Model):
                                                         embeddings_regularizer=keras.regularizers.l2(self.lambda_weights),
                                                         embeddings_initializer=self.initializer, name='I_MF',
                                                         dtype=tf.float32)
+        self.user_mf_embedding(0)
+        self.item_mf_embedding(0)
 
         self.loss = keras.losses.MeanSquaredError()
         self.optimizer = tf.optimizers.Adam(learning_rate)

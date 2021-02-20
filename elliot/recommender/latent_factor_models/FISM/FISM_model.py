@@ -57,8 +57,6 @@ class FISM_model(keras.Model):
 
         self.loss = keras.losses.BinaryCrossentropy()
 
-        #self.saver_ckpt = tf.train.Checkpoint(optimizer=self.optimizer, model=self)
-
     @tf.function
     def call(self, inputs, training=None):
         user, item = inputs

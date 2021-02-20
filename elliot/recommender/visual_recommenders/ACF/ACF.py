@@ -48,9 +48,9 @@ class ACF(RecMixin, BaseRecommenderModel):
             ("_learning_rate", "lr", "lr", 0.001, None, None),
             ("_l_w", "l_w", "l_w", 0.1, None, None),
             ("_layers_component", "layers_component", "layers_component", "(64,1)", lambda x: list(make_tuple(x)),
-             lambda x: str(x).replace(",", "-")),
+             lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
             ("_layers_item", "layers_item", "layers_item", "(64,1)", lambda x: list(make_tuple(x)),
-             lambda x: str(x).replace(",", "-"))
+             lambda x: self._batch_remove(str(x), " []").replace(",", "-"))
         ]
 
         self.autoset_params()

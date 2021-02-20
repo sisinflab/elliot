@@ -77,8 +77,6 @@ class NAIS_model(keras.Model):
 
         self.loss = keras.losses.BinaryCrossentropy()
 
-        #self.saver_ckpt = tf.train.Checkpoint(optimizer=self.optimizer, model=self)
-
     @tf.function
     def attention(self, user_history, target):
         # Attention Layers

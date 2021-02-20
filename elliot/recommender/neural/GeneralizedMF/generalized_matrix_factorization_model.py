@@ -40,6 +40,8 @@ class GeneralizedMatrixFactorizationModel(keras.Model):
         self.item_mf_embedding = keras.layers.Embedding(input_dim=self.num_items, output_dim=self.embed_mf_size,
                                                         embeddings_initializer=self.initializer, name='I_GMF',
                                                         dtype=tf.float32)
+        self.user_mf_embedding(0)
+        self.item_mf_embedding(0)
 
         if self.is_edge_weight_train:
             self.activation = keras.activations.sigmoid
