@@ -33,9 +33,9 @@ class NFM(RecMixin, BaseRecommenderModel):
         self._params_list = [
             ("_factors", "factors", "factors", 10, None, None),
             ("_hidden_neurons", "hidden_neurons", "hidden_neurons", "(64,32)", lambda x: list(make_tuple(x)),
-             lambda x: str(x).replace(",", "-")),
+             lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
             ("_hidden_activations", "hidden_activations", "hidden_activations", "('relu','relu')", lambda x: list(make_tuple(x)),
-             lambda x: str(x).replace(",", "-")),
+             lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
             ("_learning_rate", "lr", "lr", 0.001, None, None),
             ("_l_w", "reg", "reg", 0.1, None, None)
         ]

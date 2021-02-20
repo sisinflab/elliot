@@ -62,8 +62,8 @@ class WideAndDeep(RecMixin, BaseRecommenderModel):
             ("_lr", "lr", "lr", 0.001, None, None),
             ("_embed_k", "embed_k", "embed_k", 50, None, None),
             ("_mlp_hidden_size", "mlp_hidden_size", "mlp_hidden_size", "(32, 32, 1)",
-                lambda x: list(make_tuple(str(x))),
-                lambda x: str(x).replace(" ", "").replace(",", "-")),
+             lambda x: list(make_tuple(str(x))),
+             lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
             ("_dropout_prob", "dropout_prob", "dropout_prob", 0, None, None),
             ("_l_w", "l_w", "l_w", 0.005, None, None),
             ("_l_b", "l_b", "l_b", 0.0005, None, None)

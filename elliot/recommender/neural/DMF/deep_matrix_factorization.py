@@ -29,8 +29,8 @@ class DMF(RecMixin, BaseRecommenderModel):
 
         self._params_list = [
             ("_learning_rate", "lr", "lr", 0.0001, None, None),
-            ("_user_mlp", "user_mlp", "umlp", "(64,32)", lambda x: list(make_tuple(str(x))), lambda x: str(x).replace(",", "-")),
-            ("_item_mlp", "item_mlp", "imlp", "(64,32)", lambda x: list(make_tuple(str(x))), lambda x: str(x).replace(",", "-")),
+            ("_user_mlp", "user_mlp", "umlp", "(64,32)", lambda x: list(make_tuple(str(x))), lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
+            ("_item_mlp", "item_mlp", "imlp", "(64,32)", lambda x: list(make_tuple(str(x))), lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
             ("_neg_ratio", "neg_ratio", "negratio", 5, None, None),
             ("_reg", "reg", "reg", 0.001, None, None),
             ("_similarity", "similarity", "sim", "cosine", None, None)
