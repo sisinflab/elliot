@@ -15,7 +15,7 @@ from .unpersonalized import Random, MostPop
 from .autoencoders import MultiDAE, MultiVAE
 from .knowledge_aware import KaHFM, KaHFMBatch, KaHFMEmbeddings
 from .graph_based import NGCF, LightGCN
-from .visual_recommenders import VBPR, DeepStyle, ACF
+from .visual_recommenders import VBPR, DeepStyle, ACF, DVBPR
 from .NN import ItemKNN, UserKNN, AttributeItemKNN, AttributeUserKNN
 from .neural import DeepFM, DMF, NeuMF, NFM, GMF, NAIS, UserAutoRec, ItemAutoRec, ConvNeuMF, WideAndDeep, ConvMF
 from .content_based import VSM

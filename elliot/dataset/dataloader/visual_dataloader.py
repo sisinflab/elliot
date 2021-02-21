@@ -255,7 +255,9 @@ class VisualDataObject:
         if self.side_information_data.images_src_folder:
             self.output_image_size = literal_eval(
                 self.side_information_data.size_tuple) if self.side_information_data.size_tuple else None
-            self.image_dict = self.read_images_multiprocessing(self.side_information_data.images_src_folder, self.side_information_data.aligned_items, self.output_image_size)
+            self.item_mapping = pd.read_csv(self.side_information_data.item_mapping_path, sep="\t", header=None)
+            self.item_mapping = {i: j for i, j in zip(self.item_mapping[0], self.item_mapping[1])}
+            # self.image_dict = self.read_images_multiprocessing(self.side_information_data.images_src_folder, self.side_information_data.aligned_items, self.output_image_size)
 
         self.users = list(self.train_dict.keys())
         self.num_users = len(self.users)
