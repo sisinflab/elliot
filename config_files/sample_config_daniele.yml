@@ -1,7 +1,7 @@
 experiment:
   data_config:
     strategy: fixed
-    dataloader: VisualLoader
+    #dataloader: VisualLoader
     dataset_path: ../data/{0}/trainingset.tsv
     root_folder: ../data/{0}/splitting/
     train_path: ../data/{0}/trainingset.tsv
@@ -33,7 +33,7 @@ experiment:
 #    core: 5
 #    rounds: 2
 #  dataset: categorical_dbpedia_ml1m
-  dataset: amazon_men
+  dataset: example
 #  path_output_rec_result: ../results/{0}/recs/
 #  path_output_rec_weight: ../results/{0}/weights/
 #  path_output_rec_performance: ../results/{0}/performance/
@@ -172,20 +172,20 @@ experiment:
 #      l_w: 0.000025
 #      layers_component: (64, 1)
 #      layers_item: (64, 1)
-    DVBPR:
-      meta:
-        verbose: True
-        validation_rate: 1
-        save_weights: False
-        save_recs: False
-        validation_metric: nDCG
-        restore_epoch: -1
-      lr: 0.0001
-      epochs: 3
-      factors: 100
-      batch_size: 128
-      lambda_1: 0.0001
-      lambda_2: 1.0
+#    DVBPR:
+#      meta:
+#        verbose: True
+#        validation_rate: 1
+#        save_weights: False
+#        save_recs: False
+#        validation_metric: nDCG
+#        restore_epoch: -1
+#      lr: 0.0001
+#      epochs: 3
+#      factors: 100
+#      batch_size: 128
+#      lambda_1: 0.0001
+#      lambda_2: 1.0
 #      AMR:
 #        meta:
 #          verbose: True
@@ -395,6 +395,22 @@ experiment:
 #      restore: False
 #      factors: 50
 #      lr: 0.001
+    FFM:
+      meta:
+        hyper_max_evals: 1
+        hyper_opt_alg: tpe
+        validation_rate: 1
+        verbose: True
+        save_weights: False
+        save_recs: False
+        validation_metric: nDCG
+        restore_epoch: -1
+      epochs: 2
+      batch_size: 128
+      restore: False
+      factors: 50
+      lr: 0.001
+
 #    DeepFM:
 #      meta:
 #        hyper_max_evals: 1
