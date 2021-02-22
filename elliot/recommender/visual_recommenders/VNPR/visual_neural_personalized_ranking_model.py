@@ -21,6 +21,7 @@ class VNPRModel(keras.Model):
                  num_users,
                  num_items,
                  embed_mf_size, l_w, mlp_hidden_size, dropout, learning_rate=0.01,
+                 emb_image=None,
                  name="VNPR",
                  **kwargs):
         super().__init__(name=name, **kwargs)
@@ -44,6 +45,11 @@ class VNPRModel(keras.Model):
                                                           embeddings_initializer=self.initializer, name='I_MF_2',
                                                           dtype=tf.float32)
 
+        self.emb_image = emb_image
+
+        self.F = tf.Variable(
+            self.emb_image, dtype=tf.float32, trainable=False)
+
         self.mlp_layers_1 = keras.Sequential()
 
         for units in mlp_hidden_size:
@@ -66,11 +72,13 @@ class VNPRModel(keras.Model):
         user_mf_e = self.user_mf_embedding(user)
         item_mf_e_1 = self.item_mf_embedding_1(item1)
         item_mf_e_2 = self.item_mf_embedding_2(item2)
+        feature_e_1 = tf.nn.embedding_lookup(self.F, item1)
+        feature_e_2 = tf.nn.embedding_lookup(self.F, item2)
 
-        embedding_input_1 = user_mf_e * item_mf_e_1  # [batch_size, embedding_size]
+        embedding_input_1 = tf.concat([user_mf_e * item_mf_e_1, feature_e_1], axis=2)  # [batch_size, embedding_size]
         mlp_output_1 = self.mlp_layers_1(embedding_input_1)  # [batch_size, 1]
 
-        embedding_input_2 = user_mf_e * item_mf_e_2
+        embedding_input_2 = tf.concat([user_mf_e * item_mf_e_2, feature_e_2], axis=2)
         mlp_output_2 = self.mlp_layers_2(embedding_input_2)  # [batch_size, 1]
 
         return tf.squeeze(mlp_output_1), tf.squeeze(mlp_output_2), user_mf_e, item_mf_e_1, item_mf_e_2
@@ -121,9 +129,10 @@ class VNPRModel(keras.Model):
         user_mf_e = self.user_mf_embedding(user)
         item_mf_e_1 = self.item_mf_embedding_1(item)
         item_mf_e_2 = self.item_mf_embedding_2(item)
+        feature_e = tf.nn.embedding_lookup(self.F, item)
 
-        mf_output_1 = user_mf_e * item_mf_e_1  # [batch_size, embedding_size]
-        mf_output_2 = user_mf_e * item_mf_e_2  # [batch_size, embedding_size]
+        mf_output_1 = tf.concat([user_mf_e * item_mf_e_1, feature_e], axis=2)  # [batch_size, embedding_size]
+        mf_output_2 = tf.concat([user_mf_e * item_mf_e_2, feature_e], axis=2)  # [batch_size, embedding_size]
 
         mlp_output_1 = self.mlp_layers_1(mf_output_1)  # [batch_size, 1]
         mlp_output_2 = self.mlp_layers_2(mf_output_2)  # [batch_size, 1]

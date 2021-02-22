@@ -1,17 +1,17 @@
 experiment:
   data_config:
     strategy: fixed
-    #dataloader: VisualLoader
+    dataloader: VisualLoader
     dataset_path: ../data/{0}/trainingset.tsv
     root_folder: ../data/{0}/splitting/
     train_path: ../data/{0}/trainingset.tsv
 #    validation_path: ../data/{0}/trainingset.tsv
     test_path: ../data/{0}/testset.tsv
     side_information:
-      #visual_features: ../data/{0}/original/features.npy
+      visual_features: ../data/{0}/original/features.npy
       item_mapping: ../data/{0}/visual_feats.tsv
-      images_src_folder: ../data/{0}/original/images/
-      output_image_size: (224,224)
+#      images_src_folder: ../data/{0}/original/images/
+#      output_image_size: (224,224)
 #  splitting:
 #    save_on_disk: True
 #    save_folder: ../data/{0}/splitting/
@@ -33,7 +33,7 @@ experiment:
 #    core: 5
 #    rounds: 2
 #  dataset: categorical_dbpedia_ml1m
-  dataset: example
+  dataset: amazon_men
 #  path_output_rec_result: ../results/{0}/recs/
 #  path_output_rec_weight: ../results/{0}/weights/
 #  path_output_rec_performance: ../results/{0}/performance/
@@ -54,7 +54,7 @@ experiment:
 #      beta: 2
 #    - metric: SRecall
 #      feature_data: ../data/example/map.tsv
-  gpu: 0 # -1 is not use GPU
+  gpu: -1 # -1 is not use GPU
   models:
 #    MostPop:
 #      meta:
@@ -396,22 +396,21 @@ experiment:
 #      restore: False
 #      factors: 50
 #      lr: 0.001
-    FFM:
-      meta:
-        hyper_max_evals: 1
-        hyper_opt_alg: tpe
-        validation_rate: 1
-        verbose: True
-        save_weights: False
-        save_recs: False
-        validation_metric: nDCG
-        restore_epoch: -1
-      epochs: 2
-      batch_size: 128
-      restore: False
-      factors: 50
-      lr: 0.001
-
+#    FFM:
+#      meta:
+#        hyper_max_evals: 1
+#        hyper_opt_alg: tpe
+#        validation_rate: 1
+#        verbose: True
+#        save_weights: False
+#        save_recs: False
+#        validation_metric: nDCG
+#        restore_epoch: -1
+#      epochs: 2
+#      batch_size: 128
+#      restore: False
+#      factors: 50
+#      lr: 0.001
 #    DeepFM:
 #      meta:
 #        hyper_max_evals: 1
@@ -462,3 +461,31 @@ experiment:
 #      is_edge_weight_train: True
 #      lr: 0.01
 #      batch_size: 512
+#    NPR:
+#      meta:
+#        verbose: True
+#        save_recs: False
+#        save_weights: True
+#        validation_rate: 1
+#        restore: False
+#      mf_factors: 10
+#      mlp_hidden_size: (32, 1)
+#      prob_keep_dropout: 0.2
+#      batch_size: 512
+#      epochs: 1
+#      lr: 0.001
+#      l_w: 0.001
+    VNPR:
+      meta:
+        verbose: True
+        save_recs: False
+        save_weights: True
+        validation_rate: 1
+        restore: False
+      mf_factors: 10
+      mlp_hidden_size: (32, 1)
+      prob_keep_dropout: 0.2
+      batch_size: 64
+      epochs: 1
+      lr: 0.001
+      l_w: 0.001

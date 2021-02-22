@@ -38,6 +38,8 @@ class VNPR(RecMixin, BaseRecommenderModel):
         ]
         self.autoset_params()
 
+        item_indices = [self._data.item_mapping[self._data.private_items[item]] for item in range(self._num_items)]
+
         if self._batch_size < 1:
             self._batch_size = self._data.transactions
 
@@ -48,7 +50,8 @@ class VNPR(RecMixin, BaseRecommenderModel):
         self._model = VNPRModel(self._num_users, self._num_items, self._mf_factors, self._l_w,
                                                      self._mlp_hidden_size,
                                                      self._dropout,
-                                                     self._learning_rate)
+                                                     self._learning_rate,
+                                                     self._data.visual_features[item_indices])
 
     @property
     def name(self):
