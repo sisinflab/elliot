@@ -67,7 +67,7 @@ experiment:
 #        save_weights: False
 #        save_recs: False
 #        validation_metric: nDCG
-#        restore: -1
+#        restore_epoch: -1
 #      restore: False
 #      embed_k: 10
 #    WRMF:
@@ -79,7 +79,7 @@ experiment:
 #        save_weights: False
 #        save_recs: False
 #        validation_metric: nDCG
-#        restore: -1
+#        restore_epoch: -1
 #      epochs: 2
 #      embed_k: 10
 #      alpha: 1
@@ -117,7 +117,7 @@ experiment:
 ##        save_weights: False
 ##        save_recs: True
 ##        validation_metric: nDCG
-##        restore: -1
+##        restore_epoch: -1
 ##      lr: 0.0001
 ##      epochs: 10
 ##      batch_size: 512
@@ -147,7 +147,7 @@ experiment:
 #        save_weights: False
 #        save_recs: False
 #        validation_metric: nDCG
-#        restore: -1
+#        restore_epoch: -1
 #      lr: 0.05
 #      epochs: 1
 #      embed_k: 10
@@ -169,7 +169,7 @@ experiment:
 #        save_weights: False
 #        save_recs: False
 #        validation_metric: nDCG@10
-#        restore: -1
+#        restore_epoch: -1
 #      lr: 0.001
 #      epochs: 10
 #      embed_k: 50
@@ -186,7 +186,7 @@ experiment:
 ###        save_weights: False
 ###        save_recs: True
 ###        validation_metric: nDCG
-###        restore: -1
+###        restore_epoch: -1
 ###      lr: 0.05
 ###      epochs: 1
 ###      bias_regularization: 0
@@ -234,7 +234,9 @@ experiment:
 #      meta:
 #        verbose: True
 #        save_recs: False
+##        save_weights: True
 #        validation_rate: 1
+#        restore: True
 #      mf_factors: 10
 #      mlp_factors: 10
 #      mlp_hidden_size: (5, 3, 2)
@@ -242,7 +244,7 @@ experiment:
 #      is_mf_train: True
 #      is_mlp_train: True
 #      batch_size: 512
-#      epochs: 10
+#      epochs: 1
 #      lr: 0.001
 #       implementation: aiolli
 #    ItemKNN:
@@ -275,7 +277,7 @@ experiment:
 #        save_weights: False
 #        save_recs: False
 #        validation_metric: nDCG
-#        restore: -1
+#        restore_epoch: -1
 #      epochs: 2
 #      restore: False
 #      factors: [16,32]
@@ -290,7 +292,7 @@ experiment:
 #        save_weights: False
 #        save_recs: False
 #        validation_metric: nDCG
-#        restore: -1
+#        restore_epoch: -1
 #      epochs: 2
 #      restore: False
 #      li_reg: 0.0
@@ -306,7 +308,7 @@ experiment:
 #        save_weights: True
 #        save_recs: False
 #        validation_metric: nDCG
-#        restore: -1
+#        restore_epoch: -1
 #      epochs: [100,200]
 #      restore: False
 #      l1_ratio: 0.001
@@ -320,7 +322,7 @@ experiment:
 #        save_weights: True
 #        save_recs: True
 #        validation_metric: nDCG
-#        restore: -1
+#        restore_epoch: -1
 #      factors: 25
 #      margin: 0.5
 #      lr: 0.001
@@ -337,7 +339,7 @@ experiment:
 #        save_weights: True
 #        save_recs: False
 #        validation_metric: nDCG
-#        restore: -1
+#        restore_epoch: -1
 #      factors: 25
 #      lr: 0.001
 #      l_w: 0.0025
@@ -348,14 +350,12 @@ experiment:
 #      neg_ratio: 1
 #    NAIS:
 #      meta:
-#        hyper_max_evals: 10
-#        hyper_opt_alg: tpe
 #        validation_rate: 1
 #        verbose: True
 #        save_weights: True
-#        save_recs: True
+#        save_recs: False
 #        validation_metric: nDCG
-#        restore: -1
+#        restore: True
 #      factors: 25
 #      lr: 0.001
 #      l_w: 0.0025
@@ -363,7 +363,7 @@ experiment:
 #      alpha: 0.4
 #      beta: 0.5
 #      epochs: 1
-#      batch_size: 512
+#      batch_size: 64
 #      neg_ratio: 1
 #      weight_size: 32
 #      algorithm: concat
@@ -415,36 +415,104 @@ experiment:
 #      meta:
 #        validation_rate: 1
 #        verbose: True
-#        save_weights: False
+#        save_weights: True
 #        save_recs: True
 #        validation_metric: nDCG
-#        restore_epoch: False
+#        restore: True
 #      lr: 0.001
-#      epochs: [2,3]
-#      adversarial_epochs: [1,2]
+#      epochs: 2
+#      adversarial_epochs: 1
 #      embed_k: 50
 #      batch_size: 512
 #      l_w: 0.0025
 #      l_b: 0
 #      l_adv: 0.05
 #      eps: 0.5
-    IRGAN:
+#    IRGAN:
+#      meta:
+#        validation_rate: 1
+#        verbose: True
+#        save_weights: True
+#        save_recs: True
+#        validation_metric: nDCG
+#        restore: True
+#      lr: 0.001
+#      epochs: 2
+#      g_pretrain_epochs: 0
+#      d_pretrain_epochs: 0
+#      g_epochs: 1
+#      d_epochs: 1
+#      sample_lambda: 0.2
+#      embed_k: 50
+#      batch_size: 512
+#      l_w: 0.0025
+#      l_b: 0
+#      l_gan: 0.5
+#      predict_model: generator # or discriminator
+#    CFGAN:
+#      meta:
+#        validation_rate: 1
+#        verbose: True
+#        save_weights: True
+#        save_recs: True
+#        validation_metric: nDCG
+#        restore: True
+#      lr: 0.001
+#      epochs: 1
+#      g_epochs: 1
+#      d_epochs: 1
+#      embed_k: 50
+#      batch_size: 512
+#      l_w: 0.0025
+#      l_b: 0
+#      l_gan: 0.5
+#      s_zr: 0.0001
+#      s_pm: 0.0001
+#    WideAndDeep:
+#      meta:
+#        validation_rate: 1
+#        verbose: True
+#        save_weights: False
+#        save_recs: True
+#        validation_metric: nDCG
+#        restore: True
+#      lr: 0.05
+#      embed_k: 5
+#      mlp_hidden_size: (32,16,1)
+#      dropout_prob: 0.2
+#      l_w: 0.0001
+#      l_b: 0.0001
+#      epochs: 1
+#      batch_size: 1024
+#    ConvMF:
+#      meta:
+#        validation_rate: 1
+#        verbose: True
+#        save_weights: True
+#        save_recs: True
+#        validation_metric: nDCG
+#        restore: False
+#      lr: 0.05
+#      embedding_size: 64
+#      cnn_channels: (1, 32, 32)
+#      cnn_kernels: (1, 1)
+#      cnn_strides: (1,1)
+#      dropout_prob: 0.2
+#      l_w: 0.0001
+#      l_b: 0.0001
+#      epochs: 1
+#      batch_size: 64
+    NPR:
       meta:
-        validation_rate: 1
         verbose: True
-        save_weights: False
-        save_recs: True
-        validation_metric: nDCG
-        restore_epoch: -1
-      lr: 0.001
-      epochs: 2
-      g_pretrain_epochs: 0
-      d_pretrain_epochs: 0
-      g_epochs: 1
-      d_epochs: 1
-      sample_lambda: 0.2
-      embed_k: 50
+        save_recs: False
+        save_weights: True
+        validation_rate: 1
+        restore: False
+      mf_factors: 10
+      mlp_hidden_size: (32, 1)
+      prob_keep_dropout: 0.2
       batch_size: 512
-      l_w: 0.0025
-      l_b: 0
-      predict_model: generator # or discriminator
+      epochs: 1
+      lr: 0.001
+      l_w: 0.001
