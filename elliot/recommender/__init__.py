@@ -17,7 +17,7 @@ from .knowledge_aware import KaHFM, KaHFMBatch, KaHFMEmbeddings
 from .graph_based import NGCF, LightGCN
 from .visual_recommenders import VBPR, DeepStyle, ACF, DVBPR
 from .NN import ItemKNN, UserKNN, AttributeItemKNN, AttributeUserKNN
-from .neural import DeepFM, DMF, NeuMF, NFM, GMF, NAIS, UserAutoRec, ItemAutoRec, ConvNeuMF, WideAndDeep, ConvMF
+from .neural import DeepFM, DMF, NeuMF, NFM, GMF, NAIS, UserAutoRec, ItemAutoRec, ConvNeuMF, WideAndDeep, ConvMF, NPR
 from .content_based import VSM
 from .algebric import SlopeOne
 from .adversarial import AMF, AMR

@@ -9,3 +9,4 @@ from .ItemAutoRec import ItemAutoRec
 from .ConvNeuMF import ConvNeuMF
 from .WideAndDeep import WideAndDeep
 from .ConvMF import ConvMF
+from .NPR import NPR

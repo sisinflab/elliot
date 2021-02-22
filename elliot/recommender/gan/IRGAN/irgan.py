@@ -28,7 +28,7 @@ class IRGAN(RecMixin, BaseRecommenderModel):
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
         """
-        Create a BPR-MF instance.
+        Create a IRGAN instance.
         (see https://arxiv.org/abs/1705.10513 for details about the algorithm design choices).
 
         Args:
