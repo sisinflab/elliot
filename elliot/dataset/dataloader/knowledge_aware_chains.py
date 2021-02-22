@@ -309,8 +309,7 @@ class KnowledgeChainsDataObject:
     """
 
     def __init__(self, config, data_tuple, side_information_data, *args, **kwargs):
-        self.logger = logging.get_logger(self.__class__.__name__, pylog.CRITICAL if config.config_test else
-        pylog.DEBUG)
+        self.logger = logging.get_logger(self.__class__.__name__, pylog.CRITICAL if config.config_test else pylog.DEBUG)
         self.config = config
         self.side_information_data = side_information_data
         self.args = args

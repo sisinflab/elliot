@@ -7,20 +7,22 @@ __version__ = '0.1'
 __author__ = 'Vito Walter Anelli, Daniele Malitesta, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, daniele.malitesta@poliba.it, claudio.pomo@poliba.it'
 
+import concurrent.futures as c
+import logging as pylog
 import os
-import numpy as np
 import typing as t
+from ast import literal_eval
+from types import SimpleNamespace
+
+import PIL
+import numpy as np
 import pandas as pd
 import scipy.sparse as sp
-from ast import literal_eval
-import PIL
 from PIL import Image
-from types import SimpleNamespace
-import concurrent.futures as c
 
-from elliot.utils import logging
-from elliot.splitter.base_splitter import Splitter
 from elliot.prefiltering.standard_prefilters import PreFilter
+from elliot.splitter.base_splitter import Splitter
+from elliot.utils import logging
 
 """
 [(train_0,test_0)]
@@ -64,6 +66,8 @@ class VisualLoader:
         self.kwargs = kwargs
         self.config = config
         self.column_names = ['userId', 'itemId', 'rating', 'timestamp']
+        if config.config_test:
+            return
 
         if config.data_config.strategy == "fixed":
             path_train_data = config.data_config.train_path
@@ -72,7 +76,6 @@ class VisualLoader:
             visual_feature_path = getattr(config.data_config.side_information, "visual_features", None)
             item_mapping_path = getattr(config.data_config.side_information, "item_mapping", None)
             size_tuple = getattr(config.data_config.side_information, "output_image_size", None)
-
 
             if visual_feature_path and item_mapping_path:
                 feature_set = set(pd.read_csv(item_mapping_path, sep="\t", header=None)[0].unique().tolist())
@@ -98,8 +101,8 @@ class VisualLoader:
             self.side_information_data = SimpleNamespace()
 
             self.train_dataframe, self.side_information_data.aligned_items = self.load_dataset_dataframe(path_train_data,
-                                                                                                       "\t",
-                                                                                                       visual_set)
+                                                                                                         "\t",
+                                                                                                         visual_set)
             self.side_information_data.visual_feature_path = visual_feature_path
             self.side_information_data.item_mapping_path = item_mapping_path
             self.side_information_data.images_src_folder = images_src_folder
@@ -156,8 +159,8 @@ class VisualLoader:
             self.side_information_data = SimpleNamespace()
 
             self.dataframe, self.side_information_data.aligned_items = self.load_dataset_dataframe(path_dataset,
-                                                                                                       "\t",
-                                                                                                       visual_set)
+                                                                                                   "\t",
+                                                                                                   visual_set)
             self.side_information_data.visual_feature_path = visual_feature_path
             self.side_information_data.item_mapping_path = item_mapping_path
             self.side_information_data.images_src_folder = images_src_folder
@@ -210,8 +213,36 @@ class VisualLoader:
                 data_list.append(val_list)
             else:
                 single_dataobject = VisualDataObject(self.config, (train_val, test), self.side_information_data, self.args,
-                                                              self.kwargs)
+                                                     self.kwargs)
                 data_list.append([single_dataobject])
+        return data_list
+
+    def generate_dataobjects_mock(self) -> t.List[object]:
+        _column_names = ['userId', 'itemId', 'rating']
+        training_set = np.random.randint(0, self.config.top_k*20, size=(self.config.top_k*20, 3))
+        test_set = np.random.randint(0, self.config.top_k*20, size=(self.config.top_k*20, 3))
+
+        visual_feature_path = getattr(self.config.data_config.side_information, "visual_features", None)
+        item_mapping_path = getattr(self.config.data_config.side_information, "item_mapping", None)
+        size_tuple = getattr(self.config.data_config.side_information, "output_image_size", None)
+        images_src_folder = getattr(self.config.data_config.side_information, "images_src_folder", None)
+
+        side_information_data = SimpleNamespace()
+
+        side_information_data.visual_feature_path = visual_feature_path
+        side_information_data.item_mapping_path = item_mapping_path
+        side_information_data.images_src_folder = images_src_folder
+        side_information_data.size_tuple = size_tuple
+
+        training_set = pd.DataFrame(np.array(training_set), columns=_column_names)
+        test_set = pd.DataFrame(np.array(test_set), columns=_column_names)
+
+        side_information_data.aligned_items = {item: np.random.randint(0, 10, size=np.random.randint(0, 20)).tolist()
+                                               for item in training_set['itemId'].unique()}
+
+        data_list = [[VisualDataObject(self.config, (training_set, test_set), side_information_data,
+                                       self.args, self.kwargs)]]
+
         return data_list
 
     def load_dataset_dataframe(self, file_ratings,
@@ -240,7 +271,7 @@ class VisualDataObject:
     """
 
     def __init__(self, config, data_tuple, side_information_data, *args, **kwargs):
-        self.logger = logging.get_logger(self.__class__.__name__)
+        self.logger = logging.get_logger(self.__class__.__name__, pylog.CRITICAL if config.config_test else pylog.DEBUG)
         self.config = config
         self.side_information_data = side_information_data
         self.args = args
@@ -271,7 +302,7 @@ class VisualDataObject:
         self.transactions = sum(len(v) for v in self.train_dict.values())
 
         self.i_train_dict = {self.public_users[user]: {self.public_items[i]: v for i, v in items.items()}
-                                for user, items in self.train_dict.items()}
+                             for user, items in self.train_dict.items()}
 
         self.sp_i_train = self.build_sparse()
         self.sp_i_train_ratings = self.build_sparse_ratings()

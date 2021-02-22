@@ -10,6 +10,7 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 from types import SimpleNamespace
 import typing as t
 import numpy as np
+import logging as pylog
 
 from elliot.utils import logging
 
@@ -29,7 +30,7 @@ class ModelCoordinator(object):
         :param params: a SimpleNamespace that contains the hyper-parameters of the model
         :param model_class: the class of the recommendation model
         """
-        self.logger = logging.get_logger(self.__class__.__name__)
+        self.logger = logging.get_logger(self.__class__.__name__, pylog.CRITICAL if base.config_test else pylog.DEBUG)
         self.data_objs = data_objs
         self.base = base
         self.params = params

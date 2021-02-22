@@ -17,6 +17,7 @@ experiment:
   external_models_path: ../external/models/__init__.py
   print_results_as_triplets: True
   top_k: 20
+  config_test: True
   evaluation:
     cutoffs: [10, 5]
     simple_metrics: [nDCG, Precision, Recall, ItemCoverage, HR, MAP, F1, Gini, SEntropy, EFD, EPC, ARP, APLT, ACLT, PopREO, PopRSP]
@@ -299,7 +300,7 @@ experiment:
         save_recs: False
         validation_rate: 1
 #        save_weights: True
-        restore: True
+        restore: False
       mf_factors: [10, 20]
       mlp_factors: 10
       mlp_hidden_size: [(5, 3, 2),(5,2)]

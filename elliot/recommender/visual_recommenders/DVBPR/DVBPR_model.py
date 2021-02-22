@@ -44,7 +44,6 @@ class DVBPR_model(keras.Model):
         self.Cnn = FeatureExtractor(self._factors)
 
         self.optimizer = tf.optimizers.Adam(self._learning_rate)
-        self.saver_ckpt = tf.train.Checkpoint(optimizer=self.optimizer, model=self)
 
     @tf.function
     def call(self, inputs, training=None, mask=None):

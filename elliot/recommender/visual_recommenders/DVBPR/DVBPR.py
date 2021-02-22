@@ -74,12 +74,6 @@ class DVBPR(RecMixin, BaseRecommenderModel):
                                   self._num_users,
                                   self._num_items)
 
-        self.evaluator = Evaluator(self._data, self._params)
-        self._params.name = self.name
-        build_model_folder(self._config.path_output_rec_weight, self.name)
-        self._saving_filepath = f'{self._config.path_output_rec_weight}{self.name}/best-weights-{self.name}'
-        self.logger = logging.get_logger(self.__class__.__name__)
-
     @property
     def name(self):
         return "DVBPR" \
@@ -111,10 +105,9 @@ class DVBPR(RecMixin, BaseRecommenderModel):
                         result_dict = self.evaluator.eval(recs)
                         self._results.append(result_dict)
 
-                        print(f'Epoch {(it + 1)}/{self._epochs} loss {loss / steps:.3f}')
+                        self.logger.info(f'Epoch {(it + 1)}/{self._epochs} loss {loss / steps:.3f}')
 
                         if self._results[-1][self._validation_k]["val_results"][self._validation_metric] > best_metric_value:
-                            print("******************************************")
                             best_metric_value = self._results[-1][self._validation_k]["val_results"][self._validation_metric]
                             if self._save_weights:
                                 self._model.save_weights(self._saving_filepath)

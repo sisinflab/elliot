@@ -10,6 +10,7 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 import numpy as np
 from elliot.evaluation.metrics.base_metric import BaseMetric
 from elliot.utils import logging
+import logging as pylog
 
 class LAUC(BaseMetric):
     r"""
@@ -29,7 +30,7 @@ class LAUC(BaseMetric):
         :param eval_objects: list of objects that may be useful for the computation of the different metrics
         """
         super().__init__(recommendations, config, params, eval_objects)
-        self.logger = logging.get_logger("Evaluator")
+        self.logger = logging.get_logger("Evaluator",  pylog.CRITICAL if config.config_test else pylog.DEBUG)
         self._cutoff = self._evaluation_objects.cutoff
         self._relevance = self._evaluation_objects.relevance.binary_relevance
         self._num_items = self._evaluation_objects.num_items

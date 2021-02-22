@@ -2,13 +2,13 @@
 This is the implementation of the GroupAUC metric.
 It proceeds from a user-wise computation, and average the AUC values over the users.
 """
-import warnings
 
 __version__ = '0.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
 import numpy as np
+
 from elliot.evaluation.metrics.base_metric import BaseMetric
 from elliot.utils import logging
 
