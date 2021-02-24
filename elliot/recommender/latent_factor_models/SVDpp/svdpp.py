@@ -8,16 +8,14 @@ __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
 import numpy as np
-import pickle
 from tqdm import tqdm
 
 from elliot.dataset.samplers import custom_pointwise_sparse_sampler as cpss
+from elliot.recommender.base_recommender_model import BaseRecommenderModel
+from elliot.recommender.base_recommender_model import init_charger
 from elliot.recommender.latent_factor_models.SVDpp.svdpp_model import SVDppModel
 from elliot.recommender.recommender_utils_mixin import RecMixin
 from elliot.utils.write import store_recommendation
-
-from elliot.recommender.base_recommender_model import BaseRecommenderModel
-from elliot.recommender.base_recommender_model import init_charger
 
 np.random.seed(42)
 

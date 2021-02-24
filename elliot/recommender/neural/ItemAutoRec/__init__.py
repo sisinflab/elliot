@@ -2,9 +2,6 @@
 Module description:
 
 """
-import pickle
-
-from utils.folder import build_model_folder
 
 __version__ = '0.1'
 __author__ = 'Felice Antonio Merra, Vito Walter Anelli, Claudio Pomo'

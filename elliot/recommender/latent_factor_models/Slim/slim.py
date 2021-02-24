@@ -2,23 +2,21 @@
 Module description:
 
 """
-from utils import logging
+
 
 __version__ = '0.1'
 __author__ = 'Felice Antonio Merra, Vito Walter Anelli, Claudio Pomo'
 __email__ = 'felice.merra@poliba.it, vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
-import numpy as np
 import pickle
 
-from elliot.evaluation.evaluator import Evaluator
-from elliot.recommender.latent_factor_models.Slim.slim_model import SlimModel
-from elliot.recommender.recommender_utils_mixin import RecMixin
-from elliot.utils.folder import build_model_folder
-from elliot.utils.write import store_recommendation
+import numpy as np
 
 from elliot.recommender.base_recommender_model import BaseRecommenderModel
 from elliot.recommender.base_recommender_model import init_charger
+from elliot.recommender.latent_factor_models.Slim.slim_model import SlimModel
+from elliot.recommender.recommender_utils_mixin import RecMixin
+from elliot.utils.write import store_recommendation
 
 np.random.seed(42)
 

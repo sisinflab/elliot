@@ -9,7 +9,6 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
 import numpy as np
 from scipy import sparse as sp
-from scipy.sparse.linalg import spsolve
 from sklearn.utils.extmath import randomized_svd
 
 

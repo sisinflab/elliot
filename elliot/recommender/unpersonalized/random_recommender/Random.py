@@ -6,9 +6,9 @@ Tensorflow 2.1.0 implementation of APR.
 
 import numpy as np
 
-from recommender.base_recommender_model import BaseRecommenderModel
-from recommender.recommender_utils_mixin import RecMixin
-from utils.write import store_recommendation
+from elliot.recommender.base_recommender_model import BaseRecommenderModel
+from elliot.recommender.recommender_utils_mixin import RecMixin
+from elliot.utils.write import store_recommendation
 from elliot.recommender.base_recommender_model import init_charger
 
 

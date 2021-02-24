@@ -17,7 +17,7 @@ from elliot.recommender import BaseRecommenderModel
 from elliot.recommender.autoencoders.dae.multi_dae_model import DenoisingAutoEncoder
 from elliot.recommender.recommender_utils_mixin import RecMixin
 from elliot.utils.write import store_recommendation
-from recommender.base_recommender_model import init_charger
+from elliot.recommender.base_recommender_model import init_charger
 
 np.random.seed(42)
 random.seed(0)

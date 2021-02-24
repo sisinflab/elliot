@@ -7,19 +7,15 @@ __version__ = '0.1'
 __author__ = 'Felice Antonio Merra, Vito Walter Anelli, Claudio Pomo'
 __email__ = 'felice.merra@poliba.it, vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
-import pickle
-
 import numpy as np
 from tqdm import tqdm
-import pickle
 
 from elliot.dataset.samplers import pointwise_pos_neg_sampler as pws
-from elliot.utils.write import store_recommendation
-
 from elliot.recommender import BaseRecommenderModel
+from elliot.recommender.base_recommender_model import init_charger
 from elliot.recommender.gan.IRGAN.irgan_model import IRGAN_model
 from elliot.recommender.recommender_utils_mixin import RecMixin
-from elliot.recommender.base_recommender_model import init_charger
+from elliot.utils.write import store_recommendation
 
 np.random.seed(42)
 

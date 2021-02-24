@@ -1,1 +1,1 @@
-from recommender.NN.user_knn.user_knn import UserKNN
+from elliot.recommender.NN.user_knn.user_knn import UserKNN

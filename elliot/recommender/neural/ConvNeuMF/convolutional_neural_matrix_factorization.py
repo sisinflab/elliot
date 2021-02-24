@@ -7,19 +7,19 @@ __version__ = '0.1'
 __author__ = 'Felice Antonio Merra, Vito Walter Anelli, Claudio Pomo'
 __email__ = 'felice.merra@poliba.it, vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
-import numpy as np
-from ast import literal_eval as make_tuple
-from tqdm import tqdm
 import pickle
+from ast import literal_eval as make_tuple
+
+import numpy as np
+from tqdm import tqdm
 
 from elliot.dataset.samplers import custom_sampler as cs
+from elliot.recommender.base_recommender_model import BaseRecommenderModel
+from elliot.recommender.base_recommender_model import init_charger
 from elliot.recommender.neural.ConvNeuMF.convolutional_neural_matrix_factorization_model import \
     ConvNeuralMatrixFactorizationModel
 from elliot.recommender.recommender_utils_mixin import RecMixin
 from elliot.utils.write import store_recommendation
-
-from elliot.recommender.base_recommender_model import BaseRecommenderModel
-from elliot.recommender.base_recommender_model import init_charger
 
 np.random.seed(42)
 

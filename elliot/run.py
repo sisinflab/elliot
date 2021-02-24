@@ -33,7 +33,7 @@ def run_experiment(config_path: str = './config/config.yml'):
     base.base_namespace.evaluation.relevance_threshold = getattr(base.base_namespace.evaluation, "relevance_threshold", 0)
     res_handler = ResultHandler(rel_threshold=base.base_namespace.evaluation.relevance_threshold)
     hyper_handler = HyperParameterStudy(rel_threshold=base.base_namespace.evaluation.relevance_threshold)
-    dataloader_class = getattr(importlib.import_module("dataset"), base.base_namespace.data_config.dataloader)
+    dataloader_class = getattr(importlib.import_module("elliot.dataset"), base.base_namespace.data_config.dataloader)
     dataloader = dataloader_class(config=base.base_namespace)
     data_test_list = dataloader.generate_dataobjects()
     for key, model_base in builder.models():
@@ -49,7 +49,7 @@ def run_experiment(config_path: str = './config/config.yml'):
                 spec.loader.exec_module(external)
                 model_class = getattr(importlib.import_module("external"), key.split(".", 1)[1])
             else:
-                model_class = getattr(importlib.import_module("recommender"), key)
+                model_class = getattr(importlib.import_module("elliot.recommender"), key)
 
 
             model_placeholder = ho.ModelCoordinator(data_test, base.base_namespace, model_base, model_class)
@@ -137,7 +137,7 @@ def config_test(builder, base):
         base.base_namespace.evaluation.relevance_threshold = getattr(base.base_namespace.evaluation, "relevance_threshold", 0)
         res_handler = ResultHandler(rel_threshold=base.base_namespace.evaluation.relevance_threshold)
         hyper_handler = HyperParameterStudy(rel_threshold=base.base_namespace.evaluation.relevance_threshold)
-        dataloader_class = getattr(importlib.import_module("dataset"), base.base_namespace.data_config.dataloader)
+        dataloader_class = getattr(importlib.import_module("elliot.dataset"), base.base_namespace.data_config.dataloader)
         dataloader = dataloader_class(config=base.base_namespace)
         data_test_list = dataloader.generate_dataobjects_mock()
         for key, model_base in builder.models():
@@ -152,7 +152,7 @@ def config_test(builder, base):
                     spec.loader.exec_module(external)
                     model_class = getattr(importlib.import_module("external"), key.split(".", 1)[1])
                 else:
-                    model_class = getattr(importlib.import_module("recommender"), key)
+                    model_class = getattr(importlib.import_module("elliot.recommender"), key)
 
                 model_base_mock = model_base
                 model_base_mock = _reset_verbose_option(model_base_mock)

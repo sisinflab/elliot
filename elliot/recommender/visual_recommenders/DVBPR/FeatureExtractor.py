@@ -1,9 +1,9 @@
+import os
+import random
 from abc import ABC
 
-import tensorflow as tf
 import numpy as np
-import random
-import os
+import tensorflow as tf
 
 random.seed(0)
 np.random.seed(0)

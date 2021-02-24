@@ -7,24 +7,19 @@ __version__ = '0.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malitesta@poliba.it'
 
-from utils import logging
-import os
 
-from tqdm import tqdm
+import os
 
 import numpy as np
 import tensorflow as tf
+from tqdm import tqdm
 
-from dataset.samplers import pipeline_sampler as ps
-from evaluation.evaluator import Evaluator
+from elliot.dataset.samplers import pipeline_sampler as ps
+from elliot.recommender import BaseRecommenderModel
 from elliot.recommender.base_recommender_model import init_charger
-from utils.folder import build_model_folder
-
-from utils.write import store_recommendation
-
-from recommender.recommender_utils_mixin import RecMixin
-from recommender import BaseRecommenderModel
-from recommender.visual_recommenders.DVBPR.DVBPR_model import DVBPR_model
+from elliot.recommender.recommender_utils_mixin import RecMixin
+from elliot.recommender.visual_recommenders.DVBPR.DVBPR_model import DVBPR_model
+from elliot.utils.write import store_recommendation
 
 np.random.seed(0)
 tf.random.set_seed(0)

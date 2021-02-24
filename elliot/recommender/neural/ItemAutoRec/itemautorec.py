@@ -8,15 +8,14 @@ __author__ = 'Felice Antonio Merra, Vito Walter Anelli, Claudio Pomo'
 __email__ = 'felice.merra@poliba.it, vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
 import numpy as np
-from ast import literal_eval as make_tuple
 from tqdm import tqdm
 
 from elliot.dataset.samplers import sparse_sampler as sp
+from elliot.recommender.base_recommender_model import BaseRecommenderModel
+from elliot.recommender.base_recommender_model import init_charger
 from elliot.recommender.neural.ItemAutoRec.itemautorec_model import ItemAutoRecModel
 from elliot.recommender.recommender_utils_mixin import RecMixin
 from elliot.utils.write import store_recommendation
-from elliot.recommender.base_recommender_model import BaseRecommenderModel
-from elliot.recommender.base_recommender_model import init_charger
 
 np.random.seed(42)
 

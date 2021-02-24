@@ -7,23 +7,18 @@ __version__ = '0.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malitesta@poliba.it'
 
-from evaluation.evaluator import Evaluator
-from utils.folder import build_model_folder
-from utils.write import store_recommendation
-import elliot.dataset.samplers.custom_sparse_sampler as css
-
-import logging as log
-from utils import logging
-from ast import literal_eval as make_tuple
 import os
+from ast import literal_eval as make_tuple
 
 import numpy as np
 import tensorflow as tf
 from tqdm import tqdm
 
-from recommender import BaseRecommenderModel
-from recommender.recommender_utils_mixin import RecMixin
-from recommender.visual_recommenders.ACF.ACF_model import ACF_model
+import elliot.dataset.samplers.custom_sparse_sampler as css
+from elliot.recommender import BaseRecommenderModel
+from elliot.recommender.recommender_utils_mixin import RecMixin
+from elliot.recommender.visual_recommenders.ACF.ACF_model import ACF_model
+from elliot.utils.write import store_recommendation
 
 np.random.seed(0)
 tf.random.set_seed(0)
@@ -72,11 +67,6 @@ class ACF(RecMixin, BaseRecommenderModel):
                                 self._num_users,
                                 self._num_items)
 
-        self.evaluator = Evaluator(self._data, self._params)
-        self._params.name = self.name
-        build_model_folder(self._config.path_output_rec_weight, self.name)
-        self._saving_filepath = f'{self._config.path_output_rec_weight}{self.name}/best-weights-{self.name}'
-        self.logger = logging.get_logger(self.__class__.__name__)
 
     @property
     def name(self):

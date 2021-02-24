@@ -2,7 +2,6 @@
 Module description:
 
 """
-from utils import logging
 
 __version__ = '0.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo'

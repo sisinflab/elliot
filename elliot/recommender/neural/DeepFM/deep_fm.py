@@ -10,18 +10,18 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it,' \
             'daniele.malitesta@poliba.it, antonio.ferrara@poliba.it'
 
 import pickle
+from ast import literal_eval as make_tuple
 
 import numpy as np
 from tqdm import tqdm
 
-from ast import literal_eval as make_tuple
-
 from elliot.dataset.samplers import pointwise_pos_neg_sampler as pws
 from elliot.recommender.base_recommender_model import BaseRecommenderModel
+from elliot.recommender.base_recommender_model import init_charger
 from elliot.recommender.neural.DeepFM.deep_fm_model import DeepFMModel
 from elliot.recommender.recommender_utils_mixin import RecMixin
 from elliot.utils.write import store_recommendation
-from elliot.recommender.base_recommender_model import init_charger
+
 np.random.seed(42)
 
 

@@ -11,12 +11,12 @@ import numpy as np
 import pickle
 import time
 
-from recommender.recommender_utils_mixin import RecMixin
-from utils.write import store_recommendation
+from elliot.recommender.recommender_utils_mixin import RecMixin
+from elliot.utils.write import store_recommendation
 
-from recommender.base_recommender_model import BaseRecommenderModel
-from recommender.NN.user_knn.user_knn_similarity import Similarity
-from recommender.NN.user_knn.aiolli_ferrari import AiolliSimilarity
+from elliot.recommender.base_recommender_model import BaseRecommenderModel
+from elliot.recommender.NN.user_knn.user_knn_similarity import Similarity
+from elliot.recommender.NN.user_knn.aiolli_ferrari import AiolliSimilarity
 from elliot.recommender.base_recommender_model import init_charger
 
 np.random.seed(42)

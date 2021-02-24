@@ -11,15 +11,13 @@ __paper__ = 'FISM: Factored Item Similarity Models for Top-N Recommender Systems
 
 import numpy as np
 from tqdm import tqdm
-import pickle
 
 from elliot.dataset.samplers import pointwise_pos_neg_ratio_ratings_sampler as pws
-from elliot.utils.write import store_recommendation
-
 from elliot.recommender import BaseRecommenderModel
+from elliot.recommender.base_recommender_model import init_charger
 from elliot.recommender.neural.NAIS.nais_model import NAIS_model
 from elliot.recommender.recommender_utils_mixin import RecMixin
-from elliot.recommender.base_recommender_model import init_charger
+from elliot.utils.write import store_recommendation
 
 np.random.seed(42)
 

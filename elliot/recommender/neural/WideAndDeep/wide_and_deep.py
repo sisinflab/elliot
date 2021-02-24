@@ -8,20 +8,19 @@ __author__ = 'Felice Antonio Merra, Vito Walter Anelli, Claudio Pomo'
 __email__ = 'felice.merra@poliba.it, vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 __paper__ = 'Wide & Deep Learning for Recommender Systems [https://dl.acm.org/doi/pdf/10.1145/2988450.2988454]'
 
-import numpy as np
 from ast import literal_eval as make_tuple
-from tqdm import tqdm
-import pickle
+
+import numpy as np
 import scipy.sparse as sp
+from sklearn.preprocessing import OneHotEncoder
+from tqdm import tqdm
 
 from elliot.dataset.samplers import pointwise_wide_and_deep_sampler as pwwds
+from elliot.recommender.base_recommender_model import BaseRecommenderModel
+from elliot.recommender.base_recommender_model import init_charger
 from elliot.recommender.neural.WideAndDeep.wide_and_deep_model import WideAndDeepModel
 from elliot.recommender.recommender_utils_mixin import RecMixin
 from elliot.utils.write import store_recommendation
-
-from elliot.recommender.base_recommender_model import BaseRecommenderModel
-from elliot.recommender.base_recommender_model import init_charger
-from sklearn.preprocessing import OneHotEncoder
 
 np.random.seed(42)
 

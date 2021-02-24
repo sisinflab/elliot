@@ -7,17 +7,17 @@ __version__ = '0.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
-import numpy as np
 import random
+
+import numpy as np
 from tqdm import tqdm
 
-from dataset.samplers import sparse_sampler as sp
-from recommender import BaseRecommenderModel
-from recommender.base_recommender_model import init_charger
-from utils.write import store_recommendation
-
-from recommender.autoencoders.vae.multi_vae_model import VariationalAutoEncoder
-from recommender.recommender_utils_mixin import RecMixin
+from elliot.dataset.samplers import sparse_sampler as sp
+from elliot.recommender import BaseRecommenderModel
+from elliot.recommender.autoencoders.vae.multi_vae_model import VariationalAutoEncoder
+from elliot.recommender.base_recommender_model import init_charger
+from elliot.recommender.recommender_utils_mixin import RecMixin
+from elliot.utils.write import store_recommendation
 
 np.random.seed(42)
 random.seed(0)

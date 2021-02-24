@@ -2,23 +2,21 @@
 Module description:
 
 """
-from utils import logging
-from utils.folder import build_model_folder
 
 __version__ = '0.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malitesta@poliba.it'
 
-from tqdm import tqdm
 import numpy as np
+from tqdm import tqdm
 
 from elliot.dataset.samplers import custom_sampler as cs
 from elliot.recommender import BaseRecommenderModel
+from elliot.recommender.base_recommender_model import init_charger
 from elliot.recommender.knowledge_aware.kaHFM_batch.kahfm_batch_model import KaHFM_model
-from elliot.utils.write import store_recommendation
 from elliot.recommender.knowledge_aware.kaHFM_batch.tfidf_utils import TFIDF
 from elliot.recommender.recommender_utils_mixin import RecMixin
-from elliot.recommender.base_recommender_model import init_charger
+from elliot.utils.write import store_recommendation
 
 np.random.seed(42)
 

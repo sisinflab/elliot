@@ -2,25 +2,24 @@
 Module description:
 
 """
-from utils import logging
+
 
 __version__ = '0.1'
 __author__ = 'Felice Antonio Merra, Vito Walter Anelli, Claudio Pomo'
 __email__ = 'felice.merra@poliba.it, vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
-import numpy as np
 import pickle
+
+import numpy as np
 from tqdm import tqdm
 
-from dataset.samplers import custom_sampler as cs
-from evaluation.evaluator import Evaluator
-from recommender.latent_factor_models.BPRSlim.bprslim_model import BPRSlimModel
-from recommender.recommender_utils_mixin import RecMixin
-from utils.folder import build_model_folder
-from utils.write import store_recommendation
-
-from recommender.base_recommender_model import BaseRecommenderModel
+from elliot.dataset.samplers import custom_sampler as cs
 from elliot.recommender.base_recommender_model import init_charger
+from elliot.recommender.base_recommender_model import BaseRecommenderModel
+from elliot.recommender.latent_factor_models.BPRSlim.bprslim_model import BPRSlimModel
+from elliot.recommender.recommender_utils_mixin import RecMixin
+from elliot.utils.write import store_recommendation
+
 np.random.seed(42)
 
 

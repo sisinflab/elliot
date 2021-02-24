@@ -9,6 +9,7 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it,' \
             'daniele.malitesta@poliba.it, antonio.ferrara@poliba.it'
 
 import os
+
 import numpy as np
 import tensorflow as tf
 from tensorflow import keras

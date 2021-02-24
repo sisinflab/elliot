@@ -3,7 +3,7 @@ Module description:
 Lemire, Daniel, and Anna Maclachlan. "Slope one predictors for online rating-based collaborative filtering."
 Proceedings of the 2005 SIAM International Conference on Data Mining. Society for Industrial and Applied Mathematics
 """
-from utils import logging
+
 
 __version__ = '0.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo'
@@ -17,14 +17,14 @@ from elliot.recommender.recommender_utils_mixin import RecMixin
 from elliot.utils.folder import build_model_folder
 from elliot.utils.write import store_recommendation
 
-from elliot.recommender.base_recommender_model import BaseRecommenderModel
+from elliot.recommender.base_recommender_model import BaseRecommenderModel, init_charger
 from elliot.recommender.algebric.slope_one.slope_one_model import SlopeOneModel
 
 np.random.seed(42)
 
 
 class SlopeOne(RecMixin, BaseRecommenderModel):
-
+    @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
         super().__init__(data, config, params, *args, **kwargs)
 
@@ -36,12 +36,6 @@ class SlopeOne(RecMixin, BaseRecommenderModel):
         self._i_ratings = self._data.i_train_dict
 
         self._model = SlopeOneModel(self._data)
-
-        self.evaluator = Evaluator(self._data, self._params)
-        self._params.name = self.name
-        build_model_folder(self._config.path_output_rec_weight, self.name)
-        self._saving_filepath = f'{self._config.path_output_rec_weight}{self.name}/best-weights-{self.name}'
-        self.logger = logging.get_logger(self.__class__.__name__)
 
     def get_recommendations(self, k: int = 100):
         return {u: self._model.get_user_recs(u, k) for u in self._ratings.keys()}

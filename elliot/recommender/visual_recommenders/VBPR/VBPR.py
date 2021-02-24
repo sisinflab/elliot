@@ -18,10 +18,7 @@ from elliot.recommender import BaseRecommenderModel
 from elliot.recommender.base_recommender_model import init_charger
 from elliot.recommender.recommender_utils_mixin import RecMixin
 from elliot.recommender.visual_recommenders.VBPR.VBPR_model import VBPR_model
-from evaluation.evaluator import Evaluator
-from utils import logging
-from utils.folder import build_model_folder
-from utils.write import store_recommendation
+from elliot.utils.write import store_recommendation
 
 np.random.seed(0)
 tf.random.set_seed(0)
@@ -76,12 +73,6 @@ class VBPR(RecMixin, BaseRecommenderModel):
                                  self._data.visual_features[item_indices],
                                  self._num_users,
                                  self._num_items)
-
-        self.evaluator = Evaluator(self._data, self._params)
-        self._params.name = self.name
-        build_model_folder(self._config.path_output_rec_weight, self.name)
-        self._saving_filepath = f'{self._config.path_output_rec_weight}{self.name}/best-weights-{self.name}'
-        self.logger = logging.get_logger(self.__class__.__name__)
 
     @property
     def name(self):
