@@ -143,7 +143,7 @@ class BPRMF(RecMixin, BaseRecommenderModel):
         self._random = np.random
 
         self._params_list = [
-            ("_factors", "factors", "factors", 10, None, None),
+            ("_factors", "factors", "factors", 10, int, None),
             ("_learning_rate", "lr", "lr", 0.05, None, None),
             ("_bias_regularization", "bias_regularization", "bias_regularization", 0, None, None),
             ("_user_regularization", "positive_item_regularization", "positive_item_regularization", 0.0025,
