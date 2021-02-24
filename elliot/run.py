@@ -9,15 +9,14 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
 import importlib
 import sys
-import logging
-
 from os import path
+
+import numpy as np
 from hyperopt import Trials, fmin
 
+import elliot.hyperoptimization as ho
 from elliot.namespace.namespace_model_builder import NameSpaceBuilder
 from elliot.result_handler.result_handler import ResultHandler, HyperParameterStudy, StatTest
-import elliot.hyperoptimization as ho
-import numpy as np
 from elliot.utils import logging as logging_project
 
 _rstate = np.random.RandomState(42)
