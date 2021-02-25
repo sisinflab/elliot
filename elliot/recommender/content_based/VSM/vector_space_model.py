@@ -44,24 +44,26 @@ class VSM(RecMixin, BaseRecommenderModel):
             self._tfidf = self._tfidf_obj.tfidf()
             self._user_profiles = self._tfidf_obj.get_profiles(self._ratings)
         else:
-            self._user_profiles = {user: self.compute_binary_profile(user_items) for user, user_items in self._ratings.items()}
+            self._user_profiles = {user: self.compute_binary_profile(user_items)
+                                   for user, user_items in self._ratings.items()}
 
-        self._i_user_feature_dict = {self._data.public_users[user]: {self._data.public_features[feature]: value for feature, value in user_features.items()} for user, user_features in self._user_profiles.items()}
+        self._i_user_feature_dict = {self._data.public_users[user]: {self._data.public_features[feature]: value
+                                                                     for feature, value in user_features.items()}
+                                     for user, user_features in self._user_profiles.items()}
         self._sp_i_user_features = self.build_feature_sparse_values(self._i_user_feature_dict, self._num_users)
 
         if self._item_profile_type == "tfidf":
             self._tfidf_obj = TFIDF(self._data.side_information_data.feature_map)
             self._tfidf = self._tfidf_obj.tfidf()
             self._i_item_feature_dict = {
-                self._data.public_items[item]: {self._data.public_features[feature]: self._tfidf[item].get(feature, 0)
-                                                for feature in item_features}
-                for item, item_features in self._data.side_information_data.feature_map.items()}
+                i_item: {self._data.public_features[feature]: self._tfidf[item].get(feature, 0)
+                         for feature in self._data.side_information_data.feature_map[item]}
+                for item, i_item in self._data.public_items.items()}
             self._sp_i_item_features = self.build_feature_sparse_values(self._i_item_feature_dict, self._num_items)
         else:
-            self._i_item_feature_dict = {
-                self._data.public_items[item]: [self._data.public_features[feature]
-                                                for feature in item_features]
-                for item, item_features in self._data.side_information_data.feature_map.items()}
+            self._i_item_feature_dict = {i_item: [self._data.public_features[feature] for feature
+                                                  in self._data.side_information_data.feature_map[item]]
+                                         for item, i_item in self._data.public_items.items()}
             self._sp_i_item_features = self.build_feature_sparse(self._i_item_feature_dict, self._num_items)
 
         self._model = Similarity(self._data, self._sp_i_user_features, self._sp_i_item_features, self._similarity)

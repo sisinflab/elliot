@@ -35,7 +35,9 @@ class AttributeItemKNN(RecMixin, BaseRecommenderModel):
 
         self._ratings = self._data.train_dict
 
-        self._i_feature_dict = {self._data.public_items[item]: [self._data.public_features[feature] for feature in item_features] for item, item_features in self._data.side_information_data.feature_map.items()}
+        self._i_feature_dict = {i_item: [self._data.public_features[feature] for feature
+                                         in self._data.side_information_data.feature_map[item]] for item, i_item
+                                in self._data.public_items.items()}
         self._sp_i_features = self.build_feature_sparse()
 
         self._model = Similarity(self._data, self._sp_i_features, self._num_neighbors, self._similarity)

@@ -45,7 +45,9 @@ class AttributeUserKNN(RecMixin, BaseRecommenderModel):
         else:
             self._user_profiles = {user: self.compute_binary_profile(user_items) for user, user_items in self._ratings.items()}
 
-        self._i_feature_dict = {self._data.public_users[user]: {self._data.public_features[feature]: value for feature, value in user_features.items()} for user, user_features in self._user_profiles.items()}
+        self._i_feature_dict = {self._data.public_users[user]: {self._data.public_features[feature]: value
+                                                                for feature, value in user_features.items()}
+                                for user, user_features in self._user_profiles.items()}
         self._sp_i_features = self.build_feature_sparse_values()
 
         self._model = Similarity(self._data, self._sp_i_features, self._num_neighbors, self._similarity)
