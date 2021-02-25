@@ -111,7 +111,6 @@ class NGCF(RecMixin, BaseRecommenderModel):
 
         best_metric_value = 0
         for it in range(self._epochs):
-            self.restore_weights(it)
             loss = 0
             steps = 0
             with tqdm(total=int(self._data.transactions // self._batch_size), disable=not self._verbose) as t:
