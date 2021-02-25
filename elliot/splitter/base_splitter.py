@@ -163,7 +163,9 @@ class Splitter:
                     else:
                         raise Exception("Folds option value is not valid")
                 else:
-                    raise Exception(f"Option missing for {valtest_splitting_ns.strategy} strategy")
+                    valtest_splitting_ns.folds = 1
+                    print("Folds option value is missing. It has been set to 1")
+                    # raise Exception(f"Option missing for {valtest_splitting_ns.strategy} strategy")
 
                 if hasattr(valtest_splitting_ns, "test_ratio"):
                     tuple_list = self.splitting_randomsubsampling_kfolds(data, int(valtest_splitting_ns.folds),

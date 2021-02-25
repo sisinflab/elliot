@@ -64,7 +64,7 @@ class NameSpaceModel:
         self.config_file = open(config_path)
         self.config = load(self.config_file, Loader=FullLoader)
 
-        os.environ['CUDA_VISIBLE_DEVICES'] = str(self.config[_experiment][_gpu])
+        os.environ['CUDA_VISIBLE_DEVICES'] = str(self.config[_experiment].get(_gpu,-1))
 
     @staticmethod
     def _set_path(config_path, local_path):
