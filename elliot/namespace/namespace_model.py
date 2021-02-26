@@ -144,8 +144,8 @@ class NameSpaceModel:
                                                       v.format(self.config[_experiment][_dataset]))
                                     for k, v in complex_metric.items() if isinstance(v, str)})
                 self.config[_experiment][p]["complex_metrics"] = complex_metrics
-                self.config[_experiment][p]["paired_ttest"] = complex_metrics
-                self.config[_experiment][p]["wilcoxon_test"] = complex_metrics
+                self.config[_experiment][p]["paired_ttest"] = paired_ttest
+                self.config[_experiment][p]["wilcoxon_test"] = wilcoxon_test
                 setattr(self.base_namespace, p, SimpleNamespace(**self.config[_experiment][p]))
             elif p == _logger_config and not self.config[_experiment].get(p, False):
                 setattr(self.base_namespace, p, f"{self._base_folder_path_elliot}/config/logger_config.yml")
