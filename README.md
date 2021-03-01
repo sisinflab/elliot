@@ -2,6 +2,12 @@
 
 ![PyPI - Python Version](https://img.shields.io/badge/version-3.6%7C3.7%7C3.8-blue) [![Version](https://img.shields.io/badge/version-v1.0.0-green)](https://github.com/sisinflab/elliot) ![GitHub repo size](https://img.shields.io/github/repo-size/sisinflab/elliot) ![GitHub](https://img.shields.io/github/license/sisinflab/elliot.svg)
 
+[Docs] | [Paper]
+
+[Docs]: https://elliot.readthedocs.io/en/latest/
+
+[Paper]: https://elliot.readthedocs.io/en/latest/
+
 Elliot is a comprehensive recommendation framework that analyzes the recommendation problem from the researcher's perspective.
 It conducts a whole experiment, from dataset loading to results gathering.
 The core idea is to feed the system with a simple and straightforward configuration file that drives the framework 
