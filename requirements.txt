@@ -1,8 +1,8 @@
 hyperopt==0.2.5
-tensorflow==2.4.1
+tensorflow==2.3.0
 tqdm==4.58.0
-scipy==1.5.4
-numpy==1.19.5
+scipy==1.4.1
+numpy==1.18.0
 pandas==1.1.5
 Pillow==8.1.0
 PyYAML==5.4.1
