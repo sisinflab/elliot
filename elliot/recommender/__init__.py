@@ -22,4 +22,4 @@ from .content_based import VSM
 from .algebric import SlopeOne
 from .adversarial import AMF, AMR
 from .gan import IRGAN, CFGAN
-# from .attentive import AFM
+

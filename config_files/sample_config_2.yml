@@ -294,22 +294,22 @@ experiment:
 #      reg: 0.005
 #      gaussian_variance: 0.01
 #      batch_size: 512
-    NeuMF:
-      meta:
-        verbose: False
-        save_recs: False
-        validation_rate: 1
-#        save_weights: True
-        restore: False
-      mf_factors: [10, 20]
-      mlp_factors: 10
-      mlp_hidden_size: [(5, 3, 2),(5,2)]
-      dropout: 0.2
-      is_mf_train: True
-      is_mlp_train: True
-      batch_size: 512
-      epochs: 1
-      lr: 0.001
+#    NeuMF:
+#      meta:
+#        verbose: False
+#        save_recs: False
+#        validation_rate: 1
+##        save_weights: True
+#        restore: False
+#      mf_factors: [10, 20]
+#      mlp_factors: 10
+#      mlp_hidden_size: [(5, 3, 2),(5,2)]
+#      dropout: 0.2
+#      is_mf_train: True
+#      is_mlp_train: True
+#      batch_size: 512
+#      epochs: 1
+#      lr: 0.001
 #    ItemKNN:
 #      meta:
 #        verbose: True
@@ -377,3 +377,46 @@ experiment:
 #      reg_w: 0.001
 #      reg_b: 0
 #      lr: 0.0001
+    NeuMF:
+      meta:
+        hyper_max_evals: 5
+        hyper_opt_alg: tpe
+        validation_rate: 5
+      lr: [ loguniform, -10, -1 ]
+      batch_size: [ 128, 256, 512 ]
+      epochs: 50
+      mf_factors: [ quniform, 8, 32, 1 ]
+      mlp_factors: [ 8, 16 ]
+      mlp_hidden_size: [ (32, 16, 8), (64, 32, 16) ]
+      prob_keep_dropout: 0.2
+      is_mf_train: True
+      is_mlp_train: True
+    MultiVAE:
+      meta:
+        hyper_max_evals: 5
+        hyper_opt_alg: tpe
+        validation_rate: 5
+      lr: [ 0.0005, 0.001, 0.005, 0.01 ]
+      epochs: 50
+      batch_size: [ 128, 256, 512 ]
+      intermediate_dim: [ 300, 400, 500 ]
+      latent_dim: [ 100, 200, 300 ]
+      dropout_pkeep: 1
+      reg_lambda: [ 0.1, 0.0, 10 ]
+    BPRMF:
+      meta:
+        hyper_max_evals: 5
+        hyper_opt_alg: rand
+        validation_rate: 5
+      lr: [ 0.0005, 0.001, 0.005, 0.01 ]
+      batch_size: [ 128, 256, 512 ]
+      epochs: 50
+      embed_k: [ 10, 50, 100 ]
+      bias_regularization: 0
+      user_regularization: [ 0.0025, 0.005, 0.01 ]
+      positive_item_regularization: [ 0.0025, 0.005, 0.01 ]
+      negative_item_regularization: [ 0.00025, 0.0005, 0.001 ]
+      update_negative_item_factors: True
+      update_users: True
+      update_items: True
+      update_bias: True

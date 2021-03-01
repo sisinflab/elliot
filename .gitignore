@@ -42,3 +42,8 @@ wheels/
 .installed.cfg
 *.egg
 MANIFEST
+docs/source/_build
+docs/source/_static
+docs/source/_templates
+docs/source/elliot.*
+docs/source/README*
