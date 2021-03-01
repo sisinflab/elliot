@@ -10,7 +10,7 @@ experiment:
   top_k: 10
   evaluation:
     simple_metrics: [nDCG]
-#  gpu: -1 # -1 is not use GPU
+#  gpu: -1
   models:
     ItemKNN:
       meta:
