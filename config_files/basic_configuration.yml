@@ -22,7 +22,7 @@ experiment:
   top_k: 50
   evaluation:
     cutoffs: [10, 5]
-    simple_metrics: [Precision,nDCG,ItemCoverage,EPC,Gini]
+    simple_metrics: [nDCG,Precision,ItemCoverage,EPC,Gini]
     relevance_threshold: 1
   gpu: 1
   external_models_path: ../external/models/__init__.py

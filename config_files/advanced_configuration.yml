@@ -75,7 +75,6 @@ experiment:
       lr: [0.0005, 0.001, 0.005, 0.01]
       batch_size: [128, 256, 512]
       epochs: 50
-      embed_k: [10, 50, 100]
       bias_regularization: 0
       user_regularization: [0.0025, 0.005, 0.01]
       positive_item_regularization: [0.0025, 0.005, 0.01]
