@@ -43,10 +43,9 @@ Elliot works with the following operating systems:
 
 Elliot requires Python version 3.6 or later.
 
-RecBole requires tensorflow version 2.4.1 or later. If you want to use
-Elliot with GPU, please ensure that CUDA or cudatoolkit version is
-XXX.XXX or later. This requires NVIDIA driver version >= XXX.XXX (for
-Linux) or >= XXX.XXX (for Windows10).
+Elliot requires tensorflow version 2.3.2 or later. If you want to use Elliot with GPU,
+please ensure that CUDA or cudatoolkit version is 7.6 or later.
+This requires NVIDIA driver version >= 10.1 (for Linux and Windows10).
 
 Install from source
 ~~~~~~~~~~~~~~~~~~~
