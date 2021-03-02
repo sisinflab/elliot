@@ -19,9 +19,9 @@ pip-selfcheck.json
 # End of https://www.toptal.com/developers/gitignore/api/venv
 
 /results/
-/data/example
-/data/tradesy
-/data/categorical_dbpedia_ml1m
+/data/*
+!/data/cat_dbpedia_movielens_1m
+!/data/movielens_1m
 /share/
 **/__pycache__/**
 *.log

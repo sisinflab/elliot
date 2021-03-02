@@ -15,6 +15,8 @@ through the experimental setting choices.
 Elliot untangles the complexity of combining splitting strategies, hyperparameter model optimization, model training, 
 and the generation of reports of the experimental results.
 
+![system schema](img/elliot_img.png)
+
 The framework loads, filters, and splits the data considering a vast set of strategies (splitting methods and filtering 
 approaches, from temporal training-test splitting to nested K-folds Cross-Validation).
 Elliot optimizes hyperparameters for several recommendation algorithms, selects the best models, compares them with the 
