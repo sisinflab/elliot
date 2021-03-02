@@ -1,6 +1,8 @@
-from setuptools import Extension, setup, find_packages, dist
 from codecs import open
 from os import path
+
+from pip._internal.req import parse_requirements
+from setuptools import setup, dist
 
 dist.Distribution().fetch_build_eggs(['numpy>=1.11.2'])
 try:
@@ -24,10 +26,11 @@ with open(path.join(here, 'README.md'), encoding='utf-8') as f:
     long_description = f.read()
 
 # get the dependencies and installs
-with open(path.join(here, 'requirements.txt'), encoding='utf-8') as f:
-    all_reqs = f.read().split('\n')
+# parse_requirements() returns generator of pip.req.InstallRequirement objects
+install_reqs = parse_requirements('requirements.txt')
 
-install_requires = [x.strip() for x in all_reqs if 'git+' not in x]
+# reqs is a list of requirement
+reqs = [str(ir.req) for ir in install_reqs]
 
 ext = '.pyx' if USE_CYTHON else '.c'
 cmdclass = {}
@@ -50,7 +53,7 @@ setup(
     url='https://github.com/sisnflab/elliot',
     keywords='recommender recommendation system evaluation framework',
     cmdclass=cmdclass,
-    install_requires=install_requires,
+    install_requires=reqs,
 
     classifiers=[
         'Development Status :: 4 - Beta',
