@@ -159,8 +159,11 @@ Elliot is developed by:
 It is maintained by `SisInfLab Group <http://sisinflab.poliba.it/>`__
 and `Information Retrieval Group <http://ir.ii.uam.es/>`__.
 
-\* Corresponding authors ## License ELLIOT uses `APACHE2
-License <./LICENSE>`__.
+\* Corresponding authors
+
+License
+----------------
+ELLIOT uses `APACHE2 License <./LICENSE>`__.
 
 Acknowledgements
 ----------------
