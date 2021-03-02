@@ -38,6 +38,9 @@ Elliot requires tensorflow version 2.3.2 or later. If you want to use Elliot wit
 please ensure that CUDA or cudatoolkit version is 7.6 or later.
 This requires NVIDIA driver version >= 10.1 (for Linux and Windows10).
 
+Please refer to this [document](https://www.tensorflow.org/install/source#gpu) for further 
+working configurations.
+
 [comment]: <> (### Install from conda)
 
 [comment]: <> (```bash)
