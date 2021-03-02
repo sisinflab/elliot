@@ -157,11 +157,12 @@ Talk about Elliot on social media with the hashtag **#elliotrs**.
 Elliot is developed by
 * Vito Walter Anelli<sup id="a1">[*](#f1)</sup> (vitowalter.anelli@poliba.it)
 * Alejandro Bellogín (alejandro.bellogin@uam.es)
-* Tommaso Di Noia (tommaso.dinoia@poliba.it)
 * Antonio Ferrara (antonio.ferrara@poliba.it)
 * Daniele Malitesta (daniele.malitesta@poliba.it)
 * Felice Antonio Merra (felice.merra@poliba.it)
 * Claudio Pomo<sup id="a1">[*](#f1)</sup> (claudio.pomo@poliba.it)
+* Francesco Maria Donini (donini@unitus.it)
+* Tommaso Di Noia (tommaso.dinoia@poliba.it)
 
 It is maintained by [SisInfLab Group](http://sisinflab.poliba.it/) and [Information Retrieval Group](http://ir.ii.uam.es/).
 
@@ -171,6 +172,4 @@ ELLIOT uses [APACHE2 License](./LICENSE).
 
 ## Acknowledgements
 
-We refer to the following repositories to improve our code:
-
- - SliM and KNN-CF parts with [RecSys2019_DeepLearning_Evaluation](https://github.com/MaurizioFD/RecSys2019_DeepLearning_Evaluation)
+SliM and an alternative KNN-CF implementation refer to [RecSys2019_DeepLearning_Evaluation](https://github.com/MaurizioFD/RecSys2019_DeepLearning_Evaluation)

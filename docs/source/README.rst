@@ -159,6 +159,8 @@ Elliot is developed by:
 - Daniele Malitesta (daniele.malitesta@poliba.it)
 - Felice Antonio Merra (felice.merra@poliba.it)
 - Claudio Pomo\ `\* <#f1>`__\(claudio.pomo@poliba.it)
+- Francesco Maria Donini (donini@unitus.it)
+- Tommaso Di Noia (tommaso.dinoia@poliba.it)
 
 It is maintained by `SisInfLab Group <http://sisinflab.poliba.it/>`__
 and `Information Retrieval Group <http://ir.ii.uam.es/>`__.
@@ -172,9 +174,7 @@ ELLIOT uses `APACHE2 License <./LICENSE>`__.
 Acknowledgements
 ----------------
 
-We refer to the following repositories to improve our code:
-
--  SliM and KNN-CF parts with
+SliM and an alternative KNN-CF implementation refer to
    `RecSys2019\_DeepLearning\_Evaluation <https://github.com/MaurizioFD/RecSys2019_DeepLearning_Evaluation>`__
 
 .. |PyPI - Python Version| image:: https://img.shields.io/badge/version-3.6%7C3.7%7C3.8-blue
