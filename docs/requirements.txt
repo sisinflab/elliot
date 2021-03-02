@@ -1,3 +1,4 @@
 Sphinx==3.5.1
+sphinx_rtd_theme
 rinohtype
 six

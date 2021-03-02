@@ -7,10 +7,25 @@ Welcome to Elliot's documentation!
 ==================================
 
 .. toctree::
+   :maxdepth: 1
+   :caption: README:
+
    README
-   elliot
-   :maxdepth: 2
-   :caption: Contents:
+
+.. toctree::
+   :maxdepth: 5
+   :caption: elliot reference:
+
+   elliot/elliot
+   elliot/elliot.dataset
+   elliot/elliot.evaluation
+   elliot/elliot.namespace
+   elliot/elliot.hyperoptimization
+   elliot/elliot.prefiltering
+   elliot/elliot.recommender
+   elliot/elliot.result_handler
+   elliot/elliot.splitter
+   elliot/elliot.utils
 
 
 Indices and tables

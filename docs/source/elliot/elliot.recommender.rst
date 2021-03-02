@@ -10,7 +10,6 @@ Subpackages
    elliot.recommender.NN
    elliot.recommender.adversarial
    elliot.recommender.algebric
-   elliot.recommender.attentive
    elliot.recommender.autoencoders
    elliot.recommender.content_based
    elliot.recommender.gan
