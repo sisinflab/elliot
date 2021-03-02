@@ -1,8 +1,10 @@
 ELLIOT
 ======
 
-
 |PyPI - Python Version| |Version| |GitHub repo size| |GitHub|
+
+`Docs <https://elliot.readthedocs.io/en/latest/>`__ \|
+`Paper <https://elliot.readthedocs.io/en/latest/>`__
 
 Elliot is a comprehensive recommendation framework that analyzes the
 recommendation problem from the researcher's perspective. It conducts a
@@ -13,6 +15,10 @@ setting choices. Elliot untangles the complexity of combining splitting
 strategies, hyperparameter model optimization, model training, and the
 generation of reports of the experimental results.
 
+.. figure:: img/elliot_img.png
+   :alt: system schema
+
+   system schema
 The framework loads, filters, and splits the data considering a vast set
 of strategies (splitting methods and filtering approaches, from temporal
 training-test splitting to nested K-folds Cross-Validation). Elliot
@@ -139,13 +145,15 @@ Talk about Elliot on social media with the hashtag **#elliotrs**.
 The Team
 --------
 
-Elliot is developed by \* Vito Walter Anelli\ `\* <#f1>`__\ 
-(vitowalter.anelli@poliba.it) \* Alejandro Bellogín
-(alejandro.bellogin@uam.es) \* Antonio Ferrara
-(antonio.ferrara@poliba.it) \* Daniele Malitesta
-(daniele.malitesta@poliba.it) \* Felice Antonio Merra
-(felice.merra@poliba.it) \* Claudio Pomo\ `\* <#f1>`__\ 
-(claudio.pomo@poliba.it) \* Tommaso Di Noia (tommaso.dinoia@poliba.it)
+Elliot is developed by:
+
+- Vito Walter Anelli\ `\* <#f1>`__\(vitowalter.anelli@poliba.it)
+- Alejandro Bellogín (alejandro.bellogin@uam.es)
+- Tommaso Di Noia (tommaso.dinoia@poliba.it)
+- Antonio Ferrara (antonio.ferrara@poliba.it)
+- Daniele Malitesta (daniele.malitesta@poliba.it)
+- Felice Antonio Merra (felice.merra@poliba.it)
+- Claudio Pomo\ `\* <#f1>`__\(claudio.pomo@poliba.it)
 
 It is maintained by `SisInfLab Group <http://sisinflab.poliba.it/>`__
 and `Information Retrieval Group <http://ir.ii.uam.es/>`__.
@@ -161,8 +169,8 @@ We refer to the following repositories to improve our code:
 -  SliM and KNN-CF parts with
    `RecSys2019\_DeepLearning\_Evaluation <https://github.com/MaurizioFD/RecSys2019_DeepLearning_Evaluation>`__
 
-.. |PyPI - Python Version| image:: https://img.shields.io/pypi/pyversions/scikit-daisy
-.. |Version| image:: https://img.shields.io/badge/version-v1.1.2-orange
+.. |PyPI - Python Version| image:: https://img.shields.io/badge/version-3.6%7C3.7%7C3.8-blue
+.. |Version| image:: https://img.shields.io/badge/version-v1.0.0-green
    :target: https://github.com/sisinflab/elliot
 .. |GitHub repo size| image:: https://img.shields.io/github/repo-size/sisinflab/elliot
-.. |GitHub| image:: https://img.shields.io/github/license/sisinflab/elliot
+.. |GitHub| image:: https://img.shields.io/github/license/sisinflab/elliot.svg
