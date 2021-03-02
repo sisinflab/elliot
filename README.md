@@ -61,14 +61,16 @@ This requires NVIDIA driver version >= 10.1 (for Linux and Windows10).
 git clone https://github.com//sisinflab/elliot.git && cd elliot
 conda create --name elliot_env python=3.8
 conda activate
+pip install --upgrade pip
 pip install -e . --verbose
 ```
 
 #### VIRTUALENV
 ```bash
 git clone https://github.com//sisinflab/elliot.git && cd elliot
-python3 -m venv ./venv
+virtualenv -p /usr/bin/pyhton3.6 venv # your python location and version
 source venv/bin/activate
+pip install --upgrade pip
 pip install -e . --verbose
 ```
 
