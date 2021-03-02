@@ -13,7 +13,7 @@ Welcome to Elliot's documentation!
    README
 
 .. toctree::
-   :maxdepth: 5
+   :maxdepth: 1
    :caption: elliot reference:
 
    elliot/elliot
@@ -32,5 +32,4 @@ Indices and tables
 ==================
 
 * :ref:`genindex`
-* :ref:`modindex`
 * :ref:`search`
