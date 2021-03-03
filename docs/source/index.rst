@@ -50,7 +50,7 @@ in control of the framework.
    guide/data_prep
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
    :caption: ALGORITHMS
 
    guide/alg_intro
@@ -58,7 +58,7 @@ in control of the framework.
    guide/recommenders
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
    :caption: EVALUATION
 
    guide/metrics_intro
