@@ -35,7 +35,7 @@ in control of the framework.
 
 .. toctree::
    :maxdepth: 1
-   :caption: GET STARTED:
+   :caption: GET STARTED
 
    guide/introduction
    guide/install
@@ -44,14 +44,29 @@ in control of the framework.
 
 .. toctree::
    :maxdepth: 1
-   :caption: RUNNING EXPERIMENTS:
+   :caption: RUNNING EXPERIMENTS
 
    guide/config
    guide/data_prep
 
 .. toctree::
+   :maxdepth: 2
+   :caption: ALGORITHMS
+
+   guide/alg_intro
+   guide/new_alg
+   guide/recommenders
+
+.. toctree::
+   :maxdepth: 2
+   :caption: EVALUATION
+
+   guide/metrics_intro
+   guide/metrics_summary
+
+.. toctree::
    :maxdepth: 1
-   :caption: API REFERENCE:
+   :caption: API REFERENCE
 
    elliot/elliot
    elliot/elliot.dataset
