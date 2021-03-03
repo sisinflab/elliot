@@ -29,6 +29,40 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 
 class AMR(RecMixin, BaseRecommenderModel):
+    r"""
+    Adversarial Multimedia Recommender
+
+    For further details, please refer to the `paper <https://arxiv.org/pdf/1809.07062.pdf>`_
+
+    Args:
+        factors:
+        factors_d:
+        lr:
+        l_w:
+        l_b:
+        l_e:
+        eps:
+        l_adv:
+        adversarial_epochs:
+
+
+    To include the recommendation model, add it to the config file adopting the following pattern:
+
+    .. code:: yaml
+
+      models:
+        AMR:
+          meta:
+            save_recs: True
+          epochs: 10
+          factors: 10
+          lr: 0.001
+          l_w: 0.1
+          l_b: 0.001
+          eps: 0.1
+          l_adv: 0.001
+          adversarial_epochs: 10
+    """
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
         """

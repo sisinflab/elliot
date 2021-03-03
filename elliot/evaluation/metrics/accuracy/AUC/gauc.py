@@ -18,7 +18,7 @@ class GAUC(BaseMetric):
     This class represents the implementation of the GroupAUC recommendation metric.
     Passing 'GAUC' to the metrics list will enable the computation of the metric.
 
-    .. _GAUC: "Deep Interest Network for Click-Through Rate Prediction" KDD '18 by Zhou, et al.
+    For further details, please refer to  "Deep Interest Network for Click-Through Rate Prediction" KDD '18 by Zhou, et al.
 
     Note:
         It calculates the AUC score of each user, and finally obtains GAUC by weighting the user AUC.
@@ -30,10 +30,18 @@ class GAUC(BaseMetric):
     .. math::
         \mathrm {GAUC} = \frac {{{M} \times {(M+N+1)} - \frac{M \times (M+1)}{2}} -
         \sum\limits_{i=1}^M rank_{i}} {{M} \times {N}}
+
     :math:`M` is the number of positive samples.
+
     :math:`N` is the number of negative samples.
+
     :math:`rank_i` is the descending rank of the ith positive sample.
 
+    To compute the metric, add it to the config file adopting the following pattern:
+
+    .. code:: yaml
+
+        simple_metrics: [GAUC]
     """
 
     def __init__(self, recommendations, config, params, eval_objects):

@@ -15,10 +15,12 @@ from elliot.utils import logging
 
 class AUC(BaseMetric):
     r"""
+    Area Under the Curve
+
     This class represents the implementation of the global AUC recommendation metric.
     Passing 'AUC' to the metrics list will enable the computation of the metric.
 
-     .. _AUC: https://en.wikipedia.org/wiki/Receiver_operating_characteristic#Area_under_the_curve
+    For further details, please refer to the `AUC <https://en.wikipedia.org/wiki/Receiver_operating_characteristic#Area_under_the_curve>`_
 
     Note:
         This metric does not calculate group-based AUC which considers the AUC scores
@@ -28,9 +30,18 @@ class AUC(BaseMetric):
     .. math::
         \mathrm {AUC} = \frac{\sum\limits_{i=1}^M rank_{i}
         - \frac {{M} \times {(M+1)}}{2}} {{{M} \times {N}}}
+
     :math:`M` is the number of positive samples.
+
     :math:`N` is the number of negative samples.
+
     :math:`rank_i` is the ascending rank of the ith positive sample.
+
+    To compute the metric, add it to the config file adopting the following pattern:
+
+    .. code:: yaml
+
+        simple_metrics: [AUC]
     """
 
     def __init__(self, recommendations, config, params, eval_objects):

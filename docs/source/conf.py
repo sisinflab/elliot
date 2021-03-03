@@ -41,7 +41,8 @@ extensions = [
     'sphinx.ext.githubpages',
     'sphinx_copybutton',
     'rinoh.frontend.sphinx',
-    'sphinx_rtd_theme'
+    'sphinx_rtd_theme',
+    'sphinx.ext.autosummary'
 ]
 
 autodoc_mock_imports = ["pandas", "pyecharts"]
