@@ -8,9 +8,19 @@ Welcome to Elliot's documentation!
 
 .. toctree::
    :maxdepth: 1
-   :caption: README:
+   :caption: GET STARTED:
 
-   README
+   guide/introduction
+   guide/install
+   guide/quick_start
+   guide/changelog
+
+.. toctree::
+   :maxdepth: 1
+   :caption: RUNNING EXPERIMENTS:
+
+   guide/config
+   guide/data_prep
 
 .. toctree::
    :maxdepth: 1
