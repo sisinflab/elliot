@@ -23,6 +23,32 @@ np.random.seed(42)
 
 
 class FunkSVD(RecMixin, BaseRecommenderModel):
+    r"""
+    FunkSVD
+
+    For further details, please refer to the `paper <https://sifter.org/~simon/journal/20061211.html>`_
+
+    Args:
+        factors: Number of factors of feature embeddings
+        lr: Learning rate
+        reg_w: Regularization coefficient for latent factors
+        reg_b: Regularization coefficient for bias
+
+    To include the recommendation model, add it to the config file adopting the following pattern:
+
+    .. code:: yaml
+
+      models:
+        FunkSVD:
+          meta:
+            save_recs: True
+          epochs: 10
+          factors: 10
+          lr: 0.001
+          reg_w: 0.1
+          reg_b: 0.001
+    """
+
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
         self._random = np.random

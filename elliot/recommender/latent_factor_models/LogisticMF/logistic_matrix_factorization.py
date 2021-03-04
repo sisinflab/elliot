@@ -23,6 +23,32 @@ np.random.seed(42)
 
 
 class LogisticMatrixFactorization(RecMixin, BaseRecommenderModel):
+    r"""
+    Logistic Matrix Factorization
+
+    For further details, please refer to the `paper <https://web.stanford.edu/~rezab/nips2014workshop/submits/logmat.pdf>`_
+
+    Args:
+        factors: Number of factors of feature embeddings
+        lr: Learning rate
+        reg: Regularization coefficient
+        alpha: Parameter for confidence estimation
+
+    To include the recommendation model, add it to the config file adopting the following pattern:
+
+    .. code:: yaml
+
+      models:
+        LogisticMatrixFactorization:
+          meta:
+            save_recs: True
+          epochs: 10
+          factors: 10
+          lr: 0.001
+          reg: 0.1
+          alpha: 0.5
+    """
+
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
         self._random = np.random

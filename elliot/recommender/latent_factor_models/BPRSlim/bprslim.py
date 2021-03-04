@@ -25,7 +25,7 @@ np.random.seed(42)
 
 class BPRSlim(RecMixin, BaseRecommenderModel):
     r"""
-    Sparse Linear Methods for Top-N Recommender Systems
+    BPR Sparse Linear Methods
 
     For further details, please refer to the `paper <http://glaros.dtc.umn.edu/gkhome/node/774>`_
 

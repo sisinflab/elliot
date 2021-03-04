@@ -25,6 +25,32 @@ np.random.seed(42)
 
 
 class PMF(RecMixin, BaseRecommenderModel):
+    r"""
+    Probabilistic Matrix Factorization
+
+    For further details, please refer to the `paper <https://papers.nips.cc/paper/2007/file/d7322ed717dedf1eb4e6e52a37ea7bcd-Paper.pdf>`_
+
+    Args:
+        factors: Number of latent factors
+        lr: Learning rate
+        reg: Regularization coefficient
+        gaussian_variance: Variance of the Gaussian distribution
+
+    To include the recommendation model, add it to the config file adopting the following pattern:
+
+    .. code:: yaml
+
+      models:
+        PMF:
+          meta:
+            save_recs: True
+          epochs: 10
+          factors: 50
+          lr: 0.001
+          reg: 0.0025
+          gaussian_variance: 0.1
+    """
+
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
         self._random = np.random

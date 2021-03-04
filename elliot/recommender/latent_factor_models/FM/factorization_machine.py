@@ -24,6 +24,30 @@ np.random.seed(42)
 
 
 class FM(RecMixin, BaseRecommenderModel):
+    r"""
+    Factorization Machines
+
+    For further details, please refer to the `paper <https://ieeexplore.ieee.org/document/5694074>`_
+
+    Args:
+        factors: Number of factors of feature embeddings
+        lr: Learning rate
+        reg: Regularization coefficient
+
+    To include the recommendation model, add it to the config file adopting the following pattern:
+
+    .. code:: yaml
+
+      models:
+        FM:
+          meta:
+            save_recs: True
+          epochs: 10
+          factors: 10
+          lr: 0.001
+          reg: 0.1
+    """
+
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
         self._random = np.random

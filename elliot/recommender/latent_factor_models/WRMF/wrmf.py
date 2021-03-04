@@ -20,6 +20,31 @@ np.random.seed(42)
 
 
 class WRMF(RecMixin, BaseRecommenderModel):
+    r"""
+    Weighted XXX Matrix Factorization
+
+    For further details, please refer to the `paper <https://archive.siam.org/meetings/sdm06/proceedings/059zhangs2.pdf>`_
+
+    Args:
+        factors: Number of latent factors
+        lr: Learning rate
+        alpha:
+        reg: Regularization coefficient
+
+    To include the recommendation model, add it to the config file adopting the following pattern:
+
+    .. code:: yaml
+
+      models:
+        WRMF:
+          meta:
+            save_recs: True
+          epochs: 10
+          factors: 50
+          alpha: 1
+          reg: 0.1
+    """
+
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
         self._random = np.random

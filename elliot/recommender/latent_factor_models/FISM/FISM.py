@@ -27,14 +27,14 @@ class FISM(RecMixin, BaseRecommenderModel):
     r"""
     FISM: Factored Item Similarity Models
 
-    For further details, please refer to the `paper <https://dl.acm.org/doi/10.1145/2487575.2487589>`_
+    For further details, please refer to the `paper <http://glaros.dtc.umn.edu/gkhome/node/1068>`_
 
     Args:
         factors: Number of factors of feature embeddings
         lr: Learning rate
-        l_w:
-        l_b:
-        alpha:
+        l_w: Regularization coefficient for latent factors
+        l_b: Regularization coefficient for bias
+        alpha: Alpha parameter (a value between 0 and 1)
         neg_ratio:
 
     To include the recommendation model, add it to the config file adopting the following pattern:
@@ -42,7 +42,7 @@ class FISM(RecMixin, BaseRecommenderModel):
     .. code:: yaml
 
       models:
-        FFM:
+        FISM:
           meta:
             save_recs: True
           epochs: 10
@@ -50,7 +50,7 @@ class FISM(RecMixin, BaseRecommenderModel):
           lr: 0.001
           l_w: 0.001
           l_b: 0.001
-          alpha:
+          alpha: 0.5
           neg_ratio:
     """
 

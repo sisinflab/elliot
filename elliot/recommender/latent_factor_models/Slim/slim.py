@@ -22,6 +22,28 @@ np.random.seed(42)
 
 
 class Slim(RecMixin, BaseRecommenderModel):
+    r"""
+    Sparse Linear Methods
+
+    For further details, please refer to the `paper <http://glaros.dtc.umn.edu/gkhome/node/774>`_
+
+    Args:
+        l1_ratio:
+        alpha:
+
+    To include the recommendation model, add it to the config file adopting the following pattern:
+
+    .. code:: yaml
+
+      models:
+        Slim:
+          meta:
+            save_recs: True
+          epochs: 10
+          l1_ratio: 0.001
+          alpha: 0.001
+    """
+
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
 

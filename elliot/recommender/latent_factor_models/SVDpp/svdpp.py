@@ -21,6 +21,32 @@ np.random.seed(42)
 
 
 class SVDpp(RecMixin, BaseRecommenderModel):
+    r"""
+    SVD++
+
+    For further details, please refer to the `paper <https://dl.acm.org/doi/10.1145/1401890.1401944>`_
+
+    Args:
+        factors: Number of latent factors
+        lr: Learning rate
+        reg_w: Regularization coefficient for latent factors
+        reg_b: Regularization coefficient for bias
+
+    To include the recommendation model, add it to the config file adopting the following pattern:
+
+    .. code:: yaml
+
+      models:
+        SVDpp:
+          meta:
+            save_recs: True
+          epochs: 10
+          factors: 50
+          lr: 0.001
+          reg_w: 0.1
+          reg_b: 0.001
+    """
+
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
         self._random = np.random

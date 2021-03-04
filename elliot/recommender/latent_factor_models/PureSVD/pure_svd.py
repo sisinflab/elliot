@@ -21,6 +21,28 @@ np.random.seed(42)
 
 
 class PureSVD(RecMixin, BaseRecommenderModel):
+    r"""
+    PureSVD
+
+    For further details, please refer to the `paper <https://link.springer.com/chapter/10.1007/978-0-387-85820-3_5>`_
+
+    Args:
+        factors: Number of latent factors
+        seed: Random seed
+
+    To include the recommendation model, add it to the config file adopting the following pattern:
+
+    .. code:: yaml
+
+      models:
+        PureSVD:
+          meta:
+            save_recs: True
+          epochs: 10
+          factors: 10
+          seed: 42
+    """
+
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
         self._random = np.random
