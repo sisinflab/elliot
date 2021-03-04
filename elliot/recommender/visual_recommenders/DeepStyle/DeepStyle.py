@@ -26,6 +26,32 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 
 class DeepStyle(RecMixin, BaseRecommenderModel):
+    r"""
+    DeepStyle: Learning User Preferences for Visual Recommendation
+
+    For further details, please refer to the `paper <https://dl.acm.org/doi/10.1145/3077136.3080658>`_
+
+    Args:
+        lr: Learning rate
+        epochs: Number of epochs
+        factors: Number of latent factors
+        batch_size: Batch size
+        l_w: Regularization coefficient
+
+    To include the recommendation model, add it to the config file adopting the following pattern:
+
+    .. code:: yaml
+
+      models:
+        DeepStyle:
+          meta:
+            save_recs: True
+          lr: 0.0005
+          epochs: 50
+          factors: 100
+          batch_size: 128
+          l_w: 0.000025
+    """
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
         super().__init__(data, config, params, *args, **kwargs)
@@ -34,9 +60,9 @@ class DeepStyle(RecMixin, BaseRecommenderModel):
         self._random = np.random
 
         self._params_list = [
-            ("_factors", "factors", "factors", 200, None, None),
-            ("_learning_rate", "lr", "lr", 0.001, None, None),
-            ("_l_w", "l_w", "l_w", 0.1, None, None)
+            ("_factors", "factors", "factors", 100, None, None),
+            ("_learning_rate", "lr", "lr", 0.0005, None, None),
+            ("_l_w", "l_w", "l_w", 0.000025, None, None)
         ]
         self.autoset_params()
 

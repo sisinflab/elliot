@@ -26,10 +26,42 @@ random.seed(0)
 
 
 class NGCF(RecMixin, BaseRecommenderModel):
+    r"""
+    Neural Graph Collaborative Filtering
+
+    For further details, please refer to the `paper <https://dl.acm.org/doi/10.1145/3331184.3331267>`_
+
+    Args:
+        lr: Learning rate
+        epochs: Number of epochs
+        factors: Number of latent factors
+        batch_size: Batch size
+        l_w: Regularization coefficient
+        weight_size: Tuple with number of units for each embedding propagation layer
+        node_dropout: Tuple with dropout rate for each node
+        message_dropout: Tuple with dropout rate for each embedding propagation layer
+        n_fold: Number of folds to split the adjacency matrix into sub-matrices and ease the computation
+
+    To include the recommendation model, add it to the config file adopting the following pattern:
+
+    .. code:: yaml
+
+      models:
+        NGCF:
+          meta:
+            save_recs: True
+          lr: 0.0005
+          epochs: 50
+          factors: 64
+          batch_size: 256
+          l_w: 0.1
+          weight_size: (64,)
+          node_dropout: ()
+          message_dropout: (0.1,)
+          n_fold: 5
+    """
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
-        """
-        """
         self._random = np.random
         self._random_p = random
 
@@ -41,16 +73,16 @@ class NGCF(RecMixin, BaseRecommenderModel):
         ######################################
 
         self._params_list = [
-            ("_learning_rate", "lr", "lr", 0.1, None, None),
+            ("_learning_rate", "lr", "lr", 0.0005, None, None),
             ("_factors", "latent_dim", "factors", 64, None, None),
             ("_l_w", "l_w", "l_w", 0.01, None, None),
-            ("_weight_size", "weight_size", "weight_size", "(64,32)", lambda x: list(make_tuple(x)),
+            ("_weight_size", "weight_size", "weight_size", "(64,)", lambda x: list(make_tuple(x)),
              lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
-            ("_node_dropout", "node_dropout", "node_dropout", "(64,32)", lambda x: list(make_tuple(x)),
+            ("_node_dropout", "node_dropout", "node_dropout", "()", lambda x: list(make_tuple(x)),
              lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
-            ("_message_dropout", "message_dropout", "message_dropout", "(64,32)", lambda x: list(make_tuple(x)),
+            ("_message_dropout", "message_dropout", "message_dropout", "(0.1,)", lambda x: list(make_tuple(x)),
              lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
-            ("_n_fold", "n_fold", "n_fold", 1, None, None),
+            ("_n_fold", "n_fold", "n_fold", 5, None, None),
         ]
         self.autoset_params()
 

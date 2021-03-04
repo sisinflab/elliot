@@ -28,6 +28,34 @@ os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
 
 
 class DVBPR(RecMixin, BaseRecommenderModel):
+    r"""
+    Visually-Aware Fashion Recommendation and Design with Generative Image Models
+
+    For further details, please refer to the `paper <https://doi.org/10.1109/ICDM.2017.30>`_
+
+    Args:
+        lr: Learning rate
+        epochs: Number of epochs
+        factors: Number of latent factors
+        batch_size: Batch size
+        lambda_1: Regularization coefficient
+        lambda_2: CNN regularization coefficient
+
+    To include the recommendation model, add it to the config file adopting the following pattern:
+
+    .. code:: yaml
+
+      models:
+        DVBPR:
+          meta:
+            save_recs: True
+          lr: 0.0001
+          epochs: 50
+          factors: 100
+          batch_size: 128
+          lambda_1: 0.0001
+          lambda_2: 1.0
+    """
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
         super().__init__(data, config, params, *args, **kwargs)
@@ -37,10 +65,10 @@ class DVBPR(RecMixin, BaseRecommenderModel):
         self._random = np.random
 
         self._params_list = [
-            ("_factors", "factors", "factors", 10, None, None),
-            ("_learning_rate", "lr", "lr", 0.001, None, None),
-            ("_lambda_1", "lambda_1", "lambda_1", 0.001, None, None),
-            ("_lambda_2", "lambda_2", "lambda_2", 0.001, None, None)
+            ("_factors", "factors", "factors", 100, None, None),
+            ("_learning_rate", "lr", "lr", 0.0001, None, None),
+            ("_lambda_1", "lambda_1", "lambda_1", 0.0001, None, None),
+            ("_lambda_2", "lambda_2", "lambda_2", 1.0, None, None)
         ]
         self.autoset_params()
 

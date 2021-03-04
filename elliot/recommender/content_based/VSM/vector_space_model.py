@@ -26,6 +26,28 @@ np.random.seed(42)
 
 
 class VSM(RecMixin, BaseRecommenderModel):
+    r"""
+    Vector Space Model
+
+    For further details, please refer to the `paper <https://dl.acm.org/doi/10.1145/2362499.2362501>`_ and the `paper <https://ieeexplore.ieee.org/document/9143460>`_
+
+    Args:
+        similarity: Similarity metric
+        user_profile:
+        item_profile:
+
+    To include the recommendation model, add it to the config file adopting the following pattern:
+
+    .. code:: yaml
+
+      models:
+        VSM:
+          meta:
+            save_recs: True
+          similarity: cosine
+          user_profile: binary
+          item_profile: binary
+    """
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
         self._random = np.random

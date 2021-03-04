@@ -28,6 +28,36 @@ random.seed(0)
 
 
 class LightGCN(RecMixin, BaseRecommenderModel):
+    r"""
+    LightGCN: Simplifying and Powering Graph Convolution Network for Recommendation
+
+    For further details, please refer to the `paper <https://dl.acm.org/doi/10.1145/3397271.3401063>`_
+
+    Args:
+        lr: Learning rate
+        epochs: Number of epochs
+        factors: Number of latent factors
+        batch_size: Batch size
+        l_w: Regularization coefficient
+        n_layers: Number of embedding propagation layers
+        n_fold: Number of folds to split the adjacency matrix into sub-matrices and ease the computation
+
+    To include the recommendation model, add it to the config file adopting the following pattern:
+
+    .. code:: yaml
+
+      models:
+        LightGCN:
+          meta:
+            save_recs: True
+          lr: 0.0005
+          epochs: 50
+          factors: 64
+          batch_size: 256
+          l_w: 0.1
+          n_layers: 1
+          n_fold: 5
+    """
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
         """
@@ -44,10 +74,10 @@ class LightGCN(RecMixin, BaseRecommenderModel):
         ######################################
 
         self._params_list = [
-            ("_learning_rate", "lr", "lr", 0.1, None, None),
+            ("_learning_rate", "lr", "lr", 0.0005, None, None),
             ("_factors", "latent_dim", "factors", 64, None, None),
-            ("_n_layers", "n_layers", "n_layers", 2, None, None),
-            ("_l_w", "l_w", "l_w", 0.01, None, None),
+            ("_n_layers", "n_layers", "n_layers", 1, None, None),
+            ("_l_w", "l_w", "l_w", 0.1, None, None),
             ("_n_fold", "n_fold", "n_fold", 1, None, None),
         ]
         self.autoset_params()

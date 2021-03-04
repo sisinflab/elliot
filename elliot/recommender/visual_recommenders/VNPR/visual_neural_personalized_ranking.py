@@ -23,6 +23,36 @@ np.random.seed(42)
 
 
 class VNPR(RecMixin, BaseRecommenderModel):
+    r"""
+    Visual Neural Personalized Ranking for Image Recommendation
+
+    For further details, please refer to the `paper <https://dl.acm.org/doi/10.1145/3159652.3159728>`_
+
+    Args:
+        lr: Learning rate
+        epochs: Number of epochs
+        mf_factors:: Number of latent factors for Matrix Factorization
+        mlp_hidden_size: Tuple with number of units for each multi-layer perceptron layer
+        prob_keep_dropout: Dropout rate for multi-layer perceptron
+        batch_size: Batch size
+        l_w: Regularization coefficient
+
+    To include the recommendation model, add it to the config file adopting the following pattern:
+
+    .. code:: yaml
+
+      models:
+        VNPR:
+          meta:
+            save_recs: True
+          lr: 0.001
+          epochs: 50
+          mf_factors: 10
+          mlp_hidden_size: (32, 1)
+          prob_keep_dropout: 0.2
+          batch_size: 64
+          l_w: 0.001
+    """
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
         self._random = np.random
@@ -33,8 +63,8 @@ class VNPR(RecMixin, BaseRecommenderModel):
             ("_learning_rate", "lr", "lr", 0.001, None, None),
             ("_l_w", "l_w", "l_w", 0.001, None, None),
             ("_mf_factors", "mf_factors", "mffactors", 10, None, None),
-            ("_mlp_hidden_size", "mlp_hidden_size", "mlpunits", "(64,32)", lambda x: list(make_tuple(str(x))), lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
-            ("_dropout", "dropout", "drop", 0.45, None, None)
+            ("_mlp_hidden_size", "mlp_hidden_size", "mlpunits", "(32,1)", lambda x: list(make_tuple(str(x))), lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
+            ("_dropout", "dropout", "drop", 0.2, None, None)
         ]
         self.autoset_params()
 

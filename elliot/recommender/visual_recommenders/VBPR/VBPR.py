@@ -16,7 +16,6 @@ from tqdm import tqdm
 from elliot.dataset.samplers import custom_sampler as cs
 from elliot.recommender import BaseRecommenderModel
 from elliot.recommender.base_recommender_model import init_charger
-from elliot.recommender.base_recommender_model import init_charger
 from elliot.recommender.recommender_utils_mixin import RecMixin
 from elliot.recommender.visual_recommenders.VBPR.VBPR_model import VBPR_model
 from elliot.utils.write import store_recommendation
@@ -28,18 +27,40 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 
 class VBPR(RecMixin, BaseRecommenderModel):
+    r"""
+    VBPR: Visual Bayesian Personalized Ranking from Implicit Feedback
+
+    For further details, please refer to the `paper <http://www.aaai.org/ocs/index.php/AAAI/AAAI16/paper/view/11914>`_
+
+    Args:
+        lr: Learning rate
+        epochs: Number of epochs
+        factors: Number of latent factors
+        factors_d: Dimension of visual factors
+        batch_size: Batch size
+        l_w: Regularization coefficient
+        l_b: Regularization coefficient of bias
+        l_e: Regularization coefficient of projection matrix
+
+    To include the recommendation model, add it to the config file adopting the following pattern:
+
+    .. code:: yaml
+
+      models:
+        VBPR:
+          meta:
+            save_recs: True
+          lr: 0.0005
+          epochs: 50
+          factors: 100
+          factors_d: 20
+          batch_size: 128
+          l_w: 0.000025
+          l_b: 0
+          l_e: 0.002
+    """
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
-        """
-        Create a VBPR instance.
-        (see https://arxiv.org/pdf/1510.01784.pdf for details about the algorithm design choices).
-
-        Args:
-            data: data loader object
-            params: model parameters {embed_k: embedding size,
-                                      [l_w, l_b]: regularization,
-                                      lr: learning rate}
-        """
         super().__init__(data, config, params, *args, **kwargs)
 
         self._num_items = self._data.num_items
@@ -47,12 +68,12 @@ class VBPR(RecMixin, BaseRecommenderModel):
         self._random = np.random
 
         self._params_list = [
-            ("_factors", "factors", "factors", 200, None, None),
+            ("_factors", "factors", "factors", 100, None, None),
             ("_factors_d", "factors_d", "factors_d", 20, None, None),
-            ("_learning_rate", "lr", "lr", 0.001, None, None),
-            ("_l_w", "l_w", "l_w", 0.1, None, None),
-            ("_l_b", "l_b", "l_b", 0.001, None, None),
-            ("_l_e", "l_e", "l_e", 0.1, None, None)
+            ("_learning_rate", "lr", "lr", 0.0005, None, None),
+            ("_l_w", "l_w", "l_w", 0.000025, None, None),
+            ("_l_b", "l_b", "l_b", 0, None, None),
+            ("_l_e", "l_e", "l_e", 0.002, None, None)
         ]
         self.autoset_params()
 

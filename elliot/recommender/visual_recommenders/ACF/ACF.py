@@ -4,8 +4,8 @@ Module description:
 """
 
 __version__ = '0.1'
-__author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta'
-__email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malitesta@poliba.it'
+__author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta, Felice Antonio Merra'
+__email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malitesta@poliba.it, felice.merra@poliba.it'
 
 import os
 from ast import literal_eval as make_tuple
@@ -27,7 +27,36 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 
 class ACF(RecMixin, BaseRecommenderModel):
+    r"""
+    Attentive Collaborative Filtering: Multimedia Recommendation with Item- and Component-Level Attention
 
+    For further details, please refer to the `paper <https://dl.acm.org/doi/10.1145/3077136.3080797>`_
+
+    Args:
+        lr: Learning rate
+        epochs: Number of epochs
+        factors: Number of latent factors
+        batch_size: Batch size
+        l_w: Regularization coefficient
+        layers_component: Tuple with number of units for each attentive layer (component-level)
+        layers_item: Tuple with number of units for each attentive layer (item-level)
+
+    To include the recommendation model, add it to the config file adopting the following pattern:
+
+    .. code:: yaml
+
+      models:
+        ACF:
+          meta:
+            save_recs: True
+          lr: 0.0005
+          epochs: 50
+          factors: 100
+          batch_size: 128
+          l_w: 0.000025
+          layers_component: (64, 1)
+          layers_item: (64, 1)
+    """
     def __init__(self, data, config, params, *args, **kwargs):
         super().__init__(data, config, params, *args, **kwargs)
 
@@ -39,9 +68,9 @@ class ACF(RecMixin, BaseRecommenderModel):
         self._layers_item = self._params.layers_item
 
         self._params_list = [
-            ("_factors", "factors", "factors", 200, None, None),
-            ("_learning_rate", "lr", "lr", 0.001, None, None),
-            ("_l_w", "l_w", "l_w", 0.1, None, None),
+            ("_factors", "factors", "factors", 100, None, None),
+            ("_learning_rate", "lr", "lr", 0.0005, None, None),
+            ("_l_w", "l_w", "l_w", 0.000025, None, None),
             ("_layers_component", "layers_component", "layers_component", "(64,1)", lambda x: list(make_tuple(x)),
              lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
             ("_layers_item", "layers_item", "layers_item", "(64,1)", lambda x: list(make_tuple(x)),
