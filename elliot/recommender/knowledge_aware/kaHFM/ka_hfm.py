@@ -150,6 +150,55 @@ class MF(object):
 
 
 class KaHFM(RecMixin, BaseRecommenderModel):
+    r"""
+    Knowledge-aware Hybrid Factorization Machines
+
+    Vito Walter Anelli and Tommaso Di Noia and Eugenio Di Sciascio and Azzurra Ragone and Joseph Trotta
+    "How to Make Latent Factors Interpretable by Feeding Factorization Machines with Knowledge Graphs", ISWC 2019 Best student Research Paper
+    For further details, please refer to the `paper <https://doi.org/10.1007/978-3-030-30793-6_3>`_
+
+    Vito Walter Anelli and Tommaso Di Noia and Eugenio Di Sciascio and Azzurra Ragone and Joseph Trotta
+    "Semantic Interpretation of Top-N Recommendations", IEEE TKDE 2020
+    For further details, please refer to the `paper <https://doi.org/10.1109/TKDE.2020.3010215>`_
+
+    Args:
+        lr: learning rate (default: 0.05)
+        bias_regularization: Bias regularization (default: 0)
+        user_regularization: User regularization (default: 0.0025)
+        positive_item_regularization: regularization for positive (experienced) items (default: 0.0025)
+        negative_item_regularization: regularization for unknown items (default: 0.00025)
+        update_negative_item_factors: Boolean to update negative item factors (default: True)
+        update_users: Boolean to update user factors (default: True)
+        update_items: Boolean to update item factors (default: True)
+        update_bias: Boolean to update bias value (default: True)
+
+    To include the recommendation model, add it to the config file adopting the following pattern:
+
+    .. code:: yaml
+
+      models:
+        KaHFM:
+          meta:
+            hyper_max_evals: 20
+            hyper_opt_alg: tpe
+            validation_rate: 1
+            verbose: True
+            save_weights: True
+            save_recs: True
+            validation_metric: nDCG@10
+          epochs: 100
+          batch_size: -1
+          lr: 0.05
+          bias_regularization: 0
+          user_regularization: 0.0025
+          positive_item_regularization: 0.0025
+          negative_item_regularization: 0.00025
+          update_negative_item_factors: True
+          update_users: True
+          update_items: True
+          update_bias: True
+
+    """
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
         self._random = np.random
@@ -158,7 +207,7 @@ class KaHFM(RecMixin, BaseRecommenderModel):
         self._params_list = [
             ("_learning_rate", "lr", "lr", 0.05, None, None),
             ("_bias_regularization", "bias_regularization", "bias_regularization", 0, None, None),
-            ("_user_regularization", "positive_item_regularization", "positive_item_regularization", 0.0025,
+            ("_user_regularization", "user_regularization", "user_regularization", 0.0025,
              None, None),
             ("_positive_item_regularization", "positive_item_regularization", "positive_item_regularization", 0.0025,
              None, None),

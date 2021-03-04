@@ -24,6 +24,7 @@ class AMF(RecMixin, BaseRecommenderModel):
     r"""
     Adversarial Matrix Factorization
 
+
     For further details, please refer to the `paper <https://arxiv.org/abs/1808.03908>`_
 
     Args:
@@ -51,6 +52,7 @@ class AMF(RecMixin, BaseRecommenderModel):
           eps: 0.1
           l_adv: 0.001
           adversarial_epochs: 10
+
     """
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
