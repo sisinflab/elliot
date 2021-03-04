@@ -22,6 +22,43 @@ np.random.seed(42)
 
 
 class KaHFMEmbeddings(RecMixin, BaseRecommenderModel):
+    r"""
+    Knowledge-aware Hybrid Factorization Machines (Tensorflow Embedding-based Variant)
+
+    Vito Walter Anelli and Tommaso Di Noia and Eugenio Di Sciascio and Azzurra Ragone and Joseph Trotta
+    "How to Make Latent Factors Interpretable by Feeding Factorization Machines with Knowledge Graphs", ISWC 2019 Best student Research Paper
+    For further details, please refer to the `paper <https://doi.org/10.1007/978-3-030-30793-6_3>`_
+
+    Vito Walter Anelli and Tommaso Di Noia and Eugenio Di Sciascio and Azzurra Ragone and Joseph Trotta
+    "Semantic Interpretation of Top-N Recommendations", IEEE TKDE 2020
+    For further details, please refer to the `paper <https://doi.org/10.1109/TKDE.2020.3010215>`_
+
+    Args:
+        lr: learning rate (default: 0.0001)
+        l_w: Weight regularization (default: 0.005)
+        l_b: Bias regularization (default: 0)
+
+    To include the recommendation model, add it to the config file adopting the following pattern:
+
+    .. code:: yaml
+
+      models:
+        KaHFM:
+          meta:
+            hyper_max_evals: 20
+            hyper_opt_alg: tpe
+            validation_rate: 1
+            verbose: True
+            save_weights: True
+            save_recs: True
+            validation_metric: nDCG@10
+          epochs: 100
+          batch_size: -1
+          lr: 0.0001
+          l_w: 0.005
+          l_b: 0
+
+    """
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
         """
