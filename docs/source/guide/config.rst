@@ -88,6 +88,7 @@ To enable Prefiltering operations, we can insert the corresponding block into ou
 
 .. code:: yaml
 
+    experiment:
       prefiltering:
         strategy: global_threshold|user_average|user_k_core|item_k_core|iterative_k_core|n_rounds_k_core|cold_users
         threshold: 3|average
@@ -127,6 +128,7 @@ To enable the splitting operations, we can insert the corresponding section:
 
 .. code:: yaml
 
+    experiment:
       splitting:
         save_on_disk: True
         save_folder: this/is/the/path/
@@ -193,6 +195,7 @@ Elliot lets the user specify where to store specific output files: the recommend
 
 .. code:: yaml
 
+    experiment:
       path_output_rec_result: this/is/the/path/
       path_output_rec_weight: this/is/the/path/
       path_output_rec_performance: this/is/the/path/
@@ -225,6 +228,7 @@ Beyond the former general definition, to specify the evaluation configuration, w
 
 .. code:: yaml
 
+    experiment:
       top_k: 50
       evaluation:
         cutoffs: [10, 5]
@@ -295,9 +299,79 @@ GPU Acceleration
 
 Recommendation Model Configuration
 """""""""""""""""""""""""""""""""""""""""
+To include the recommendation models, Elliot provides a straightforward syntax.
+
+First, we can create a new section in the experiment, named ``models``:
+
+
 .. code:: yaml
 
+    experiment:
       models:
-        MostPop:
+
+Then, we can insert a **list** of recommendation models in which each model respects the following syntax:
+
+
+.. code:: yaml
+
+    experiment:
+      models:
+        model_0:
           meta:
+            meta_parameter_0: something
+          model_parameter_0: something
+          model_parameter_1: something
+          model_parameter_2: something
+        model_1:
+          meta:
+            meta_parameter_0: something
+          model_parameter_0: something
+          model_parameter_1: something
+          model_parameter_2: something
+
+meta is a mandatory field that lets the user define some parameters that all recommendation models share, but they can decline differently.
+
+The decision to save model weights and recommendations, the choice of the validation metric and cut-off, the chosen hyperparameter tuning strategy, the verbosity, and the frequency of the evaluation during the training belong to this category.
+
+In detail, use:
+
+``verbose`` **boolean** field to enable verbose logs
+
+``save_recs`` **boolean** field to enable recommendation lists storage
+
+``save_weights`` **boolean** field to enable model weights storage
+
+``validation_metric`` **mixed** field (**string** @ **int**) to define the simple metric and the cut-off used for the model selection. If not provided it takes the first provided simple metric, and the first cut-off.
+
+``validation_rate`` **int** field: where applicable, define the iteration interval for the validation and test evaluation
+
+``hyper_opt_alg`` **string** field: it defines the hyperparameter tuning strategy
+
+``hyper_max_evals`` **int** field: where applicable, it defines the number of samples to consider for hyperparameter evaluation
+
+To fully understand how to conduct hyperparameter optimization in Elliot, please refer to the corresponding section XXX
+
+Finally, *model_parameter_0*, *model_parameter_1*, and *model_parameter_2* represents the model-specific parameters.
+
+For further details on model-specific parameters see the corresponding section XXX.
+
+Example:
+
+.. code:: yaml
+
+    experiment:
+      models:
+        KaHFMEmbeddings:
+          meta:
+            hyper_max_evals: 20
+            hyper_opt_alg: tpe
+            validation_rate: 1
+            verbose: True
+            save_weights: True
             save_recs: True
+            validation_metric: nDCG@10
+          epochs: 100
+          batch_size: -1
+          lr: 0.0001
+          l_w: 0.005
+          l_b: 0

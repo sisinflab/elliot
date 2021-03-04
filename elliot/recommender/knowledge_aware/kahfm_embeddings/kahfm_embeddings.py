@@ -43,7 +43,7 @@ class KaHFMEmbeddings(RecMixin, BaseRecommenderModel):
     .. code:: yaml
 
       models:
-        KaHFM:
+        KaHFMEmbeddings:
           meta:
             hyper_max_evals: 20
             hyper_opt_alg: tpe
