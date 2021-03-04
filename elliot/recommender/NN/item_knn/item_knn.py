@@ -23,6 +23,28 @@ np.random.seed(42)
 
 
 class ItemKNN(RecMixin, BaseRecommenderModel):
+    r"""
+    Amazon.com recommendations: item-to-item collaborative filtering
+
+    For further details, please refer to the `paper <http://ieeexplore.ieee.org/document/1167344/>`_
+
+    Args:
+        neighbors: Number of item neighbors
+        similarity: Similarity function
+        implementation: Implementation type ('aiolli', 'classical')
+
+    To include the recommendation model, add it to the config file adopting the following pattern:
+
+    .. code:: yaml
+
+      models:
+        ItemKNN:
+          meta:
+            save_recs: True
+          neighbors: 40
+          similarity: cosine
+          implementation: aiolli
+    """
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
         self._random = np.random

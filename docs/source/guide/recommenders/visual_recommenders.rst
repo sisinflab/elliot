@@ -17,6 +17,7 @@ Summary
     DVBPR.DVBPR.DVBPR
     VBPR.VBPR.VBPR
     VNPR.visual_neural_personalized_ranking.VNPR
+    elliot.recommender.adversarial.AMR.AMR.AMR
 
 
 ACF

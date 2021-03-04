@@ -23,6 +23,26 @@ np.random.seed(42)
 
 
 class AttributeItemKNN(RecMixin, BaseRecommenderModel):
+    r"""
+    Attribute Item-kNN proposed in MyMediaLite Recommender System Library
+
+    For further details, please refer to the `paper <https://www.researchgate.net/publication/221141162_MyMediaLite_A_free_recommender_system_library>`_
+
+    Args:
+        neighbors: Number of item neighbors
+        similarity: Similarity function
+
+    To include the recommendation model, add it to the config file adopting the following pattern:
+
+    .. code:: yaml
+
+      models:
+        AttributeItemKNN:
+          meta:
+            save_recs: True
+          neighbors: 40
+          similarity: cosine
+    """
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
         self._random = np.random

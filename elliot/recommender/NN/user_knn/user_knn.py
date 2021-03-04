@@ -23,6 +23,28 @@ np.random.seed(42)
 
 
 class UserKNN(RecMixin, BaseRecommenderModel):
+    r"""
+    GroupLens: An Open Architecture for Collaborative Filtering of Netnews
+
+    For further details, please refer to the `paper <https://dl.acm.org/doi/10.1145/192844.192905>`_
+
+    Args:
+        neighbors: Number of item neighbors
+        similarity: Similarity function
+        implementation: Implementation type ('aiolli', 'classical')
+
+    To include the recommendation model, add it to the config file adopting the following pattern:
+
+    .. code:: yaml
+
+      models:
+        UserKNN:
+          meta:
+            save_recs: True
+          neighbors: 40
+          similarity: cosine
+          implementation: aiolli
+    """
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
         self._random = np.random
