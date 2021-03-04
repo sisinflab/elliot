@@ -13,13 +13,17 @@ from elliot.evaluation.metrics.base_metric import BaseMetric
 
 class F1(BaseMetric):
     r"""
+    F-Measure
+
     This class represents the implementation of the F-score recommendation metric.
     Passing 'F1' to the metrics list will enable the computation of the metric.
 
-    .. _F1: .. _MAP: http://sdsawtelle.github.io/blog/output/mean-average-precision-MAP-for-recommender-systems.html#So-Why-Did-I-Bother-Defining-Recall?
+    "Evaluating Recommender Systems" Gunawardana, Asela and Shani, Guy, In Recommender systems handbook pages 265--308, 2015
+    For further details, please refer to the `paper <https://link.springer.com/chapter/10.1007/978-1-4899-7637-6_8>`_
 
     .. math::
         \mathrm {F1@K} = \frac{1+\beta^{2}}{\frac{1}{\text { precision@k }}+\frac{\beta^{2}}{\text { recall@k }}}
+
     """
 
     def __init__(self, recommendations, config, params, eval_objects):

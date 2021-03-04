@@ -14,14 +14,30 @@ from elliot.evaluation.metrics.base_metric import BaseMetric
 
 class DSC(BaseMetric):
     r"""
+    Sørensen–Dice coefficient
+
     This class represents the implementation of the Sørensen–Dice coefficient recommendation metric.
     Passing 'DSC' to the metrics list will enable the computation of the metric.
 
-    .. _DSC: https://en.wikipedia.org/wiki/S%C3%B8rensen%E2%80%93Dice_coefficient
+    For further details, please refer to the `page <https://en.wikipedia.org/wiki/S%C3%B8rensen%E2%80%93Dice_coefficient>`_
 
-    . math::
-        \mathrm {F1@K} = \frac{1+\beta^{2}}{\frac{1}{\text { precision@k }}+\frac{\beta^{2}}{\text { recall@k }}}
+    .. math::
+        \mathrm {DSC@K} = \frac{1+\beta^{2}}{\frac{1}{\text { metric_0@k }}+\frac{\beta^{2}}{\text { metric_1@k }}}
 
+    Args:
+        beta: the beta coefficient (default: 1)
+        metric_0: First considered metric (default: Precision)
+        metric_1: Second considered metric (default: Recall)
+
+    To compute the metric, add it to the config file adopting the following pattern:
+
+    .. code:: yaml
+
+        complex_metrics:
+        - metric: DSC
+          beta: 1
+          metric_0: Precision
+          metric_1: Recall
 
     """
 

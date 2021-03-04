@@ -14,7 +14,7 @@ Summary
 
     ACF.ACF.ACF
     DeepStyle.DeepStyle.DeepStyle
-    DVBPR.DVPR.DVBPR
+    DVBPR.DVBPR.DVBPR
     VBPR.VBPR.VBPR
     VNPR.visual_neural_personalized_ranking.VNPR
 
@@ -34,7 +34,7 @@ DeepStyle
 DVBPR
 ~~~~~~~~~~~~~~~~
 
-.. autoclass:: elliot.recommender.visual_recommenders.DVBPR.DVPR.DVBPR
+.. autoclass:: elliot.recommender.visual_recommenders.DVBPR.DVBPR.DVBPR
     :show-inheritance:
 
 VBPR

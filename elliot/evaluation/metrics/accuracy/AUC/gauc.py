@@ -15,10 +15,13 @@ from elliot.utils import logging
 
 class GAUC(BaseMetric):
     r"""
+    Group Area Under the Curve
+
     This class represents the implementation of the GroupAUC recommendation metric.
     Passing 'GAUC' to the metrics list will enable the computation of the metric.
 
-    For further details, please refer to  "Deep Interest Network for Click-Through Rate Prediction" KDD '18 by Zhou, et al.
+    "Deep Interest Network for Click-Through Rate Prediction" KDD '18 by Zhou, et al.
+    For further details, please refer to the `paper <https://www.ijcai.org/Proceedings/2019/0319.pdf>`_
 
     Note:
         It calculates the AUC score of each user, and finally obtains GAUC by weighting the user AUC.

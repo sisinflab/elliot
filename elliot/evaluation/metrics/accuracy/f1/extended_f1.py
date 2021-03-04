@@ -15,9 +15,31 @@ from elliot.evaluation.metrics.metrics_utils import ProxyStatisticalMetric
 
 
 class ExtendedF1(BaseMetric):
-    """
+    r"""
+    Extended F-Measure
+
     This class represents the implementation of the F-score recommendation metric.
     Passing 'ExtendedF1' to the metrics list will enable the computation of the metric.
+
+    "Evaluating Recommender Systems" Gunawardana, Asela and Shani, Guy, In Recommender systems handbook pages 265--308, 2015
+    For further details, please refer to the `paper <https://link.springer.com/chapter/10.1007/978-1-4899-7637-6_8>`_
+
+    .. math::
+        \mathrm {ExtendedF1@K} =\frac{2}{\frac{1}{\text { metric_0@k }}+\frac{1}{\text { metric_1@k }}}
+
+    Args:
+        metric_0: First considered metric (default: Precision)
+        metric_1: Second considered metric (default: Recall)
+
+    To compute the metric, add it to the config file adopting the following pattern:
+
+    .. code:: yaml
+
+        complex_metrics:
+        - metric: ExtendedF1
+          metric_0: Precision
+          metric_1: Recall
+
     """
 
     def __init__(self, recommendations, config, params, eval_objects, additional_data):

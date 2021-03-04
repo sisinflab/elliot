@@ -14,6 +14,8 @@ from elliot.evaluation.metrics.base_metric import BaseMetric
 
 class HR(BaseMetric):
     r"""
+    Hit Rate
+
     This class represents the implementation of the Hit Rate recommendation metric.
     Passing 'HR' to the metrics list will enable the computation of the metric.
 
