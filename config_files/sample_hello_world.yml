@@ -2,7 +2,7 @@ experiment:
   dataset: categorical_dbpedia_ml1m
   data_config:
     strategy: dataset
-    dataset_path: ../data/categorical_dbpedia_ml1m/dataset.tsv
+    dataset_path: ../data/movielens_1m/dataset.tsv
   splitting:
     test_splitting:
         strategy: random_subsampling
