@@ -54,6 +54,7 @@ in control of the framework.
    :caption: ALGORITHMS
 
    guide/alg_intro
+   guide/hyper_optimization
    guide/new_alg
    guide/recommenders
 
