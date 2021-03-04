@@ -23,6 +23,34 @@ np.random.seed(42)
 
 
 class CML(RecMixin, BaseRecommenderModel):
+    r"""
+    Collaborative Metric Learning
+
+    For further details, please refer to the `paper <https://www.cs.cornell.edu/~ylongqi/paper/HsiehYCLBE17.pdf>`_
+
+    Args:
+        factors: Number of latent factors
+        lr: Learning rate
+        l_w: Regularization coefficient for latent factors
+        l_b: Regularization coefficient for bias
+        margin: Safety margin size
+
+    To include the recommendation model, add it to the config file adopting the following pattern:
+
+    .. code:: yaml
+
+      models:
+        CML:
+          meta:
+            save_recs: True
+          epochs: 10
+          factors: 10
+          lr: 0.001
+          l_w: 0.001
+          l_b: 0.001
+          margin: 0.5
+    """
+
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
         """

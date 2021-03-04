@@ -24,6 +24,32 @@ np.random.seed(42)
 
 
 class BPRSlim(RecMixin, BaseRecommenderModel):
+    r"""
+    Sparse Linear Methods for Top-N Recommender Systems
+
+    For further details, please refer to the `paper <http://glaros.dtc.umn.edu/gkhome/node/774>`_
+
+    Args:
+        factors: Number of latent factors
+        lr: Learning rate
+        lj_reg: Regularization coefficient for positive items
+        li_reg: Regularization coefficient for negative items
+
+    To include the recommendation model, add it to the config file adopting the following pattern:
+
+    .. code:: yaml
+
+      models:
+        AMF:
+          meta:
+            save_recs: True
+          epochs: 10
+          factors: 10
+          lr: 0.001
+          lj_reg: 0.001
+          li_reg: 0.1
+    """
+
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
         self._random = np.random

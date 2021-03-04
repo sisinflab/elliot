@@ -24,6 +24,36 @@ np.random.seed(42)
 
 
 class FISM(RecMixin, BaseRecommenderModel):
+    r"""
+    FISM: Factored Item Similarity Models
+
+    For further details, please refer to the `paper <https://dl.acm.org/doi/10.1145/2487575.2487589>`_
+
+    Args:
+        factors: Number of factors of feature embeddings
+        lr: Learning rate
+        l_w:
+        l_b:
+        alpha:
+        neg_ratio:
+
+    To include the recommendation model, add it to the config file adopting the following pattern:
+
+    .. code:: yaml
+
+      models:
+        FFM:
+          meta:
+            save_recs: True
+          epochs: 10
+          factors: 10
+          lr: 0.001
+          l_w: 0.001
+          l_b: 0.001
+          alpha:
+          neg_ratio:
+    """
+
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
         """

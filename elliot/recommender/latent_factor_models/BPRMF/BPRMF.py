@@ -22,10 +22,6 @@ np.random.seed(42)
 
 
 class MF(object):
-    """
-    Simple Matrix Factorization class
-    """
-
     def __init__(self, F, ratings, random, *args):
         self._factors = F
         self._ratings = ratings
@@ -138,6 +134,45 @@ class MF(object):
 
 
 class BPRMF(RecMixin, BaseRecommenderModel):
+    r"""
+    Bayesian Personalized Ranking with Matrix Factorization
+
+    For further details, please refer to the `paper <https://arxiv.org/abs/1205.2618.pdf>`_
+
+    Args:
+        factors: Number of latent factors
+        lr: Learning rate
+        bias_regularization: Regularization coefficient for the bias
+        user_regularization: Regularization coefficient for user latent factors
+        positive_item_regularization: Regularization coefficient for positive item latent factors
+        negative_item_regularization: Regularization coefficient for negative item latent factors
+        update_negative_item_factors:
+        update_users:
+        update_items:
+        update_bias:
+
+
+    To include the recommendation model, add it to the config file adopting the following pattern:
+
+    .. code:: yaml
+
+      models:
+        BPRMF:
+          meta:
+            save_recs: True
+          epochs: 10
+          factors: 10
+          lr: 0.001
+          bias_regularization: 0
+          user_regularization: 0.0025
+          positive_item_regularization: 0.0025
+          negative_item_regularization: 0.0025
+          update_negative_item_factors: True
+          update_users: True
+          update_items: True
+          update_bias: True
+    """
+
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
         self._random = np.random

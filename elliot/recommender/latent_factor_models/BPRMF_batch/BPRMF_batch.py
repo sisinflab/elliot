@@ -25,6 +25,32 @@ np.random.seed(42)
 
 
 class BPRMF_batch(RecMixin, BaseRecommenderModel):
+    r"""
+    Batch Bayesian Personalized Ranking with Matrix Factorization
+
+    For further details, please refer to the `paper <https://arxiv.org/abs/1205.2618.pdf>`_
+
+    Args:
+        factors: Number of latent factors
+        lr: Learning rate
+        l_w: Regularization coefficient for latent factors
+        l_b: Regularization coefficient for bias
+
+    To include the recommendation model, add it to the config file adopting the following pattern:
+
+    .. code:: yaml
+
+      models:
+        BPRMF_batch:
+          meta:
+            save_recs: True
+          epochs: 10
+          factors: 10
+          lr: 0.001
+          l_w: 0.1
+          l_b: 0.001
+    """
+
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
         """
