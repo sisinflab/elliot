@@ -20,8 +20,6 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed id porta mi. Proin 
 
 .. module:: elliot.recommender.unpersonalized.most_popular.most_popular
 .. autoclass:: MostPop
-    :members:
-    :undoc-members:
     :show-inheritance:
 
 To include the recommendation model, add it to the config file adopting the following pattern:
@@ -41,8 +39,6 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed id porta mi. Proin 
 
 .. module:: elliot.recommender.unpersonalized.random_recommender.Random
 .. autoclass:: Random
-    :members:
-    :undoc-members:
     :show-inheritance:
 
 To include the recommendation model, add it to the config file adopting the following pattern:
