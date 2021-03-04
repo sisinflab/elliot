@@ -45,11 +45,11 @@ class MultiVAE(RecMixin, BaseRecommenderModel):
           meta:
             save_recs: True
           epochs: 10
-            intermediate_dim: 600
-            latent_dim: 200
-            reg_lambda: 0.01
-            lr: 0.001
-            dropout_pkeep: 1
+          intermediate_dim: 600
+          latent_dim: 200
+          reg_lambda: 0.01
+          lr: 0.001
+          dropout_pkeep: 1
     """
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):

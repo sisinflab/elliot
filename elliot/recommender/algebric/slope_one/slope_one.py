@@ -22,6 +22,20 @@ np.random.seed(42)
 
 
 class SlopeOne(RecMixin, BaseRecommenderModel):
+    r"""
+    Slope One Predictors for Online Rating-Based Collaborative Filtering
+
+    For further details, please refer to the `paper <https://arxiv.org/abs/cs/0702144>`_
+
+    To include the recommendation model, add it to the config file adopting the following pattern:
+
+    .. code:: yaml
+
+      models:
+        SlopeOne:
+          meta:
+            save_recs: True
+    """
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
         super().__init__(data, config, params, *args, **kwargs)

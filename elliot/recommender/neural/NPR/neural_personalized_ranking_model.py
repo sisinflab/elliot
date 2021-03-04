@@ -76,7 +76,7 @@ class NPRModel(keras.Model):
 
         return tf.squeeze(mlp_output_1), tf.squeeze(mlp_output_2), user_mf_e, item_mf_e_1, item_mf_e_2
 
-    @tf.function
+    #@tf.function
     def train_step(self, batch):
         with tf.GradientTape() as tape:
             user, pos, neg = batch

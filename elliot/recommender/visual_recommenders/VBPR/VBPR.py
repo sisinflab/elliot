@@ -16,6 +16,7 @@ from tqdm import tqdm
 from elliot.dataset.samplers import custom_sampler as cs
 from elliot.recommender import BaseRecommenderModel
 from elliot.recommender.base_recommender_model import init_charger
+from elliot.recommender.base_recommender_model import init_charger
 from elliot.recommender.recommender_utils_mixin import RecMixin
 from elliot.recommender.visual_recommenders.VBPR.VBPR_model import VBPR_model
 from elliot.utils.write import store_recommendation
