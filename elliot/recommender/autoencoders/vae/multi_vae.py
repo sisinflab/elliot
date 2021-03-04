@@ -24,7 +24,33 @@ random.seed(0)
 
 
 class MultiVAE(RecMixin, BaseRecommenderModel):
+    r"""
+    Variational Autoencoders for Collaborative Filtering
 
+    For further details, please refer to the `paper <https://dl.acm.org/doi/10.1145/3178876.3186150>`_
+
+    Args:
+        intermediate_dim: Number of intermediate dimension
+        latent_dim: Number of latent factors
+        reg_lambda: Regularization coefficient
+        lr: Learning rate
+        dropout_pkeep: Dropout probaility
+
+    To include the recommendation model, add it to the config file adopting the following pattern:
+
+    .. code:: yaml
+
+      models:
+        MultiVAE:
+          meta:
+            save_recs: True
+          epochs: 10
+            intermediate_dim: 600
+            latent_dim: 200
+            reg_lambda: 0.01
+            lr: 0.001
+            dropout_pkeep: 1
+    """
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
         """

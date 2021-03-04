@@ -27,13 +27,13 @@ class AMF(RecMixin, BaseRecommenderModel):
     For further details, please refer to the `paper <https://arxiv.org/abs/1808.03908>`_
 
     Args:
-        factors:
-        lr:
-        l_w:
-        l_b:
-        eps:
-        l_adv:
-        adversarial_epochs:
+        factors: Number of latent factor
+        lr: Learning rate
+        l_w: Regularization coefficient
+        l_b: Regularization coefficient of bias
+        eps: Perturbation Budget
+        l_adv: Adversarial regularization coefficient
+        adversarial_epochs: Adversarial epochs
 
     To include the recommendation model, add it to the config file adopting the following pattern:
 
@@ -44,7 +44,7 @@ class AMF(RecMixin, BaseRecommenderModel):
           meta:
             save_recs: True
           epochs: 10
-          factors: 10
+          factors: 200
           lr: 0.001
           l_w: 0.1
           l_b: 0.001
@@ -68,7 +68,7 @@ class AMF(RecMixin, BaseRecommenderModel):
         self._random = np.random
 
         self._params_list = [
-            ("_factors", "factors", "factors", 10, None, None),
+            ("_factors", "factors", "factors", 200, None, None),
             ("_learning_rate", "lr", "lr", 0.001, None, None),
             ("_l_w", "l_w", "l_w", 0.1, None, None),
             ("_l_b", "l_b", "l_b", 0.001, None, None),

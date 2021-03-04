@@ -35,16 +35,15 @@ class AMR(RecMixin, BaseRecommenderModel):
     For further details, please refer to the `paper <https://arxiv.org/pdf/1809.07062.pdf>`_
 
     Args:
-        factors:
-        factors_d:
-        lr:
-        l_w:
-        l_b:
-        l_e:
-        eps:
-        l_adv:
-        adversarial_epochs:
-
+        factors: Number of latent factor
+        factors_d: Image-feature dimensionality
+        lr: Learning rate
+        l_w: Regularization coefficient
+        l_b: Regularization coefficient of bias
+        l_e: Regularization coefficient of image matrix embedding
+        eps: Perturbation Budget
+        l_adv: Adversarial regularization coefficient
+        adversarial_epochs: Adversarial epochs
 
     To include the recommendation model, add it to the config file adopting the following pattern:
 
@@ -55,13 +54,15 @@ class AMR(RecMixin, BaseRecommenderModel):
           meta:
             save_recs: True
           epochs: 10
-          factors: 10
+          factors: 200
+          factors_d: 20
           lr: 0.001
           l_w: 0.1
           l_b: 0.001
+          l_e: 0.1
           eps: 0.1
           l_adv: 0.001
-          adversarial_epochs: 10
+          adversarial_epochs: 5
     """
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
