@@ -19,8 +19,6 @@ AMF
 
 .. module:: elliot.recommender.adversarial.AMF.AMF
 .. autoclass:: AMF
-    :members:
-    :undoc-members:
     :show-inheritance:
 
 AMR
@@ -28,7 +26,5 @@ AMR
 
 .. module:: elliot.recommender.adversarial.AMR.AMR
 .. autoclass:: AMR
-    :members:
-    :undoc-members:
     :show-inheritance:
 
