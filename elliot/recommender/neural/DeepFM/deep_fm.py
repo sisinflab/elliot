@@ -26,18 +26,45 @@ np.random.seed(42)
 
 
 class DeepFM(RecMixin, BaseRecommenderModel):
+    r"""
+        DeepFM: A Factorization-Machine based Neural Network for CTR Prediction
+
+        For further details, please refer to the `paper <https://arxiv.org/abs/1703.04247>`_
+
+        Args:
+            factors: Number of factors dimension
+            lr: Learning rate
+            l_w: Regularization coefficient
+            hidden_neurons: List of units for each layer
+            hidden_activations: List of activation functions
+
+        To include the recommendation model, add it to the config file adopting the following pattern:
+
+        .. code:: yaml
+
+          models:
+            DeepFM:
+              meta:
+                save_recs: True
+              epochs: 10
+              factors: 100
+              lr: 0.001
+              l_w: 0.0001
+              hidden_neurons: (64,32)
+              hidden_activations: ('relu','relu')
+        """
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
         self._random = np.random
 
         self._params_list = [
-            ("_factors", "factors", "factors", 10, None, None),
+            ("_factors", "factors", "factors", 100, None, None),
             ("_hidden_neurons", "hidden_neurons", "hidden_neurons", "(64,32)", lambda x: list(make_tuple(x)),
              lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
             ("_hidden_activations", "hidden_activations", "hidden_activations", "('relu','relu')", lambda x: list(make_tuple(x)),
              lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
             ("_learning_rate", "lr", "lr", 0.001, None, None),
-            ("_l_w", "reg", "reg", 0.1, None, None)
+            ("_l_w", "reg", "reg", 0.0001, None, None)
         ]
         self.autoset_params()
 

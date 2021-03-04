@@ -23,6 +23,34 @@ np.random.seed(42)
 
 
 class DMF(RecMixin, BaseRecommenderModel):
+    r"""
+        Deep Matrix Factorization Models for Recommender Systems.
+
+        For further details, please refer to the `paper <https://www.ijcai.org/Proceedings/2017/0447.pdf>`_
+
+        Args:
+            lr: Learning rate
+            reg: Regularization coefficient
+            user_mlp: List of units for each layer
+            item_mlp: List of activation functions
+            similarity: Number of factors dimension
+
+
+        To include the recommendation model, add it to the config file adopting the following pattern:
+
+        .. code:: yaml
+
+          models:
+            DMF:
+              meta:
+                save_recs: True
+              epochs: 10
+              lr: 0.0001
+              reg: 0.001
+              user_mlp: (64,32)
+              item_mlp: (64,32)
+              similarity: cosine
+        """
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
         self._random = np.random

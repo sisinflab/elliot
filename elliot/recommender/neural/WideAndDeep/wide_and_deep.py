@@ -49,6 +49,37 @@ def build_sparse_features(data):
 
 
 class WideAndDeep(RecMixin, BaseRecommenderModel):
+    r"""
+    Wide & Deep Learning for Recommender Systems
+
+    (For now, available with knowledge-aware features)
+
+    For further details, please refer to the `paper <https://arxiv.org/abs/1606.07792>`_
+
+    Args:
+        factors: Number of latent factors
+        mlp_hidden_size: List of units for each layer
+        lr: Learning rate
+        l_w: Regularization coefficient
+        l_b: Bias Regularization Coefficient
+        dropout_prob: Dropout rate
+
+    To include the recommendation model, add it to the config file adopting the following pattern:
+
+    .. code:: yaml
+
+      models:
+        NPR:
+          meta:
+            save_recs: True
+          epochs: 10
+          factors: 50
+          mlp_hidden_size: (32, 32, 1)
+          lr: 0.001
+          l_w: 0.005
+          l_b: 0.0005
+          dropout_prob: 0.0
+    """
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
         self._random = np.random
@@ -59,7 +90,7 @@ class WideAndDeep(RecMixin, BaseRecommenderModel):
 
         self._params_list = [
             ("_lr", "lr", "lr", 0.001, None, None),
-            ("_embed_k", "embed_k", "embed_k", 50, None, None),
+            ("_factors", "factors", "factors", 50, None, None),
             ("_mlp_hidden_size", "mlp_hidden_size", "mlp_hidden_size", "(32, 32, 1)",
              lambda x: list(make_tuple(str(x))),
              lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
@@ -76,7 +107,7 @@ class WideAndDeep(RecMixin, BaseRecommenderModel):
         self._sp_i_train = self._data.sp_i_train
         self._i_items_set = list(range(self._num_items))
 
-        self._model = WideAndDeepModel(self._data, self._num_users, self._num_items, self._embed_k,
+        self._model = WideAndDeepModel(self._data, self._num_users, self._num_items, self._factors,
                                        self._mlp_hidden_size,
                                        self._dropout_prob, self._lr, self._l_w, self._l_b
                                        )

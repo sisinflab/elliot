@@ -23,6 +23,34 @@ np.random.seed(42)
 
 
 class NPR(RecMixin, BaseRecommenderModel):
+    r"""
+    Neural Personalized Ranking for Image Recommendation
+    (Model without visual features)
+
+    For further details, please refer to the `paper <https://dl.acm.org/citation.cfm?id=3159728>`_
+
+    Args:
+        mf_factors: Number of MF latent factors
+        mlp_hidden_size: List of units for each layer
+        lr: Learning rate
+        l_w: Regularization coefficient
+        dropout: Dropout rate
+
+    To include the recommendation model, add it to the config file adopting the following pattern:
+
+    .. code:: yaml
+
+      models:
+        NPR:
+          meta:
+            save_recs: True
+          epochs: 10
+          mf_factors: 100
+          mlp_hidden_size:  (64,32)
+          lr: 0.001
+          l_w: 0.001
+          dropout: 0.45
+    """
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
         self._random = np.random
@@ -32,7 +60,7 @@ class NPR(RecMixin, BaseRecommenderModel):
         self._params_list = [
             ("_learning_rate", "lr", "lr", 0.001, None, None),
             ("_l_w", "l_w", "l_w", 0.001, None, None),
-            ("_mf_factors", "mf_factors", "mffactors", 10, None, None),
+            ("_mf_factors", "mf_factors", "mffactors", 100, None, None),
             ("_mlp_hidden_size", "mlp_hidden_size", "mlpunits", "(64,32)", lambda x: list(make_tuple(str(x))), lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
             ("_dropout", "dropout", "drop", 0.45, None, None)
         ]

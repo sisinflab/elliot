@@ -25,6 +25,39 @@ np.random.seed(42)
 
 
 class ConvNeuMF(RecMixin, BaseRecommenderModel):
+    r"""
+        Outer Product-based Neural Collaborative Filtering
+
+        For further details, please refer to the `paper <https://arxiv.org/abs/1808.03912>`_
+
+        Args:
+            embedding_size: Embedding dimension
+            lr: Learning rate
+            l_w: Regularization coefficient
+            l_b: Regularization coefficient of bias
+            cnn_channels: List of channels
+            cnn_kernels: List of kernels
+            cnn_strides: List of strides
+            dropout_prob: Dropout probability applied on the convolutional layers
+
+        To include the recommendation model, add it to the config file adopting the following pattern:
+
+        .. code:: yaml
+
+          models:
+            ConvNeuMF:
+              meta:
+                save_recs: True
+              epochs: 10
+              embedding_size: 100
+              lr: 0.001
+              l_w: 0.005
+              l_b: 0.0005
+              cnn_channels: (1, 32, 32)
+              cnn_kernels: (2,2)
+              cnn_strides: (2,2)
+              dropout_prob: 0
+        """
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
         self._random = np.random

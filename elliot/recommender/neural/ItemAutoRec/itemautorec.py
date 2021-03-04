@@ -21,6 +21,29 @@ np.random.seed(42)
 
 
 class ItemAutoRec(RecMixin, BaseRecommenderModel):
+    r"""
+    AutoRec: Autoencoders Meet Collaborative Filtering (Item-based)
+
+    For further details, please refer to the `paper <https://users.cecs.anu.edu.au/~akmenon/papers/autorec/autorec-paper.pdf>`_
+
+    Args:
+        hidden_neuron: List of units for each layer
+        lr: Learning rate
+        l_w: Regularization coefficient
+
+    To include the recommendation model, add it to the config file adopting the following pattern:
+
+    .. code:: yaml
+
+      models:
+        ItemAutoRec:
+          meta:
+            save_recs: True
+          epochs: 10
+          hidden_neuron: 500
+          lr: 0.0001
+          l_w: 0.001
+    """
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
         """

@@ -25,10 +25,42 @@ np.random.seed(42)
 
 
 class ConvMF(RecMixin, BaseRecommenderModel):
+    r"""
+        Convolutional Matrix Factorization for Document Context-Aware Recommendation
+
+        For further details, please refer to the `paper <https://dl.acm.org/doi/10.1145/2959100.2959165>`_
+
+        Args:
+            embedding_size: Embedding dimension
+            lr: Learning rate
+            l_w: Regularization coefficient
+            l_b: Regularization coefficient of bias
+            cnn_channels: List of channels
+            cnn_kernels: List of kernels
+            cnn_strides: List of strides
+            dropout_prob: Dropout probability applied on the convolutional layers
+
+        To include the recommendation model, add it to the config file adopting the following pattern:
+
+        .. code:: yaml
+
+          models:
+            ConvMF:
+              meta:
+                save_recs: True
+              epochs: 10
+              embedding_size: 100
+              lr: 0.001
+              l_w: 0.005
+              l_b: 0.0005
+              cnn_channels: (1, 32, 32)
+              cnn_kernels: (2,2)
+              cnn_strides: (2,2)
+              dropout_prob: 0
+        """
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
         """
-        http://dm.postech.ac.kr/~cartopy/ConvMF/ConvMF_RecSys16_for_public.pdf
         Args:
             data:
             config:

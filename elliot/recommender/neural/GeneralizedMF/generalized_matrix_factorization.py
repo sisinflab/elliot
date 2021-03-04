@@ -22,6 +22,30 @@ np.random.seed(42)
 
 
 class GMF(RecMixin, BaseRecommenderModel):
+    r"""
+        Neural Collaborative Filtering
+
+        For further details, please refer to the `paper <https://arxiv.org/abs/1708.05031>`_
+
+        Args:
+            mf_factors: Number of latent factors
+            lr: Learning rate
+            is_edge_weight_train: Whether the training uses edge weighting
+
+
+        To include the recommendation model, add it to the config file adopting the following pattern:
+
+        .. code:: yaml
+
+          models:
+            GMF:
+              meta:
+                save_recs: True
+              epochs: 10
+              mf_factors: 10
+              lr: 0.001
+              is_edge_weight_train: True
+        """
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
         self._random = np.random

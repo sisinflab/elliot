@@ -23,8 +23,40 @@ np.random.seed(42)
 
 
 class NeuMF(RecMixin, BaseRecommenderModel):
+    r"""
+    Neural Collaborative Filtering
+
+    For further details, please refer to the `paper <https://arxiv.org/abs/1708.05031>`_
+
+    Args:
+        mf_factors: Number of MF latent factors
+        mlp_factors: Number of MLP latent factors
+        mlp_hidden_size: List of units for each layer
+        lr: Learning rate
+        dropout: Dropout rate
+        is_mf_train: Whether to train the MF embeddings
+        is_mlp_train: Whether to train the MLP layers
+
+    To include the recommendation model, add it to the config file adopting the following pattern:
+
+    .. code:: yaml
+
+      models:
+        NeuMF:
+          meta:
+            save_recs: True
+          epochs: 10
+          mf_factors: 10
+          mlp_factors: 10
+          mlp_hidden_size: (64,32)
+          lr: 0.001
+          dropout: 0.0
+          is_mf_train: True
+          is_mlp_train: True
+    """
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
+
         self._random = np.random
 
         self._sampler = pws.Sampler(self._data.i_train_dict)

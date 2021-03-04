@@ -26,6 +26,33 @@ np.random.seed(42)
 
 
 class NFM(RecMixin, BaseRecommenderModel):
+    r"""
+        Neural Factorization Machines for Sparse Predictive Analytics
+
+        For further details, please refer to the `paper <https://arxiv.org/abs/1708.05027>`_
+
+        Args:
+            factors: Number of factors dimension
+            lr: Learning rate
+            l_w: Regularization coefficient
+            hidden_neurons: List of units for each layer
+            hidden_activations: List of activation functions
+
+        To include the recommendation model, add it to the config file adopting the following pattern:
+
+        .. code:: yaml
+
+          models:
+            NFM:
+              meta:
+                save_recs: True
+              epochs: 10
+              factors: 100
+              lr: 0.001
+              l_w: 0.0001
+              hidden_neurons: (64,32)
+              hidden_activations: ('relu','relu')
+        """
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
         self._random = np.random
