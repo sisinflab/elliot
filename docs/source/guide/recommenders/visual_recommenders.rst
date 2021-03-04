@@ -34,7 +34,7 @@ DeepStyle
 DVBPR
 ~~~~~~~~~~~~~~~~
 
-.. autoclass:: elliot.recommender.visual_recommenders.DVBPR.DVPR.DVBPR
+.. autoclass:: elliot.recommender.visual_recommenders.DVBPR.DVBPR.DVBPR
     :show-inheritance:
 
 VBPR
