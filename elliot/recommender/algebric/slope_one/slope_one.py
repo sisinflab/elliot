@@ -9,16 +9,14 @@ __version__ = '0.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
-import numpy as np
 import pickle
 
-from elliot.evaluation.evaluator import Evaluator
-from elliot.recommender.recommender_utils_mixin import RecMixin
-from elliot.utils.folder import build_model_folder
-from elliot.utils.write import store_recommendation
+import numpy as np
 
-from elliot.recommender.base_recommender_model import BaseRecommenderModel, init_charger
 from elliot.recommender.algebric.slope_one.slope_one_model import SlopeOneModel
+from elliot.recommender.base_recommender_model import BaseRecommenderModel, init_charger
+from elliot.recommender.recommender_utils_mixin import RecMixin
+from elliot.utils.write import store_recommendation
 
 np.random.seed(42)
 
