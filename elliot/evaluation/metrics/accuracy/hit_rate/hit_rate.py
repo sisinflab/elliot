@@ -23,6 +23,7 @@ class HR(BaseMetric):
         \mathrm {HR@K} =\frac{Number \space of \space Hits @K}{|GT|}
     :math:`HR` is the number of users with a positive sample in the recommendation list.
     :math:`GT` is the total number of samples in the test set.
+
     """
 
     def __init__(self, recommendations: t.Dict[int, t.List[t.Tuple[int, float]]], config, params, eval_objects):
