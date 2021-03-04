@@ -12,19 +12,19 @@ Summary
 
 .. autosummary::
 
-    CFGAN.cfgan.CFGAN
     IRGAN.irgan.IRGAN
-
-CFGAN
-~~~~~~~~~~~~~~~~
-
-.. module:: elliot.recommender.gan.CFGAN.cfgan
-.. autoclass:: CFGAN
-    :show-inheritance:
+    CFGAN.cfgan.CFGAN
 
 IRGAN
 ~~~~~~~~~~~~~~~~
 
 .. module:: elliot.recommender.gan.IRGAN.irgan
 .. autoclass:: IRGAN
+    :show-inheritance:
+
+CFGAN
+~~~~~~~~~~~~~~~~
+
+.. module:: elliot.recommender.gan.CFGAN.cfgan
+.. autoclass:: CFGAN
     :show-inheritance:
