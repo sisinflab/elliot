@@ -14,10 +14,20 @@ import logging as pylog
 
 class LAUC(BaseMetric):
     r"""
+    Limited Area Under the Curve
+
     This class represents the implementation of the Limited AUC recommendation metric.
     Passing 'LAUC' to the metrics list will enable the computation of the metric.
 
-    .. _LAUC: "Setting Goals and Choosing Metrics for Recommender System Evaluations" by Gunnar Schröder, et al.
+    "Setting Goals and Choosing Metrics for Recommender System Evaluations" by Gunnar Schröder, et al.
+    For further details, please refer to the `paper <https://wiki.epfl.ch/edicpublic/documents/Candidacy%20exam/Evaluation.pdf>`_
+
+
+    To compute the metric, add it to the config file adopting the following pattern:
+
+    .. code:: yaml
+
+        simple_metrics: [LAUC]
 
     """
 
