@@ -23,14 +23,14 @@ KaHFM
 .. autoclass:: KaHFM
     :show-inheritance:
 
-KaHFMBatch
+KaHFM Batch
 ~~~~~~~~~~~~~~~~
 
 .. module:: elliot.recommender.knowledge_aware.kaHFM_batch.kahfm_batch
 .. autoclass:: KaHFMBatch
     :show-inheritance:
 
-KaHFMBatch
+KaHFM Embeddings
 ~~~~~~~~~~~~~~~~
 
 .. module:: elliot.recommender.knowledge_aware.kahfm_embeddings.kahfm_embeddings
