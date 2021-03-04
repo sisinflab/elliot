@@ -48,3 +48,9 @@ VNPR
 
 .. autoclass:: elliot.recommender.visual_recommenders.VNPR.visual_neural_personalized_ranking.VNPR
     :show-inheritance:
+
+AMR
+~~~~~~~~~~~~~~~~
+
+.. autoclass:: elliot.recommender.adversarial.AMR.AMR
+    :show-inheritance:
