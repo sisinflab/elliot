@@ -119,22 +119,17 @@ It takes the second parameter, ``rounds``, where the user passes an **int** corr
 ``cold_users`` filters out all the users with a number of interactions higher than a given threshold.
 It takes a parameter, ``threshold``, where the user passes an **int** corresponding to the desired value.
 
-.. code:: yaml
-
-      prefiltering:
-        strategy: global_threshold|user_average|user_k_core|item_k_core|iterative_k_core|n_rounds_k_core|cold_users
-        threshold: 3|average
-        core: 5
-        rounds: 2
-      dataset: categorical_dbpedia_ml1m
 
 Data Splitting
 """"""""""""""""""
+Elliot provides several splitting strategies.
+To enable the splitting operations, we can insert the corresponding section:
+
 .. code:: yaml
 
       splitting:
         save_on_disk: True
-        save_folder: ../data/{0}/splitting/
+        save_folder: this/is/the/path/
         test_splitting:
             strategy: fixed_timestamp|temporal_hold_out|random_subsampling|random_cross_validation
             timestamp: best|1609786061
@@ -148,32 +143,149 @@ Data Splitting
             leave_n_out: 1
             folds: 5
 
+Before deepening the splitting configurations, we can configure Elliot to save on disk the split files, once the splitting operation is completed.
+
+To this extent, we can insert two fields into the section: ``save_on_disk``, and ``save_folder``.
+
+``save_on_disk`` enables the writing process, and ``save_folder`` specifies the system location where to save the split files:
+
+.. code:: yaml
+
+      splitting:
+        save_on_disk: True
+        save_folder: this/is/the/path/
+
+Now, we can insert one (or two) specific subsections to detail the train/test, and the train/validation splitting via the corresponding fields:
+``test_splitting``, and ``validation_splitting``.
+``test_splitting`` is clearly mandatory, while ``validation_splitting`` is optional.
+Since the two subsections follow the same guidelines, here we detail ``test_splitting`` without loss of generality.
+
+Elliot enables four splitting families: ``fixed_timestamp``, ``temporal_hold_out``, ``random_subsampling``, ``random_cross_validation``.
+
+``fixed_timestamp`` assumes that there will be a specific timestamp to split prior interactions (train) and future interactions.
+It takes the parameter ``timestamp``, that can assume one of two possible kind of values: a **long** corresponding to a specific timestamp, or the string *best* computed following Anelli et al. XX.
+
+``temporal_hold_out`` relies on a temporal split of user transactions. The split can be realized following two different approaches: a *ratio-based* and a *leave-n-out-based* approach.
+If we enable the ``test_ratio`` field with a **float** value, Elliot splits data retaining the last (100 * ``test_ratio``) % of the user transactions for the test set.
+If we enable the ``leave_n_out`` field with an **int** value, Elliot retains the last ``leave_n_out`` transactions for the test set.
+
+``random_subsampling`` generalizes random hold-out strategy.
+It takes a ``test_ratio`` parameter with a **float** value to define the train/test ratio for user-based hold-out splitting.
+Alternatively, it can take ``leave_n_out`` with an **int** value to define the number of transaction retained for the test set.
+Moreover, the splitting operation can be repeated enabling the ``folds`` field and passing an **int**.
+In that case, the overall splitting strategy corresponds to a user-based random subsampling strategy.
+
+``random_cross_validation`` adopts a k-folds cross-validation splitting strategy.
+It takes the parameter ``folds`` with an **int** value, that defines the overall number of folds to consider.
+
+Dataset Name Configuration
+""""""""""""""""""""""""""""
+Elliot needs a MANDATORY field, ``dataset``, that identifies the name of the dataset used for the experiment. This information is used in the majority of the experimental steps, to identify the experiment and save the files correctly:
+
+.. code:: yaml
+
+    experiment:
+      dataset: dataset_name
 
 Output Configuration
 """""""""""""""""""""""
+Elliot lets the user specify where to store specific output files: the recommendation lists, the model weights, the evaluation results, and the logs:
+
 .. code:: yaml
 
-      path_output_rec_result: ../results/{0}/recs/
-      path_output_rec_weight: ../results/{0}/weights/
-      path_output_rec_performance: ../results/{0}/performance/
-      path_logger_config: ./config/logger_config.yml
-      path_log_folder: ../log/
+      path_output_rec_result: this/is/the/path/
+      path_output_rec_weight: this/is/the/path/
+      path_output_rec_performance: this/is/the/path/
+      path_log_folder: this/is/the/path/
+
+``path_output_rec_result`` lets the user define the path to the folder to store the recommendation lists.
+
+``path_output_rec_weight`` lets the user define the path to the folder to store the model weights.
+
+``path_output_rec_performance`` lets the user define the path to the folder to store the evaluation results.
+
+``path_log_folder`` lets the user define the path to the folder to store the logs.
+
+If not provided, Elliot creates a *results* folder in the parent folder of the config file location.
+
+Inside it, Elliot creates an experiment-specific folder with the name of the *dataset*, and there it creates the *recs/*, *weights/*, and *performance/* folders, respectively.
+
+Moreover, Elliot creates a *log/* folder in the parent folder of the config file location.
+
 
 Evaluation Configuration
 """""""""""""""""""""""""""""
+
+Elliot provides several facilities to evaluate recommendation systems.
+The majority of the evaluation techniques require the computation of user-specific recommendation lists (some techniques use recommendation systems to perform knowledge completion or other tasks).
+
+To define the length of the user recommendation list, Elliot provides a specific mandatory field, ``top_k``, that takes an **int** representing the list length.
+
+Beyond the former general definition, to specify the evaluation configuration, we can insert a specific section:
+
 .. code:: yaml
 
       top_k: 50
       evaluation:
-        cutoff: 10
-        simple_metrics: [ nDCG, Precision, Recall, ItemCoverage, HR, MRR, MAP, F1, Gini, SEntropy, EFD, EPC, AUC, GAUC, LAUC, MAE, MSE, RMSE]
+        cutoffs: [10, 5]
+        simple_metrics: [ nDCG, Precision, Recall]
         relevance_threshold: 1
         paired_ttest: True
+        wilcoxon_test: True
         complex_metrics:
         - metric: DSC
           beta: 2
         - metric: SRecall
-          feature_data: ../data/categorical_dbpedia_ml1m/map.tsv
+          feature_data: this/is/the/path.tsv
+
+In that section, we can detail the main characteristics of our experimental benchmark.
+
+In particular, we can provide Elliot with the information regarding the metrics we want to compute.
+According to the metrics definition, some of them might require additional parameters or files.
+To make it easier for the user to pass metrics and optional arguments, Elliot partitions the metrics into simple_metrics and complex_metrics.
+
+simple_metrics can be inserted as a field into the evaluation section, and it takes as a value the list of the metrics we want to compute.
+In the simple metrics set, we find all the metrics that **DO NOT** require any other additional parameter or file:
+
+simple metrics example
+
+The majority of the evaluation metrics relies on the notions of *cut-off* and *relevance threshold*.
+
+The cut-off is the maximum length of the recommendation list we want to consider when computing the metric (it could be different from the top k).
+To pass cut-off values, we can enable the ``cutoffs`` field and pass a single value or a **list of values**. Elliot will compute the evaluation results for each considered cut-off.
+If cutoffs field is not provided, ``top_k`` value is assumed as a cut-off.
+
+The relevance threshold is the minimum value of the rating to consider a test transaction relevant for the evaluation process.
+We can pass the relevance threshold value to the corresponding ``relevance_threshold`` field.
+If not given, relevance_threshold is set to **0**.
+
+The set of metrics that require additional arguments is referred to as ``complex_metrics``.
+The inclusion of the metrics follows the syntax:
+
+.. code:: yaml
+
+      evaluation:
+        complex_metrics:
+        - metric: complex_metric_name_0
+          parameter_0: 2
+        - metric: complex_metric_name_1
+          parameter_1: this/is/the/path.tsv
+
+where *parameter_0* and *parameter_1* are metric-specific parameters of any kind.
+
+For further details about the available metrics, please see the corresponding section XXX.
+
+Finally, Elliot enables the computation of paired statistical hypothesis tests, namely, *Wilcoxon*, and *Student's paired t-tests*.
+
+To enable them, we can insert the corresponding boolean fields into the evaluation section:
+
+.. code:: yaml
+
+      evaluation:
+        paired_ttest: True
+        wilcoxon_test: True
+
+All the evaluation results are available in the *performance* folder at the end of the experiment.
 
 GPU Acceleration
 """""""""""""""""
