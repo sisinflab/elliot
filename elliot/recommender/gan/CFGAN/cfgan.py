@@ -21,6 +21,41 @@ np.random.seed(42)
 
 
 class CFGAN(RecMixin, BaseRecommenderModel):
+    r"""
+    CFGAN: A Generic Collaborative Filtering Framework based on Generative Adversarial Networks
+
+    For further details, please refer to the `paper <https://dl.acm.org/doi/10.1145/3269206.3271743>`_
+
+    Args:
+        factors: Number of latent factor
+        lr: Learning rate
+        l_w: Regularization coefficient
+        l_b: Regularization coefficient of bias
+        l_gan: Adversarial regularization coefficient
+        g_epochs: Number of epochs to train the generator for each IRGAN step
+        d_epochs: Number of epochs to train the discriminator for each IRGAN step
+        s_zr: Sampling parameter of zero-reconstruction
+        s_pm: Sampling parameter of partial-masking
+
+    To include the recommendation model, add it to the config file adopting the following pattern:
+
+    .. code:: yaml
+
+      models:
+        CFGAN:
+          meta:
+            save_recs: True
+          epochs: 10
+          factors: 10
+          lr: 0.001
+          l_w: 0.1
+          l_b: 0.001
+          l_gan: 0.001
+          g_epochs: 5
+          d_epochs: 1
+          s_zr: 0.001
+          s_pm: 0.001
+    """
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
         """

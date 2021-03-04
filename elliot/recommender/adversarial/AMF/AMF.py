@@ -24,7 +24,6 @@ class AMF(RecMixin, BaseRecommenderModel):
     r"""
     Adversarial Matrix Factorization
 
-
     For further details, please refer to the `paper <https://arxiv.org/abs/1808.03908>`_
 
     Args:

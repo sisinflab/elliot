@@ -21,18 +21,48 @@ np.random.seed(42)
 
 
 class IRGAN(RecMixin, BaseRecommenderModel):
+    r"""
+    IRGAN: A Minimax Game for Unifying Generative and Discriminative Information Retrieval Models
+
+    For further details, please refer to the `paper <https://dl.acm.org/doi/10.1145/3077136.3080786>`_
+
+    Args:
+        factors: Number of latent factor
+        lr: Learning rate
+        l_w: Regularization coefficient
+        l_b: Regularization coefficient of bias
+        l_gan: Adversarial regularization coefficient
+        predict_model: Specification of the model to generate the recommendation (Generator/ Discriminator)
+        g_epochs: Number of epochs to train the generator for each IRGAN step
+        d_epochs: Number of epochs to train the discriminator for each IRGAN step
+        g_pretrain_epochs: Number of epochs to pre-train the generator
+        d_pretrain_epochs: Number of epochs to pre-train the discriminator
+        sample_lambda: Temperature Parameters
+
+    To include the recommendation model, add it to the config file adopting the following pattern:
+
+    .. code:: yaml
+
+      models:
+        IRGAN:
+          meta:
+            save_recs: True
+          epochs: 10
+          factors: 10
+          lr: 0.001
+          l_w: 0.1
+          l_b: 0.001
+          l_gan: 0.001
+          predict_model: generator
+          g_epochs: 5
+          d_epochs: 1
+          g_pretrain_epochs: 10
+          d_pretrain_epochs: 10
+          sample_lambda: 0.2
+    """
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
-        """
-        Create a IRGAN instance.
-        (see https://arxiv.org/abs/1705.10513 for details about the algorithm design choices).
 
-        Args:
-            data: data loader object
-            params: model parameters {embed_k: embedding size,
-                                      [l_w, l_b]: regularization,
-                                      lr: learning rate}
-        """
         self._random = np.random
 
         self._params_list = [
@@ -44,8 +74,8 @@ class IRGAN(RecMixin, BaseRecommenderModel):
             ("_l_gan", "l_gan", "l_gan", 0.001, None, None),
             ("_g_epochs", "g_epochs", "g_epochs", 5, None, None),
             ("_d_epochs", "d_epochs", "d_epochs", 1, None, None),
-            ("_g_pretrain_epochs", "g_pretrain_epochs", "g_pt_ep", 1, None, None),
-            ("_d_pretrain_epochs", "d_pretrain_epochs", "d_pt_ep", 1, None, None),
+            ("_g_pretrain_epochs", "g_pretrain_epochs", "g_pt_ep", 10, None, None),
+            ("_d_pretrain_epochs", "d_pretrain_epochs", "d_pt_ep", 10, None, None),
             ("_sample_lambda", "sample_lambda", "sample_lambda", 0.2, None, None)
         ]
         self.autoset_params()
