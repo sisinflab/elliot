@@ -32,7 +32,7 @@ experiment:
     save_folder: ../data/movielens_1m/splitting/
     test_splitting:
         strategy: random_subsampling
-	folds: 1
+	    folds: 1
         test_ratio: 0.2
     validation_splitting:
         strategy: random_cross_validation
