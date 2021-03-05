@@ -12,12 +12,25 @@ from elliot.evaluation.metrics.base_metric import BaseMetric
 
 
 class ARP(BaseMetric):
-    """
-    This class represents the implementation of the Average Recommendation Popularity recommendation metric.
-    Passing 'ARP' to the metrics list will enable the computation of the metric.
+    r"""
+    Average Recommendation Popularity
 
-    Yin, H.; Cui, B.; Li, J.; Yao, J.; and Chen, C. 2012.
-    Challenging the long tail recommendation. Proceedings of the VLDB Endowment
+    This class represents the implementation of the Average Recommendation Popularity recommendation metric.
+
+    For further details, please refer to the `paper <https://arxiv.org/abs/1205.6700>`_
+
+    .. math::
+        \mathrm {ARP}=\frac{1}{\left|U_{t}\right|} \sum_{u \in U_{t}} \frac{\sum_{i \in L_{u}} \phi(i)}{\left|L_{u}\right|}
+
+    :math:`U_{t}` is the number of users in the test set.
+
+    :math:`L_{u}` is the recommended list of items for user u.
+
+    To compute the metric, add it to the config file adopting the following pattern:
+
+    .. code:: yaml
+
+        simple_metrics: [ARP]
     """
 
     def __init__(self, recommendations, config, params, eval_objects):

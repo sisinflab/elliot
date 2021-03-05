@@ -15,21 +15,26 @@ from elliot.evaluation.metrics.base_metric import BaseMetric
 
 class ACLT(BaseMetric):
     r"""
+    Average coverage of long tail items
+
     This class represents the implementation of the Average coverage of long tail items recommendation metric.
-    Passing 'ACLT' to the metrics list will enable the computation of the metric.
 
-
-    .. _ACLT: "Managing Popularity Bias in Recommender Systems with Personalized Re-Ranking"
-    Himan Abdollahpouri, Robin Burke, Bamshad Mobasher
-    Proceedings of the Thirty-Second International Florida Artificial
-    Intelligence Research Society Conference, 2019
+    For further details, please refer to the `paper <https://arxiv.org/abs/1901.07555>`_
 
     .. math::
         \mathrm {ACLT}=\frac{1}{\left|U_{t}\right|} \sum_{u \in U_{f}} \sum_{i \in L_{u}} 1(i \in \Gamma)
+
     :math:`U_{t}` is the number of users in the test set.
+
     :math:`L_{u}` is the recommended list of items for user u.
+
     :math:`1(i \in \Gamma)`  is an indicator function and it equals to 1 when i is in \Gamma.
 
+    To compute the metric, add it to the config file adopting the following pattern:
+
+    .. code:: yaml
+
+        simple_metrics: [ACLT]
     """
 
     def __init__(self, recommendations, config, params, eval_objects):

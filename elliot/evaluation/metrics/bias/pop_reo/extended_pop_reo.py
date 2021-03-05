@@ -14,11 +14,18 @@ from elliot.evaluation.metrics.base_metric import BaseMetric
 
 class ExtendedPopREO(BaseMetric):
     """
-    This class represents the implementation of the Popularity-based Ranking-based Equal Opportunity (REO) recommendation metric.
-    Passing 'ExtendedPopREO' to the metrics list will enable the computation of the metric.
+    Extended Popularity-based Ranking-based Equal Opportunity
 
-    Zhu, Ziwei, Jianling Wang, and James Caverlee. "Measuring and Mitigating Item Under-Recommendation Bias in Personalized Ranking Systems." Proceedings of the 43rd International ACM SIGIR Conference on Research and Development in Information Retrieval. 2020.
+    This class represents the implementation of the Extended Popularity-based Ranking-based Equal Opportunity (REO) recommendation metric.
 
+    For further details, please refer to the `paper <https://dl.acm.org/doi/abs/10.1145/3397271.3401177>`_
+
+    To compute the metric, add it to the config file adopting the following pattern:
+
+    .. code:: yaml
+
+        complex_metrics:
+        - metric: ExtendedPopREO
     """
 
     def __init__(self, recommendations, config, params, eval_objects, additional_data):

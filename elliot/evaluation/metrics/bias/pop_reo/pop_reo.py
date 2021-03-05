@@ -14,14 +14,11 @@ from elliot.evaluation.metrics.base_metric import BaseMetric
 
 class PopREO(BaseMetric):
     r"""
+    Popularity-based Ranking-based Equal Opportunity
+
     This class represents the implementation of the Popularity-based Ranking-based Equal Opportunity (REO) recommendation metric.
-    Passing 'PopREO' to the metrics list will enable the computation of the metric.
 
-
-    .. _PopREO:   "Measuring and Mitigating Item Under-Recommendation Bias in Personalized Ranking Systems."
-    Zhu, Ziwei, Jianling Wang, and James Caverlee.
-    Proceedings of the 43rd International ACM SIGIR
-    Conference on Research and Development in Information Retrieval. 2020.
+    For further details, please refer to the `paper <https://dl.acm.org/doi/abs/10.1145/3397271.3401177>`_
 
     .. math::
         \mathrm {REO}=\frac{{std}\left(P\left(R @ k \mid g=g_{1}, y=1\right) \ldots P\left(R(a) k=g_{A}, y=1\right)\right)}
@@ -39,6 +36,11 @@ class PopREO(BaseMetric):
     :math:`\sum_{i \in I \backslash I_{u}^{+}} G_{g_{a}}(i) Y(u, i)`
     counts the total number of items from group `{g_a}` 𝑎 in test set for user u
 
+    To compute the metric, add it to the config file adopting the following pattern:
+
+    .. code:: yaml
+
+        simple_metrics: [PopREO]
     """
 
     def __init__(self, recommendations, config, params, eval_objects):
