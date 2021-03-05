@@ -8,6 +8,7 @@ __author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malitesta@poliba.it'
 
 import tensorflow as tf
+import numpy as np
 from tensorflow import keras
 
 
