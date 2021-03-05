@@ -15,54 +15,47 @@ The majority of the recommendation models uses a Mixin:
 .. autosummary::
     recommender_utils_mixin.RecMixin
 
-Adversarial Learning
-~~~~~~~~~~~~~~~~
+* **Adversarial Learning**
 
 .. autosummary::
 
     adversarial.AMF.AMF.AMF
     adversarial.AMR.AMR.AMR
 
-Algebric
-~~~~~~~~~~~~~~~~
+* **Algebric**
 
 .. autosummary::
 
     algebric.slope_one.slope_one.SlopeOne
 
-Autoencoders
-~~~~~~~~~~~~~~~~
+* **Autoencoders**
 
 .. autosummary::
 
     autoencoders.dae.multi_dae.MultiDAE
     autoencoders.vae.multi_vae.MultiVAE
 
-Content-Based
-~~~~~~~~~~~~~~~~
+* **Content-Based**
 
 .. autosummary::
 
     content_based.VSM.vector_space_model.VSM
 
-Generative Adversarial Networks (GANs)
-~~~~~~~~~~~~~~~~
+* **Generative Adversarial Networks (GANs)**
 
 .. autosummary::
 
     gan.IRGAN.irgan.IRGAN
     gan.CFGAN.cfgan.CFGAN
 
-Graph-based
-~~~~~~~~~~~~~~~~
+* **Graph-based**
 
 .. autosummary::
 
     graph_based.lightgcn.LightGCN.LightGCN
     graph_based.ngcf.NGCF.NGCF
 
-Knowledge-aware
-~~~~~~~~~~~~~~~~
+* **Knowledge-aware**
 
 .. autosummary::
 
@@ -70,8 +63,7 @@ Knowledge-aware
     knowledge_aware.kaHFM_batch.kahfm_batch.KaHFMBatch
     knowledge_aware.kahfm_embeddings.kahfm_embeddings.KaHFMEmbeddings
 
-Latent Factor Models
-~~~~~~~~~~~~~~~~
+* **Latent Factor Models**
 
 .. autosummary::
 
@@ -92,8 +84,7 @@ Latent Factor Models
     latent_factor_models.SVDpp.svdpp.SVDpp
     latent_factor_models.WRMF.wrmf.WRMF
 
-Artificial Neural Networks
-~~~~~~~~~~~~~~~~
+* **Artificial Neural Networks**
 
 .. autosummary::
 
@@ -110,8 +101,7 @@ Artificial Neural Networks
     neural.UserAutoRec.userautorec.UserAutoRec
     neural.WideAndDeep.wide_and_deep.WideAndDeep
 
-Neighborhood-based Models
-~~~~~~~~~~~~~~~~
+* **Neighborhood-based Models**
 
 .. autosummary::
 
@@ -120,16 +110,14 @@ Neighborhood-based Models
     NN.attribute_item_knn.attribute_item_knn.AttributeItemKNN
     NN.attribute_user_knn.attribute_user_knn.AttributeUserKNN
 
-Unpersonalized Recommenders
-~~~~~~~~~~~~~~~~
+* **Unpersonalized Recommenders**
 
 .. autosummary::
 
     unpersonalized.most_popular.most_popular.MostPop
     unpersonalized.random_recommender.Random.Random
 
-Visual Models
-~~~~~~~~~~~~~~~~
+* **Visual Models**
 
 .. autosummary::
 
