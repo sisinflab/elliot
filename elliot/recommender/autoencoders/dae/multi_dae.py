@@ -25,7 +25,7 @@ random.seed(0)
 
 class MultiDAE(RecMixin, BaseRecommenderModel):
     r"""
-    Variational Autoencoders for Collaborative Filtering
+    Collaborative denoising autoencoder
 
     For further details, please refer to the `paper <https://dl.acm.org/doi/10.1145/3178876.3186150>`_
 
