@@ -13,16 +13,22 @@ from elliot.evaluation.metrics.base_metric import BaseMetric
 
 class GiniIndex(BaseMetric):
     r"""
-    This class represents the implementation of the Gini Index recommendation metric.
-    Passing 'Gini' to the metrics list will enable the computation of the metric.
+    Gini Index
 
-    .. _GiniIndex: "Recommender systems handbook. Springer, Berlin"
-    Ricci F, Rokach L, Shapira B, Kantor P. 2015
+    This class represents the implementation of the Gini Index recommendation metric.
+
+    For further details, please refer to the `book <https://link.springer.com/10.1007/978-1-4939-7131-2_110158>`_
 
     .. math::
         \mathrm {GiniIndex}=\frac{1}{n-1} \sum_{j=1}^{n}(2 j-n-1) p\left(i_{j}\right)
+
     :math:`i_{j}` is the list of items ordered according to increasing `p(i)`
 
+    To compute the metric, add it to the config file adopting the following pattern:
+
+    .. code:: yaml
+
+        simple_metrics: [Gini]
     """
 
     def __init__(self, recommendations, config, params, eval_objects):
