@@ -4,7 +4,7 @@ Configuration file
 
 Input Data Configuration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The first key component of the config file is the data_config section.
+The first key component of the config file is the ``data_config`` section.
 
 .. code:: yaml
 
@@ -38,23 +38,45 @@ According to the kind of data we have, we can choose among three different loadi
 ``dataset`` assumes that the input data is NOT previously split in training, validation, and test set.
 For this reason, ONLY if we adopt a dataset strategy we can later perform prefiltering and splitting operations.
 
+``dataset`` takes just ONE default parameter: ``dataset_path``, which points to the stored dataset.
+
+.. code:: yaml
+
+    experiment:
+      data_config:
+        strategy: dataset
+        dataset_path: this/is/the/path.tsv
+
 ``fixed`` strategy assumes that our data has been previously split into training/validation/test sets or training/test sets.
 Since data is supposed as previously split, no further prefiltering and splitting operation is contemplated.
+
+``fixed`` takes two mandatory parameters: ``train_path`` and ``test_path``, and one optional parameter, ``validation_path``.
+
+.. code:: yaml
+
+    experiment:
+      data_config:
+        strategy: fixed
+        train_path: this/is/the/path.tsv
+        validation_path: this/is/the/path.tsv
+        test_path: this/is/the/path.tsv
 
 The last strategy is ``hierarchy``.
 ``hierarchy`` is designed to load a dataset that has been previously split and filtered with Elliot.
 Here, the data is assumed as split and no further prefiltering and splitting operations are needed.
 
-``dataset`` takes just ONE default parameter: ``dataset_path``, which points to the stored dataset.
-
-``fixed`` takes two mandatory parameters: ``train_path`` and ``test_path``, and one optional parameter, ``validation_path``.
-
 ``hierarchy`` takes one mandatory parameter, ``root_folder``, that points to the folder where we previously stored the split files.
 
+.. code:: yaml
+
+    experiment:
+      data_config:
+        strategy: hierarchy
+        root_folder: this/is/the/path
 
 Data Loaders
 """""""""""""""""
-Within the data_config section, we can also enable data-specific Data Loaders.
+Within the ``data_config`` section, we can also enable data-specific Data Loaders.
 Each Data Loader is designed to handle a specific kind of additional data.
 
 It is possible to enable a Data Loader by inserting the field ``dataloader`` and passing the corresponding name.
@@ -64,7 +86,6 @@ To pass the required parameters to the Data Loader, we use a specific subsection
 There we can enable the required (by the specific Data Loader) fields and insert the corresponding values.
 
 An example can be:
-
 
 .. code:: yaml
 
@@ -77,7 +98,7 @@ An example can be:
         side_information:
             feature_data: this/is/the/path/to/features.npy
 
-For further details regarding the Data Loaders, please refer to XXX
+For further details regarding the Data Loaders, please refer to **XXX**
 
 
 Data Prefiltering
@@ -102,24 +123,79 @@ In detail, Elliot provides eight main prefiltering approaches: ``global_threshol
 ``global_threshold`` takes one mandatory parameter, ``threshold``.
 ``threshold`` takes, as values, a **float** (ratings >= threshold will be kept), or the string *average*. With average, the system computes the global mean of the rating values and filters out all the ratings below.
 
+.. code:: yaml
+
+    experiment:
+      prefiltering:
+        strategy: global_threshold
+        threshold: 3
+
+.. code:: yaml
+
+    experiment:
+      prefiltering:
+        strategy: global_threshold
+        threshold: average
+
 ``user_average`` has no parameters, and the system filters out the ratings below each user rating values mean.
+
+.. code:: yaml
+
+    experiment:
+      prefiltering:
+        strategy: user_average
 
 ``user_k_core`` filters out all the users with a number of transactions lower than the given k core.
 It takes a parameter, ``core``, where the user passes an **int** corresponding to the desired value.
 
+.. code:: yaml
+
+    experiment:
+      prefiltering:
+        strategy: user_k_core
+        core: 5
+
 ``item_k_core`` filters out all the items with a number of transactions lower than the given k core.
 It takes a parameter, ``core``, where the user passes an **int** corresponding to the desired value.
 
+.. code:: yaml
+
+    experiment:
+      prefiltering:
+        strategy: item_k_core
+        core: 5
+
 ``iterative_k_core`` runs iteratively user_k_core, and item_k_core until the dataset is no further modified.
 It takes a parameter, ``core``, where the user passes an **int** corresponding to the desired value.
+
+.. code:: yaml
+
+    experiment:
+      prefiltering:
+        strategy: iterative_k_core
+        core: 5
 
 ``n_rounds_k_core`` runs iteratively user_k_core, and item_k_core for a specified number of rounds.
 It takes the first parameter, ``core``, where the user passes an **int** corresponding to the desired value.
 It takes the second parameter, ``rounds``, where the user passes an **int** corresponding to the desired value.
 
+.. code:: yaml
+
+    experiment:
+      prefiltering:
+        strategy: n_rounds_k_core
+        core: 5
+        rounds: 2
+
 ``cold_users`` filters out all the users with a number of interactions higher than a given threshold.
 It takes a parameter, ``threshold``, where the user passes an **int** corresponding to the desired value.
 
+.. code:: yaml
+
+    experiment:
+      prefiltering:
+        strategy: cold_users
+        threshold: 3
 
 Data Splitting
 """"""""""""""""""
@@ -153,6 +229,7 @@ To this extent, we can insert two fields into the section: ``save_on_disk``, and
 
 .. code:: yaml
 
+    experiment:
       splitting:
         save_on_disk: True
         save_folder: this/is/the/path/
@@ -167,9 +244,41 @@ Elliot enables four splitting families: ``fixed_timestamp``, ``temporal_hold_out
 ``fixed_timestamp`` assumes that there will be a specific timestamp to split prior interactions (train) and future interactions.
 It takes the parameter ``timestamp``, that can assume one of two possible kind of values: a **long** corresponding to a specific timestamp, or the string *best* computed following Anelli et al. XX.
 
+.. code:: yaml
+
+    experiment:
+      splitting:
+        test_splitting:
+            strategy: fixed_timestamp
+            timestamp: 1609786061
+
+.. code:: yaml
+
+    experiment:
+      splitting:
+        test_splitting:
+            strategy: fixed_timestamp
+            timestamp: best
+
 ``temporal_hold_out`` relies on a temporal split of user transactions. The split can be realized following two different approaches: a *ratio-based* and a *leave-n-out-based* approach.
 If we enable the ``test_ratio`` field with a **float** value, Elliot splits data retaining the last (100 * ``test_ratio``) % of the user transactions for the test set.
 If we enable the ``leave_n_out`` field with an **int** value, Elliot retains the last ``leave_n_out`` transactions for the test set.
+
+.. code:: yaml
+
+    experiment:
+      splitting:
+        test_splitting:
+            strategy: temporal_hold_out
+            test_ratio: 0.2
+
+.. code:: yaml
+
+    experiment:
+      splitting:
+        test_splitting:
+            strategy: temporal_hold_out
+            leave_n_out: 1
 
 ``random_subsampling`` generalizes random hold-out strategy.
 It takes a ``test_ratio`` parameter with a **float** value to define the train/test ratio for user-based hold-out splitting.
@@ -177,8 +286,42 @@ Alternatively, it can take ``leave_n_out`` with an **int** value to define the n
 Moreover, the splitting operation can be repeated enabling the ``folds`` field and passing an **int**.
 In that case, the overall splitting strategy corresponds to a user-based random subsampling strategy.
 
+.. code:: yaml
+
+    experiment:
+      splitting:
+        test_splitting:
+            strategy: random_subsampling
+            test_ratio: 0.2
+
+.. code:: yaml
+
+    experiment:
+      splitting:
+        test_splitting:
+            strategy: random_subsampling
+            test_ratio: 0.2
+            folds: 5
+
+.. code:: yaml
+
+    experiment:
+      splitting:
+        test_splitting:
+            strategy: random_subsampling
+            leave_n_out: 1
+            folds: 5
+
 ``random_cross_validation`` adopts a k-folds cross-validation splitting strategy.
 It takes the parameter ``folds`` with an **int** value, that defines the overall number of folds to consider.
+
+.. code:: yaml
+
+    experiment:
+      splitting:
+        test_splitting:
+            strategy: random_cross_validation
+            folds: 5
 
 Dataset Name Configuration
 """"""""""""""""""""""""""""
@@ -251,7 +394,16 @@ To make it easier for the user to pass metrics and optional arguments, Elliot pa
 simple_metrics can be inserted as a field into the evaluation section, and it takes as a value the list of the metrics we want to compute.
 In the simple metrics set, we find all the metrics that **DO NOT** require any other additional parameter or file:
 
-simple metrics example
+
+.. code:: yaml
+
+    experiment:
+      top_k: 50
+      evaluation:
+        cutoffs: [10, 5]
+        simple_metrics: [ nDCG, Precision, Recall]
+        relevance_threshold: 1
+
 
 The majority of the evaluation metrics relies on the notions of *cut-off* and *relevance threshold*.
 
@@ -268,6 +420,7 @@ The inclusion of the metrics follows the syntax:
 
 .. code:: yaml
 
+    experiment:
       evaluation:
         complex_metrics:
         - metric: complex_metric_name_0
@@ -277,7 +430,7 @@ The inclusion of the metrics follows the syntax:
 
 where *parameter_0* and *parameter_1* are metric-specific parameters of any kind.
 
-For further details about the available metrics, please see the corresponding section XXX.
+For further details about the available metrics, please see the corresponding section **XXX**.
 
 Finally, Elliot enables the computation of paired statistical hypothesis tests, namely, *Wilcoxon*, and *Student's paired t-tests*.
 
@@ -285,17 +438,48 @@ To enable them, we can insert the corresponding boolean fields into the evaluati
 
 .. code:: yaml
 
+    experiment:
       evaluation:
         paired_ttest: True
         wilcoxon_test: True
 
 All the evaluation results are available in the *performance* folder at the end of the experiment.
 
-GPU Acceleration
-"""""""""""""""""
+Print evaluation results as triples
+"""""""""""""""""""""""""""""""""""""""
+It is common in the Recommender Systems community to generate the evaluation tables with the format: [method,metric,value].
+
+This choice easily lets use custom pivot tables on the data, and thus enabling several complex analysis.
+To obtain additional evaluation summaries in this format, insert the following field:
+
 .. code:: yaml
 
-      gpu: -1 # -1 is not use GPU
+    experiment:
+      print_results_as_triplets: True
+
+Test the config file
+""""""""""""""""""""""""""""
+Since an experiment may take a long time, a possible error in the configuration file in the last model configuration can lead to a severe waste of time.
+To avoid common mistakes in config file creation, Elliot provides a specific field that tests our configuration file before the actual run of the experiment.
+The feature can be activated as follows:
+
+.. code:: yaml
+
+    experiment:
+      config_test: True
+
+GPU Acceleration
+"""""""""""""""""
+Elliot lets the user enable GPU acceleration with Tensorflow. To select the gpu on which we can run our experiments, use the following syntax:
+
+.. code:: yaml
+
+    experiment:
+      gpu: 1
+
+If a negative value is passed, or the field is missing, the computation will take place on the CPU.
+
+Please note that the configuration of tensorflow to work with GPUs is not covered by this guide. Please refer to the Tensorflow documentation for that.
 
 Recommendation Model Configuration
 """""""""""""""""""""""""""""""""""""""""
@@ -349,11 +533,11 @@ In detail, use:
 
 ``hyper_max_evals`` **int** field: where applicable, it defines the number of samples to consider for hyperparameter evaluation
 
-To fully understand how to conduct hyperparameter optimization in Elliot, please refer to the corresponding section XXX
+To fully understand how to conduct hyperparameter optimization in Elliot, please refer to the corresponding section **XXX**
 
 Finally, *model_parameter_0*, *model_parameter_1*, and *model_parameter_2* represents the model-specific parameters.
 
-For further details on model-specific parameters see the corresponding section XXX.
+For further details on model-specific parameters see the corresponding section **XXX**.
 
 Example:
 
