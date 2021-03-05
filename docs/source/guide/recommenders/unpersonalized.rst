@@ -1,8 +1,6 @@
 Unpersonalized Recommenders
 ==============================
 
-Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed id porta mi. Proin luctus sapien ut mauris facilisis, in faucibus quam cursus. Pellentesque eget lacus eros. Aenean eget molestie magna. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. Nam dapibus erat at scelerisque facilisis. Cras diam dolor, viverra et ipsum ac, ultrices lacinia eros.
-
 .. py:module:: elliot.recommender.unpersonalized
 
 
