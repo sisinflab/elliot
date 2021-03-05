@@ -13,16 +13,22 @@ from elliot.utils import logging
 
 class MAE(BaseMetric):
     r"""
-    This class represents the implementation of the Mean Absolute Error recommendation metric.
-    Passing 'MAE' to the metrics list will enable the computation of the metric.
+    Mean Absolute Error
 
-    .. _MAE: https://en.wikipedia.org/wiki/Mean_absolute_error
+    This class represents the implementation of the Mean Absolute Error recommendation metric.
+
+    For further details, please refer to the `link <https://en.wikipedia.org/wiki/Mean_absolute_error>`_
 
     .. math::
         \mathrm{MAE}=\frac{1}{|{T}|} \sum_{(u, i) \in {T}}\left|\hat{r}_{u i}-r_{u i}\right|
-    :math:`T` is the test set, :math:`\hat{r}_{u i}` is the score predicted by the model,
-    and :math:`r_{u i}` the actual score of the test set.
 
+    :math:`T` is the test set, :math:`\hat{r}_{u i}` is the score predicted by the model,
+
+    To compute the metric, add it to the config file adopting the following pattern:
+
+    .. code:: yaml
+
+        simple_metrics: [MAE]
     """
 
     def __init__(self, recommendations, config, params, eval_objects):
