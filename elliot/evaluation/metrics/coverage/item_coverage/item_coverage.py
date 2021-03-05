@@ -12,16 +12,21 @@ from elliot.evaluation.metrics.base_metric import BaseMetric
 
 class ItemCoverage(BaseMetric):
     r"""
-    This class represents the implementation of the Item Coverage recommendation metric.
-    Passing 'ItemCoverage' to the metrics list will enable the computation of the metric.
+    Item Coverage
 
-    .. _ItemCoverage: "Recommender systems handbook. Springer, Berlin"
-    Ricci F, Rokach L, Shapira B, Kantor P. 2015
+    This class represents the implementation of the Item Coverage recommendation metric.
+
+    For further details, please refer to the `book <https://link.springer.com/10.1007/978-1-4939-7131-2_110158>`_
 
     Note:
          The simplest measure of catalog coverage is the percentage of all items that can ever be recommended.
          This measure can be computed in many cases directly given the algorithm and the input data set.
 
+    To compute the metric, add it to the config file adopting the following pattern:
+
+    .. code:: yaml
+
+        simple_metrics: [ItemCoverage]
     """
 
     def __init__(self, recommendations, config, params, eval_objects):

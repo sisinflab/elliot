@@ -12,18 +12,22 @@ from elliot.evaluation.metrics.base_metric import BaseMetric
 
 class UserCoverage(BaseMetric):
     r"""
-    This class represents the implementation of the User Coverage recommendation metric.
-    Passing 'UserCoverage' to the metrics list will enable the computation of the metric.
+    User Coverage
 
-    .. _ItemCoverage: "Recommender systems handbook. Springer, Berlin"
-    Ricci F, Rokach L, Shapira B, Kantor P. 2015
+    This class represents the implementation of the User Coverage recommendation metric.
+
+    For further details, please refer to the `book <https://link.springer.com/10.1007/978-1-4939-7131-2_110158>`_
 
     Note:
           The proportion of users or user interactions for which the system can recommend items. In many applications
           the recommender may not provide recommendations for some users due to, e.g. low confidence in the accuracy
           of predictions for that user.
 
+    To compute the metric, add it to the config file adopting the following pattern:
 
+    .. code:: yaml
+
+        simple_metrics: [UserCoverage]
     """
 
     def __init__(self, recommendations, config, params, eval_objects):

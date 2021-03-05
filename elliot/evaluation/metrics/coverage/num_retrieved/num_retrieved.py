@@ -13,12 +13,15 @@ from elliot.evaluation.metrics.base_metric import BaseMetric
 
 class NumRetrieved(BaseMetric):
     r"""
-    This class represents the implementation of the NumRetrieved recommendation metric.
-    Passing 'NumRetrieved' to the metrics list will enable the computation of the metric.
+    Number of Recommendations Retrieved
 
-    .. _NumRetrieved: https://github.com/RankSys/RankSys/blob/master/RankSys-metrics/src/main/java/es/uam/eps/ir/ranksys/metrics/basic/NumRetrieved.java
+    This class represents the implementation of the Number of Recommendations Retrieved recommendation metric.
 
+    For further details, please refer to the `link <https://github.com/RankSys/RankSys/blob/master/RankSys-metrics/src/main/java/es/uam/eps/ir/ranksys/metrics/basic/NumRetrieved.java>`_
 
+    .. code:: yaml
+
+        simple_metrics: [NumRetrieved]
     """
 
     def __init__(self, recommendations, config, params, eval_objects):

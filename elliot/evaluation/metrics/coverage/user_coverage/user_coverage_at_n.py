@@ -11,9 +11,18 @@ from elliot.evaluation.metrics.base_metric import BaseMetric
 
 
 class UserCoverageAtN(BaseMetric):
-    """
+    r"""
+    User Coverage on Top-N rec. Lists
+
     This class represents the implementation of the User Coverage recommendation metric.
-    Passing 'UserCoverageAtN' to the metrics list will enable the computation of the metric.
+
+    For further details, please refer to the `book <https://link.springer.com/10.1007/978-1-4939-7131-2_110158>`_
+
+    To compute the metric, add it to the config file adopting the following pattern:
+
+    .. code:: yaml
+
+        simple_metrics: [UserCoverageAtN]
     """
 
     def __init__(self, recommendations, config, params, eval_objects):
