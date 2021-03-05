@@ -98,7 +98,7 @@ An example can be:
         side_information:
             feature_data: this/is/the/path/to/features.npy
 
-For further details regarding the Data Loaders, please refer to **XXX**
+For further details regarding the Data Loaders, please refer to the :ref:`section<Data Loaders>`.
 
 
 Data Prefiltering
@@ -430,7 +430,7 @@ The inclusion of the metrics follows the syntax:
 
 where *parameter_0* and *parameter_1* are metric-specific parameters of any kind.
 
-For further details about the available metrics, please see the corresponding section **XXX**.
+For further details about the available metrics, please see the corresponding :ref:`section<Metrics>`.
 
 Finally, Elliot enables the computation of paired statistical hypothesis tests, namely, *Wilcoxon*, and *Student's paired t-tests*.
 
@@ -533,11 +533,11 @@ In detail, use:
 
 ``hyper_max_evals`` **int** field: where applicable, it defines the number of samples to consider for hyperparameter evaluation
 
-To fully understand how to conduct hyperparameter optimization in Elliot, please refer to the corresponding section **XXX**
+To fully understand how to conduct hyperparameter optimization in Elliot, please refer to the corresponding :ref:`section<Hyperparameter Optimization>`.
 
 Finally, *model_parameter_0*, *model_parameter_1*, and *model_parameter_2* represents the model-specific parameters.
 
-For further details on model-specific parameters see the corresponding section **XXX**.
+For further details on model-specific parameters see the corresponding :ref:`section<Recommendation Models>`.
 
 Example:
 
