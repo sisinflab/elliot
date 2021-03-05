@@ -26,3 +26,12 @@ Paired t-test).
 
 Elliot aims to keep the entire experiment reproducible and put the user
 in control of the framework.
+
+For all the details about Elliot, please refer to the `paper <https://arxiv.org/abs/2103.02590>`_ and cite [Elliot]_
+
+
+.. [Elliot]
+    Vito Walter Anelli and Alejandro Bellogín and Antonio Ferrara and Daniele Malitesta and Felice Antonio Merra and Claudio Pomo and Francesco Maria Donini and Tommaso Di Noia. 2021.
+    Elliot: a Comprehensive and Rigorous Framework for Reproducible Recommender Systems Evaluation.
+    *Under review*.
+    arXiv:`2103.02590 <https://arxiv.org/abs/2103.02590>`_ [cs.IR].
