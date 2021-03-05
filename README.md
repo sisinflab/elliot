@@ -41,21 +41,6 @@ This requires NVIDIA driver version >= 10.1 (for Linux and Windows10).
 Please refer to this [document](https://www.tensorflow.org/install/source#gpu) for further 
 working configurations.
 
-[comment]: <> (### Install from conda)
-
-[comment]: <> (```bash)
-
-[comment]: <> (conda install -c aibox recbole)
-
-[comment]: <> (```)
-
-[comment]: <> (### Install from pip)
-
-[comment]: <> (```bash)
-
-[comment]: <> (pip install recbole)
-
-[comment]: <> (```)
 
 ### Install from source
 
@@ -133,25 +118,29 @@ Reference Elliot in your blogs, papers, and articles.
 
 Talk about Elliot on social media with the hashtag **#elliotrs**.
 
-[comment]: <> (## Cite)
+## Cite
 
-[comment]: <> (If you find RecBole useful for your research or development, please cite the following [paper]&#40;https://arxiv.org/abs/2011.01731&#41;:)
+If you find Elliot useful for your research or development, please cite the following [paper](https://arxiv.org/abs/2103.02590):
 
-[comment]: <> (```)
+```
 
-[comment]: <> (@article{recbole,)
+@article{DBLP:journals/corr/abs-2103-02590,
+  author    = {Vito Walter Anelli and
+               Alejandro Bellog{\'{\i}}n and
+               Antonio Ferrara and
+               Daniele Malitesta and
+               Felice Antonio Merra and
+               Claudio Pomo and
+               Francesco M. Donini and
+               Tommaso Di Noia},
+  title     = {Elliot: a Comprehensive and Rigorous Framework for Reproducible Recommender
+               Systems Evaluation},
+  journal   = {CoRR},
+  volume    = {abs/2103.02590},
+  year      = {2021}
+}
 
-[comment]: <> (    title={RecBole: Towards a Unified, Comprehensive and Efficient Framework for Recommendation Algorithms},)
-
-[comment]: <> (    author={Wayne Xin Zhao and Shanlei Mu and Yupeng Hou and Zihan Lin and Kaiyuan Li and Yushuo Chen and Yujie Lu and Hui Wang and Changxin Tian and Xingyu Pan and Yingqian Min and Zhichao Feng and Xinyan Fan and Xu Chen and Pengfei Wang and Wendi Ji and Yaliang Li and Xiaoling Wang and Ji-Rong Wen},)
-
-[comment]: <> (    year={2020},)
-
-[comment]: <> (    journal={arXiv preprint arXiv:2011.01731})
-
-[comment]: <> (})
-
-[comment]: <> (```)
+```
 
 ## The Team
 Elliot is developed by
