@@ -1,6 +1,6 @@
 # ELLIOT
 
-![PyPI - Python Version](https://img.shields.io/badge/version-3.6%7C3.7%7C3.8-blue) [![Version](https://img.shields.io/badge/version-v0.1.0-green)](https://github.com/sisinflab/elliot) ![GitHub repo size](https://img.shields.io/github/repo-size/sisinflab/elliot) ![GitHub](https://img.shields.io/github/license/sisinflab/elliot.svg)
+![PyPI - Python Version](https://img.shields.io/badge/python-3.6%7C3.7%7C3.8-blue) [![Version](https://img.shields.io/badge/version-v0.1.0-green)](https://github.com/sisinflab/elliot) ![GitHub repo size](https://img.shields.io/github/repo-size/sisinflab/elliot) ![GitHub](https://img.shields.io/github/license/sisinflab/elliot.svg)
 
 [Docs] | [Paper]
 
