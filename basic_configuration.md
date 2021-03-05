@@ -1,3 +1,5 @@
+## Basic Configuration
+
 In the first scenario, the experiments require comparing a group of RSs whose parameters are optimized via a grid-search. 
 
 The configuration specifies the data loading information, i.e., semantic features source files, in addition to the filtering and splitting strategies. 
@@ -15,5 +17,6 @@ by merely passing a list of possible hyperparameter values, e.g., neighbors: [50
 
 The reported models are selected according to nDCG@10.
 
-To see the full configuration file please visit the following [link](config_files/basic_configuration.yml).
-To run the experiment use the following [script](sample_basic.py).
+|To see the full configuration file please visit the following [link](config_files/basic_configuration.yml)|
+|-------------------------------------------------------------------------------------------------------------|
+|**To run the experiment use the following [script](sample_basic.py)**|
