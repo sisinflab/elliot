@@ -13,18 +13,24 @@ from elliot.evaluation.metrics.base_metric import BaseMetric
 
 
 class UserMADrating(BaseMetric):
-    """
-    This class represents the implementation of the User MAD rating recommendation metric.
-    Passing 'UserMADrating' to the metrics list will enable the computation of the metric.
+    r"""
+    User MAD Rating-based
 
-    .. _UserMADrating: "Fairness-aware tensor-based recommendation."
-    Zhu, Ziwei, Xia Hu, and James Caverlee.
-    Proceedings of the 27th ACM International Conference on Information and Knowledge Management. 2018.
+    This class represents the implementation of the User MAD rating recommendation metric.
+
+    For further details, please refer to the `paper <https://dl.acm.org/doi/abs/10.1145/3269206.3271795>`_
 
     .. math::
         \mathrm {MAD}={avg}_{i, j}({MAD}(R^{(i)}, R^{(j)}))
 
-    :math: {MAD}={avg}_{i, j}({MAD}\left(R^{(i)}, R^{(j)}))
+    To compute the metric, add it to the config file adopting the following pattern:
+
+    .. code:: yaml
+
+        complex_metrics:
+        - metric: UserMADrating
+          clustering_name: Happiness
+          clustering_file: ../data/movielens_1m/u_happy.tsv
     """
 
     def __init__(self, recommendations, config, params, eval_objects, additional_data):

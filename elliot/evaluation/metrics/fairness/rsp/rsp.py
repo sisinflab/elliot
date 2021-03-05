@@ -16,20 +16,18 @@ from elliot.evaluation.metrics.base_metric import BaseMetric
 from elliot.evaluation.metrics.metrics_utils import ProxyMetric
 
 class RSP(BaseMetric):
-    """
+    r"""
+    Ranking-based Statistical Parity
+
     This class represents the implementation of the Ranking-based Statistical Parity (RSP) recommendation metric.
-    Passing 'RSP' to the metrics list will enable the computation of the metric.
 
-    .. _PopRSP:   "Measuring and Mitigating Item Under-Recommendation Bias in Personalized Ranking Systems."
-    Zhu, Ziwei, Jianling Wang, and James Caverlee.
-    Proceedings of the 43rd International ACM SIGIR
-    Conference on Research and Development in Information Retrieval. 2020.
+    For further details, please refer to the `paper <https://dl.acm.org/doi/abs/10.1145/3397271.3401177>`_
 
-     .. math::
+    .. math::
         \mathrm {RSP}=\frac{{std}(P(R @ k \mid g=g_{1}), \ldots, P(R @ k \mid g=g_{A}))}
         {{mean}(P(R @ k \mid g=g_{1}), \ldots, P(R @ k \mid g=g_{A}))}
 
-    :math:`P(R @ k \mid g=g_{a})}` is `\frac{\sum_{u=1}^{N} \sum_{i=1}^{k} G_{g_{a}}(R_{u, i})}
+    :math:`P(R @ k \mid g=g_{A})) = \frac{\sum_{u=1}^{N} \sum_{i=1}^{k} G_{g_{a}}(R_{u, i})}
     {\sum_{u=1}^{N} \sum_{i \in I \backslash I_{u}^{+}} G_{g_{a}}(i)}`
 
     :math:`\sum_{i=1}^{k} G_{g_{a}}(R_{u, i})` calculates how many un-interacted items
@@ -37,6 +35,15 @@ class RSP(BaseMetric):
 
     :math:`\sum_{i \in I \backslash I_{u}^{+}} G_{g_{a}}(i)`
     calculates how many un-interacted items belong to group `{g_a}` for u
+
+    To compute the metric, add it to the config file adopting the following pattern:
+
+    .. code:: yaml
+
+        complex_metrics:
+         - metric: RSP
+          clustering_name: ItemPopularity
+          clustering_file: ../data/movielens_1m/i_pop.tsv
     """
 
     def __init__(self, recommendations, config, params, eval_objects, additional_data):

@@ -24,7 +24,7 @@ class PopREO(BaseMetric):
         \mathrm {REO}=\frac{{std}\left(P\left(R @ k \mid g=g_{1}, y=1\right) \ldots P\left(R(a) k=g_{A}, y=1\right)\right)}
         {{mean}\left(P\left(R @ k \mid g=g_{1}, y=1\right) \ldots P\left(R @ k \mid g=g_{A}, y=1\right)\right)}
 
-    :math:`P\left(R @ k \mid g=g_{a}, y=1\right)` is `\frac{\sum_{u=1}^{N} \sum_{i=1}^{k} G_{g_{a}}\left(R_{u, i}\right) Y\left(u, R_{u, i}\right)}
+    :math:`P\left(R @ k \mid g=g_{a}, y=1\right) = \frac{\sum_{u=1}^{N} \sum_{i=1}^{k} G_{g_{a}}\left(R_{u, i}\right) Y\left(u, R_{u, i}\right)}
     {\sum_{u=1}^{N} \sum_{i \in I \backslash I_{u}^{+}} G_{g_{a}}(i) Y(u, i)}`
 
     :math:`Y\left(u, R_{u, i}\right)` identifies the ground-truth label of a user-item pair `\left(u, R_{u, i}\right)`,

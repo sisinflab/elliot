@@ -13,18 +13,24 @@ from elliot.evaluation.metrics.base_metric import BaseMetric
 
 
 class ItemMADrating(BaseMetric):
-    """
-    This class represents the implementation of the Item MAD rating recommendation metric.
-    Passing 'ItemMADrating' to the metrics list will enable the computation of the metric.
+    r"""
+    Item MAD Rating-based
 
-    .. _ItemMADrating: "Fairness-aware tensor-based recommendation."
-    Zhu, Ziwei, Xia Hu, and James Caverlee.
-    Proceedings of the 27th ACM International Conference on Information and Knowledge Management. 2018.
+    This class represents the implementation of the Item MAD rating recommendation metric.
+
+    For further details, please refer to the `paper <https://dl.acm.org/doi/abs/10.1145/3269206.3271795>`_
 
     .. math::
         \mathrm {MAD}={avg}_{i, j}({MAD}(R^{(i)}, R^{(j)}))
 
-    :math: {MAD}={avg}_{i, j}({MAD}\left(R^{(i)}, R^{(j)}))
+    To compute the metric, add it to the config file adopting the following pattern:
+
+    .. code:: yaml
+
+        complex_metrics:
+        - metric: ItemMADrating
+          clustering_name: ItemPopularity
+          clustering_file: ../data/movielens_1m/i_pop.tsv
     """
 
     def __init__(self, recommendations, config, params, eval_objects, additional_data):

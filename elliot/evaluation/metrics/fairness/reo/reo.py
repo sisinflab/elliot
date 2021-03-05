@@ -16,20 +16,17 @@ from elliot.evaluation.metrics.metrics_utils import ProxyMetric
 
 class REO(BaseMetric):
     r"""
+    Ranking-based Equal Opportunity
+
     This class represents the implementation of the Ranking-based Equal Opportunity (REO) recommendation metric.
-    Passing 'REO' to the metrics list will enable the computation of the metric.
 
-
-    .. _PopREO:   Measuring and Mitigating Item Under-Recommendation Bias in Personalized Ranking Systems."
-    Zhu, Ziwei, Jianling Wang, and James Caverlee.
-    Proceedings of the 43rd International ACM SIGIR
-    Conference on Research and Development in Information Retrieval. 2020.
+    For further details, please refer to the `paper <https://dl.acm.org/doi/abs/10.1145/3397271.3401177>`_
 
     .. math::
         \mathrm {REO}=\frac{{std}\left(P\left(R @ k \mid g=g_{1}, y=1\right) \ldots P\left(R(a) k=g_{A}, y=1\right)\right)}
         {{mean}\left(P\left(R @ k \mid g=g_{1}, y=1\right) \ldots P\left(R @ k \mid g=g_{A}, y=1\right)\right)}
 
-    :math:`P\left(R @ k \mid g=g_{a}, y=1\right)` is `\frac{\sum_{u=1}^{N} \sum_{i=1}^{k} G_{g_{a}}\left(R_{u, i}\right) Y\left(u, R_{u, i}\right)}
+    :math:`P\left(R @ k \mid g=g_{a}, y=1\right) = \frac{\sum_{u=1}^{N} \sum_{i=1}^{k} G_{g_{a}}\left(R_{u, i}\right) Y\left(u, R_{u, i}\right)}
     {\sum_{u=1}^{N} \sum_{i \in I \backslash I_{u}^{+}} G_{g_{a}}(i) Y(u, i)}`
 
     :math:`Y\left(u, R_{u, i}\right)` identifies the ground-truth label of a user-item pair `\left(u, R_{u, i}\right)`,
@@ -41,6 +38,14 @@ class REO(BaseMetric):
     :math:`\sum_{i \in I \backslash I_{u}^{+}} G_{g_{a}}(i) Y(u, i)`
     counts the total number of items from group `{g_a}` 𝑎 in test set for user u
 
+    To compute the metric, add it to the config file adopting the following pattern:
+
+    .. code:: yaml
+
+        complex_metrics:
+         - metric: REO
+          clustering_name: ItemPopularity
+          clustering_file: ../data/movielens_1m/i_pop.tsv
     """
 
     def __init__(self, recommendations, config, params, eval_objects, additional_data):

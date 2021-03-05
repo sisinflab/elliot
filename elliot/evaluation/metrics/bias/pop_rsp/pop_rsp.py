@@ -25,7 +25,7 @@ class PopRSP(BaseMetric):
         \mathrm {RSP}=\frac{{std}\left(P\left(R @ k \mid g=g_{1}\right), \ldots, P\left(R @ k \mid g=g_{A}\right)\right)}
         {{mean}\left(P\left(R @ k \mid g=g_{1}\right), \ldots, P\left(R @ k \mid g=g_{A}\right)\right)}
 
-    :math:`P\left(R @ k \mid g=g_{a}\right)}` is `\frac{\sum_{u=1}^{N} \sum_{i=1}^{k} G_{g_{a}}\left(R_{u, i}\right)}
+    :math `P(R @ k \mid g=g_{A})) = \frac{\sum_{u=1}^{N} \sum_{i=1}^{k} G_{g_{a}}(R_{u, i})}
     {\sum_{u=1}^{N} \sum_{i \in I \backslash I_{u}^{+}} G_{g_{a}}(i)}`
 
     :math:`\sum_{i=1}^{k} G_{g_{a}}\left(R_{u, i}\right)` calculates how many un-interacted items

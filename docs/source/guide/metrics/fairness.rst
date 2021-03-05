@@ -1,16 +1,16 @@
 Fairness
 ======================
 
-Elliot integrates, to date, 50 recommendation models partitioned into two sets. The first set includes 38 popular models implemented in at least two of frameworks reviewed in this work (i.e., adopting a framework-wise popularity notion).
+Elliot integrates the following fairness metrics.
 
 Summary
 ~~~~~~~~~~~~~~~~
 
 .. py:module:: elliot.evaluation.metrics.fairness
 .. autosummary::
-    BiasDisparity.BiasDisparityBD.BD
-    BiasDisparity.BiasDisparityBR.BR
-    BiasDisparity.BiasDisparityBS.BS
+    BiasDisparity.BiasDisparityBD
+    BiasDisparity.BiasDisparityBR
+    BiasDisparity.BiasDisparityBS
     MAD.ItemMADranking.ItemMADranking
     MAD.ItemMADrating.ItemMADrating
     MAD.UserMADranking.UserMADranking

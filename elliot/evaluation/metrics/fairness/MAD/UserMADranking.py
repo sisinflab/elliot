@@ -17,17 +17,23 @@ from elliot.evaluation.metrics.base_metric import BaseMetric
 
 class UserMADranking(BaseMetric):
     r"""
-    This class represents the implementation of the User MAD ranking recommendation metric.
-    Passing 'UserMADranking' to the metrics list will enable the computation of the metric.
+    User MAD Ranking-based
 
-    .. _ItemMADranking: "A flexible framework for evaluating user and item fairness in recommender systems."
-     Deldjoo, Yashar, Vito Walter Anelli, Hamed Zamani, Alejandro Bellogin, and Tommaso Di Noia.
-     User Modeling and User-Adapted Interaction (2020): 1-47.
+    This class represents the implementation of the User MAD ranking recommendation metric.
+
+    For further details, please refer to the `paper <https://link.springer.com/article/10.1007/s11257-020-09285-1>`_
 
      .. math::
         \mathrm {MAD}={avg}_{i, j}({MAD}(R^{(i)}, R^{(j)}))
 
-    :math: {MAD}={avg}_{i, j}({MAD}\left(R^{(i)}, R^{(j)}))
+    To compute the metric, add it to the config file adopting the following pattern:
+
+    .. code:: yaml
+
+        complex_metrics:
+        - metric: UserMADranking
+          clustering_name: Happiness
+          clustering_file: ../data/movielens_1m/u_happy.tsv
     """
 
     def __init__(self, recommendations, config, params, eval_objects, additional_data):
