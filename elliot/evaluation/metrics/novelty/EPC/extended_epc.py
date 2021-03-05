@@ -13,9 +13,19 @@ from elliot.evaluation.metrics.base_metric import BaseMetric
 
 
 class ExtendedEPC(BaseMetric):
-    """
-    This class represents the implementation of the Expected Popularity Complement recommendation metric.
-    Passing 'ExtendedEPC' to the metrics list will enable the computation of the metric.
+    r"""
+    Extended EPC
+
+    This class represents the implementation of the Extended EPC recommendation metric.
+
+    For further details, please refer to the `paper <https://dl.acm.org/doi/pdf/10.1145/2043932.2043955>`_
+
+    To compute the metric, add it to the config file adopting the following pattern:
+
+    .. code:: yaml
+
+        complex_metrics:
+        - metric: ExtendedEPC
     """
 
     def __init__(self, recommendations, config, params, eval_objects, additional_data):

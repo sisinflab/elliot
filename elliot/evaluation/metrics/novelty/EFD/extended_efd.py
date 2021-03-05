@@ -13,9 +13,19 @@ from elliot.evaluation.metrics.base_metric import BaseMetric
 
 
 class ExtendedEFD(BaseMetric):
-    """
-    This class represents the implementation of the Expected Free Discovery recommendation metric.
-    Passing 'ExtendedEFD' to the metrics list will enable the computation of the metric.
+    r"""
+    Extended EFD
+
+    This class represents the implementation of the Extended Expected Free Discovery recommendation metric.
+
+    For further details, please refer to the `paper <https://dl.acm.org/doi/pdf/10.1145/2043932.2043955>`_
+
+    To compute the metric, add it to the config file adopting the following pattern:
+
+    .. code:: yaml
+
+        complex_metrics:
+        - metric: ExtendedEFD
     """
 
     def __init__(self, recommendations, config, params, eval_objects, additional_data):

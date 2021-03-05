@@ -14,18 +14,23 @@ from elliot.evaluation.metrics.base_metric import BaseMetric
 
 class EPC(BaseMetric):
     r"""
+    Expected Popularity Complement (EPC)
+
     This class represents the implementation of the Expected Popularity Complement recommendation metric.
-    Passing 'EPC' to the metrics list will enable the computation of the metric.
 
-     .. _EPC: "Rank and relevance in novelty and diversity for Recommender Systems"
-     S. Vargas and P. Castells
-     Proceedings of RecSys 2011
+    For further details, please refer to the `paper <https://dl.acm.org/doi/pdf/10.1145/2043932.2043955>`_
 
-     Note:
+    Note:
          EPC can be read as the expected number of seen relevant recommended items not previously seen
 
-     .. math::
-        \mathrm {EPC}=C \sum_{i_{k} \in R} {disc}(k) p\left({rel} \mid i_{k}, u\right)\left(1-p\left(\{seen} \mid i_{k}\right)\right)
+    .. math::
+       \mathrm{EPC}=C \sum_{i_{k} \in R} \operatorname{disc}(k) p\left(r e l \mid i_{k}, u\right)\left(1-p\left(\operatorname{seen} \mid t_{k}\right)\right)
+
+    To compute the metric, add it to the config file adopting the following pattern:
+
+    .. code:: yaml
+
+        simple_metrics: [EPC]
     """
 
     def __init__(self, recommendations, config, params, eval_objects):

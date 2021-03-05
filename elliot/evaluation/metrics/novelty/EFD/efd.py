@@ -13,19 +13,24 @@ from elliot.evaluation.metrics.base_metric import BaseMetric
 
 
 class EFD(BaseMetric):
-    """
+    r"""
+    Expected Free Discovery (EFD)
+
     This class represents the implementation of the Expected Free Discovery recommendation metric.
-    Passing 'EFD' to the metrics list will enable the computation of the metric.
 
-   .. _EFD: "Rank and relevance in novelty and diversity for Recommender Systems"
-     S. Vargas and P. Castells
-     Proceedings of RecSys 2011
+    For further details, please refer to the `paper <https://dl.acm.org/doi/pdf/10.1145/2043932.2043955>`_
 
-     Note:
+    Note:
          EFD can be read as the expected ICF of seen recommended items
 
-     .. math::
-        \mathrm {EFD}=C \sum_{i_{k} \in R} {disc}(k) p({rel} \mid i_{k}, u)( -\log _{2} p(i \mid {seen}, \theta))
+    .. math::
+       \mathrm {EFD}=C \sum_{i_{k} \in R} {disc}(k) p({rel} \mid i_{k}, u)( -\log _{2} p(i \mid {seen}, \theta))
+
+    To compute the metric, add it to the config file adopting the following pattern:
+
+    .. code:: yaml
+
+        simple_metrics: [EFD]
     """
 
     def __init__(self, recommendations, config, params, eval_objects):
