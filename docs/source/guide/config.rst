@@ -242,7 +242,7 @@ Since the two subsections follow the same guidelines, here we detail ``test_spli
 Elliot enables four splitting families: ``fixed_timestamp``, ``temporal_hold_out``, ``random_subsampling``, ``random_cross_validation``.
 
 ``fixed_timestamp`` assumes that there will be a specific timestamp to split prior interactions (train) and future interactions.
-It takes the parameter ``timestamp``, that can assume one of two possible kind of values: a **long** corresponding to a specific timestamp, or the string *best* computed following Anelli et al. XX.
+It takes the parameter ``timestamp``, that can assume one of two possible kind of values: a **long** corresponding to a specific timestamp, or the string *best* computed following `Anelli et al. <https://doi.org/10.1007/978-3-030-15712-8_63>`_
 
 .. code:: yaml
 

@@ -40,7 +40,7 @@ in control of the framework.
    guide/introduction
    guide/install
    guide/quick_start
-   guide/changelog
+   Release Notes <https://github.com/sisinflab/elliot/releases>
 
 .. toctree::
    :maxdepth: 1
