@@ -13,18 +13,26 @@ from elliot.evaluation.metrics.base_metric import BaseMetric
 
 class Precision(BaseMetric):
     r"""
-    This class represents the implementation of the Precision recommendation metric.
-    Passing 'Precision' to the metrics list will enable the computation of the metric.
+    Precision-measure
 
-    .. _Precision: https://en.wikipedia.org/wiki/Precision_and_recall#Precision
+    This class represents the implementation of the Precision recommendation metric.
+
+    For further details, please refer to the `link <https://en.wikipedia.org/wiki/Precision_and_recall#Precision>`_
 
     .. math::
         \mathrm {Precision@K} = \frac{|Rel_u \cap Rec_u|}{Rec_u}
 
     :math:`Rel_u` is the set of items relevant to user :math:`U`,
+
     :math:`Rec_u` is the top K items recommended to users.
+
     We obtain the result by calculating the average :math:`Precision@K` of each user.
 
+    To compute the metric, add it to the config file adopting the following pattern:
+
+    .. code:: yaml
+
+        simple_metrics: [Precision]
     """
 
     def __init__(self, recommendations, config, params, eval_objects):

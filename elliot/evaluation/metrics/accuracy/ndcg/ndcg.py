@@ -14,10 +14,11 @@ from elliot.evaluation.metrics.base_metric import BaseMetric
 
 class NDCG(BaseMetric):
     r"""
-    This class represents the implementation of the nDCG recommendation metric.
-    Passing 'nDCG' to the metrics list will enable the computation of the metric.
+    normalized Discounted Cumulative Gain
 
-    .. _NDCG: https://en.wikipedia.org/wiki/Discounted_cumulative_gain#Normalized_DCG
+    This class represents the implementation of the nDCG recommendation metric.
+
+    For further details, please refer to the `link <https://en.wikipedia.org/wiki/Discounted_cumulative_gain#Normalized_DCG>`_
 
     .. math::
         \begin{gather}
@@ -27,11 +28,20 @@ class NDCG(BaseMetric):
             \mathrm {NDCG@K}=\frac{\sum \nolimits_{u \in u^{te}NDCG_u@K}}{|u^{te}|}
         \end{gather}
 
+
     :math:`K` stands for recommending :math:`K` items.
+
     And the :math:`rel_i` is the relevance of the item in position :math:`i` in the recommendation list.
+
     :math:`2^{rel_i}` equals to 1 if the item hits otherwise 0.
+
     :math:`U^{te}` is for all users in the test set.
 
+    To compute the metric, add it to the config file adopting the following pattern:
+
+    .. code:: yaml
+
+        simple_metrics: [nDCG]
     """
 
     def __init__(self, recommendations, config, params, eval_objects):

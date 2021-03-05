@@ -13,14 +13,16 @@ from elliot.evaluation.metrics.base_metric import BaseMetric
 
 class MAP(BaseMetric):
     r"""
+    Mean Average Precision
+
     This class represents the implementation of the Mean Average Precision recommendation metric.
     Passing 'MAP' to the metrics list will enable the computation of the metric.
+
+    For further details, please refer to the `link <http://sdsawtelle.github.io/blog/output/mean-average-precision-MAP-for-recommender-systems.html#MAP-for-Recommender-Algorithms>`_
 
     Note:
         In this case the normalization factor used is :math:`\frac{1}{\min (m,N)}`, which prevents your AP score from
         being unfairly suppressed when your number of recommendations couldn't possibly capture all the correct ones.
-
-    .. _MAP: http://sdsawtelle.github.io/blog/output/mean-average-precision-MAP-for-recommender-systems.html#MAP-for-Recommender-Algorithms
 
     .. math::
         \begin{align*}
@@ -28,6 +30,11 @@ class MAP(BaseMetric):
         \mathrm{MAP@N}& = \frac{1}{|U|}\sum_{u=1}^{|U|}(\mathrm{AP@N})_u
         \end{align*}
 
+    To compute the metric, add it to the config file adopting the following pattern:
+
+    .. code:: yaml
+
+        simple_metrics: [MAP]
     """
 
     def __init__(self, recommendations, config, params, eval_objects):

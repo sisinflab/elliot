@@ -13,18 +13,26 @@ from elliot.evaluation.metrics.base_metric import BaseMetric
 
 class Recall(BaseMetric):
     r"""
-    This class represents the implementation of the Recall recommendation metric.
-    Passing 'Recall' to the metrics list will enable the computation of the metric.
+    Recall-measure
 
-    . _Recall: https://en.wikipedia.org/wiki/Precision_and_recall#Recall
+    This class represents the implementation of the Recall recommendation metric.
+
+    For further details, please refer to the `link <https://en.wikipedia.org/wiki/Precision_and_recall#Recall>`_
 
     .. math::
         \mathrm {Recall@K} = \frac{|Rel_u\cap Rec_u|}{Rel_u}
 
     :math:`Rel_u` is the set of items relevant to user :math:`U`,
+
     :math:`Rec_u` is the top K items recommended to users.
+
     We obtain the result by calculating the average :math:`Recall@K` of each user.
 
+    To compute the metric, add it to the config file adopting the following pattern:
+
+    .. code:: yaml
+
+        simple_metrics: [Recall]
     """
 
     def __init__(self, recommendations, config, params, eval_objects):

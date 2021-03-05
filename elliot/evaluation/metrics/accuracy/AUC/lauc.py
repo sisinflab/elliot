@@ -20,6 +20,7 @@ class LAUC(BaseMetric):
     Passing 'LAUC' to the metrics list will enable the computation of the metric.
 
     "Setting Goals and Choosing Metrics for Recommender System Evaluations" by Gunnar Schröder, et al.
+
     For further details, please refer to the `paper <https://wiki.epfl.ch/edicpublic/documents/Candidacy%20exam/Evaluation.pdf>`_
 
 

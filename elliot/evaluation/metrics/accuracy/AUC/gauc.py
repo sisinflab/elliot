@@ -21,6 +21,7 @@ class GAUC(BaseMetric):
     Passing 'GAUC' to the metrics list will enable the computation of the metric.
 
     "Deep Interest Network for Click-Through Rate Prediction" KDD '18 by Zhou, et al.
+
     For further details, please refer to the `paper <https://www.ijcai.org/Proceedings/2019/0319.pdf>`_
 
     Note:

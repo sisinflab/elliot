@@ -18,12 +18,16 @@ class F1(BaseMetric):
     This class represents the implementation of the F-score recommendation metric.
     Passing 'F1' to the metrics list will enable the computation of the metric.
 
-    "Evaluating Recommender Systems" Gunawardana, Asela and Shani, Guy, In Recommender systems handbook pages 265--308, 2015
     For further details, please refer to the `paper <https://link.springer.com/chapter/10.1007/978-1-4899-7637-6_8>`_
 
     .. math::
         \mathrm {F1@K} = \frac{1+\beta^{2}}{\frac{1}{\text { precision@k }}+\frac{\beta^{2}}{\text { recall@k }}}
 
+    To compute the metric, add it to the config file adopting the following pattern:
+
+    .. code:: yaml
+
+        simple_metrics: [F1]
     """
 
     def __init__(self, recommendations, config, params, eval_objects):

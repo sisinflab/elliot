@@ -19,15 +19,21 @@ class HR(BaseMetric):
     This class represents the implementation of the Hit Rate recommendation metric.
     Passing 'HR' to the metrics list will enable the computation of the metric.
 
-    .. _HR: https://medium.com/@rishabhbhatia315/recommendation-system-evaluation-metrics-3f6739288870
+    For further details, please refer to the `link <https://medium.com/@rishabhbhatia315/recommendation-system-evaluation-metrics-3f6739288870>`_
 
     .. math::
         \mathrm {HR@K} =\frac{Number \space of \space Hits @K}{|GT|}
+
     :math:`HR` is the number of users with a positive sample in the recommendation list.
+
     :math:`GT` is the total number of samples in the test set.
 
-    """
+    To compute the metric, add it to the config file adopting the following pattern:
 
+    .. code:: yaml
+
+        simple_metrics: [HR]
+    """
     def __init__(self, recommendations: t.Dict[int, t.List[t.Tuple[int, float]]], config, params, eval_objects):
         """
         Constructor
