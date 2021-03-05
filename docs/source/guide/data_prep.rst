@@ -5,5 +5,6 @@ Data Preparation
    :maxdepth: 1
 
    loading
+   data_loaders
    prefiltering
    splitting
