@@ -12,6 +12,8 @@ experiment:
     simple_metrics: [nDCG]
 #  gpu: -1
   models:
-    MostPop:
+    ItemKNN:
       meta:
         save_recs: True
+      neighbors: 50
+      similarity: cosine
