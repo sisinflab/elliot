@@ -6,7 +6,7 @@
 
 [Docs]: https://elliot.readthedocs.io/en/latest/
 
-[Paper]: https://elliot.readthedocs.io/en/latest/
+[Paper]: https://arxiv.org/abs/2103.02590
 
 Elliot is a comprehensive recommendation framework that analyzes the recommendation problem from the researcher's perspective.
 It conducts a whole experiment, from dataset loading to results gathering.
@@ -105,6 +105,14 @@ experiment:
       simple_metrics: [nDCG]
     top_k: 10
 ```
+
+If you want to explore a basic configuration, and an advanced configuration, please refer to:
+
+[basic_configuration](basic_configuration.md)
+
+[advanced_configuration](advanced_configuration.md)
+
+You can find the full description of the two experiments in the [paper](https://arxiv.org/abs/2103.02590).
 
 ## Contributing
 

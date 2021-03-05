@@ -56,7 +56,7 @@ to top\_k, unless otherwise noted.
         top_k: 10
 
 
-Basic Cofiguration
+Advanced Configuration
 ----------------------
 
 This configuration file takes movielens dataset from a specific path, then Elliot performs an exhaustive iterative k-core for both user
