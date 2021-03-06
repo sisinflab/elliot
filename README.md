@@ -90,20 +90,20 @@ experiment:
   data_config:
     strategy: dataset
     dataset_path: ../data/movielens_1m/dataset.tsv
-    splitting:
-      test_splitting:
-        strategy: random_subsampling
-        test_ratio: 0.2
-    models:
-      ItemKNN:
-        meta:
-          hyper_opt_alg: grid
-          save_recs: True
-        neighbors: [50, 100]
-        similarity: cosine
-    evaluation:
-      simple_metrics: [nDCG]
-    top_k: 10
+  splitting:
+    test_splitting:
+      strategy: random_subsampling
+      test_ratio: 0.2
+  models:
+    ItemKNN:
+      meta:
+        hyper_opt_alg: grid
+        save_recs: True
+      neighbors: [50, 100]
+      similarity: cosine
+  evaluation:
+    simple_metrics: [nDCG]
+  top_k: 10
 ```
 
 If you want to explore a basic configuration, and an advanced configuration, please refer to:
