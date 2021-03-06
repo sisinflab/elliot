@@ -31,7 +31,12 @@ class BaseRecommenderModel(ABC):
         self._params = params
 
         self._restore = getattr(self._params.meta, "restore", False)
-        self._validation_metric = getattr(self._params.meta, "validation_metric", "nDCG").split("@")
+
+        _first_metric = data.config.evaluation.simple_metrics[0] if data.config.evaluation.simple_metrics else ""
+        self._validation_metric = getattr(self._params.meta, "validation_metric", _first_metric + "@10").split("@")
+        if self._validation_metric[0].lower() not in [m.lower()
+                                              for m in data.config.evaluation.simple_metrics]:
+            raise Exception("Validation metric must be in the list of simple metrics")
 
         _cutoff_k = getattr(data.config.evaluation, "cutoffs", [data.config.top_k])
         _cutoff_k = _cutoff_k if isinstance(_cutoff_k, list) else [_cutoff_k]

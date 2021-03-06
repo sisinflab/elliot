@@ -105,7 +105,8 @@ def run_experiment(config_path: str = './config/config.yml'):
     # res_handler.save_results(output=base.base_namespace.path_output_rec_performance)
     hyper_handler.save_trials(output=base.base_namespace.path_output_rec_performance)
     res_handler.save_best_results(output=base.base_namespace.path_output_rec_performance)
-    res_handler.save_best_models(output=base.base_namespace.path_output_rec_performance)
+    first_metric = base.base_namespace.evaluation.simple_metrics[0] if base.base_namespace.evaluation.simple_metrics else ""
+    res_handler.save_best_models(output=base.base_namespace.path_output_rec_performance, default_metric=first_metric)
     if hasattr(base.base_namespace, "print_results_as_triplets") and base.base_namespace.print_results_as_triplets == True:
         res_handler.save_best_results_as_triplets(output=base.base_namespace.path_output_rec_performance)
         hyper_handler.save_trials_as_triplets(output=base.base_namespace.path_output_rec_performance)
