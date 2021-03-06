@@ -53,12 +53,6 @@ class Evaluator(object):
         self._paired_ttest = self._data.config.evaluation.paired_ttest
         self._metrics = metrics.parse_metrics(data.config.evaluation.simple_metrics)
         self._complex_metrics = getattr(data.config.evaluation, "complex_metrics", dict())
-        # _first_metric = data.config.evaluation.simple_metrics[0] if data.config.evaluation.simple_metrics else ""
-        # self._complex_metrics = getattr(data.config.evaluation, "complex_metrics", dict())
-        # _validation_metric = getattr(self._params.meta, "validation_metric", _first_metric+"@10").split("@")[0]
-        # if _validation_metric.lower() not in [m.lower()
-        #                                       for m in data.config.evaluation.simple_metrics]:
-        #     raise Exception("Validation metric must be in the list of simple metrics")
         #TODO integrate complex metrics in validation metric (the problem is that usually complex metrics generate a complex name that does not match with the base name when looking for the loss value)
         # if _validation_metric.lower() not in [m.lower()
         #                                       for m in data.config.evaluation.simple_metrics]+[m["metric"].lower()
