@@ -56,7 +56,7 @@ pip install -e . --verbose
 #### VIRTUALENV
 ```bash
 git clone https://github.com//sisinflab/elliot.git && cd elliot
-virtualenv -p /usr/bin/pyhton3.6 venv # your python location and version
+virtualenv -p /usr/bin/python3.6 venv # your python location and version
 source venv/bin/activate
 pip install --upgrade pip
 pip install -e . --verbose
