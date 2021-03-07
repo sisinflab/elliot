@@ -2,6 +2,7 @@ from codecs import open
 from os import path
 
 from pip._internal.req import parse_requirements
+from pip._internal.network.session import PipSession
 from setuptools import setup, dist
 
 dist.Distribution().fetch_build_eggs(['numpy>=1.11.2'])
@@ -26,11 +27,12 @@ with open(path.join(here, 'README.md'), encoding='utf-8') as f:
     long_description = f.read()
 
 # get the dependencies and installs
-# parse_requirements() returns generator of pip.req.InstallRequirement objects
-install_reqs = parse_requirements('requirements.txt')
+# parse_requirements() returns generator of pip._internal.req.req_file.ParsedRequirement objects
+session = PipSession()
+install_reqs = parse_requirements('requirements.txt', session=session)
 
 # reqs is a list of requirement
-reqs = [str(ir.req) for ir in install_reqs]
+reqs = [str(ir.requirement) for ir in install_reqs]
 
 ext = '.pyx' if USE_CYTHON else '.c'
 cmdclass = {}
@@ -47,7 +49,8 @@ setup(
     license='Apache License',
     packages=['elliot'],
     platforms=['all'],
-    description=('A Comprehensive and RigorousFramework for Reproducible Recommender Systems Evaluation'),
+    description=(
+        'A Comprehensive and Rigorous Framework for Reproducible Recommender Systems Evaluation'),
     long_description=long_description,
     long_description_content_type='text/markdown',
     url='https://github.com/sisnflab/elliot',

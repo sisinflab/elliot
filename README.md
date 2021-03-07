@@ -48,7 +48,7 @@ working configurations.
 ```bash
 git clone https://github.com//sisinflab/elliot.git && cd elliot
 conda create --name elliot_env python=3.8
-conda activate
+conda activate elliot_env
 pip install --upgrade pip
 pip install -e . --verbose
 ```
@@ -56,7 +56,7 @@ pip install -e . --verbose
 #### VIRTUALENV
 ```bash
 git clone https://github.com//sisinflab/elliot.git && cd elliot
-virtualenv -p /usr/bin/pyhton3.6 venv # your python location and version
+virtualenv -p /usr/bin/python3.6 venv # your python location and version
 source venv/bin/activate
 pip install --upgrade pip
 pip install -e . --verbose
