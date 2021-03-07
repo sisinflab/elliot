@@ -240,7 +240,7 @@ class ItemCategoryDataObject:
         self.num_items = len(self.items)
 
         self.features = list({f for i in self.items for f in self.side_information_data.feature_map[i]})
-        self.factors = len(self.features)
+        self.nfeatures = len(self.features)
         self.private_users = {p: u for p, u in enumerate(self.users)}
         self.public_users = {v: k for k, v in self.private_users.items()}
         self.private_items = {p: i for p, i in enumerate(self.items)}
