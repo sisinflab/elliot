@@ -48,7 +48,7 @@ working configurations.
 ```bash
 git clone https://github.com//sisinflab/elliot.git && cd elliot
 conda create --name elliot_env python=3.8
-conda activate
+conda activate elliot_env
 pip install --upgrade pip
 pip install -e . --verbose
 ```
