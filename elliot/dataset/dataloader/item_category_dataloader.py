@@ -7,18 +7,20 @@ __version__ = '0.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
+import concurrent.futures as c
+import logging as pylog
 import os
-import numpy as np
 import typing as t
+from ast import literal_eval
+from types import SimpleNamespace
+
+import numpy as np
 import pandas as pd
 import scipy.sparse as sp
-from collections import Counter
-from types import SimpleNamespace
-import logging as pylog
 
-from elliot.utils import logging
-from elliot.splitter.base_splitter import Splitter
 from elliot.prefiltering.standard_prefilters import PreFilter
+from elliot.splitter.base_splitter import Splitter
+from elliot.utils import logging
 
 """
 [(train_0,test_0)]
@@ -45,7 +47,7 @@ from elliot.prefiltering.standard_prefilters import PreFilter
 """
 
 
-class KnowledgeChainsLoader:
+class ItemCategoryLoader:
     """
     Load train and test dataset
     """
@@ -69,20 +71,19 @@ class KnowledgeChainsLoader:
             path_train_data = config.data_config.train_path
             path_val_data = getattr(config.data_config, "validation_path", None)
             path_test_data = config.data_config.test_path
-            path_map = config.data_config.side_information.map
-            path_features = config.data_config.side_information.features
-            path_properties = config.data_config.side_information.properties
+            item_mapping_path = getattr(config.data_config.side_information, "item_mapping", None)
 
             self.side_information_data = SimpleNamespace()
 
             self.train_dataframe, self.side_information_data.feature_map = self.load_dataset_dataframe(path_train_data,
-                                                                                                       "\t",
-                                                                                                       path_map,
-                                                                                                       path_features,
-                                                                                                       path_properties)
+                                                                                                 "\t",
+                                                                                                 item_mapping_path,
+                                                                                                 self.column_names)
+            self.side_information_data.item_mapping_path = item_mapping_path
+
             self.train_dataframe = self.check_timestamp(self.train_dataframe)
 
-            self.logger.info(f"{path_train_data} - Loaded")
+            self.logger.info('{0} - Loaded'.format(path_train_data))
 
             self.test_dataframe = pd.read_csv(path_test_data, sep="\t", header=None, names=self.column_names)
             self.test_dataframe = self.check_timestamp(self.test_dataframe)
@@ -102,18 +103,16 @@ class KnowledgeChainsLoader:
             self.logger.info("There will be the splitting")
             path_dataset = config.data_config.dataset_path
 
-            path_map = config.data_config.side_information.map
-            path_features = config.data_config.side_information.features
-            path_properties = config.data_config.side_information.properties
+            item_mapping_path = getattr(config.data_config.side_information, "item_mapping", None)
 
             self.side_information_data = SimpleNamespace()
 
             self.dataframe, self.side_information_data.feature_map = self.load_dataset_dataframe(path_dataset,
                                                                                                  "\t",
-                                                                                                 path_map,
-                                                                                                 path_features,
-                                                                                                 path_properties,
+                                                                                                 item_mapping_path,
                                                                                                  self.column_names)
+            self.side_information_data.item_mapping_path = item_mapping_path
+
             self.dataframe = self.check_timestamp(self.dataframe)
 
             self.logger.info('{0} - Loaded'.format(path_dataset))
@@ -156,12 +155,12 @@ class KnowledgeChainsLoader:
                 # validation level
                 val_list = []
                 for train, val in train_val:
-                    single_dataobject = KnowledgeChainsDataObject(self.config, (train,val,test), self.side_information_data, self.args, self.kwargs)
+                    single_dataobject = ItemCategoryDataObject(self.config, (train,val,test), self.side_information_data, self.args, self.kwargs)
                     val_list.append(single_dataobject)
                 data_list.append(val_list)
             else:
-                single_dataobject = KnowledgeChainsDataObject(self.config, (train_val, test), self.side_information_data, self.args,
-                                                              self.kwargs)
+                single_dataobject = ItemCategoryDataObject(self.config, (train_val, test), self.side_information_data, self.args,
+                                                     self.kwargs)
                 data_list.append([single_dataobject])
         return data_list
 
@@ -178,54 +177,21 @@ class KnowledgeChainsLoader:
         side_information_data.feature_map = {item: np.random.randint(0, 10, size=np.random.randint(0, 20)).tolist()
                                              for item in training_set['itemId'].unique()}
 
-        data_list = [[KnowledgeChainsDataObject(self.config, (training_set, test_set), side_information_data,
+        data_list = [[ItemCategoryDataObject(self.config, (training_set, test_set), side_information_data,
                                                 self.args, self.kwargs)]]
 
         return data_list
 
-    def load_dataset_dict(self, file_ratings, separator='\t', attribute_file=None, feature_file=None, properties_file=None,
-                          additive=True, threshold=10):
-        column_names = ['userId', 'itemId', 'rating']
-        data = pd.read_csv(file_ratings, sep=separator, header=None, names=column_names)
-        if (attribute_file is not None) & (feature_file is not None) & (properties_file is not None):
-            map = self.load_attribute_file(attribute_file)
-            items = self.load_item_set(file_ratings)
-            feature_names = self.load_feature_names(feature_file)
-            properties = self.load_properties(properties_file)
-            map = self.reduce_attribute_map_property_selection(map, items, feature_names, properties, additive, threshold)
-            items = set(map.keys())
-            data = data[data[column_names[1]].isin(items)]
-        users = list(data['userId'].unique())
-
-        "Conversion to Dictionary"
-        ratings = {}
-        for u in users:
-            sel_ = data[data['userId'] == u]
-            ratings[u] = dict(zip(sel_['itemId'], sel_['rating']))
-        n_users = len(ratings.keys())
-        n_items = len({k for a in ratings.values() for k in a.keys()})
-        transactions = sum([len(a) for a in ratings.values()])
-        sparsity = 1 - (transactions / (n_users * n_items))
-        self.logger.info(f"Statistics\tUsers:\t{n_users}\tItems:\t{n_items}\tTransactions:\t{transactions}\t"
-                         f"Sparsity:\t{sparsity}")
-        return ratings, map
-
     def load_dataset_dataframe(self, file_ratings,
                                separator='\t',
                                attribute_file=None,
-                               feature_file=None,
-                               properties_file=None,
-                               column_names=['userId', 'itemId', 'rating', 'timestamp'],
-                               additive=True,
-                               threshold=10
+                               column_names=['userId', 'itemId', 'rating', 'timestamp']
                                ):
         data = pd.read_csv(file_ratings, sep=separator, header=None, names=column_names)
-        if (attribute_file is not None) & (feature_file is not None) & (properties_file is not None):
+        if (attribute_file is not None):
             map = self.load_attribute_file(attribute_file)
-            items = self.load_item_set(file_ratings)
-            feature_names = self.load_feature_names(feature_file)
-            properties = self.load_properties(properties_file)
-            map = self.reduce_attribute_map_property_selection(map, items, feature_names, properties, additive, threshold)
+            items = set(data['itemId'].unique().tolist())
+            map = {k: v for k, v in map.items() if k in items}
             items = set(map.keys())
             data = data[data[column_names[1]].isin(items)]
 
@@ -248,54 +214,6 @@ class KnowledgeChainsLoader:
                 s.add(int(line[itemPosition]))
         return s
 
-    def load_feature_names(self, infile, separator='\t'):
-        feature_names = {}
-        with open(infile) as file:
-            for line in file:
-                line = line.split(separator)
-                pattern = line[1].split('><')
-                pattern[0] = pattern[0][1:]
-                pattern[len(pattern) - 1] = pattern[len(pattern) - 1][:-2]
-                feature_names[int(line[0])] = pattern
-        return feature_names
-
-    def load_properties(self, properties_file):
-        properties = []
-        with open(properties_file) as file:
-            for line in file:
-                if line[0] != '#':
-                    properties.append(line.rstrip("\n"))
-        return properties
-
-    def reduce_attribute_map_property_selection(self, map, items, feature_names, properties, additive, threshold = 10):
-
-        acceptable_features = set()
-        if not properties:
-            acceptable_features.update(feature_names.keys())
-        else:
-            for feature in feature_names.items():
-                if additive:
-                    if feature[1][0] in properties:
-                        acceptable_features.add(int(feature[0]))
-                else:
-                    if feature[1][0] not in properties:
-                        acceptable_features.add(int(feature[0]))
-
-        self.logger.info(f"Acceptable Features:\t{len(acceptable_features)}\tMapped items:\t{len(map)}")
-
-        nmap = {k: v for k, v in map.items() if k in items}
-
-        feature_occurrences_dict = Counter([x for xs in nmap.values() for x in xs  if x in acceptable_features])
-        features_popularity = {k: v for k, v in feature_occurrences_dict.items() if v > threshold}
-
-        self.logger.info(f"Features above threshold:\t{len(features_popularity)}")
-
-        new_map = {k:[value for value in v if value in features_popularity.keys()] for k,v in nmap.items()}
-        new_map = {k:v for k,v in new_map.items() if len(v)>0}
-        self.logger.info(f"Final #items:\t{len(new_map.keys())}")
-
-        return new_map
-
     def reduce_dataset_by_item_list(self, ratings_file, items, separator = '\t'):
         column_names = ["userId", "itemId", "rating"]
         data = pd.read_csv(ratings_file, sep=separator, header=None, names=column_names)
@@ -303,7 +221,7 @@ class KnowledgeChainsLoader:
         return data
 
 
-class KnowledgeChainsDataObject:
+class ItemCategoryDataObject:
     """
     Load train and test dataset
     """
