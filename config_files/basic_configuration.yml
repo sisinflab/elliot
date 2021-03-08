@@ -8,8 +8,8 @@ experiment:
         map: ../data/cat_dbpedia_movielens_1m/map.tsv
         features: ../data/cat_dbpedia_movielens_1m/features.tsv
         properties: ../data/cat_dbpedia_movielens_1m/properties.conf
-  prefiltering:
-    strategy: user_average
+#  prefiltering:
+#    strategy: user_average # Not applied in the paper experiments
   splitting:
     save_on_disk: True
     save_folder: ../data/cat_dbpedia_movielens_1m/splitting/
