@@ -124,8 +124,10 @@ class DataSetLoader:
 
     def generate_dataobjects_mock(self) -> t.List[object]:
         _column_names = ['userId', 'itemId', 'rating']
-        training_set = np.random.randint(0, self.config.top_k*10, size=(self.config.top_k*2, 3))
-        test_set = np.random.randint(0, self.config.top_k*10, size=(self.config.top_k*2, 3))
+        training_set = np.hstack(
+            (np.random.randint(0, 5 * 20, size=(5 * 20, 2)), np.random.randint(0, 2, size=(5 * 20, 1))))
+        test_set = np.hstack(
+            (np.random.randint(0, 5 * 20, size=(5 * 20, 2)), np.random.randint(0, 2, size=(5 * 20, 1))))
 
         training_set = pd.DataFrame(np.array(training_set), columns=_column_names)
         test_set = pd.DataFrame(np.array(test_set), columns=_column_names)
