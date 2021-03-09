@@ -69,6 +69,8 @@ class VisualLoader:
         if config.config_test:
             return
 
+        self.side_information_data = SimpleNamespace()
+
         if config.data_config.strategy == "fixed":
             path_train_data = config.data_config.train_path
             path_val_data = getattr(config.data_config, "validation_path", None)
@@ -98,8 +100,6 @@ class VisualLoader:
             else:
                 visual_set = {}
 
-            self.side_information_data = SimpleNamespace()
-
             self.train_dataframe, self.side_information_data.aligned_items = self.load_dataset_dataframe(path_train_data,
                                                                                                          "\t",
                                                                                                          visual_set)
@@ -124,7 +124,19 @@ class VisualLoader:
                 self.tuple_list = [(self.train_dataframe, self.test_dataframe)]
 
         elif config.data_config.strategy == "hierarchy":
+            visual_feature_path = getattr(config.data_config.side_information, "visual_features", None)
+            item_mapping_path = getattr(config.data_config.side_information, "item_mapping", None)
+            size_tuple = getattr(config.data_config.side_information, "output_image_size", None)
+            images_src_folder = getattr(config.data_config.side_information, "images_src_folder", None)
+
+            self.side_information_data.visual_feature_path = visual_feature_path
+            self.side_information_data.item_mapping_path = item_mapping_path
+            self.side_information_data.images_src_folder = images_src_folder
+            self.side_information_data.size_tuple = size_tuple
+
             self.tuple_list = self.read_splitting(config.data_config.root_folder)
+
+            self.logger.info('{0} - Loaded'.format(config.data_config.root_folder))
 
         elif config.data_config.strategy == "dataset":
             self.logger.info("There will be the splitting")
@@ -155,8 +167,6 @@ class VisualLoader:
                 visual_set = image_set
             else:
                 visual_set = {}
-
-            self.side_information_data = SimpleNamespace()
 
             self.dataframe, self.side_information_data.aligned_items = self.load_dataset_dataframe(path_dataset,
                                                                                                    "\t",

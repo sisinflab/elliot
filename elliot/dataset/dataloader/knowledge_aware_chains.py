@@ -65,6 +65,8 @@ class KnowledgeChainsLoader:
         if config.config_test:
             return
 
+        self.side_information_data = SimpleNamespace()
+
         if config.data_config.strategy == "fixed":
             path_train_data = config.data_config.train_path
             path_val_data = getattr(config.data_config, "validation_path", None)
@@ -72,8 +74,6 @@ class KnowledgeChainsLoader:
             path_map = config.data_config.side_information.map
             path_features = config.data_config.side_information.features
             path_properties = config.data_config.side_information.properties
-
-            self.side_information_data = SimpleNamespace()
 
             self.train_dataframe, self.side_information_data.feature_map = self.load_dataset_dataframe(path_train_data,
                                                                                                        "\t",
@@ -96,7 +96,12 @@ class KnowledgeChainsLoader:
                 self.tuple_list = [(self.train_dataframe, self.test_dataframe)]
 
         elif config.data_config.strategy == "hierarchy":
+            item_mapping_path = getattr(config.data_config.side_information, "item_mapping", None)
+            self.side_information_data.feature_map = self.load_attribute_file(item_mapping_path)
+
             self.tuple_list = self.read_splitting(config.data_config.root_folder)
+
+            self.logger.info('{0} - Loaded'.format(config.data_config.root_folder))
 
         elif config.data_config.strategy == "dataset":
             self.logger.info("There will be the splitting")
@@ -105,8 +110,6 @@ class KnowledgeChainsLoader:
             path_map = config.data_config.side_information.map
             path_features = config.data_config.side_information.features
             path_properties = config.data_config.side_information.properties
-
-            self.side_information_data = SimpleNamespace()
 
             self.dataframe, self.side_information_data.feature_map = self.load_dataset_dataframe(path_dataset,
                                                                                                  "\t",
