@@ -70,7 +70,7 @@ class FunkSVDModel(keras.Model):
         user_bias_e = self.user_bias_embedding(user)
         item_bias_e = self.item_bias_embedding(item)
 
-        output = tf.reduce_sum(user_mf_e * item_mf_e, axis = -1) + user_bias_e + item_bias_e
+        output = tf.reduce_sum(user_mf_e * item_mf_e, axis = -1) + tf.squeeze(user_bias_e + item_bias_e)
 
         return output
 
@@ -112,7 +112,7 @@ class FunkSVDModel(keras.Model):
         user_bias_e = self.user_bias_embedding(user)
         item_bias_e = self.item_bias_embedding(item)
 
-        output = tf.reduce_sum(user_mf_e * item_mf_e, axis = -1) + user_bias_e + item_bias_e
+        output = tf.reduce_sum(user_mf_e * item_mf_e, axis = -1) + tf.squeeze(user_bias_e + item_bias_e)
 
         return tf.squeeze(output)
 
