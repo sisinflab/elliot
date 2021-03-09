@@ -48,6 +48,7 @@ class IRGAN(RecMixin, BaseRecommenderModel):
           meta:
             save_recs: True
           epochs: 10
+          batch_size: 512
           factors: 10
           lr: 0.001
           l_w: 0.1

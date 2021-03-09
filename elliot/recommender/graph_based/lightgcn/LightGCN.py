@@ -52,6 +52,7 @@ class LightGCN(RecMixin, BaseRecommenderModel):
             save_recs: True
           lr: 0.0005
           epochs: 50
+          batch_size: 512
           factors: 64
           batch_size: 256
           l_w: 0.1

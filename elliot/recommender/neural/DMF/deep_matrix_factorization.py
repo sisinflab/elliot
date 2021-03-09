@@ -45,6 +45,7 @@ class DMF(RecMixin, BaseRecommenderModel):
               meta:
                 save_recs: True
               epochs: 10
+              batch_size: 512
               lr: 0.0001
               reg: 0.001
               user_mlp: (64,32)

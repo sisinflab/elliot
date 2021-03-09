@@ -45,6 +45,7 @@ class NPR(RecMixin, BaseRecommenderModel):
           meta:
             save_recs: True
           epochs: 10
+          batch_size: 512
           mf_factors: 100
           mlp_hidden_size:  (64,32)
           lr: 0.001

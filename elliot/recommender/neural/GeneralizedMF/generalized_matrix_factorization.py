@@ -42,6 +42,7 @@ class GMF(RecMixin, BaseRecommenderModel):
               meta:
                 save_recs: True
               epochs: 10
+              batch_size: 512
               mf_factors: 10
               lr: 0.001
               is_edge_weight_train: True

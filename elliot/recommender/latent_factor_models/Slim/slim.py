@@ -39,7 +39,6 @@ class Slim(RecMixin, BaseRecommenderModel):
         Slim:
           meta:
             save_recs: True
-          epochs: 10
           l1_ratio: 0.001
           alpha: 0.001
     """

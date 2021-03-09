@@ -73,6 +73,7 @@ class WideAndDeep(RecMixin, BaseRecommenderModel):
           meta:
             save_recs: True
           epochs: 10
+          batch_size: 512
           factors: 50
           mlp_hidden_size: (32, 32, 1)
           lr: 0.001

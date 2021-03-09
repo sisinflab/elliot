@@ -40,6 +40,7 @@ class ItemAutoRec(RecMixin, BaseRecommenderModel):
           meta:
             save_recs: True
           epochs: 10
+          batch_size: 512
           hidden_neuron: 500
           lr: 0.0001
           l_w: 0.001

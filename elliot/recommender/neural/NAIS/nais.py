@@ -48,6 +48,7 @@ class NAIS(RecMixin, BaseRecommenderModel):
           meta:
             save_recs: True
           factors: 100
+          batch_size: 512
           algorithm: concat
           weight_size: 32
           lr: 0.001

@@ -41,6 +41,7 @@ class SVDpp(RecMixin, BaseRecommenderModel):
           meta:
             save_recs: True
           epochs: 10
+          batch_size: 512
           factors: 50
           lr: 0.001
           reg_w: 0.1

@@ -46,6 +46,7 @@ class NeuMF(RecMixin, BaseRecommenderModel):
           meta:
             save_recs: True
           epochs: 10
+          batch_size: 512
           mf_factors: 10
           mlp_factors: 10
           mlp_hidden_size: (64,32)

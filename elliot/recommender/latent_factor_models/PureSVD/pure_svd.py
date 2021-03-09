@@ -38,7 +38,6 @@ class PureSVD(RecMixin, BaseRecommenderModel):
         PureSVD:
           meta:
             save_recs: True
-          epochs: 10
           factors: 10
           seed: 42
     """
