@@ -468,6 +468,9 @@ The feature can be activated as follows:
     experiment:
       config_test: True
 
+**NOTE: The configuration test uses small data mock-ups. Consequently, some model parameter values (e.g. a high value of the neighborhood for Item-kNN) do no fit.
+In such cases, uses compatible values for testing, then remove** ``config_test`` **field and run the full experiment.**
+
 GPU Acceleration
 """""""""""""""""
 Elliot lets the user enable GPU acceleration with Tensorflow. To select the gpu on which we can run our experiments, use the following syntax:
