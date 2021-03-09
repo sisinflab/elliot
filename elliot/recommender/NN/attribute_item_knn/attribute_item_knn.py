@@ -48,7 +48,7 @@ class AttributeItemKNN(RecMixin, BaseRecommenderModel):
         self._random = np.random
 
         self._params_list = [
-            ("_num_neighbors", "neighbors", "nn", 40, None, None),
+            ("_num_neighbors", "neighbors", "nn", 40, int, None),
             ("_similarity", "similarity", "sim", "cosine", None, None)
         ]
         self.autoset_params()

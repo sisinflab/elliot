@@ -87,7 +87,8 @@ class BPRSlimModel(object):
         indices, values = zip(*predictions.items())
         indices = np.array(indices)
         values = np.array(values)
-        partially_ordered_preds_indices = np.argpartition(values, -k)[-k:]
+        local_k = min(k, len(values))
+        partially_ordered_preds_indices = np.argpartition(values, -local_k)[-local_k:]
         real_values = values[partially_ordered_preds_indices]
         real_indices = indices[partially_ordered_preds_indices]
         local_top_k = real_values.argsort()[::-1]

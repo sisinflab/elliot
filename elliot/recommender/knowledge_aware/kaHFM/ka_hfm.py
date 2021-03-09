@@ -82,7 +82,8 @@ class MF(object):
 
     def get_user_recs(self, user: int, k: int):
         arr = self._item_bias + self._item_factors @ self._user_factors[self._public_users[user]]
-        top_k = arr.argsort()[-(len(self._ratings[user].keys()) + k):][::-1]
+        local_k = min(k, len(self._ratings[user].keys()) + k)
+        top_k = arr.argsort()[-(local_k):][::-1]
         top_k_2 = [(self._private_items[i], arr[i]) for p, i in enumerate(top_k)
                    if (self._private_items[i] not in self._ratings[user].keys())]
         top_k_2 = top_k_2[:k]
@@ -90,9 +91,9 @@ class MF(object):
 
     def get_user_recs_argpartition(self, user: int, k: int):
         user_items = self._ratings[user].keys()
-        safety_k = len(user_items)+k
+        local_k = min(k, len(user_items)+k)
         predictions = self._item_bias +  self._item_factors  @ self._user_factors[self._public_users[user]]
-        partially_ordered_preds_indices = np.argpartition(predictions, -safety_k)[-safety_k:]
+        partially_ordered_preds_indices = np.argpartition(predictions, -local_k)[-local_k:]
         partially_ordered_preds_values = predictions[partially_ordered_preds_indices]
         partially_ordered_preds_ids = [self._private_items[x] for x in partially_ordered_preds_indices]
 
