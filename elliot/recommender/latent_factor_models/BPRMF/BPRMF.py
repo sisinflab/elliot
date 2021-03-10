@@ -179,20 +179,20 @@ class BPRMF(RecMixin, BaseRecommenderModel):
         self._random = np.random
 
         self._params_list = [
-            ("_factors", "factors", "factors", 10, int, None),
+            ("_factors", "factors", "f", 10, int, None),
             ("_learning_rate", "lr", "lr", 0.05, None, None),
-            ("_bias_regularization", "bias_regularization", "bias_regularization", 0, None, None),
-            ("_user_regularization", "positive_item_regularization", "positive_item_regularization", 0.0025,
+            ("_bias_regularization", "bias_regularization", "bias_reg", 0, None, None),
+            ("_user_regularization", "user_regularization", "u_reg", 0.0025,
              None, None),
-            ("_positive_item_regularization", "positive_item_regularization", "positive_item_regularization", 0.0025,
+            ("_positive_item_regularization", "positive_item_regularization", "pos_i_reg", 0.0025,
              None, None),
-            ("_negative_item_regularization", "negative_item_regularization", "negative_item_regularization", 0.00025,
+            ("_negative_item_regularization", "negative_item_regularization", "neg_i_reg", 0.00025,
              None, None),
-            ("_update_negative_item_factors", "update_negative_item_factors", "update_negative_item_factors", True,
+            ("_update_negative_item_factors", "update_negative_item_factors", "up_neg_i_f", True,
              None, None),
-            ("_update_users", "update_users", "update_users", True, None, None),
-            ("_update_items", "update_items", "update_items", True, None, None),
-            ("_update_bias", "update_bias", "update_bias", True, None, None),
+            ("_update_users", "update_users", "up_u", True, None, None),
+            ("_update_items", "update_items", "up_i", True, None, None),
+            ("_update_bias", "update_bias", "up_b", True, None, None),
         ]
         self.autoset_params()
 
