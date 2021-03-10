@@ -2,7 +2,7 @@ experiment:
   dataset: movielens_1m
   data_config:
     strategy: dataset
-    dataset_path: ../data/{0}/dataset.tsv
+    dataset_path: ../data/movielens_1m/dataset.tsv
   splitting:
     test_splitting:
         strategy: random_subsampling
