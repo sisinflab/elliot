@@ -188,12 +188,15 @@ class NameSpaceModel:
                             val = [v for v in val if v is not None]
                             space_list.append((k, func_(k, *val)))
                         else:
-                            if all([isinstance(v, str) for v in value]):
-                                space_list.append((k, hp.choice(k, value)))
-                            else:
-                                space_list.append((k, hp.choice(k, literal_eval(
-                                    "["+str(",".join([str(v) for v in value]))+"]")
-                                                                )))
+                            # if not all([isinstance(v, str) for v in value]):
+                            #     space_list.append((k, hp.choice(k, value)))
+                            # else:
+                            #     space_list.append((k, hp.choice(k, literal_eval(
+                            #         "["+str(",".join([str(v) for v in value]))+"]")
+                            #                                     )))
+                            space_list.append((k, hp.choice(k, literal_eval(
+                                "[" + str(",".join([str(v) for v in value])) + "]")
+                                                            )))
                 _SPACE = OrderedDict(space_list)
                 _estimated_evals = reduce(lambda x, y: x*y, [len(param.pos_args) - 1 for _, param in _SPACE.items()], 1)
                 _max_evals = meta_model.get(_hyper_max_evals, _estimated_evals)

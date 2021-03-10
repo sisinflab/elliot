@@ -17,7 +17,6 @@ experiment:
         folds: 5
   top_k: 50
   evaluation:
-    cutoff: 10
     simple_metrics: [nDCG, ACLT, APLT, ARP, PopREO]
     complex_metrics:
     - metric: UserMADrating
@@ -45,7 +44,6 @@ experiment:
       meta:
         hyper_max_evals: 5
         hyper_opt_alg: tpe
-        validation_rate: 5
       lr: [loguniform, -10, -1]
       batch_size: [128, 256, 512]
       epochs: 50
@@ -59,7 +57,6 @@ experiment:
       meta:
         hyper_max_evals: 5
         hyper_opt_alg: tpe
-        validation_rate: 5
       lr: [0.0005, 0.001, 0.005, 0.01]
       epochs: 50
       batch_size: [128, 256, 512]
@@ -71,7 +68,6 @@ experiment:
       meta:
         hyper_max_evals: 5
         hyper_opt_alg: rand
-        validation_rate: 5
       lr: [0.0005, 0.001, 0.005, 0.01]
       batch_size: [128, 256, 512]
       epochs: 50
