@@ -35,7 +35,7 @@ class BaseRecommenderModel(ABC):
         _cutoff_k = getattr(data.config.evaluation, "cutoffs", [data.config.top_k])
         _cutoff_k = _cutoff_k if isinstance(_cutoff_k, list) else [_cutoff_k]
         _first_metric = data.config.evaluation.simple_metrics[0] if data.config.evaluation.simple_metrics else ""
-        _default_validation_k = getattr(data.config.evaluation, "cutoffs", [data.config.top_k])[0]
+        _default_validation_k = _cutoff_k[0]
         self._validation_metric = getattr(self._params.meta, "validation_metric",
                                           _first_metric + "@" + str(_default_validation_k)).split("@")
         if self._validation_metric[0].lower() not in [m.lower()
