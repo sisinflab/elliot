@@ -78,13 +78,13 @@ class CFGAN(RecMixin, BaseRecommenderModel):
         self._random = np.random
 
         self._params_list = [
-            ("_factors", "factors", "factors", 10, None, None),
+            ("_factors", "factors", "factors", 10, int, None),
             ("_learning_rate", "lr", "lr", 0.001, None, None),
             ("_l_w", "l_w", "l_w", 0.1, None, None),
             ("_l_b", "l_b", "l_b", 0.001, None, None),
             ("_l_gan", "l_gan", "l_gan", 0.001, None, None),
-            ("_g_epochs", "g_epochs", "g_epochs", 5, None, None),
-            ("_d_epochs", "d_epochs", "d_epochs", 1, None, None),
+            ("_g_epochs", "g_epochs", "g_epochs", 5, int, None),
+            ("_d_epochs", "d_epochs", "d_epochs", 1, int, None),
             ("_s_zr", "s_zr", "s_zr", 0.001, None, None),  # sampling parameter of zero-reconstruction
             ("_s_pm", "s_pm", "s_pm", 0.001, None, None)  # sampling parameter of partial-masking
         ]
@@ -92,10 +92,6 @@ class CFGAN(RecMixin, BaseRecommenderModel):
 
         if self._batch_size < 1:
             self._batch_size = self._data.transactions
-
-        if self._predict_model not in ["generator", "discriminator"]:
-            raise Exception(
-                f"It is necessary to specify the model component to use as recommender (generator/discriminator)")
 
         self._ratings = self._data.train_dict
 

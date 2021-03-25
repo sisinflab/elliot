@@ -40,7 +40,7 @@ class Generator(keras.Model):
         self._num_users = num_users
         self.data = data
 
-        self.initializer = tf.initializers.GlorotUniform()
+        self.initializer = tf.random_uniform_initializer(minval=-0.05, maxval=0.05, seed=1234)
 
         self.sampler = pws.Sampler(self.data.i_train_dict)
 
@@ -53,7 +53,6 @@ class Generator(keras.Model):
 
         self.optimizer = tf.optimizers.Adam(self._learning_rate)
 
-    # @tf.function
     def call(self, inputs, training=None, mask=None):
         user, item = inputs
         beta_i = tf.squeeze(tf.nn.embedding_lookup(self.Bi, item))
@@ -64,48 +63,44 @@ class Generator(keras.Model):
 
         return xui, beta_i, gamma_u, gamma_i
 
-    # @tf.function
     def train_step(self, batch):
         user, pos, label = batch
 
         with tf.GradientTape() as tape:
             # Clean Inference
             xui, beta_i, gamma_u, gamma_i = self(inputs=(user, pos), training=True)
-            # loss = tf.reduce_sum(tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.cast(label, tf.float32), logits=xui))
-            #
-            # reg_loss = self._l_w * tf.reduce_sum([tf.nn.l2_loss(gamma_u),
-            #                                       tf.nn.l2_loss(gamma_i)]) \
-            #            + self._l_b * tf.nn.l2_loss(beta_i)
 
             loss = tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.cast(label, tf.float32), logits=xui)
+
             reg_loss = self._l_w * tf.nn.l2_loss(gamma_u) + tf.nn.l2_loss(gamma_i) + self._l_b * tf.nn.l2_loss(beta_i)
 
             loss += reg_loss
 
-        grads = tape.gradient(loss, self.trainable_weights)
-        self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
+        grads = tape.gradient(loss, self.trainable_variables)
+        self.optimizer.apply_gradients(zip(grads, self.trainable_variables))
 
-    # @tf.function
     def train_step_with_reward(self, batch):
         user, pos, reward = batch
 
         with tf.GradientTape() as tape:
             # Clean Inference
-            xui, beta_i, gamma_u, gamma_i = self(inputs=(user, pos), training=True)
-            i_prob = tf.nn.softmax(xui)
+            xui, beta_i, gamma_u, gamma_i = self(
+                inputs=(tf.repeat(user[0], self._num_items), np.arange(self._num_items)), training=True)
 
-            gan_loss = -tf.reduce_mean(tf.math.log(i_prob) * reward)
+            i_prob = tf.gather(tf.reshape(tf.nn.softmax(tf.reshape(xui, [1, -1])), [-1]), pos)
 
-            reg_loss = self._l_w * tf.reduce_sum([tf.nn.l2_loss(gamma_u),
-                                                  tf.nn.l2_loss(gamma_i)]) \
-                       + self._l_b * tf.nn.l2_loss(beta_i)
+            gan_loss = -tf.reduce_mean(tf.math.log(i_prob + 1e-5) * reward)
 
-            gan_loss += reg_loss
+            reg_loss = self._l_w * tf.reduce_sum([tf.nn.l2_loss(tf.gather(gamma_u, user[0])),
+                                                  tf.nn.l2_loss(tf.gather(gamma_i, pos))]) \
+                       + self._l_b * tf.nn.l2_loss(tf.gather(beta_i, pos))
 
-        grads = tape.gradient(gan_loss, self.trainable_weights)
-        self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
+            gan_loss_reg = gan_loss + reg_loss
 
-        return gan_loss
+        grads = tape.gradient(gan_loss_reg, self.trainable_variables)
+        self.optimizer.apply_gradients(zip(grads, self.trainable_variables))
+
+        return gan_loss_reg
 
 
 class Discriminator(keras.Model):
@@ -131,7 +126,7 @@ class Discriminator(keras.Model):
         self._num_users = num_users
         self.data = data
 
-        self.initializer = tf.initializers.GlorotUniform()
+        self.initializer = tf.random_uniform_initializer(minval=-0.05, maxval=0.05, seed=1234)
 
         self.sampler = pws.Sampler(self.data.i_train_dict)
 
@@ -144,7 +139,6 @@ class Discriminator(keras.Model):
 
         self.optimizer = tf.optimizers.Adam(self._learning_rate)
 
-    # @tf.function
     def call(self, inputs, training=None, mask=None):
         user, item = inputs
         beta_i = tf.squeeze(tf.nn.embedding_lookup(self.Bi, item))
@@ -155,7 +149,6 @@ class Discriminator(keras.Model):
 
         return xui, beta_i, gamma_u, gamma_i
 
-    # @tf.function
     def train_step(self, batch):
         user, pos, label = batch
 
@@ -168,8 +161,8 @@ class Discriminator(keras.Model):
 
             loss += reg_loss
 
-        grads = tape.gradient(loss, self.trainable_weights)
-        self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
+        grads = tape.gradient(loss, self.trainable_variables)
+        self.optimizer.apply_gradients(zip(grads, self.trainable_variables))
 
         return tf.reduce_sum(loss)
 
@@ -211,7 +204,7 @@ class IRGAN_model(keras.Model):
         self._batch_size = batch_size
         self._sample_lambda = sample_lambda
 
-        self.initializer = tf.initializers.GlorotUniform()
+        self.initializer = tf.random_uniform_initializer(minval=-0.05, maxval=0.05, seed=1234)
 
         # Discriminator
         self._discriminator = Discriminator(self._data,
@@ -239,16 +232,12 @@ class IRGAN_model(keras.Model):
         # Pretrain of G
         self.pre_train_generator()
 
-        # self.saver_ckpt = tf.train.Checkpoint(optimizer=self.optimizer, model=self)
-
-    # @tf.function
     def call(self, inputs, training=None):
         return self._generator(inputs) if self._predict_model == "generator" else self._discriminator(inputs)
 
-    # #@tf.function
     def train_step(self):
         for d_epoch in range(self._d_epochs):
-            # print(f'\n***** Train D - Epoch{d_epoch + 1}/{self._d_epochs}')
+            print(f'\n***** Train D - Epoch{d_epoch + 1}/{self._d_epochs}')
             dis_loss, step = 0, 0
             for batch in self._discriminator.sampler.step(self._discriminator.data.transactions, self._batch_size):
                 dis_loss += self._discriminator.train_step(batch)
@@ -256,20 +245,21 @@ class IRGAN_model(keras.Model):
             dis_loss /= step
 
         for g_epoch in range(self._g_epochs):
-            # print(f'***** Train G - Epoch{g_epoch + 1}/{self._g_epochs}')
+            print(f'***** Train G - Epoch{g_epoch + 1}/{self._g_epochs}')
             gan_loss = 0
             for user in range(self._num_users):
                 # print(f'***** Train G - Epoch{g_epoch+1}/{self._g_epochs} - User {user+1}/{self._num_users}')
                 u, pos = self._data.sp_i_train_ratings.getrow(user).nonzero()
                 pred_score, _, _, _ = self._generator(
-                    inputs=(np.repeat(user, self._num_items), np.zeros_like(self._num_items)))
-                exp_pred_score = np.exp(pred_score)
+                    inputs=(np.repeat(user, self._num_items), np.arange(self._num_items)))
+
+                exp_pred_score = np.exp(pred_score / 0.5)
                 prob = exp_pred_score / np.sum(exp_pred_score)
 
                 # Here is the importance sampling.
                 pn = (1 - self._sample_lambda) * prob
                 pn[pos] += self._sample_lambda * 1.0 / len(pos)
-                sample = np.random.choice(np.arange(self._num_items), 3 * len(pos), p=pn)
+                sample = np.random.choice(np.arange(self._num_items), 2 * len(pos), p=pn)
 
                 # Get reward and adapt it with importance sampling
                 reward_logits, _, _, _ = self._discriminator(inputs=(np.repeat(user, len(sample)), sample))
@@ -282,7 +272,6 @@ class IRGAN_model(keras.Model):
 
         return dis_loss, gan_loss
 
-    # @tf.function
     def predict(self, start, stop, **kwargs):
         if self._predict_model == "generator":
             return self._generator.Bi + tf.matmul(self._generator.Gu[start:stop], self._generator.Gi, transpose_b=True)
@@ -302,14 +291,12 @@ class IRGAN_model(keras.Model):
         positions = tf.where(tf.equal(equal, i))[:, 1]
         return 1 - (positions / tf.reduce_sum(tf.cast(train_mask, tf.int64), axis=1))
 
-    # @tf.function
     def pre_train_generator(self):
         for g_epoch in range(self._g_pretrain_epochs):
             for batch in self._generator.sampler.step(self._generator.data.transactions, self._batch_size):
                 self._generator.train_step(batch)
             print(f'***** Pre Train G - Epoch {g_epoch + 1}/{self._g_pretrain_epochs}')
 
-    # @tf.function
     def pre_train_discriminator(self):
         for d_epoch in range(self._d_pretrain_epochs):
             for batch in self._discriminator.sampler.step(self._discriminator.data.transactions, self._batch_size):

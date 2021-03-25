@@ -45,13 +45,13 @@ class Sampler:
 
             for i in range(int(s_zr * n_items)):
                 ng = r_int(n_items)
-                while ui_dict[u].has_key(ng):
+                while ng in ui_dict[u]:
                     ng = r_int(n_items)
                 N_zr[n][ng] = 1
 
             for i in range(int(s_pm * n_items)):
                 ng = r_int(n_items)
-                while ui_dict[u].has_key(ng):
+                while ng in ui_dict[u]:
                     ng = r_int(n_items)
                 mask[n][ng] = 1
 
