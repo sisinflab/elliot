@@ -7,22 +7,36 @@ experiment:
     test_splitting:
         strategy: random_subsampling
         test_ratio: 0.2
-  top_k: 10
+  top_k: 50
   evaluation:
-    simple_metrics: [HR]
-  gpu: -1
+    cutoffs: 50
+    simple_metrics: [HR, nDCG, EFD, ACLT, APLT]
+    paired_ttest: True
+    wilcoxon_test: True
   models:
     AMF:
       meta:
-        save_recs: True
+        save_recs: False
         hyper_max_evals: 5
         hyper_opt_alg: tpe
       epochs: 20
       batch_size: 256
-      factors: [50, 100]
-      lr: [0.001, 0.1]
+      factors: [quniform, 50, 100, 1]
+      lr: [loguniform, -2, -1]
       l_w: 0.0001
       l_b: 0.0001
-      eps: [0.1, 0.5] # Magnitude of the Perturbation
+      eps: [uniform, 0.1, 0.5] # Magnitude of the Perturbation
       l_adv: 1 # Adversarial Regularization Parameters
-      adversarial_epochs: [5, 15] # Number of final epochs to be run [APR starts from (epochs - adversarial_epochs) epoch]
+      adversarial_epochs: [quniform, 5, 15, 1] # Number of final epochs to be run [APR starts from (epochs - adversarial_epochs) epoch]
+    NeuMF:
+      meta:
+        validation_rate: 1
+      mf_factors: 20
+      mlp_factors: 10
+      mlp_hidden_size: (5,2)
+      dropout: 0.2
+      is_mf_train: True
+      is_mlp_train: True
+      batch_size: 256
+      epochs: 10
+      lr: 0.001

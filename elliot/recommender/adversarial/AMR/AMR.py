@@ -85,15 +85,15 @@ class AMR(RecMixin, BaseRecommenderModel):
         self._random = np.random
 
         self._params_list = [
-            ("_factors", "factors", "factors", 200, None, None),
-            ("_factors_d", "factors_d", "factors_d", 20, None, None),
+            ("_factors", "factors", "factors", 200, int, None),
+            ("_factors_d", "factors_d", "factors_d", 20, int, None),
             ("_learning_rate", "lr", "lr", 0.001, None, None),
             ("_l_w", "l_w", "l_w", 0.1, None, None),
             ("_l_b", "l_b", "l_b", 0.001, None, None),
             ("_l_e", "l_e", "l_e", 0.1, None, None),
             ("_eps", "eps", "eps", 0.1, None, None),
             ("_l_adv", "l_adv", "l_adv", 0.001, None, None),
-            ("_adversarial_epochs", "adversarial_epochs", "adv_epochs", self._epochs // 2, None, None)
+            ("_adversarial_epochs", "adversarial_epochs", "adv_epochs", self._epochs // 2, int, None)
         ]
         self.autoset_params()
 
