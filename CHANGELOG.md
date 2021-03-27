@@ -6,6 +6,8 @@ All notable changes to this project will be documented in this file
 ### Changed
 
 - `requirements.txt` for Pillow vulnerabilities, change version to >=8.1.1
+- Adversarial features for ECIR tutorial "__AL4Rec__"
+- Hands-on example for ECIR Tutorial "__AL4Rec__"
 
 ## [v0.2.0] - 2020-03-12
 ### Added
