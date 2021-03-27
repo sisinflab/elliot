@@ -4,6 +4,6 @@ tensorflow==2.3.2
 tqdm==4.58.0
 scipy==1.4.1
 pandas==1.1.5
-Pillow==8.1.0
+Pillow>=8.1.1
 PyYAML==5.4.1
 scikit_learn==0.24.1
