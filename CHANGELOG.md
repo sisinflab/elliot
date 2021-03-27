@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file
 
+## [v0.2.1] - 2020-03-27
+### Changed
+
+- `requirements.txt` for Pillow vulnerabilities, change version to >=8.1.1
+
 ## [v0.2.0] - 2020-03-12
 ### Added
 
