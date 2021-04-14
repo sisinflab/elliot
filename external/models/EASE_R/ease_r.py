@@ -30,11 +30,13 @@ class EASER(RecMixin, BaseRecommenderModel):
         self._random = np.random
 
         self._params_list = [
-            ("_neighborhood", "neighborhood", "neighborhood", 10, int, None),
+            ("_neighborhood", "neighborhood", "neighborhood", -1, int, None),
             ("_l2_norm", "l2_norm", "l2_norm", 1e3, float, None)
         ]
 
         self.autoset_params()
+        if self._neighborhood == -1:
+            self._neighborhood = self._data.num_items
 
     @property
     def name(self):
@@ -72,7 +74,7 @@ class EASER(RecMixin, BaseRecommenderModel):
 
     def get_user_predictions(self, user_id, W_sparse):
         user_id = self._data.public_users.get(user_id)
-        b = self._data.sp_i_train_ratings[user_id].dot(W_sparse)
+        b = self._train[user_id].dot(W_sparse)
         a = self.get_train_mask(user_id, user_id+1)
         b[a] = -np.inf
         indices, values = zip(*[(self._data.private_items.get(u_list[0]), u_list[1])
@@ -94,7 +96,7 @@ class EASER(RecMixin, BaseRecommenderModel):
         start = time.time()
 
         self._train = normalize(self._data.sp_i_train_ratings, norm='l2', axis=1)
-        self._train = normalize(self._data.sp_i_train_ratings, norm='l2', axis=0)
+        self._train = normalize(self._train, norm='l2', axis=0)
 
         self._similarity_matrix = np.empty((len(self._data.items), len(self._data.items)))
         self._similarity_matrix = cosine_similarity(self._train.T)

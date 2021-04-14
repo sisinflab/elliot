@@ -7,19 +7,22 @@ experiment:
     test_splitting:
         strategy: random_subsampling
         test_ratio: 0.2
-  top_k: 100
+  top_k: 10
   evaluation:
-    cutoffs: [20, 50, 100]
+    cutoffs: 10
     simple_metrics: [nDCG, recall]
 #  gpu: -1
   external_models_path: ../external/models/__init__.py
   models:
+#    external.MostPop:
+#      meta:
+#        verbose: True
+#        save_recs: False
     external.EASER:
       meta:
         verbose: True
         save_recs: False
       l2_norm: 3e3
-      neighborhood: 100
 #    external.RP3beta:
 #      meta:
 #        verbose: True
