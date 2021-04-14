@@ -1,0 +1,32 @@
+experiment:
+  dataset: movielens_1m
+  data_config:
+    strategy: dataset
+    dataset_path: ../data/movielens_1m/dataset.tsv
+  splitting:
+    test_splitting:
+        strategy: random_subsampling
+        test_ratio: 0.2
+  top_k: 100
+  evaluation:
+    cutoffs: [20, 50, 100]
+    simple_metrics: [nDCG, recall]
+#  gpu: -1
+  external_models_path: ../external/models/__init__.py
+  models:
+    external.EASER:
+      meta:
+        verbose: True
+        save_recs: False
+      l2_norm: 3e3
+      neighborhood: 100
+#    external.RP3beta:
+#      meta:
+#        verbose: True
+#        save_recs: False
+#      neighborhood: 100
+#      alpha: 1
+#      beta: 0.6
+#      min_rating: 3
+#      implicit: False
+#      normalize_similarity: True

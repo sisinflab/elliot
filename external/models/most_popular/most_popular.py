@@ -1,9 +1,3 @@
-"""
-Created on April 4, 2020
-Tensorflow 2.1.0 implementation of APR.
-@author Anonymized
-"""
-
 import operator
 
 import numpy as np
