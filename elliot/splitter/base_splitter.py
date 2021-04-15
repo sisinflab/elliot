@@ -153,7 +153,7 @@ class Splitter:
                 if hasattr(valtest_splitting_ns, "test_ratio"):
                     tuple_list = self.splitting_temporal_holdout(data, float(valtest_splitting_ns.test_ratio))
                 elif hasattr(valtest_splitting_ns, "leave_n_out"):
-                    tuple_list = self.splitting_temporal_holdout(data, int(valtest_splitting_ns.leave_n_out))
+                    tuple_list = self.splitting_temporal_leavenout(data, int(valtest_splitting_ns.leave_n_out))
                 else:
                     raise Exception(f"Option missing for {valtest_splitting_ns.strategy} strategy")
             elif valtest_splitting_ns.strategy == "random_subsampling":
