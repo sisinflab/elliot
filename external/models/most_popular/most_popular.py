@@ -27,7 +27,8 @@ class MostPop(RecMixin, BaseRecommenderModel):
         self._random = np.random
         self.evaluator = Evaluator(self._data, self._params)
 
-        self._pop_items = {self._data.private_items[p]: pop for p, pop in enumerate(self._data.sp_i_train.astype(bool).sum(axis=0).tolist()[0])}
+        # self._pop_items = {self._data.private_items[p]: pop for p, pop in enumerate(self._data.sp_i_train.astype(bool).sum(axis=0).tolist()[0])}
+        self._pop_items = {p: pop for p, pop in enumerate(self._data.sp_i_train.astype(bool).sum(axis=0).tolist()[0])}
         self._sorted_pop_items = dict(sorted(self._pop_items.items(), key=operator.itemgetter(1), reverse=True))
 
         self._params.name = self.name
@@ -47,27 +48,62 @@ class MostPop(RecMixin, BaseRecommenderModel):
         if self._save_recs:
             store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}.tsv")
 
+
+
     def get_recommendations(self, top_k):
+        predictions_top_k_val = {}
+        predictions_top_k_test = {}
+
+        recs_val, recs_test = self.process_protocol(top_k)
+
+        predictions_top_k_val.update(recs_val)
+        predictions_top_k_test.update(recs_test)
+
+        return predictions_top_k_val, predictions_top_k_test
+
+    def get_single_recommendation(self, mask, k):
         n_items = self._num_items
         sorted_pop_items = self._sorted_pop_items
-        ratings = self._data.train_dict
+        ratings = self._data.i_train_dict
 
         r = {}
         for u, i_s in ratings.items():
             l = []
-            ui = set(i_s.keys())
+            lui = len(set(i_s.keys()))
 
-            lui = len(ui)
-            if lui+top_k >= n_items:
+            if lui+k >= n_items:
                 r[u] = l
                 continue
 
             for item, pop in sorted_pop_items.items():
-                if item in ui:
-                    continue
-                else:
-                    l.append((item, pop))
-                if len(l) >= top_k:
+                if mask[u, item]:
+                    l.append((self._data.private_items[item], pop))
+                if len(l) >= k:
                     break
-            r[u] = l
+            r[self._data.private_users[u]] = l
         return r
+
+    # def get_recommendations(self, top_k):
+    #     n_items = self._num_items
+    #     sorted_pop_items = self._sorted_pop_items
+    #     ratings = self._data.train_dict
+    #
+    #     r = {}
+    #     for u, i_s in ratings.items():
+    #         l = []
+    #         ui = set(i_s.keys())
+    #
+    #         lui = len(ui)
+    #         if lui+top_k >= n_items:
+    #             r[u] = l
+    #             continue
+    #
+    #         for item, pop in sorted_pop_items.items():
+    #             if item in ui:
+    #                 continue
+    #             else:
+    #                 l.append((item, pop))
+    #             if len(l) >= top_k:
+    #                 break
+    #         r[u] = l
+    #     return r

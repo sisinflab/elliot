@@ -30,6 +30,8 @@ class BaseRecommenderModel(ABC):
         self._config = config
         self._params = params
 
+        self._negative_sampling = hasattr(data.config, "negative_sampling")
+
         self._restore = getattr(self._params.meta, "restore", False)
 
         _cutoff_k = getattr(data.config.evaluation, "cutoffs", [data.config.top_k])
@@ -51,7 +53,6 @@ class BaseRecommenderModel(ABC):
         self._save_recs = getattr(self._params.meta, "save_recs", False)
         self._verbose = getattr(self._params.meta, "verbose", None)
         self._validation_rate = getattr(self._params.meta, "validation_rate", 1)
-        self._compute_auc = getattr(self._params.meta, "compute_auc", False)
         self._epochs = getattr(self._params, "epochs", 2)
         self._iteration = 0
         if self._epochs < self._validation_rate:

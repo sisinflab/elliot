@@ -43,46 +43,31 @@ class EASER(RecMixin, BaseRecommenderModel):
         return f"EASER_{self.get_params_shortcut()}"
 
     def get_recommendations(self, k: int = 10):
-        data, rows_indices, cols_indptr = [], [], []
+        predictions_top_k_val = {}
+        predictions_top_k_test = {}
 
-        k = min(k, len(self._data.items))
+        recs_val, recs_test = self.process_protocol(k)
 
-        column_row_index = np.arange(len(self._data.items), dtype=np.int32)
+        predictions_top_k_val.update(recs_val)
+        predictions_top_k_test.update(recs_test)
 
-        for item_idx in range(len(self._data.items)):
-            cols_indptr.append(len(data))
-            column_data = self._similarity_matrix[:, item_idx]
+        return predictions_top_k_val, predictions_top_k_test
 
-            non_zero_data = column_data != 0
+    def get_single_recommendation(self, mask, k):
+        return {u: self.get_user_predictions(u, mask, k) for u in self._data.train_dict.keys()}
 
-            idx_sorted = np.argsort(column_data[non_zero_data])  # sort by column
-            top_k_idx = idx_sorted[-k:]
-
-            data.extend(column_data[non_zero_data][top_k_idx])
-            rows_indices.extend(column_row_index[non_zero_data][top_k_idx])
-
-        cols_indptr.append(len(data))
-
-        W_sparse = sparse.csc_matrix((data, rows_indices, cols_indptr),
-                                     shape=(len(self._data.items), len(self._data.items)), dtype=np.float32).tocsr()
-
-
-        # items_ratings_pair = [list(zip(map(self._data.private_items.get, u_list[0]), u_list[1]))
-        #                       for u_list in list(zip(i.numpy(), v.numpy()))]
-
-        return {u: self.get_user_predictions(u, W_sparse) for u in self._data.train_dict.keys()}
-
-    def get_user_predictions(self, user_id, W_sparse):
+    def get_user_predictions(self, user_id, mask, top_k=10):
         user_id = self._data.public_users.get(user_id)
-        b = self._train[user_id].dot(W_sparse)
-        a = self.get_train_mask(user_id, user_id+1)
-        b[a] = -np.inf
+        # b = self._train[user_id].dot(W_sparse)
+        b = self._preds[user_id]
+        a = mask[user_id:user_id+1]
+        b[~a] = -np.inf
         indices, values = zip(*[(self._data.private_items.get(u_list[0]), u_list[1])
                               for u_list in enumerate(b.data)])
 
         indices = np.array(indices)
         values = np.array(values)
-        local_k = min(self.evaluator.get_needed_recommendations(), len(values))
+        local_k = min(top_k, len(values))
         partially_ordered_preds_indices = np.argpartition(values, -local_k)[-local_k:]
         real_values = values[partially_ordered_preds_indices]
         real_indices = indices[partially_ordered_preds_indices]
@@ -115,8 +100,30 @@ class EASER(RecMixin, BaseRecommenderModel):
         print(f"The similarity computation has taken: {end - start}")
 
         best_metric_value = 0
+        data, rows_indices, cols_indptr = [], [], []
 
-        recs = self.get_recommendations(self._neighborhood)
+        column_row_index = np.arange(len(self._data.items), dtype=np.int32)
+
+        for item_idx in range(len(self._data.items)):
+            cols_indptr.append(len(data))
+            column_data = self._similarity_matrix[:, item_idx]
+
+            non_zero_data = column_data != 0
+
+            idx_sorted = np.argsort(column_data[non_zero_data])  # sort by column
+            top_k_idx = idx_sorted[-self._neighborhood:]
+
+            data.extend(column_data[non_zero_data][top_k_idx])
+            rows_indices.extend(column_row_index[non_zero_data][top_k_idx])
+
+        cols_indptr.append(len(data))
+
+        W_sparse = sparse.csc_matrix((data, rows_indices, cols_indptr),
+                                     shape=(len(self._data.items), len(self._data.items)), dtype=np.float32).tocsr()
+
+        self._preds = self._train.dot(W_sparse)
+
+        recs = self.get_recommendations(self.evaluator.get_needed_recommendations())
         result_dict = self.evaluator.eval(recs)
         self._results.append(result_dict)
         print(f'Finished')

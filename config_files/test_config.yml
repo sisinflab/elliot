@@ -7,6 +7,9 @@ experiment:
     test_splitting:
         strategy: random_subsampling
         test_ratio: 0.2
+  negative_sampling:
+    strategy: random
+    num_items: 99
   top_k: 10
   evaluation:
     cutoffs: 10
@@ -14,10 +17,26 @@ experiment:
 #  gpu: -1
   external_models_path: ../external/models/__init__.py
   models:
-#    external.MostPop:
-#      meta:
-#        verbose: True
-#        save_recs: False
+    MultiVAE:
+      meta:
+#        hyper_max_evals: 3
+#        hyper_opt_alg: tpe
+#        validation_rate: 10
+        verbose: True
+#        save_weights: True
+        save_recs: False
+        restore: False
+      lr: 0.002718457840118028
+      epochs: 10
+      intermediate_dim: 91
+      latent_dim: 100
+      batch_size: -1
+      dropout_pkeep: 1
+      reg_lambda: 0.01
+    external.MostPop:
+      meta:
+        verbose: True
+        save_recs: False
     external.EASER:
       meta:
         verbose: True

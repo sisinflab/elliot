@@ -17,6 +17,7 @@ import logging as pylog
 from elliot.dataset.abstract_dataset import AbstractDataset
 from elliot.splitter.base_splitter import Splitter
 from elliot.prefiltering.standard_prefilters import PreFilter
+from elliot.negative_sampling.negative_sampling import NegativeSampler
 from elliot.utils import logging
 
 
@@ -172,9 +173,24 @@ class DataSet(AbstractDataset):
 
         if len(data_tuple) == 2:
             self.test_dict = self.build_dict(data_tuple[1], self.users)
+            if hasattr(config, "negative_sampling"):
+                val_neg_samples, test_neg_samples = NegativeSampler.sample(config, self.public_users, self.public_items, self.sp_i_train, None, self.test_dict)
+                sp_i_test = self.to_bool_sparse(self.test_dict)
+                test_candidate_items = test_neg_samples + sp_i_test
+                self.test_mask = np.where((test_candidate_items.toarray() == True), True, False)
         else:
             self.val_dict = self.build_dict(data_tuple[1], self.users)
             self.test_dict = self.build_dict(data_tuple[2], self.users)
+            if hasattr(config, "negative_sampling"):
+                val_neg_samples, test_neg_samples = NegativeSampler.sample(config, self.public_users, self.public_items, self.sp_i_train, self.val_dict, self.test_dict)
+                sp_i_val = self.to_bool_sparse(self.val_dict)
+                sp_i_test = self.to_bool_sparse(self.test_dict)
+                val_candidate_items = val_neg_samples + sp_i_val
+                self.val_mask = np.where((val_candidate_items.toarray() == True), True, False)
+                test_candidate_items = test_neg_samples + sp_i_test
+                self.test_mask = np.where((test_candidate_items.toarray() == True), True, False)
+
+        self.allunrated_mask = np.where((self.sp_i_train.toarray() == 0), True, False)
 
     def dataframe_to_dict(self, data):
         users = list(data['userId'].unique())
@@ -224,3 +240,13 @@ class DataSet(AbstractDataset):
 
     def get_validation(self):
         return self.val_dict if hasattr(self, 'val_dict') else None
+
+    def to_bool_sparse(self, test_dict):
+        i_test = [(self.public_users[user], self.public_items[i])
+                  for user, items in test_dict.items() if user in self.public_users.keys()
+                  for i in items.keys() if i in self.public_items.keys()]
+        rows = [u for u, _ in i_test]
+        cols = [i for _, i in i_test]
+        i_test = sp.csr_matrix((np.ones_like(rows), (rows, cols)), dtype='bool',
+                               shape=(len(self.public_users.keys()), len(self.public_items.keys())))
+        return i_test

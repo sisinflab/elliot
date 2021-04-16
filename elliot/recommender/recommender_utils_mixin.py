@@ -38,16 +38,30 @@ class RecMixin(object):
                         store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}-it:{it + 1}.tsv")
 
     def get_recommendations(self, k: int = 100):
-        predictions_top_k = {}
+        predictions_top_k_test = {}
+        predictions_top_k_val = {}
         for index, offset in enumerate(range(0, self._num_users, self._batch_size)):
             offset_stop = min(offset + self._batch_size, self._num_users)
             predictions = self._model.predict(self._data.sp_i_train[offset:offset_stop].toarray())
-            v, i = self._model.get_top_k(predictions, self.get_train_mask(offset, offset_stop), k=k)
-            items_ratings_pair = [list(zip(map(self._data.private_items.get, u_list[0]), u_list[1]))
-                                  for u_list in list(zip(i.numpy(), v.numpy()))]
-            predictions_top_k.update(dict(zip(map(self._data.private_users.get,
-                                                  range(offset, offset_stop)), items_ratings_pair)))
-        return predictions_top_k
+            recs_val, recs_test = self.process_protocol(k, predictions, offset, offset_stop)
+            predictions_top_k_val.update(recs_val)
+            predictions_top_k_test.update(recs_test)
+
+        return predictions_top_k_val, predictions_top_k_test
+
+    def process_protocol(self, k, *args):
+
+        if not self._negative_sampling:
+            return {}, self.get_single_recommendation(self.get_candidate_mask(), k, *args)
+        else:
+            return self.get_single_recommendation(self.get_candidate_mask(validation=True), k, *args) if hasattr(self._data, "val_dict") else {}, \
+                   self.get_single_recommendation(self.get_candidate_mask(), k, *args)
+
+    def get_single_recommendation(self, mask, k, predictions, offset, offset_stop):
+        v, i = self._model.get_top_k(predictions, mask[offset: offset_stop], k=k)
+        items_ratings_pair = [list(zip(map(self._data.private_items.get, u_list[0]), u_list[1]))
+                              for u_list in list(zip(i.numpy(), v.numpy()))]
+        return dict(zip(map(self._data.private_users.get, range(offset, offset_stop)), items_ratings_pair))
 
     def restore_weights(self):
         try:
@@ -68,8 +82,14 @@ class RecMixin(object):
 
         return False
 
-    def get_train_mask(self, start, stop):
-        return np.where((self._data.sp_i_train[range(start, stop)].toarray() == 0), True, False)
+    def get_candidate_mask(self, validation=False):
+        if self._negative_sampling:
+            if validation:
+                return self._data.val_mask
+            else:
+                return self._data.test_mask
+        else:
+            return self._data.allunrated_mask
 
     def get_loss(self):
         return -max([r[self._validation_k]["val_results"][self._validation_metric] for r in self._results])

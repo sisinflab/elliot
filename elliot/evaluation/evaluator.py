@@ -93,10 +93,10 @@ class Evaluator(object):
 
     def eval_at_k(self, recommendations, k):
         result_list = []
-        for test_data, eval_objs in self._get_test_data():
+        for p, (test_data, eval_objs) in enumerate(self._get_test_data()):
             if eval_objs is not None:
                 eval_objs.cutoff = k
-            results, statistical_results = self._process_test_data(recommendations, test_data, eval_objs)
+            results, statistical_results = self._process_test_data(recommendations[p], test_data, eval_objs)
             result_list.append((results, statistical_results))
 
         if (not result_list[0][0]):
