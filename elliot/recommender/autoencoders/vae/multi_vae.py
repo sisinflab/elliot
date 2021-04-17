@@ -121,17 +121,20 @@ class MultiVAE(RecMixin, BaseRecommenderModel):
                     t.update()
                     self._update_count += 1
 
-            if not (it + 1) % self._validation_rate:
-                recs = self.get_recommendations(self.evaluator.get_needed_recommendations())
-                result_dict = self.evaluator.eval(recs)
-                self._results.append(result_dict)
+            # if not (it + 1) % self._validation_rate:
+            #     recs = self.get_recommendations(self.evaluator.get_needed_recommendations())
+            #     result_dict = self.evaluator.eval(recs)
+            #     self._results.append(result_dict)
+            #
+            #     print(f'Epoch {(it + 1)}/{self._epochs} loss {loss/steps:.5f}')
+            #
+            #     if self._results[-1][self._validation_k]["val_results"][self._validation_metric] > best_metric_value:
+            #         print("******************************************")
+            #         best_metric_value = self._results[-1][self._validation_k]["val_results"][self._validation_metric]
+            #         if self._save_weights:
+            #             self._model.save_weights(self._saving_filepath)
+            #         if self._save_recs:
+            #             store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}-it:{it + 1}.tsv")
 
-                print(f'Epoch {(it + 1)}/{self._epochs} loss {loss/steps:.5f}')
-
-                if self._results[-1][self._validation_k]["val_results"][self._validation_metric] > best_metric_value:
-                    print("******************************************")
-                    best_metric_value = self._results[-1][self._validation_k]["val_results"][self._validation_metric]
-                    if self._save_weights:
-                        self._model.save_weights(self._saving_filepath)
-                    if self._save_recs:
-                        store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}-it:{it + 1}.tsv")
+            self.losses.append(loss)
+            self.evaluate(it)

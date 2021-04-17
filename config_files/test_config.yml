@@ -26,6 +26,7 @@ experiment:
 #        save_weights: True
         save_recs: False
         restore: False
+        optimize_internal_loss: True
       lr: 0.002718457840118028
       epochs: 10
       intermediate_dim: 91
@@ -33,15 +34,16 @@ experiment:
       batch_size: -1
       dropout_pkeep: 1
       reg_lambda: 0.01
-    external.MostPop:
-      meta:
-        verbose: True
-        save_recs: False
-    external.EASER:
-      meta:
-        verbose: True
-        save_recs: False
-      l2_norm: 3e3
+#    external.MostPop:
+#      meta:
+#        verbose: True
+#        save_recs: True
+#        save_weights: True
+#    external.EASER:
+#      meta:
+#        verbose: True
+#        save_recs: False
+#      l2_norm: 3e3
 #    external.RP3beta:
 #      meta:
 #        verbose: True

@@ -53,12 +53,18 @@ class BaseRecommenderModel(ABC):
         self._save_recs = getattr(self._params.meta, "save_recs", False)
         self._verbose = getattr(self._params.meta, "verbose", None)
         self._validation_rate = getattr(self._params.meta, "validation_rate", 1)
+        self._optimize_internal_loss = getattr(self._params.meta, "optimize_internal_loss", False)
         self._epochs = getattr(self._params, "epochs", 2)
         self._iteration = 0
         if self._epochs < self._validation_rate:
             raise Exception(f"The first validation epoch ({self._validation_rate}) "
                             f"is later than the overall number of epochs ({self._epochs}).")
         self._batch_size = getattr(self._params, "batch_size", -1)
+
+
+        self.best_metric_value = 0
+
+        self.losses = []
         self._results = []
         self._params_list = []
 

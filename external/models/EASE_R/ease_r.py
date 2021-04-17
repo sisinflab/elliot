@@ -2,6 +2,7 @@
 Module description:
 
 """
+from types import SimpleNamespace
 
 __version__ = '0.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo'
@@ -78,6 +79,7 @@ class EASER(RecMixin, BaseRecommenderModel):
         if self._restore:
             return self.restore_weights()
 
+
         start = time.time()
 
         self._train = normalize(self._data.sp_i_train_ratings, norm='l2', axis=1)
@@ -99,7 +101,6 @@ class EASER(RecMixin, BaseRecommenderModel):
         end = time.time()
         print(f"The similarity computation has taken: {end - start}")
 
-        best_metric_value = 0
         data, rows_indices, cols_indptr = [], [], []
 
         column_row_index = np.arange(len(self._data.items), dtype=np.int32)
@@ -123,15 +124,17 @@ class EASER(RecMixin, BaseRecommenderModel):
 
         self._preds = self._train.dot(W_sparse)
 
-        recs = self.get_recommendations(self.evaluator.get_needed_recommendations())
-        result_dict = self.evaluator.eval(recs)
-        self._results.append(result_dict)
-        print(f'Finished')
+        # recs = self.get_recommendations(self.evaluator.get_needed_recommendations())
+        # result_dict = self.evaluator.eval(recs)
+        # self._results.append(result_dict)
+        # print(f'Finished')
+        #
+        # if self._results[-1][self._validation_k]["val_results"][self._validation_metric] > best_metric_value:
+        #     print("******************************************")
+        #     if self._save_weights:
+        #         with open(self._saving_filepath, "wb") as f:
+        #             pickle.dump(self._model.get_model_state(), f)
+        #     if self._save_recs:
+        #         store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}.tsv")
 
-        if self._results[-1][self._validation_k]["val_results"][self._validation_metric] > best_metric_value:
-            print("******************************************")
-            if self._save_weights:
-                with open(self._saving_filepath, "wb") as f:
-                    pickle.dump(self._model.get_model_state(), f)
-            if self._save_recs:
-                store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}.tsv")
+        self.evaluate()

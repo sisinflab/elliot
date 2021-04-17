@@ -10,8 +10,6 @@ class RecMixin(object):
         if self._restore:
             return self.restore_weights()
 
-        best_metric_value = 0
-
         for it in range(self._num_iters):
             loss = 0
             steps = 0
@@ -22,20 +20,35 @@ class RecMixin(object):
                     t.set_postfix({'loss': f'{loss.numpy()/steps:.5f}'})
                     t.update()
 
-            if not (it + 1) % self._validation_rate:
-                recs = self.get_recommendations(self.evaluator.get_needed_recommendations())
-                result_dict = self.evaluator.eval(recs)
-                self._results.append(result_dict)
+            self.evaluate(it)
 
-                print(f'Epoch {(it + 1)}/{self._epochs} loss {loss/steps:.5f}')
+    def evaluate(self, it = None, loss = 0):
+        if (it is None) or (not (it + 1) % self._validation_rate):
+            recs = self.get_recommendations(self.evaluator.get_needed_recommendations())
+            result_dict = self.evaluator.eval(recs)
 
-                if self._results[-1][self._validation_k]["val_results"][self._validation_metric] > best_metric_value:
-                    print("******************************************")
-                    best_metric_value = self._results[-1][self._validation_k]["val_results"][self._validation_metric]
-                    if self._save_weights:
+            self.losses.append(loss)
+
+            self._results.append(result_dict)
+
+            if it is not None:
+                self.logger.info(f'Epoch {(it + 1)}/{self._epochs} loss {loss/(it + 1):.5f}')
+            else:
+                self.logger.info(f'Finished')
+
+            if (len(self._results) - 1) == self.get_best_arg():
+                self.logger.info("******************************************")
+                self.best_metric_value = self._results[-1][self._validation_k]["val_results"][self._validation_metric]
+                if self._save_weights:
+                    if hasattr(self, "_model"):
                         self._model.save_weights(self._saving_filepath)
-                    if self._save_recs:
-                        store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}-it:{it + 1}.tsv")
+                    else:
+                        self.logger.warning("Saving weights FAILED. No model to save.")
+                if self._save_recs:
+                    if it is not None:
+                        store_recommendation(recs[1], self._config.path_output_rec_result + f"{self.name}-it:{it + 1}.tsv")
+                    else:
+                        store_recommendation(recs[1], self._config.path_output_rec_result + f"{self.name}.tsv")
 
     def get_recommendations(self, k: int = 100):
         predictions_top_k_test = {}
@@ -92,11 +105,20 @@ class RecMixin(object):
             return self._data.allunrated_mask
 
     def get_loss(self):
-        return -max([r[self._validation_k]["val_results"][self._validation_metric] for r in self._results])
+        if self._optimize_internal_loss:
+            return min(self.losses)
+        else:
+            return -max([r[self._validation_k]["val_results"][self._validation_metric] for r in self._results])
 
     def get_params(self):
         return self._params.__dict__
 
     def get_results(self):
-        val_max = np.argmax([r[self._validation_k]["val_results"][self._validation_metric] for r in self._results])
-        return self._results[val_max]
+        return self._results[self.get_best_arg()]
+
+    def get_best_arg(self):
+        if self._optimize_internal_loss:
+            val_results = np.argmin(self.losses)
+        else:
+            val_results = np.argmax([r[self._validation_k]["val_results"][self._validation_metric] for r in self._results])
+        return val_results
