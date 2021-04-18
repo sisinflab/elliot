@@ -116,8 +116,8 @@ class MultiVAE(RecMixin, BaseRecommenderModel):
                     else:
                         anneal = self._anneal_cap
 
-                    loss += self._model.train_step(batch, anneal)
-                    t.set_postfix({'loss': f'{loss.numpy()/steps:.5f}'})
+                    loss += self._model.train_step(batch, anneal).numpy()
+                    t.set_postfix({'loss': f'{loss/steps:.5f}'})
                     t.update()
                     self._update_count += 1
 
@@ -136,5 +136,5 @@ class MultiVAE(RecMixin, BaseRecommenderModel):
             #         if self._save_recs:
             #             store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}-it:{it + 1}.tsv")
 
-            self.losses.append(loss)
-            self.evaluate(it)
+            # self.losses.append(loss)
+            self.evaluate(it, loss)

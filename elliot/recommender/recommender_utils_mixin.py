@@ -16,11 +16,11 @@ class RecMixin(object):
             with tqdm(total=int(self._data.transactions // self._batch_size), disable=not self._verbose) as t:
                 for batch in self._sampler.step(self._data.transactions, self._batch_size):
                     steps += 1
-                    loss += self._model.train_step(batch)
-                    t.set_postfix({'loss': f'{loss.numpy()/steps:.5f}'})
+                    loss += self._model.train_step(batch).numpy()
+                    t.set_postfix({'loss': f'{loss/steps:.5f}'})
                     t.update()
 
-            self.evaluate(it)
+            self.evaluate(it, loss)
 
     def evaluate(self, it = None, loss = 0):
         if (it is None) or (not (it + 1) % self._validation_rate):
