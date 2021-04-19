@@ -78,6 +78,9 @@ class DataSetLoader:
 
             self.dataframe = PreFilter.filter(self.dataframe, self.config)
 
+            if config.binarize == True:
+                self.dataframe["rating"] = 1
+
             splitter = Splitter(self.dataframe, self.config.splitting)
             self.tuple_list = splitter.process_splitting()
 

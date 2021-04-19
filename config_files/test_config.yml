@@ -3,6 +3,12 @@ experiment:
   data_config:
     strategy: dataset
     dataset_path: ../data/movielens_1m/dataset.tsv
+  prefiltering:
+    - strategy: global_threshold
+      threshold: 4
+    - strategy: iterative_k_core
+      core: 10
+  binarize: True
   splitting:
     test_splitting:
         strategy: random_subsampling
@@ -17,6 +23,14 @@ experiment:
 #  gpu: -1
   external_models_path: ../external/models/__init__.py
   models:
+    Random:
+      meta:
+        save_recs: False
+    external.MostPop:
+      meta:
+        verbose: True
+        save_recs: False
+        save_weights: False
     MultiVAE:
       meta:
 #        hyper_max_evals: 3
@@ -34,11 +48,6 @@ experiment:
       batch_size: -1
       dropout_pkeep: 1
       reg_lambda: 0.01
-#    external.MostPop:
-#      meta:
-#        verbose: True
-#        save_recs: True
-#        save_weights: True
 #    external.EASER:
 #      meta:
 #        verbose: True

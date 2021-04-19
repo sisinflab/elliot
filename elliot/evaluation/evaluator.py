@@ -129,7 +129,8 @@ class Evaluator(object):
 
             str_results = {k: str(round(v, rounding_factor)) for k, v in results.items()}
             # res_print = "\t".join([":".join(e) for e in str_results.items()])
-            self.logger.info(f"\nCut-off: {eval_objs.cutoff}")
+            self.logger.info("")
+            self.logger.info(f"Cut-off: {eval_objs.cutoff}")
             self.logger.info(f"Eval Time: {time() - eval_start_time}")
             self.logger.info(f"Results")
             [self.logger.info("\t".join(e)) for e in str_results.items()]

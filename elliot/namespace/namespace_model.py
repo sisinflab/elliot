@@ -29,6 +29,7 @@ _data_config = "data_config"
 _splitting = "splitting"
 _evaluation = "evaluation"
 _prefiltering = "prefiltering"
+_binarize = "binarize"
 _negative_sampling = "negative_sampling"
 _dataset = 'dataset'
 _dataloader = 'dataloader'
@@ -100,7 +101,7 @@ class NameSpaceModel:
 
         for p in [_data_config, _weights, _recs, _dataset, _top_k, _performance, _logger_config,
                   _log_folder, _dataloader, _splitting, _prefiltering, _evaluation, _external_models_path,
-                  _print_triplets, _config_test, _negative_sampling]:
+                  _print_triplets, _config_test, _negative_sampling, _binarize]:
             if p == _data_config:
                 side_information = self.config[_experiment][p].get("side_information", {})
                 side_information.update({k: self._set_path(self._base_folder_path_config,
@@ -133,9 +134,12 @@ class NameSpaceModel:
 
                 setattr(self.base_namespace, p, SimpleNamespace(**self.config[_experiment][p]))
             elif p == _prefiltering and self.config[_experiment].get(p, {}):
-                preprocessing_strategy = SimpleNamespace(**self.config[_experiment][p])
-                self.config[_experiment][p] = preprocessing_strategy
+                preprocessing_strategies = [SimpleNamespace(**strategy) for strategy in self.config[_experiment][p]]
+                self.config[_experiment][p] = preprocessing_strategies
                 setattr(self.base_namespace, p, self.config[_experiment][p])
+                # preprocessing_strategy = SimpleNamespace(**self.config[_experiment][p])
+                # self.config[_experiment][p] = preprocessing_strategy
+                # setattr(self.base_namespace, p, self.config[_experiment][p])
             elif p == _negative_sampling and self.config[_experiment].get(p, {}):
                 negative_sampling_strategy = SimpleNamespace(**self.config[_experiment][p])
                 self.config[_experiment][p] = negative_sampling_strategy
@@ -160,6 +164,8 @@ class NameSpaceModel:
                 self.config[_experiment][p] = self._set_path(self._base_folder_path_config, self.config[_experiment][p])
                 setattr(self.base_namespace, p, self.config[_experiment][p])
             elif p == _config_test:
+                setattr(self.base_namespace, p, self.config[_experiment].get(p, False))
+            elif p == _binarize:
                 setattr(self.base_namespace, p, self.config[_experiment].get(p, False))
             else:
                 if self.config[_experiment].get(p):

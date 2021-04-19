@@ -64,7 +64,7 @@ class BaseRecommenderModel(ABC):
 
         self.best_metric_value = 0
 
-        self.losses = []
+        self._losses = []
         self._results = []
         self._params_list = []
 

@@ -27,7 +27,7 @@ class RecMixin(object):
             recs = self.get_recommendations(self.evaluator.get_needed_recommendations())
             result_dict = self.evaluator.eval(recs)
 
-            self.losses.append(loss)
+            self._losses.append(loss)
 
             self._results.append(result_dict)
 
@@ -106,7 +106,7 @@ class RecMixin(object):
 
     def get_loss(self):
         if self._optimize_internal_loss:
-            return min(self.losses)
+            return min(self._losses)
         else:
             return -max([r[self._validation_k]["val_results"][self._validation_metric] for r in self._results])
 
@@ -118,7 +118,7 @@ class RecMixin(object):
 
     def get_best_arg(self):
         if self._optimize_internal_loss:
-            val_results = np.argmin(self.losses)
+            val_results = np.argmin(self._losses)
         else:
             val_results = np.argmax([r[self._validation_k]["val_results"][self._validation_metric] for r in self._results])
         return val_results
