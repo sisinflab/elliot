@@ -134,12 +134,14 @@ class NameSpaceModel:
 
                 setattr(self.base_namespace, p, SimpleNamespace(**self.config[_experiment][p]))
             elif p == _prefiltering and self.config[_experiment].get(p, {}):
+
+                if not isinstance(self.config[_experiment][p], list):
+                    self.config[_experiment][p] = [self.config[_experiment][p]]
+
                 preprocessing_strategies = [SimpleNamespace(**strategy) for strategy in self.config[_experiment][p]]
                 self.config[_experiment][p] = preprocessing_strategies
                 setattr(self.base_namespace, p, self.config[_experiment][p])
-                # preprocessing_strategy = SimpleNamespace(**self.config[_experiment][p])
-                # self.config[_experiment][p] = preprocessing_strategy
-                # setattr(self.base_namespace, p, self.config[_experiment][p])
+
             elif p == _negative_sampling and self.config[_experiment].get(p, {}):
                 negative_sampling_strategy = SimpleNamespace(**self.config[_experiment][p])
                 self.config[_experiment][p] = negative_sampling_strategy
