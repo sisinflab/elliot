@@ -146,7 +146,7 @@ class RP3beta(RecMixin, BaseRecommenderModel):
                     numCells += 1
 
         self._similarity_matrix = sparse.csr_matrix((values[:numCells], (rows[:numCells], cols[:numCells])),
-                                       shape=(self.Pui.shape[1], self.Pui.shape[1]))
+                                                    shape=(self.Pui.shape[1], self.Pui.shape[1]))
 
         if self._normalize_similarity:
             self._similarity_matrix = normalize(self._similarity_matrix, norm='l1', axis=1)
