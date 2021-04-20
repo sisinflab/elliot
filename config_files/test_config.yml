@@ -48,26 +48,24 @@ experiment:
 #      batch_size: -1
 #      dropout_pkeep: 1
 #      reg_lambda: 0.01
-    external.RendleMF:
-      meta:
-        verbose: True
-        save_recs: False
-      epochs: 10
-      factors: 10
-      lr: 0.001
-      reg: 0.0025
+#    external.RendleMF:
+#      meta:
+#        verbose: True
+#        save_recs: False
+#      epochs: 10
+#      factors: 10
+#      lr: 0.01
+#      reg: 0.0025
 #    external.EASER:
 #      meta:
 #        verbose: True
 #        save_recs: False
 #      l2_norm: 3e3
-#    external.RP3beta:
-#      meta:
-#        verbose: True
-#        save_recs: False
-#      neighborhood: 100
-#      alpha: 1
-#      beta: 0.6
-#      min_rating: 3
-#      implicit: False
-#      normalize_similarity: True
+    external.RP3beta:
+      meta:
+        verbose: True
+        save_recs: False
+      neighborhood: 100
+      alpha: 1
+      beta: 0.6
+      normalize_similarity: True

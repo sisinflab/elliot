@@ -60,11 +60,11 @@ class RP3beta(RecMixin, BaseRecommenderModel):
 
     def get_user_predictions(self, user_id, mask, top_k=10):
         user_id = self._data.public_users.get(user_id)
-        user_recs = self._preds[user_id]
-        user_recs_mask = mask[user_id:user_id+1]
+        user_recs = self._preds[user_id].toarray()[0]
+        user_recs_mask = mask[user_id]
         user_recs[~user_recs_mask] = -np.inf
         indices, values = zip(*[(self._data.private_items.get(u_list[0]), u_list[1])
-                              for u_list in enumerate(user_recs.data)])
+                              for u_list in enumerate(user_recs)])
 
         indices = np.array(indices)
         values = np.array(values)
@@ -79,7 +79,7 @@ class RP3beta(RecMixin, BaseRecommenderModel):
         if self._restore:
             return self.restore_weights()
 
-        self._train = self._data.sp_i_train_ratings
+        self._train = self._data.sp_i_train_ratings.copy()
         self.Pui = normalize(self._train, norm='l1', axis=1)
 
         X_bool = self._train.transpose(copy=True)
