@@ -2,24 +2,21 @@
 Module description:
 
 """
-from types import SimpleNamespace
 
 __version__ = '0.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
-import numpy as np
-import pickle
 import time
+
+import numpy as np
 import scipy.sparse as sparse
 from sklearn.metrics.pairwise import cosine_similarity
-from elliot.recommender.recommender_utils_mixin import RecMixin
-from elliot.utils.write import store_recommendation
 from sklearn.preprocessing import normalize
+
 from elliot.recommender.base_recommender_model import BaseRecommenderModel
-from elliot.recommender.NN.item_knn.item_knn_similarity import Similarity
-from elliot.recommender.NN.item_knn.aiolli_ferrari import AiolliSimilarity
 from elliot.recommender.base_recommender_model import init_charger
+from elliot.recommender.recommender_utils_mixin import RecMixin
 
 np.random.seed(42)
 
@@ -59,7 +56,6 @@ class EASER(RecMixin, BaseRecommenderModel):
 
     def get_user_predictions(self, user_id, mask, top_k=10):
         user_id = self._data.public_users.get(user_id)
-        # b = self._train[user_id].dot(W_sparse)
         b = self._preds[user_id]
         a = mask[user_id:user_id+1]
         b[~a] = -np.inf
