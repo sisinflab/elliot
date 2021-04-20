@@ -23,31 +23,39 @@ experiment:
 #  gpu: -1
   external_models_path: ../external/models/__init__.py
   models:
-    Random:
-      meta:
-        save_recs: False
-    external.MostPop:
+#    Random:
+#      meta:
+#        save_recs: False
+#    external.MostPop:
+#      meta:
+#        verbose: True
+#        save_recs: False
+#        save_weights: False
+#    MultiVAE:
+#      meta:
+##        hyper_max_evals: 3
+##        hyper_opt_alg: tpe
+##        validation_rate: 10
+#        verbose: True
+##        save_weights: True
+#        save_recs: False
+#        restore: False
+#        optimize_internal_loss: True
+#      lr: 0.002718457840118028
+#      epochs: 10
+#      intermediate_dim: 91
+#      latent_dim: 100
+#      batch_size: -1
+#      dropout_pkeep: 1
+#      reg_lambda: 0.01
+    external.RendleMF:
       meta:
         verbose: True
         save_recs: False
-        save_weights: False
-    MultiVAE:
-      meta:
-#        hyper_max_evals: 3
-#        hyper_opt_alg: tpe
-#        validation_rate: 10
-        verbose: True
-#        save_weights: True
-        save_recs: False
-        restore: False
-        optimize_internal_loss: True
-      lr: 0.002718457840118028
       epochs: 10
-      intermediate_dim: 91
-      latent_dim: 100
-      batch_size: -1
-      dropout_pkeep: 1
-      reg_lambda: 0.01
+      factors: 10
+      lr: 0.001
+      reg: 0.0025
 #    external.EASER:
 #      meta:
 #        verbose: True
