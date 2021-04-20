@@ -151,7 +151,34 @@ class RP3beta(RecMixin, BaseRecommenderModel):
         if self._normalize_similarity:
             self._similarity_matrix = normalize(self._similarity_matrix, norm='l1', axis=1)
 
-        self._preds = self._train.dot(self._similarity_matrix)
+        self._similarity_matrix = self._similarity_matrix.tocsc()
+
+        data, rows_indices, cols_indptr = [], [], []
+
+        for item_idx in range(len(self._data.items)):
+            cols_indptr.append(len(data))
+
+            start_position = self._similarity_matrix.indptr[item_idx]
+            end_position = self._similarity_matrix.indptr[item_idx + 1]
+
+            column_data = self._similarity_matrix.data[start_position:end_position]
+            column_row_index = self._similarity_matrix.indices[start_position:end_position]
+
+
+            non_zero_data = column_data != 0
+
+            idx_sorted = np.argsort(column_data[non_zero_data])  # sort by column
+            top_k_idx = idx_sorted[-self._neighborhood:]
+
+            data.extend(column_data[non_zero_data][top_k_idx])
+            rows_indices.extend(column_row_index[non_zero_data][top_k_idx])
+
+        cols_indptr.append(len(data))
+
+        W_sparse = sparse.csc_matrix((data, rows_indices, cols_indptr),
+                                     shape=(len(self._data.items), len(self._data.items)), dtype=np.float32).tocsr()
+
+        self._preds = self._train.dot(W_sparse)
 
         end = time.time()
         print(f"The similarity computation has taken: {end - start}")
