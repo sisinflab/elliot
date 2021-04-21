@@ -21,7 +21,8 @@ class iALSModel(object):
 
         self._data = data
         self.random = random
-        self.C = 1.0 + alpha * self._data.sp_i_train
+        self.C = self._data.sp_i_train
+        self.C.data = 1.0 + alpha * self.C.data
         self.train_dict = self._data.train_dict
         self.user_num, self.item_num = self._data.num_users, self._data.num_items
 
@@ -39,10 +40,21 @@ class iALSModel(object):
         yTy = self.Y.T.dot(self.Y)
         xTx = self.X.T.dot(self.X)
         for u in range(self.user_num):
+
+            # Cu = self.C[u, :].toarray()
+            # Pu = Cu.copy()
+            # Pu[Pu != 0] = 1
+            # CuI = sp.diags(Cu, [0])
+            # CuI.data = CuI.data - 1
+            # A = self.Y.T.dot(CuI).dot(self.Y)
+            # B = yTy + A + self.lambda_eye
+            # self.X[u] = np.dot(np.linalg.inv(B.toarray()), self.Y.T.dot(CuI))
+
             Cu = self.C[u, :].toarray()
             Pu = Cu.copy()
             Pu[Pu != 0] = 1
             CuI = sp.diags(Cu, [0])
+            CuI.data = CuI.data - 1
             yTCuIY = self.Y.T.dot(CuI).dot(self.Y)
             yTCuPu = self.Y.T.dot(CuI + self.Y_eye).dot(Pu.T)
             self.X[u] = spsolve(yTy + yTCuIY + self.lambda_eye, yTCuPu)
@@ -51,6 +63,7 @@ class iALSModel(object):
             Pi = Ci.copy()
             Pi[Pi != 0] = 1
             CiI = sp.diags(Ci, [0])
+            CiI.data = CiI.data - 1
             xTCiIX = self.X.T.dot(CiI).dot(self.X)
             xTCiPi = self.X.T.dot(CiI + self.X_eye).dot(Pi.T)
             self.Y[i] = spsolve(xTx + xTCiIX + self.lambda_eye, xTCiPi)

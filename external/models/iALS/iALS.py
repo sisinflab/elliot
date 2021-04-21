@@ -60,7 +60,7 @@ class iALS(RecMixin, BaseRecommenderModel):
         self._ratings = self._data.train_dict
         self._sp_i_train = self._data.sp_i_train
 
-        self._model = iALSModel(self._factors, self._data, self._random, self._alpha, self.__epsilon, self._reg)
+        self._model = iALSModel(self._factors, self._data, self._random, self._alpha, self._epsilon, self._reg)
 
     def get_recommendations(self, k: int = 100):
         return {u: self._model.get_user_recs(u, k) for u in self._ratings.keys()}

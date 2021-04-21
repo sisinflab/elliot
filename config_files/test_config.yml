@@ -61,11 +61,19 @@ experiment:
 #        verbose: True
 #        save_recs: False
 #      l2_norm: 3e3
-    external.RP3beta:
+#    external.RP3beta:
+#      meta:
+#        verbose: True
+#        save_recs: False
+#      neighborhood: 100
+#      alpha: 1
+#      beta: 0.6
+#      normalize_similarity: True
+    external.iALS:
       meta:
         verbose: True
         save_recs: False
-      neighborhood: 100
-      alpha: 1
-      beta: 0.6
-      normalize_similarity: True
+      _factors: 100
+      alpha: 0.5
+      _epsilon: 0.6
+      reg: 0.2
