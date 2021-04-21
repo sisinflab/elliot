@@ -79,14 +79,14 @@ class iALS(RecMixin, BaseRecommenderModel):
     def get_single_recommendation(self, mask, k, *args):
         return {u: self._model.get_user_recs(u, mask, k) for u in self._data.train_dict.keys()}
 
-    def predict(self, u: int, i: int):
-        """
-        Get prediction on the user item pair.
-
-        Returns:
-            A single float vaue.
-        """
-        return self._model.predict(u, i)
+    # def predict(self, u: int, i: int):
+    #     """
+    #     Get prediction on the user item pair.
+    #
+    #     Returns:
+    #         A single float vaue.
+    #     """
+    #     return self._model.predict(u, i)
 
     @property
     def name(self):
@@ -104,21 +104,23 @@ class iALS(RecMixin, BaseRecommenderModel):
 
             print("Iteration Finished")
 
-            if not (it + 1) % self._validation_rate:
-                recs = self.get_recommendations(self.evaluator.get_needed_recommendations())
-                result_dict = self.evaluator.eval(recs)
-                self._results.append(result_dict)
+            self.evaluate(it)
 
-                print(f'Epoch {(it + 1)}/{self._epochs}')
-
-                if self._results[-1][self._validation_k]["val_results"][self._validation_metric] > best_metric_value:
-                    print("******************************************")
-                    best_metric_value = self._results[-1][self._validation_k]["val_results"][self._validation_metric]
-                    if self._save_weights:
-                        with open(self._saving_filepath, "wb") as f:
-                            pickle.dump(self._model.get_model_state(), f)
-                    if self._save_recs:
-                        store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}-it:{it + 1}.tsv")
+            # if not (it + 1) % self._validation_rate:
+            #     recs = self.get_recommendations(self.evaluator.get_needed_recommendations())
+            #     result_dict = self.evaluator.eval(recs)
+            #     self._results.append(result_dict)
+            #
+            #     print(f'Epoch {(it + 1)}/{self._epochs}')
+            #
+            #     if self._results[-1][self._validation_k]["val_results"][self._validation_metric] > best_metric_value:
+            #         print("******************************************")
+            #         best_metric_value = self._results[-1][self._validation_k]["val_results"][self._validation_metric]
+            #         if self._save_weights:
+            #             with open(self._saving_filepath, "wb") as f:
+            #                 pickle.dump(self._model.get_model_state(), f)
+            #         if self._save_recs:
+            #             store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}-it:{it + 1}.tsv")
 
     def restore_weights(self):
         try:

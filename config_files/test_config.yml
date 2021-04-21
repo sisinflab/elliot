@@ -73,7 +73,7 @@ experiment:
       meta:
         verbose: True
         save_recs: False
-      _factors: 100
+      factors: 100
       alpha: 0.5
-      _epsilon: 0.6
+      epsilon: 0.6
       reg: 0.2
