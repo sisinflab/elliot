@@ -66,6 +66,8 @@ class iALS(RecMixin, BaseRecommenderModel):
     #     return {u: self._model.get_user_recs(u, k) for u in self._ratings.keys()}
 
     def get_recommendations(self, k: int = 10):
+        self._model.prepare_predictions()
+
         predictions_top_k_val = {}
         predictions_top_k_test = {}
 
