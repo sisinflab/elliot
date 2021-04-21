@@ -73,9 +73,10 @@ class iALSModel(object):
     def predict(self, user, item):
         return self.pred_mat[self._data.public_users[user], self._data.public_items[item]]
 
-    def get_user_recs(self, user, k=100):
-        user_items = self._data.train_dict[user].keys()
-        predictions = {i: self.predict(user, i) for i in self._data.items if i not in user_items}
+    def get_user_recs(self, user, mask, k=100):
+        user_mask = mask[self._data.public_users[user]].toarray()[0]
+        predictions = {i: self.predict(user, i) for i in self._data.items if user_mask[self._data.public_items[i]]}
+
         indices, values = zip(*predictions.items())
         indices = np.array(indices)
         values = np.array(values)
