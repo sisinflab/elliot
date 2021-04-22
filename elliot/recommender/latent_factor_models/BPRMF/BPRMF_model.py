@@ -123,12 +123,9 @@ class MFModel(object):
 
     def train_step(self, batch, **kwargs):
         for u, i, j in zip(*batch):
-            self.update_factors(u, i, j)
+            self.update_factors(u[0], i[0], j[0])
 
-    def update_factors(self, u: int, i: int, j: int):
-        ui = self._public_users[u]
-        ii = self._public_items[i]
-        ji = self._public_items[j]
+    def update_factors(self, ui: int, ii: int, ji: int):
         user_factors = self._user_factors[ui]
         item_factors_i = self._item_factors[ii]
         item_factors_j = self._item_factors[ji]
@@ -153,12 +150,12 @@ class MFModel(object):
 
         # update item i factors
         d_i = (user_factors*z - self._positive_item_regularization*item_factors_i)
-        self._item_bias[ii] = item_factors_i + (self._learning_rate * d_i)
+        self._item_factors[ii] = item_factors_i + (self._learning_rate * d_i)
         # self.set_item_factors(i, item_factors_i + (self._learning_rate * d_i))
 
         # update item j factors
         d_j = (-user_factors*z - self._negative_item_regularization*item_factors_j)
-        self._item_bias[ji] = item_factors_j + (self._learning_rate * d_j)
+        self._item_factors[ji] = item_factors_j + (self._learning_rate * d_j)
         # self.set_item_factors(j, item_factors_j + (self._learning_rate * d_j))
 
     def get_model_state(self):
