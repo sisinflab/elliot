@@ -15,7 +15,7 @@ import time
 
 import numpy as np
 
-from elliot.dataset.samplers import pairwise_sampler as ps
+from elliot.dataset.samplers import custom_sampler as cs
 from elliot.recommender.base_recommender_model import BaseRecommenderModel
 from elliot.recommender.base_recommender_model import init_charger
 from elliot.recommender.recommender_utils_mixin import RecMixin
@@ -86,6 +86,7 @@ class BPRMF(RecMixin, BaseRecommenderModel):
         ]
         self.autoset_params()
 
+        self._batch_size = 1
         self._ratings = self._data.train_dict
 
         self._model = MFModel(self._factors,
@@ -94,9 +95,8 @@ class BPRMF(RecMixin, BaseRecommenderModel):
                               self._user_regularization,
                               self._bias_regularization,
                               self._positive_item_regularization,
-                              self._negative_item_regularization,
-                              self._ratings, self._random)
-        self._sampler = ps.Sampler(self._ratings, self._data.users, self._data.items)
+                              self._negative_item_regularization)
+        self._sampler = cs.Sampler(self._data.i_train_dict)
 
     # def get_recommendations(self, k: int = 100):
     #     return {u: self._model.get_user_recs(u, k) for u in self._ratings.keys()}
@@ -158,8 +158,7 @@ class BPRMF(RecMixin, BaseRecommenderModel):
             with tqdm(total=int(self._data.transactions // self._batch_size), disable=not self._verbose) as t:
                 for batch in self._sampler.step(self._data.transactions, self._batch_size):
                     steps += 1
-                    loss += self._model.train_step(batch)
-                    t.set_postfix({'loss': f'{loss/steps:.5f}'})
+                    self._model.train_step(batch)
                     t.update()
 
             self.evaluate(it)
