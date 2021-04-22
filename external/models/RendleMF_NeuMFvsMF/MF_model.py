@@ -76,7 +76,7 @@ class MFModel(object):
 
     def train_step(self, batch, **kwargs):
         sum_of_loss = 0
-        for u, i, r in zip(*batch):
+        for u, i, r in batch:
             loss = self.update_factors(u, i, r)
             sum_of_loss += loss
 

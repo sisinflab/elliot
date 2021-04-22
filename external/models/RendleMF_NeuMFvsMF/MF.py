@@ -13,7 +13,7 @@ from tqdm import tqdm
 
 import numpy as np
 
-from elliot.dataset.samplers import pointwise_pos_neg_sampler as ps
+from . import custom_sampler as ps
 from elliot.recommender.base_recommender_model import BaseRecommenderModel
 from elliot.recommender.base_recommender_model import init_charger
 from elliot.recommender.recommender_utils_mixin import RecMixin
@@ -64,12 +64,13 @@ class MF(RecMixin, BaseRecommenderModel):
         self._params_list = [
             ("_factors", "factors", "f", 10, int, None),
             ("_learning_rate", "lr", "lr", 0.05, None, None),
-            ("_regularization", "reg", "reg", 0, None, None)
+            ("_regularization", "reg", "reg", 0, None, None),
+            ("_m", "m", "m", 0, None, None)
         ]
         self.autoset_params()
 
         self._ratings = self._data.train_dict
-        self._sampler = ps.Sampler(self._data.i_train_dict)
+        self._sampler = ps.Sampler(self._data.i_train_dict, self._m)
 
         self._batch_size = 1
 
@@ -117,8 +118,8 @@ class MF(RecMixin, BaseRecommenderModel):
             print(f"\n********** Iteration: {it + 1}")
             loss = 0
             steps = 0
-            with tqdm(total=int(self._data.transactions // self._batch_size), disable=not self._verbose) as t:
-                for batch in self._sampler.step(self._data.transactions, self._batch_size):
+            with tqdm(total=int(self._data.num_users * (self._m + 1) // self._batch_size), disable=not self._verbose) as t:
+                for batch in self._sampler.step():
                     steps += 1
                     loss += self._model.train_step(batch)
                     t.set_postfix({'loss': f'{loss/steps:.5f}'})
