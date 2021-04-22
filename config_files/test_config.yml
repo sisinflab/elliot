@@ -1,8 +1,9 @@
 experiment:
-  dataset: movielens_1m
+  dataset: ncf_ml1m
   data_config:
-    strategy: dataset
-    dataset_path: ../data/movielens_1m/dataset.tsv
+    strategy: fixed
+    train_path: ../data/{0}/ml-1m.train.rating
+    test_path: ../data/{0}/ml-1m.test.rating
   prefiltering:
     - strategy: global_threshold
       threshold: 4
@@ -14,8 +15,8 @@ experiment:
         strategy: random_subsampling
         test_ratio: 0.2
   negative_sampling:
-    strategy: random
-    num_items: 99
+    strategy: fixed
+    files: ["/home/cheggynho/PycharmProjects/elliot/data/ncf_ml1m/ml-1m.test.negative"]
   top_k: 10
   evaluation:
     cutoffs: 10
@@ -73,7 +74,7 @@ experiment:
       meta:
         verbose: True
         save_recs: False
-      factors: 100
-      alpha: 0.5
-      epsilon: 0.6
-      reg: 0.2
+      factors: 20
+      alpha: 1
+      epsilon: 1
+      reg: 0.001
