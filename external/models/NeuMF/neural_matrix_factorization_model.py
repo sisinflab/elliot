@@ -92,7 +92,7 @@ class NeuralMatrixFactorizationModel(keras.Model):
             raise RuntimeError('mf_train and mlp_train can not be False at the same time')
         return output
 
-    @tf.function
+    # @tf.function
     def train_step(self, batch):
         user, pos, label = batch
         with tf.GradientTape() as tape:

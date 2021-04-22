@@ -65,7 +65,7 @@ class MF(RecMixin, BaseRecommenderModel):
             ("_factors", "factors", "f", 10, int, None),
             ("_learning_rate", "lr", "lr", 0.05, None, None),
             ("_regularization", "reg", "reg", 0, None, None),
-            ("_m", "m", "m", 0, None, None)
+            ("_m", "m", "m", 0, int, None)
         ]
         self.autoset_params()
 
