@@ -109,9 +109,11 @@ class Similarity(object):
     def get_transactions(self):
         return self._transactions
 
-    def get_user_recs(self, u, k):
+    def get_user_recs(self, u, mask, k):
         user_items = self._ratings[u].keys()
-        predictions = {i: self.score_item(self.get_item_neighbors(i), user_items) for i in self._data.items if i not in user_items}
+        user_mask = mask[self._data.public_users[u]]
+        predictions = {i: self.score_item(self.get_item_neighbors(i), user_items) for i in self._data.items if
+                       user_mask[self._data.public_items[i]]}
         indices, values = zip(*predictions.items())
         indices = np.array(indices)
         values = np.array(values)

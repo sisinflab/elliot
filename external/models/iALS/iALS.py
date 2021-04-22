@@ -53,14 +53,16 @@ class iALS(RecMixin, BaseRecommenderModel):
             ("_factors", "factors", "factors", 10, int, None),
             ("_alpha", "alpha", "alpha", 1, float, None),
             ("_epsilon", "epsilon", "epsilon", 1, float, None),
-            ("_reg", "reg", "reg", 0.1, float, None)
+            ("_reg", "reg", "reg", 0.1, float, None),
+            ("_scaling", "scaling", "scaling", "linear", None, None)
         ]
         self.autoset_params()
 
         self._ratings = self._data.train_dict
         self._sp_i_train = self._data.sp_i_train
 
-        self._model = iALSModel(self._factors, self._data, self._random, self._alpha, self._epsilon, self._reg)
+        self._model = iALSModel(self._factors, self._data, self._random, self._alpha, self._epsilon, self._reg,
+                                self._scaling)
 
     # def get_recommendations(self, k: int = 100):
     #     return {u: self._model.get_user_recs(u, k) for u in self._ratings.keys()}

@@ -56,9 +56,9 @@ class FM(RecMixin, BaseRecommenderModel):
         self._random = np.random
 
         self._params_list = [
-            ("_factors", "factors", "factors", 10, None, None),
-            ("_learning_rate", "lr", "lr", 0.001, None, None),
-            ("_l_w", "reg", "reg", 0.1, None, None),
+            ("_factors", "factors", "factors", 10, int, None),
+            ("_learning_rate", "lr", "lr", 0.001, float, None),
+            ("_l_w", "reg", "reg", 0.1, float, None),
             ("_simplify", "mf_simplification", "mf", False, None, None)
         ]
         self.autoset_params()

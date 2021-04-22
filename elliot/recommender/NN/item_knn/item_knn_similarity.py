@@ -110,7 +110,8 @@ class Similarity(object):
     def get_user_recs(self, u, mask, k):
         user_items = self._ratings[u].keys()
         user_mask = mask[self._data.public_users[u]]
-        predictions = {i: self.score_item(self.get_item_neighbors(i), user_items) for i in self._data.items if user_mask[self._data.public_items[i]]}
+        predictions = {i: self.score_item(self.get_item_neighbors(i), user_items) for i in self._data.items if
+                       user_mask[self._data.public_items[i]]}
 
         indices, values = zip(*predictions.items())
         indices = np.array(indices)

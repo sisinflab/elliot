@@ -17,12 +17,15 @@ class iALSModel(object):
     Simple Matrix Factorization class
     """
 
-    def __init__(self, factors, data, random, alpha, epsilon, reg):
+    def __init__(self, factors, data, random, alpha, epsilon, reg, scaling):
 
         self._data = data
         self.random = random
         self.C = self._data.sp_i_train
-        self.C.data = 1.0 + alpha * self.C.data
+        if scaling == "linear":
+            self.C.data = 1.0 + alpha * self.C.data
+        elif scaling == "log":
+            self.C.data = 1.0 + alpha * np.log(1.0 + self.C.data / epsilon)
         self.C_csc = self.C.tocsc()
         self.train_dict = self._data.train_dict
         self.user_num, self.item_num = self._data.num_users, self._data.num_items
