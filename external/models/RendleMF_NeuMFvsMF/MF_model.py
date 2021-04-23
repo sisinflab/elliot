@@ -83,8 +83,8 @@ class MFModel(object):
         return sum_of_loss
 
     def update_factors(self, user: int, item: int, rating: float):
-        uf_ = self._user_factors[user, :]
-        if_ = self._item_factors[item, :]
+        uf_ = self._user_factors[user]
+        if_ = self._item_factors[item]
         ub_ = self._user_bias[user]
         ib_ = self._item_bias[item]
         gb_ = self._global_bias
@@ -107,8 +107,8 @@ class MFModel(object):
 
         grad = rating - sigmoid
 
-        self._user_factors[user, :] += lr * (grad * if_ - reg * uf_)
-        self._item_factors[item, :] += lr * (grad * uf_ - reg * if_)
+        self._user_factors[user] += lr * (grad * if_ - reg * uf_)
+        self._item_factors[item] += lr * (grad * uf_ - reg * if_)
         self._user_bias[user] += lr * (grad - reg * ub_)
         self._item_bias[item] += lr * (grad - reg * ib_)
         self._global_bias += lr * (grad - reg * gb_)
