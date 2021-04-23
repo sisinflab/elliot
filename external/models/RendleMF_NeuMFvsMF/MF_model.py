@@ -83,7 +83,17 @@ class MFModel(object):
         return sum_of_loss
 
     def update_factors(self, user: int, item: int, rating: float):
-        prediction = self.indexed_predict(user, item)
+        uf_ = self._user_factors[user, :]
+        if_ = self._item_factors[item, :]
+        ub_ = self._user_bias[user]
+        ib_ = self._item_bias[item]
+        gb_ = self._global_bias
+        lr = self._lr
+        reg = self._reg
+
+
+        # prediction = gb_ + ub_ + ib_ + np.dot(uf_,if_)
+        prediction = gb_ + ub_ + ib_ + uf_ @ if_
 
         if prediction > 0:
             one_plus_exp_minus_pred = 1.0 + np.exp(-prediction)
@@ -97,11 +107,11 @@ class MFModel(object):
 
         grad = rating - sigmoid
 
-        self._user_factors[user, :] += self._lr * (grad * self._item_factors[item, :] - self._reg * self._user_factors[user, :])
-        self._item_factors[item, :] += self._lr * (grad * self._user_factors[user, :] - self._reg * self._item_factors[item, :])
-        self._user_bias[user] += self._lr * (grad - self._reg * self._user_bias[user])
-        self._item_bias[item] += self._lr * (grad - self._reg * self._item_bias[item])
-        self._global_bias += self._lr * (grad - self._reg * self._global_bias)
+        self._user_factors[user, :] += lr * (grad * if_ - reg * uf_)
+        self._item_factors[item, :] += lr * (grad * uf_ - reg * if_)
+        self._user_bias[user] += lr * (grad - reg * ub_)
+        self._item_bias[item] += lr * (grad - reg * ib_)
+        self._global_bias += lr * (grad - reg * gb_)
 
         return this_loss
 

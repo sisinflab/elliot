@@ -70,22 +70,22 @@ experiment:
 #      alpha: 1
 #      beta: 0.6
 #      normalize_similarity: True
-    external.NeuMF: #from the original paper + Rendle
-      meta:
-        hyper_max_evals: 20
-        hyper_opt_alg: tpe
-        verbose: True
-        save_recs: True
-        validation_rate: 1
-        # optimize_internal_loss: True
-      mf_factors:  [8, 16, 32, 64, 128, 256]
-      dropout: 0
-      is_mf_train: True
-      is_mlp_train: True
-      batch_size: [128, 256, 512, 1024]
-      epochs: 50
-      lr: [0.0001, 0.0005, 0.001, 0.005]
-      m: 4
+#    external.NeuMF: #from the original paper + Rendle
+#      meta:
+#        hyper_max_evals: 20
+#        hyper_opt_alg: tpe
+#        verbose: True
+#        save_recs: True
+#        validation_rate: 1
+#        # optimize_internal_loss: True
+#      mf_factors:  [8, 16, 32, 64, 128, 256]
+#      dropout: 0
+#      is_mf_train: True
+#      is_mlp_train: True
+#      batch_size: [128, 256, 512, 1024]
+#      epochs: 50
+#      lr: [0.0001, 0.0005, 0.001, 0.005]
+#      m: 4
     external.RendleMF: # from original paper
       meta:
         hyper_max_evals: 20
