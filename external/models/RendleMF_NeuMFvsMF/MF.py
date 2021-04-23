@@ -70,7 +70,7 @@ class MF(RecMixin, BaseRecommenderModel):
         self.autoset_params()
 
         self._ratings = self._data.train_dict
-        self._sampler = ps.Sampler(self._data.i_train_dict, self._m)
+        self._sampler = ps.Sampler(self._data.i_train_dict, self._m, self._data.sp_i_train)
 
         self._batch_size = 1
 

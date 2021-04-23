@@ -14,7 +14,8 @@ random.seed(42)
 
 
 class Sampler:
-    def __init__(self, indexed_ratings, m):
+    def __init__(self, indexed_ratings, m, sparse_matrix):
+        self._sparse = sparse_matrix
         self._indexed_ratings = indexed_ratings
         self._users = list(self._indexed_ratings.keys())
         self._nusers = len(self._users)
@@ -37,15 +38,20 @@ class Sampler:
         #     if lui == n_items:
         #         return None
         #     return ui[r_int(lui)]
-        pos = {(u, i, 1) for u, items in ui_dict.items() for i in items}
+        # pos = {(u, i, 1) for u, items in ui_dict.items() for i in items}
+        nonzero = self._sparse.nonzero()
+        pos = list(zip(*nonzero,np.ones(len(nonzero[0]), dtype=np.int32)))
 
-        neg = set()
+        neg = list()
         for u, i, _ in pos:
-            for _ in range(self._m):
-                neg.add((u, r_int(n_items), 0))
+            neg_samples = random.sample(range(n_items), self._m)
+            neg += list(zip(np.ones(len(neg_samples), dtype=np.int32) * u, neg_samples, np.zeros(len(neg_samples), dtype=np.int32)))
+            pass
+            # for _ in range(self._m):
+            #     neg.add((u, r_int(n_items), 0))
 
-        samples = list(pos)
-        samples.extend(list(neg))
+        # samples = list(pos)
+        samples = pos + neg
         samples = random.sample(samples, len(samples))
 
         # def sample():
