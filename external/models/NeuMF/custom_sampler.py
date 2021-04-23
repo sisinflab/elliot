@@ -40,8 +40,12 @@ class Sampler:
 
         neg = set()
         for u, i, _ in pos:
+            ui = ui_dict[u]
             for _ in range(self._m):
-                neg.add((u, r_int(n_items), 0))
+                j = r_int(n_items)
+                while j in ui:
+                    j = r_int(n_items)
+                neg.add((u, j, 0))
 
         samples = list(pos)
         samples.extend(list(neg))
