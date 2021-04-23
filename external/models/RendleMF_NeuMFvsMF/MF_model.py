@@ -92,8 +92,8 @@ class MFModel(object):
         reg = self._reg
 
 
-        # prediction = gb_ + ub_ + ib_ + np.dot(uf_,if_)
-        prediction = gb_ + ub_ + ib_ + uf_ @ if_
+        prediction = gb_ + ub_ + ib_ + np.dot(uf_,if_)
+        # prediction = gb_ + ub_ + ib_ + uf_ @ if_
 
         if prediction > 0:
             one_plus_exp_minus_pred = 1.0 + np.exp(-prediction)

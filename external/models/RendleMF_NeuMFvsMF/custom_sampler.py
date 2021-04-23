@@ -25,7 +25,7 @@ class Sampler:
         self._lui_dict = {u: len(v) for u, v in self._ui_dict.items()}
         self._m = m
 
-    def step(self):
+    def step(self, batch_size):
         r_int = np.random.randint
         n_users = self._nusers
         n_items = self._nitems
@@ -67,5 +67,9 @@ class Sampler:
         #         j = r_int(n_items)
         #     return u, i, j
 
-        for sample in zip(samples):
-            yield sample
+        # for sample in zip(samples):
+        #     yield
+
+        for start in range(0, len(samples), batch_size):
+            # u, i, b = samples[start:min(start + batch_size, len(samples))]
+            yield samples[start:min(start + batch_size, len(samples))]

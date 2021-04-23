@@ -72,7 +72,7 @@ class MF(RecMixin, BaseRecommenderModel):
         self._ratings = self._data.train_dict
         self._sampler = ps.Sampler(self._data.i_train_dict, self._m, self._data.sp_i_train)
 
-        self._batch_size = 1
+        self._batch_size = self._data.transactions * (self._m + 1)
 
         self._model = MFModel(self._factors,
                               self._data,
@@ -119,7 +119,7 @@ class MF(RecMixin, BaseRecommenderModel):
             loss = 0
             steps = 0
             with tqdm(total=int(self._data.transactions * (self._m + 1) // self._batch_size), disable=not self._verbose) as t:
-                for batch in self._sampler.step():
+                for batch in self._sampler.step(self._batch_size):
                     steps += 1
                     loss += self._model.train_step(batch)
                     t.set_postfix({'loss': f'{loss/steps:.5f}'})
