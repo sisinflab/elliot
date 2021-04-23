@@ -76,9 +76,36 @@ class MFModel(object):
 
     def train_step(self, batch, **kwargs):
         sum_of_loss = 0
-        for u, i, r in batch:
-            loss = self.update_factors(u, i, r)
-            sum_of_loss += loss
+        for user, item, rating in batch:
+            uf_ = self._user_factors[user]
+            if_ = self._item_factors[item]
+            ub_ = self._user_bias[user]
+            ib_ = self._item_bias[item]
+            gb_ = self._global_bias
+            lr = self._lr
+            reg = self._reg
+
+            prediction = gb_ + ub_ + ib_ + np.dot(uf_, if_)
+            # prediction = gb_ + ub_ + ib_ + uf_ @ if_
+
+            if prediction > 0:
+                one_plus_exp_minus_pred = 1.0 + np.exp(-prediction)
+                sigmoid = 1.0 / one_plus_exp_minus_pred
+                this_loss = (np.log(one_plus_exp_minus_pred) +
+                             (1.0 - rating) * prediction)
+            else:
+                exp_pred = np.exp(prediction)
+                sigmoid = exp_pred / (1.0 + exp_pred)
+                this_loss = -rating * prediction + np.log(1.0 + exp_pred)
+
+            grad = rating - sigmoid
+
+            self._user_factors[user] += lr * (grad * if_ - reg * uf_)
+            self._item_factors[item] += lr * (grad * uf_ - reg * if_)
+            self._user_bias[user] += lr * (grad - reg * ub_)
+            self._item_bias[item] += lr * (grad - reg * ib_)
+            self._global_bias += lr * (grad - reg * gb_)
+            sum_of_loss += this_loss
 
         return sum_of_loss
 
