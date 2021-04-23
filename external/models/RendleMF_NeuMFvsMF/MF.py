@@ -21,7 +21,6 @@ from elliot.utils.write import store_recommendation
 
 from .MF_model import MFModel
 
-np.random.seed(42)
 
 
 class MF(RecMixin, BaseRecommenderModel):
@@ -64,19 +63,23 @@ class MF(RecMixin, BaseRecommenderModel):
             ("_factors", "factors", "f", 10, int, None),
             ("_learning_rate", "lr", "lr", 0.05, None, None),
             ("_regularization", "reg", "reg", 0, None, None),
-            ("_m", "m", "m", 0, int, None)
+            ("_m", "m", "m", 0, int, None),
+            ("_seed", "random_seed", "seed", 42, None, None)
         ]
         self.autoset_params()
 
+        np.random.seed(self._seed)
+
         self._ratings = self._data.train_dict
-        self._sampler = ps.Sampler(self._data.i_train_dict, self._m, self._data.sp_i_train)
+        self._sampler = ps.Sampler(self._data.i_train_dict, self._m, self._data.sp_i_train, self._seed)
 
         self._batch_size = self._data.transactions * (self._m + 1)
 
         self._model = MFModel(self._factors,
                               self._data,
                               self._learning_rate,
-                              self._regularization)
+                              self._regularization,
+                              self._seed)
 
     def get_recommendations(self, k: int = 10):
         predictions_top_k_val = {}

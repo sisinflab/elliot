@@ -17,7 +17,9 @@ class MFModel(object):
                  data,
                  lr,
                  reg,
+                 random,
                  *args):
+        np.random.seed(random)
         self._factors = F
         self._users = data.users
         self._items = data.items
