@@ -42,7 +42,6 @@ class MF(RecMixin, BaseRecommenderModel):
         update_items:
         update_bias:
 
-
     To include the recommendation model, add it to the config file adopting the following pattern:
 
     .. code:: yaml
