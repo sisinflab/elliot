@@ -76,14 +76,14 @@ class MFModel(object):
 
     def train_step(self, batch, **kwargs):
         sum_of_loss = 0
+        gb_ = self._global_bias
+        lr = self._lr
+        reg = self._reg
         for user, item, rating in batch:
             uf_ = self._user_factors[user]
             if_ = self._item_factors[item]
             ub_ = self._user_bias[user]
             ib_ = self._item_bias[item]
-            gb_ = self._global_bias
-            lr = self._lr
-            reg = self._reg
 
             prediction = gb_ + ub_ + ib_ + np.dot(uf_, if_)
             # prediction = gb_ + ub_ + ib_ + uf_ @ if_
