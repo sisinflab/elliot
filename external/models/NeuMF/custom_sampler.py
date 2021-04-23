@@ -30,13 +30,13 @@ class Sampler:
         ui_dict = self._ui_dict
         lui_dict = self._lui_dict
 
-        def sample_pos(u):
-            ui = ui_dict[u]
-            lui = lui_dict[u]
-            if lui == n_items:
-                return None
-            return ui[r_int(lui)]
-        pos = {(u, sample_pos(u), 1) for u in ui_dict.keys()}
+        # def sample_pos(u):
+        #     ui = ui_dict[u]
+        #     lui = lui_dict[u]
+        #     if lui == n_items:
+        #         return None
+        #     return ui[r_int(lui)]
+        pos = {(u, i, 1) for u, items in ui_dict.items() for i in items}
 
         neg = set()
         for u, i, _ in pos:
