@@ -25,6 +25,9 @@ class Sampler:
         self._ui_dict = {u: list(set(indexed_ratings[u])) for u in indexed_ratings}
         self._lui_dict = {u: len(v) for u, v in self._ui_dict.items()}
         self._m = m
+        self._nonzero = self._sparse.nonzero()
+        self._num_pos_examples = len(self._nonzero[0])
+        self._positive_pairs = list(zip(*self._nonzero, np.ones(len(self._nonzero[0]), dtype=np.int32)))
 
     def step(self, batch_size):
         """Converts a list of positive pairs into a two class dataset.
@@ -44,10 +47,8 @@ class Sampler:
         r_int = np.random.randint
         num_items = self._nitems
         num_negatives = self._m
-
-        nonzero = self._sparse.nonzero()
-        num_pos_examples = len(nonzero[0])
-        positive_pairs = list(zip(*nonzero, np.ones(len(nonzero[0]), dtype=np.int32)))
+        num_pos_examples = self._num_pos_examples
+        positive_pairs = self._positive_pairs
 
         training_matrix = np.empty([num_pos_examples * (1 + num_negatives), 3],
                                    dtype=np.int32)
