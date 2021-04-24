@@ -13,7 +13,7 @@ from tqdm import tqdm
 
 import numpy as np
 
-from . import custom_sampler as ps
+from . import custom_sampler_rendle as ps
 from elliot.recommender.base_recommender_model import BaseRecommenderModel
 from elliot.recommender.base_recommender_model import init_charger
 from elliot.recommender.recommender_utils_mixin import RecMixin
