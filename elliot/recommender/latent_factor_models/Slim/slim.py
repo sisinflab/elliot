@@ -83,6 +83,20 @@ class Slim(RecMixin, BaseRecommenderModel):
     def get_single_recommendation(self, mask, k, *args):
         return {u: self._model.get_user_recs(u, mask, k) for u in self._data.train_dict.keys()}
 
+    def get_recommendations(self, k: int = 10):
+        self._model.prepare_predictions()
+
+        predictions_top_k_val = {}
+        predictions_top_k_test = {}
+
+        recs_val, recs_test = self.process_protocol(k)
+
+        predictions_top_k_val.update(recs_val)
+        predictions_top_k_test.update(recs_test)
+
+        return predictions_top_k_val, predictions_top_k_test
+
+
     def predict(self, u: int, i: int):
         """
         Get prediction on the user item pair.

@@ -39,6 +39,7 @@ class SlimModel(object):
 
         self._w_sparse = None
         self._A_tilde = None
+        self.pred_mat = None
 
     def train(self, verbose):
         train = self._data.sp_i_train_ratings
@@ -111,8 +112,11 @@ class SlimModel(object):
         train = train.tocsr()
         self._A_tilde = train.dot(self._w_sparse).A
 
+    def prepare_predictions(self):
+        self.pred_mat = self._A_tilde
+
     def predict(self, u, i):
-        return self._A_tilde[u, i]
+        return self.pred_mat[u, i]
 
     def get_user_recs(self, user, mask, k=100):
         # user_items = self._data.train_dict[user].keys()
