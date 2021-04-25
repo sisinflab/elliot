@@ -113,7 +113,7 @@ class SlimModel(object):
         self._A_tilde = train.dot(self._w_sparse).A
 
     def prepare_predictions(self):
-        self.pred_mat = self._A_tilde
+        self.pred_mat = self._data.sp_i_train_ratings.dot(self._A_tilde)
 
     def predict(self, u, i):
         return self.pred_mat[u, i]
