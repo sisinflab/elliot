@@ -58,7 +58,8 @@ class Slim(RecMixin, BaseRecommenderModel):
         self._sp_i_train = self._data.sp_i_train
         self._i_items_set = list(range(self._num_items))
 
-        self._model = SlimModel(self._data, self._num_users, self._num_items, self._l1_ratio, self._alpha, self._epochs)
+        self._model = SlimModel(self._data, self._num_users, self._num_items, self._l1_ratio, self._alpha,
+                                self._epochs, self._neighborhood)
 
     @property
     def name(self):
