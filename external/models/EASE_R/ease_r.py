@@ -84,7 +84,8 @@ class EASER(RecMixin, BaseRecommenderModel):
         self._train = self._data.sp_i_train_ratings
 
         self._similarity_matrix = np.empty((len(self._data.items), len(self._data.items)))
-        self._similarity_matrix = cosine_similarity(self._train.T)
+        self._similarity_matrix = cosine_similarity(self._train.T, dense_output=False)
+        self._similarity_matrix = self._similarity_matrix.tocsr()
 
         diagonal_indices = np.diag_indices(self._similarity_matrix.shape[0])
         item_popularity = np.ediff1d(self._train.tocsc().indptr)
@@ -120,7 +121,7 @@ class EASER(RecMixin, BaseRecommenderModel):
         # W_sparse = sparse.csc_matrix((data, rows_indices, cols_indptr),
         #                              shape=(len(self._data.items), len(self._data.items)), dtype=np.float32).tocsr()
 
-        self._preds = self._train.dot(sparse.csc_matrix(self._similarity_matrix))
+        self._preds = self._train.dot(self._similarity_matrix)
 
         # recs = self.get_recommendations(self.evaluator.get_needed_recommendations())
         # result_dict = self.evaluator.eval(recs)
