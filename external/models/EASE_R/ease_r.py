@@ -99,28 +99,28 @@ class EASER(RecMixin, BaseRecommenderModel):
         end = time.time()
         print(f"The similarity computation has taken: {end - start}")
 
-        data, rows_indices, cols_indptr = [], [], []
+        # data, rows_indices, cols_indptr = [], [], []
+        #
+        # column_row_index = np.arange(len(self._data.items), dtype=np.int32)
+        #
+        # for item_idx in range(len(self._data.items)):
+        #     cols_indptr.append(len(data))
+        #     column_data = self._similarity_matrix[:, item_idx]
+        #
+        #     non_zero_data = column_data != 0
+        #
+        #     idx_sorted = np.argsort(column_data[non_zero_data])  # sort by column
+        #     top_k_idx = idx_sorted[-self._neighborhood:]
+        #
+        #     data.extend(column_data[non_zero_data][top_k_idx])
+        #     rows_indices.extend(column_row_index[non_zero_data][top_k_idx])
+        #
+        # cols_indptr.append(len(data))
+        #
+        # W_sparse = sparse.csc_matrix((data, rows_indices, cols_indptr),
+        #                              shape=(len(self._data.items), len(self._data.items)), dtype=np.float32).tocsr()
 
-        column_row_index = np.arange(len(self._data.items), dtype=np.int32)
-
-        for item_idx in range(len(self._data.items)):
-            cols_indptr.append(len(data))
-            column_data = self._similarity_matrix[:, item_idx]
-
-            non_zero_data = column_data != 0
-
-            idx_sorted = np.argsort(column_data[non_zero_data])  # sort by column
-            top_k_idx = idx_sorted[-self._neighborhood:]
-
-            data.extend(column_data[non_zero_data][top_k_idx])
-            rows_indices.extend(column_row_index[non_zero_data][top_k_idx])
-
-        cols_indptr.append(len(data))
-
-        W_sparse = sparse.csc_matrix((data, rows_indices, cols_indptr),
-                                     shape=(len(self._data.items), len(self._data.items)), dtype=np.float32).tocsr()
-
-        self._preds = self._train.dot(W_sparse)
+        self._preds = self._train.dot(sparse.csc_matrix(self._similarity_matrix))
 
         # recs = self.get_recommendations(self.evaluator.get_needed_recommendations())
         # result_dict = self.evaluator.eval(recs)
