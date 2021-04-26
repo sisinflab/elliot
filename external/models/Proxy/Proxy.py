@@ -67,7 +67,9 @@ class ProxyRecommender(RecMixin, BaseRecommenderModel):
         for u, user_recs in self._recommendations.items():
             user_cleaned_recs = []
             user_candidate_items = candidate_items[u]
-            for item, prediction in user_recs:
+            for p, (item, prediction) in enumerate(user_recs):
+                if p + 1 >= k:
+                    break
                 if item in user_candidate_items:
                     user_cleaned_recs.append((item, prediction))
             recs[u] = user_cleaned_recs
