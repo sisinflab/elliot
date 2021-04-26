@@ -86,19 +86,23 @@ experiment:
 #      epochs: 50
 #      lr: [0.0001, 0.0005, 0.001, 0.005]
 #      m: 4
-    external.RendleMF: # from original paper
-      meta:
-        hyper_max_evals: 20
-        hyper_opt_alg: tpe
-        verbose: True
-        save_recs: True
-        # optimize_internal_loss: True
-      epochs: 50 # 256 original paper but 50 comes from NeuMF paper
-      factors: 8 #[8, 16, 32, 64, 128, 256]
-      lr: [0.001, 0.003, 0.01]
-      reg: [0.001, 0.003, 0.01]
-      m: 4
-      seed: 42
+    RecommendationFolder:
+      folder: /home/cheggynho/Downloads/recsys_first
+#    external.ProxyRecommender:
+#      path: /home/cheggynho/PycharmProjects/elliot/data/ncf_ml1m/ml-1m.test.rating
+#    external.RendleMF: # from original paper
+#      meta:
+#        hyper_max_evals: 20
+#        hyper_opt_alg: tpe
+#        verbose: True
+#        save_recs: True
+#        # optimize_internal_loss: True
+#      epochs: 50 # 256 original paper but 50 comes from NeuMF paper
+#      factors: 8 #[8, 16, 32, 64, 128, 256]
+#      lr: [0.001, 0.003, 0.01]
+#      reg: [0.001, 0.003, 0.01]
+#      m: 4
+#      seed: 42
 #    external.iALS:
 #      meta:
 #        verbose: True

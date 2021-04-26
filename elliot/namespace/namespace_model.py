@@ -7,7 +7,9 @@ __version__ = '0.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
+import copy
 import os
+from os.path import isfile, join
 import sys
 from types import SimpleNamespace
 from ast import literal_eval
@@ -175,7 +177,7 @@ class NameSpaceModel:
 
     def fill_model(self):
         for key in self.config[_experiment][_models]:
-            meta_model = self.config[_experiment][_models][key][_meta]
+            meta_model = self.config[_experiment][_models][key].get(_meta, {})
             model_name_space = SimpleNamespace(**self.config[_experiment][_models][key])
             setattr(model_name_space, _meta, SimpleNamespace(**meta_model))
             if any(isinstance(value, list) for value in self.config[_experiment][_models][key].values()):
@@ -218,4 +220,15 @@ class NameSpaceModel:
                 _opt_alg = ho.parse_algorithms(meta_model.get(_hyper_opt_alg, "grid"))
                 yield key, (model_name_space, _SPACE, _max_evals, _opt_alg)
             else:
-                yield key, model_name_space
+                if key == "RecommendationFolder":
+                    folder_path = getattr(model_name_space, "folder", None)
+                    if folder_path:
+                        onlyfiles = [f for f in os.listdir(folder_path) if isfile(join(folder_path, f))]
+                        for file_ in onlyfiles:
+                            local_model_name_space = copy.copy(model_name_space)
+                            local_model_name_space.path = os.path.join(folder_path, file_)
+                            yield "external.ProxyRecommender", local_model_name_space
+                    else:
+                        raise Exception("RecommendationFolder meta-model must expose the folder field.")
+                else:
+                    yield key, model_name_space
