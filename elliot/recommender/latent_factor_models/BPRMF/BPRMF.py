@@ -4,7 +4,7 @@ Module description:
 """
 from tqdm import tqdm
 
-from recommender.latent_factor_models.BPRMF.BPRMF_model import MFModel
+from elliot.recommender.latent_factor_models.BPRMF.BPRMF_model import MFModel
 
 __version__ = '0.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo'

@@ -33,12 +33,11 @@ class SlimModel(object):
                              copy_X=False,
                              precompute=True,
                              selection='random',
-                             max_iter=self._epochs,
+                             max_iter=100,
                              random_state=42,
-                             tol=1e-3)
+                             tol=1e-4)
 
         self._w_sparse = None
-        self._A_tilde = None
         self.pred_mat = None
 
     def train(self, verbose):
@@ -109,11 +108,8 @@ class SlimModel(object):
         self._w_sparse = sp.csr_matrix((values[:numCells], (rows[:numCells], cols[:numCells])),
                                       shape=(self._num_items, self._num_items), dtype=np.float32)
 
-        train = train.tocsr()
-        self._A_tilde = train.dot(self._w_sparse).A
-
     def prepare_predictions(self):
-        self.pred_mat = self._data.sp_i_train_ratings.dot(self._A_tilde)
+        self.pred_mat = self._data.sp_i_train_ratings.dot(self._w_sparse).toarray()
 
     def predict(self, u, i):
         return self.pred_mat[u, i]

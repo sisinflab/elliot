@@ -73,7 +73,8 @@ class MF(RecMixin, BaseRecommenderModel):
         self._ratings = self._data.train_dict
         self._sampler = ps.Sampler(self._data.i_train_dict, self._m, self._data.sp_i_train, self._seed)
 
-        self._batch_size = self._data.transactions * (self._m + 1)
+        # self._batch_size = self._data.transactions * (self._m + 1)
+        self._batch_size = 100000
 
         self._model = MFModel(self._factors,
                               self._data,

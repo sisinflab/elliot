@@ -55,6 +55,10 @@ class DataSetLoader:
 
             self.test_dataframe = self.check_timestamp(self.test_dataframe)
 
+            if config.binarize == True:
+                self.test_dataframe["rating"] = 1
+                self.train_dataframe["rating"] = 1
+
             if path_val_data:
                 self.validation_dataframe = pd.read_csv(path_val_data, sep="\t", header=None, names=self.column_names)
                 self.validation_dataframe = self.check_timestamp(self.validation_dataframe)

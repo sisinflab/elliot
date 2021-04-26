@@ -74,7 +74,7 @@ class NeuMF(RecMixin, BaseRecommenderModel):
 
         self._sampler = ps.Sampler(self._data.i_train_dict, self._m)
         self._mlp_hidden_size = (self._mf_factors*4, self._mf_factors*2, self._mf_factors)
-        self._mlp_factors = self._mf_factors * 2
+        self._mlp_factors = self._mf_factors
 
         if self._batch_size < 1:
             self._batch_size = self._data.transactions
@@ -104,7 +104,7 @@ class NeuMF(RecMixin, BaseRecommenderModel):
         for it in range(self._epochs):
             loss = 0
             steps = 0
-            with tqdm(total=int(self._data.num_users * (self._m + 1) // self._batch_size), disable=not self._verbose) as t:
+            with tqdm(total=int(self._data.transactions * (self._m + 1) // self._batch_size), disable=not self._verbose) as t:
                 for batch in self._sampler.step(self._batch_size):
                     steps += 1
                     loss += self._model.train_step(batch).numpy()

@@ -10,9 +10,7 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 import time
 
 import numpy as np
-import scipy.sparse as sparse
-from sklearn.metrics.pairwise import cosine_similarity
-from sklearn.preprocessing import normalize
+from sklearn.utils.extmath import safe_sparse_dot
 
 from elliot.recommender.base_recommender_model import BaseRecommenderModel
 from elliot.recommender.base_recommender_model import init_charger
@@ -57,7 +55,7 @@ class EASER(RecMixin, BaseRecommenderModel):
     def get_user_predictions(self, user_id, mask, top_k=10):
         user_id = self._data.public_users.get(user_id)
         b = self._preds[user_id]
-        a = mask[user_id:user_id+1]
+        a = mask[user_id]
         b[~a] = -np.inf
         indices, values = zip(*[(self._data.private_items.get(u_list[0]), u_list[1])
                               for u_list in enumerate(b.data)])
@@ -83,8 +81,7 @@ class EASER(RecMixin, BaseRecommenderModel):
 
         self._train = self._data.sp_i_train_ratings
 
-        self._similarity_matrix = np.empty((len(self._data.items), len(self._data.items)))
-        self._similarity_matrix = cosine_similarity(self._train.T)
+        self._similarity_matrix = safe_sparse_dot(self._train.T, self._train, dense_output=True)
 
         diagonal_indices = np.diag_indices(self._similarity_matrix.shape[0])
         item_popularity = np.ediff1d(self._train.tocsc().indptr)
@@ -120,7 +117,7 @@ class EASER(RecMixin, BaseRecommenderModel):
         # W_sparse = sparse.csc_matrix((data, rows_indices, cols_indptr),
         #                              shape=(len(self._data.items), len(self._data.items)), dtype=np.float32).tocsr()
 
-        self._preds = self._train.dot(sparse.csr_matrix(self._similarity_matrix))
+        self._preds = self._train.dot(self._similarity_matrix)
 
         # recs = self.get_recommendations(self.evaluator.get_needed_recommendations())
         # result_dict = self.evaluator.eval(recs)
