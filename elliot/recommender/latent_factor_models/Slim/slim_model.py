@@ -118,9 +118,9 @@ class SlimModel(object):
         # user_items = self._data.train_dict[user].keys()
         # predictions = {i: self.predict(user, i) for i in self._data.items if i not in user_items}
 
-        user_mask = mask[self._data.public_users[user]]
-        predictions = {i: self.predict(user, i) for i in self._data.items if i in self._data.items if
-                       user_mask[self._data.public_items[i]]}
+        ui = self._data.public_users[user]
+        user_mask = mask[ui]
+        predictions = {self._data.private_items[i]: self.predict(ui, i) for i in range(self._data.num_items) if user_mask[i]}
 
         indices, values = zip(*predictions.items())
         indices = np.array(indices)
