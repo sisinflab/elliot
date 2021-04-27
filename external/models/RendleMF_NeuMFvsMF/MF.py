@@ -125,7 +125,7 @@ class MF(RecMixin, BaseRecommenderModel):
             with tqdm(total=int(self._data.transactions * (self._m + 1) // self._batch_size), disable=not self._verbose) as t:
                 for batch in self._sampler.step(self._batch_size):
                     steps += 1
-                    loss += self._model.train_step(batch)
+                    loss += self._model.train_step(batch)/len(batch)
                     t.set_postfix({'loss': f'{loss/steps:.5f}'})
                     t.update()
 
