@@ -19,8 +19,10 @@ experiment:
     files: ["/home/cheggynho/PycharmProjects/elliot/data/ncf_ml1m/ml-1m.test.negative"]
   top_k: 10
   evaluation:
-    cutoffs: 10
-    simple_metrics: [nDCG, recall]
+    cutoffs: [10, 9, 8, 7, 6, 5, 4, 3, 2, 1]
+    simple_metrics: [nDCG, HR, LAUC, F1, MAP, MAR, MRR, ACLT, APLT, ARP, PopREO, PopRSP, ItemCoverage, UserCoverage, NumRetrived, UserCoverage, Gini, SEntropy, EFD, EPC]
+    paired_ttest: True
+    wilcoxon_test: True
 #  gpu: -1
   external_models_path: ../external/models/__init__.py
   models:
