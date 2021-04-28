@@ -83,6 +83,8 @@ class MF(RecMixin, BaseRecommenderModel):
                               self._seed)
 
     def get_recommendations(self, k: int = 10):
+        self._model.prepare_predictions()
+
         predictions_top_k_val = {}
         predictions_top_k_test = {}
 
