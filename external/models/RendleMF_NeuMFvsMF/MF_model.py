@@ -60,8 +60,9 @@ class MFModel(object):
     def get_user_predictions(self, user_id, mask, top_k=10):
         user_id = self._public_users.get(user_id)
         # b = self._train[user_id].dot(W_sparse)
-        b = self._global_bias + self._user_bias[user_id] + self._item_bias \
-               + self._user_factors[user_id] @ self._item_factors.T
+        # b = self._global_bias + self._user_bias[user_id] + self._item_bias \
+        #        + self._user_factors[user_id] @ self._item_factors.T
+        b = self._preds[user_id]
         a = mask[user_id]
         b[~a] = -np.inf
         indices, values = zip(*[(self._private_items.get(u_list[0]), u_list[1])
@@ -110,6 +111,9 @@ class MFModel(object):
             sum_of_loss += this_loss
 
         return sum_of_loss
+
+    def prepare_predictions(self):
+        self._preds = np.expand_dims(self._user_bias, axis=1) + (self._global_bias + self._item_bias + self._user_factors @ self._item_factors.T)
 
     def update_factors(self, user: int, item: int, rating: float):
         uf_ = self._user_factors[user]
