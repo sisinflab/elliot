@@ -6,3 +6,4 @@ from .RendleMF_NeuMFvsMF import RendleMF
 from .iALS import iALS
 from .NeuMF import NeuMF
 from .Proxy import ProxyRecommender
+from .item_knn import ItemKNN
