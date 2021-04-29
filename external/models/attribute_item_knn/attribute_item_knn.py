@@ -16,7 +16,7 @@ from elliot.utils.write import store_recommendation
 import scipy.sparse as sp
 
 from elliot.recommender.base_recommender_model import BaseRecommenderModel
-from elliot.recommender.NN.attribute_item_knn.attribute_item_knn_similarity import Similarity
+from .attribute_item_knn_similarity import Similarity
 from elliot.recommender.base_recommender_model import init_charger
 
 np.random.seed(42)

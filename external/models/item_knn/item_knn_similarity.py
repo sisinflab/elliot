@@ -66,7 +66,7 @@ class Similarity(object):
 
         W_sparse = sparse.csc_matrix((data, rows_indices, cols_indptr),
                                      shape=(len(self._data.items), len(self._data.items)), dtype=np.float32).tocsr()
-        self._preds = self._data.sp_i_train_ratings.dot(W_sparse).toarray()
+        self._preds = self._data.sp_i_train.dot(W_sparse).toarray()
         ##############
         # self.compute_neighbors()
 
