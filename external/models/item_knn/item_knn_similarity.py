@@ -3,7 +3,7 @@ import numpy as np
 from scipy import sparse
 from sklearn.metrics.pairwise import cosine_similarity, euclidean_distances, haversine_distances, chi2_kernel, manhattan_distances
 from sklearn.metrics import pairwise_distances
-
+from sklearn.preprocessing import normalize
 
 
 class Similarity(object):
@@ -45,6 +45,8 @@ class Similarity(object):
 
         self.process_similarity(self._similarity)
 
+        # self._similarity_matrix = normalize(self._similarity_matrix, norm='l1', axis=1)
+
         ##############
         data, rows_indices, cols_indptr = [], [], []
 
@@ -66,70 +68,66 @@ class Similarity(object):
 
         W_sparse = sparse.csc_matrix((data, rows_indices, cols_indptr),
                                      shape=(len(self._data.items), len(self._data.items)), dtype=np.float32).tocsr()
-        self._preds = self._data.sp_i_train.dot(W_sparse).toarray()
+        self._preds = self._data.sp_i_train_ratings.dot(W_sparse).toarray()
         ##############
         # self.compute_neighbors()
 
         del self._similarity_matrix
 
-    def compute_neighbors(self):
-        self._neighbors = {}
-        for x in range(self._similarity_matrix.shape[0]):
-            arr = np.concatenate((self._similarity_matrix[0:x, x], [-np.inf], self._similarity_matrix[x, x+1:]))
-            top_indices = np.argpartition(arr, -self._num_neighbors)[-self._num_neighbors:]
-            arr = arr[top_indices]
-            self._neighbors[self._private_items[x]] = {self._private_items[i]: arr[p] for p, i in enumerate(top_indices)}
-
-    def get_item_neighbors(self, item):
-        return self._neighbors.get(item, {})
+    # def compute_neighbors(self):
+    #     self._neighbors = {}
+    #     for x in range(self._similarity_matrix.shape[0]):
+    #         arr = np.concatenate((self._similarity_matrix[0:x, x], [-np.inf], self._similarity_matrix[x, x+1:]))
+    #         top_indices = np.argpartition(arr, -self._num_neighbors)[-self._num_neighbors:]
+    #         arr = arr[top_indices]
+    #         self._neighbors[self._private_items[x]] = {self._private_items[i]: arr[p] for p, i in enumerate(top_indices)}
+    #
+    # def get_item_neighbors(self, item):
+    #     return self._neighbors.get(item, {})
 
     def process_similarity(self, similarity):
         if similarity == "cosine":
-            x, y = np.triu_indices(self._similarity_matrix.shape[0], k=1)
-            self._similarity_matrix[x, y] = cosine_similarity(self._data.sp_i_train_ratings.T)[x, y]
+            # x, y = np.triu_indices(self._similarity_matrix.shape[0], k=1)
+            # self._similarity_matrix[x, y] = cosine_similarity(self._data.sp_i_train_ratings.T)[x, y]
+            self._similarity_matrix = cosine_similarity(self._data.sp_i_train_ratings.T)
         elif similarity == "dot":
             self._similarity_matrix = (self._data.sp_i_train_ratings.T @ self._data.sp_i_train_ratings).toarray()
         elif similarity == "euclidean":
-            x, y = np.triu_indices(self._similarity_matrix.shape[0], k=1)
-            self._similarity_matrix[x, y] = (1 / (1 + euclidean_distances(self._data.sp_i_train_ratings.T)))[x, y]
+            self._similarity_matrix = (1 / (1 + euclidean_distances(self._data.sp_i_train_ratings.T)))
         elif similarity == "manhattan":
-            x, y = np.triu_indices(self._similarity_matrix.shape[0], k=1)
-            self._similarity_matrix[x, y] = (1 / (1 + manhattan_distances(self._data.sp_i_train_ratings.T)))[x, y]
+            self._similarity_matrix = (1 / (1 + manhattan_distances(self._data.sp_i_train_ratings.T)))
         elif similarity == "haversine":
-            x, y = np.triu_indices(self._similarity_matrix.shape[0], k=1)
-            self._similarity_matrix[x, y] = (1 / (1 + haversine_distances(self._data.sp_i_train_ratings.T)))[x, y]
+            self._similarity_matrix = (1 / (1 + haversine_distances(self._data.sp_i_train_ratings.T)))
         elif similarity == "chi2":
-            x, y = np.triu_indices(self._similarity_matrix.shape[0], k=1)
-            self._similarity_matrix[x, y] = (1 / (1 + chi2_kernel(self._data.sp_i_train_ratings.T)))[x, y]
+            self._similarity_matrix = (1 / (1 + chi2_kernel(self._data.sp_i_train_ratings.T)))
         elif similarity in ['cityblock', 'l1', 'l2']:
-            x, y = np.triu_indices(self._similarity_matrix.shape[0], k=1)
-            self._similarity_matrix[x, y] = (1 / (1 + pairwise_distances(self._data.sp_i_train_ratings.T, metric=similarity)))[x, y]
+            self._similarity_matrix = (1 / (1 + pairwise_distances(self._data.sp_i_train_ratings.T, metric=similarity)))
         elif similarity in ['braycurtis', 'canberra', 'chebyshev', 'correlation', 'dice', 'hamming', 'jaccard', 'kulsinski', 'mahalanobis', 'minkowski', 'rogerstanimoto', 'russellrao', 'seuclidean', 'sokalmichener', 'sokalsneath', 'sqeuclidean', 'yule']:
-            x, y = np.triu_indices(self._similarity_matrix.shape[0], k=1)
-            self._similarity_matrix[x, y] = (1 / (1 + pairwise_distances(self._data.sp_i_train_ratings.T.toarray(), metric=similarity)))[x, y]
+
+            self._similarity_matrix = (1 / (1 + pairwise_distances(self._data.sp_i_train_ratings.T.toarray(), metric=similarity)))
         else:
             raise Exception("Not implemented similarity")
 
-    def process_cosine(self):
-        x, y = np.triu_indices(self._similarity_matrix.shape[0], k=1)
-        self._similarity_matrix[x, y] = cosine_similarity(self._data.sp_i_train_ratings.T)[x, y]
-        # g = np.vectorize(self.compute_cosine)
-        # g(x,y)
-        # for item_row in range(self._similarity_matrix.shape[0]):
-        #     for item_col in range(item_row + 1, self._similarity_matrix.shape[1]):
-        #         self._similarity_matrix[item_row, item_col] = self.compute_cosine(
-        #             self._item_ratings.get(self._private_items[item_row],{}), self._item_ratings.get(self._private_items[item_col], {}))
-
-    def compute_cosine(self, i_index, j_index):
-        i_dict = self._item_ratings.get(self._private_items[i_index],{})
-        j_dict = self._item_ratings.get(self._private_items[j_index],{})
-        union_keyset = set().union(*[i_dict, j_dict])
-        i: np.ndarray = np.array([[i_dict.get(x, 0) for x in union_keyset]])
-        j: np.ndarray = np.array([[j_dict.get(x, 0) for x in union_keyset]])
-        self._similarity_matrix[i_index, j_index] = cosine_similarity(i, j)[0, 0]
-
-    def get_transactions(self):
-        return self._transactions
+    # def process_cosine(self):
+    #     x, y = np.triu_indices(self._similarity_matrix.shape[0], k=1)
+    #     self._similarity_matrix[x, y] = cosine_similarity(self._data.sp_i_train_ratings.T)[x, y]
+    #     # g = np.vectorize(self.compute_cosine)
+    #     # g(x,y)
+    #     # for item_row in range(self._similarity_matrix.shape[0]):
+    #     #     for item_col in range(item_row + 1, self._similarity_matrix.shape[1]):
+    #     #         self._similarity_matrix[item_row, item_col] = self.compute_cosine(
+    #     #             self._item_ratings.get(self._private_items[item_row],{}), self._item_ratings.get(self._private_items[item_col], {}))
+    #
+    # def compute_cosine(self, i_index, j_index):
+    #     i_dict = self._item_ratings.get(self._private_items[i_index],{})
+    #     j_dict = self._item_ratings.get(self._private_items[j_index],{})
+    #     union_keyset = set().union(*[i_dict, j_dict])
+    #     i: np.ndarray = np.array([[i_dict.get(x, 0) for x in union_keyset]])
+    #     j: np.ndarray = np.array([[j_dict.get(x, 0) for x in union_keyset]])
+    #     self._similarity_matrix[i_index, j_index] = cosine_similarity(i, j)[0, 0]
+    #
+    # def get_transactions(self):
+    #     return self._transactions
 
     # def get_user_recs(self, u, mask, k):
     #     user_items = self._ratings[u].keys()
@@ -166,11 +164,11 @@ class Similarity(object):
         local_top_k = real_values.argsort()[::-1]
         return [(real_indices[item], real_values[item]) for item in local_top_k]
 
-    @staticmethod
-    def score_item(neighs, user_items):
-        num = sum([v for k, v in neighs.items() if k in user_items])
-        den = sum(np.power(list(neighs.values()), 1))
-        return num/den if den != 0 else 0
+    # @staticmethod
+    # def score_item(neighs, user_items):
+    #     num = sum([v for k, v in neighs.items() if k in user_items])
+    #     den = sum(np.power(list(neighs.values()), 1))
+    #     return num/den if den != 0 else 0
 
     def get_model_state(self):
         saving_dict = {}
