@@ -20,8 +20,6 @@ from elliot.recommender.latent_factor_models.BPRSlim.bprslim_model import BPRSli
 from elliot.recommender.recommender_utils_mixin import RecMixin
 from elliot.utils.write import store_recommendation
 
-np.random.seed(42)
-
 
 class BPRSlim(RecMixin, BaseRecommenderModel):
     r"""
@@ -53,7 +51,6 @@ class BPRSlim(RecMixin, BaseRecommenderModel):
 
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
-        self._random = np.random
 
         self._params_list = [
             ("_lr", "lr", "lr", 0.001, None, None),

@@ -21,11 +21,6 @@ from elliot.recommender.recommender_utils_mixin import RecMixin
 from elliot.recommender.visual_recommenders.DVBPR.DVBPR_model import DVBPR_model
 from elliot.utils.write import store_recommendation
 
-np.random.seed(0)
-tf.random.set_seed(0)
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
-
 
 class DVBPR(RecMixin, BaseRecommenderModel):
     r"""
@@ -58,11 +53,6 @@ class DVBPR(RecMixin, BaseRecommenderModel):
     """
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
-        super().__init__(data, config, params, *args, **kwargs)
-
-        self._num_items = self._data.num_items
-        self._num_users = self._data.num_users
-        self._random = np.random
 
         self._params_list = [
             ("_factors", "factors", "factors", 100, None, None),

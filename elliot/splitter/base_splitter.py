@@ -110,14 +110,14 @@ class Splitter:
     def store_splitting(self, tuple_list):
         for i, (train_val, test) in enumerate(tuple_list):
             actual_test_folder = create_folder_by_index(self.save_folder, i)
-            test.to_csv(f"{actual_test_folder}test.tsv", sep='\t', index=False)
+            test.to_csv(os.path.abspath(os.sep.join([actual_test_folder, "test.tsv"])), sep='\t', index=False)
             if isinstance(train_val, list):
                 for j, (train, val) in enumerate(train_val):
-                   actual_val_folder = create_folder_by_index(actual_test_folder, j)
-                   val.to_csv(f"{actual_val_folder}val.tsv", sep='\t', index=False)
-                   train.to_csv(f"{actual_val_folder}train.tsv", sep='\t', index=False)
+                    actual_val_folder = create_folder_by_index(actual_test_folder, j)
+                    val.to_csv(os.path.abspath(os.sep.join([actual_val_folder, "val.tsv"])), sep='\t', index=False)
+                    train.to_csv(os.path.abspath(os.sep.join([actual_val_folder, "train.tsv"])), sep='\t', index=False)
             else:
-                train_val.to_csv(f"{actual_test_folder}train.tsv", sep='\t', index=False)
+                train_val.to_csv(os.path.abspath(os.sep.join([actual_test_folder, "train.tsv"])), sep='\t', index=False)
 
     def read_folder(self, folder_path):
         for root, dirs, files in os.walk(folder_path):

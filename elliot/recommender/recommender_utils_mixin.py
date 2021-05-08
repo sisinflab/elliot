@@ -1,3 +1,5 @@
+import os
+
 import numpy as np
 from tqdm import tqdm
 
@@ -45,10 +47,11 @@ class RecMixin(object):
                     else:
                         self.logger.warning("Saving weights FAILED. No model to save.")
                 if self._save_recs:
+                    self.logger.info(f"Writing recommendations at: {self._config.path_output_rec_result}")
                     if it is not None:
-                        store_recommendation(recs[1], self._config.path_output_rec_result + f"{self.name}-it:{it + 1}.tsv")
+                        store_recommendation(recs[1], os.path.abspath(os.sep.join([self._config.path_output_rec_result, f"{self.name}_it={it + 1}.tsv"])))
                     else:
-                        store_recommendation(recs[1], self._config.path_output_rec_result + f"{self.name}.tsv")
+                        store_recommendation(recs[1], os.path.abspath(os.sep.join([self._config.path_output_rec_result, f"{self.name}.tsv"])))
 
     def get_recommendations(self, k: int = 100):
         predictions_top_k_test = {}

@@ -23,7 +23,7 @@ _rstate = np.random.RandomState(42)
 here = path.abspath(path.dirname(__file__))
 
 
-def run_experiment(config_path: str = './config/config.yml'):
+def run_experiment(config_path: str = ''):
     builder = NameSpaceBuilder(config_path, here, path.abspath(path.dirname(config_path)))
     base = builder.base
     config_test(builder, base)

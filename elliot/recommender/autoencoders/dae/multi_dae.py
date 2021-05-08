@@ -19,9 +19,6 @@ from elliot.recommender.recommender_utils_mixin import RecMixin
 from elliot.utils.write import store_recommendation
 from elliot.recommender.base_recommender_model import init_charger
 
-np.random.seed(42)
-random.seed(0)
-
 
 class MultiDAE(RecMixin, BaseRecommenderModel):
     r"""
@@ -56,8 +53,6 @@ class MultiDAE(RecMixin, BaseRecommenderModel):
     def __init__(self, data, config, params, *args, **kwargs):
         """
         """
-        self._random = np.random
-        self._random_p = random
 
         self._ratings = self._data.train_dict
         self._sampler = sp.Sampler(self._data.sp_i_train)
@@ -73,7 +68,7 @@ class MultiDAE(RecMixin, BaseRecommenderModel):
             ("_latent_dim", "latent_dim", "latent_dim", 200, None, None),
             ("_lambda", "reg_lambda", "reg_lambda", 0.01, None, None),
             ("_learning_rate", "lr", "lr", 0.001, None, None),
-            ("_dropout_rate", "dropout_pkeep", "dropout_pkeep", 1, None, None),
+            ("_dropout_rate", "dropout_pkeep", "dropout_pkeep", 1, None, None)
         ]
         self.autoset_params()
 

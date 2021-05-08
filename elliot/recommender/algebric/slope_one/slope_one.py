@@ -18,8 +18,6 @@ from elliot.recommender.base_recommender_model import BaseRecommenderModel, init
 from elliot.recommender.recommender_utils_mixin import RecMixin
 from elliot.utils.write import store_recommendation
 
-np.random.seed(42)
-
 
 class SlopeOne(RecMixin, BaseRecommenderModel):
     r"""

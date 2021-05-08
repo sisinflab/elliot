@@ -19,9 +19,6 @@ from elliot.recommender.base_recommender_model import init_charger
 from elliot.recommender.recommender_utils_mixin import RecMixin
 from elliot.utils.write import store_recommendation
 
-np.random.seed(42)
-random.seed(0)
-
 
 class MultiVAE(RecMixin, BaseRecommenderModel):
     r"""
@@ -73,8 +70,11 @@ class MultiVAE(RecMixin, BaseRecommenderModel):
             ("_lambda", "reg_lambda", "reg_lambda", 0.01, None, None),
             ("_learning_rate", "lr", "lr", 0.001, None, None),
             ("_dropout_rate", "dropout_pkeep", "dropout_pkeep", 1, None, None),
+            # ("_seed", "seed", "seed", 42, None, None)
         ]
         self.autoset_params()
+        # np.random.seed(self._seed)
+        # random.seed(self._seed)
 
         self._dropout_rate = 1. - self._dropout_rate
 

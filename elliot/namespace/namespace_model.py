@@ -73,28 +73,47 @@ class NameSpaceModel:
     @staticmethod
     def _set_path(config_path, local_path):
         if os.path.isabs(local_path):
-            return local_path
+            return os.path.abspath(local_path)
         else:
-            if local_path.startswith(("./", "../")) or regexp.search(local_path):
-                return f"{config_path}/{local_path}"
+            if local_path.startswith((".", "..")) or regexp.search(local_path):
+                # return f"{config_path}/{local_path}"
+                return os.path.abspath(os.sep.join([config_path, local_path]))
             else:
+                # the string is an attribute but not a path
                 return local_path
+
+    @staticmethod
+    def _safe_set_path(config_path, raw_local_path, dataset_name):
+        if isinstance(raw_local_path, str):
+            local_path = raw_local_path.format(dataset_name)
+            if os.path.isabs(local_path):
+                return os.path.abspath(local_path)
+            else:
+                if local_path.startswith((".", "..")) or regexp.search(local_path):
+                    return os.path.abspath(os.sep.join([config_path, local_path]))
+                else:
+                    # the string is an attribute but not a path
+                    return local_path
+        else:
+            raw_local_path
 
     def fill_base(self):
 
         # for path in self.config[_experiment][_data_paths].keys():
         #     self.config[_experiment][_data_paths][path] = \
         #         self.config[_experiment][_data_paths][path].format(self.config[_experiment][_dataset])
-
-        self.config[_experiment][_recs] = self.config[_experiment]\
-            .get(_recs, self._set_path(self._base_folder_path_config, "../results/{0}/recs/"))\
-            .format(self.config[_experiment][_dataset])
-        self.config[_experiment][_weights] = self.config[_experiment]\
-            .get(_weights, self._set_path(self._base_folder_path_config, "../results/{0}/weights/")) \
-            .format(self.config[_experiment][_dataset])
-        self.config[_experiment][_performance] = self.config[_experiment]\
-            .get(_performance, self._set_path(self._base_folder_path_config, "../results/{0}/performance/")) \
-            .format(self.config[_experiment][_dataset])
+        default_results_recs = os.sep.join(["..", "results", "{0}", "recs"])
+        default_results_weights = os.sep.join(["..", "results", "{0}", "weights"])
+        default_results_performance = os.sep.join(["..", "results", "{0}", "performance"])
+        self.config[_experiment][_recs] = os.path.abspath(self.config[_experiment]\
+            .get(_recs, self._set_path(self._base_folder_path_config, default_results_recs))\
+            .format(self.config[_experiment][_dataset]))
+        self.config[_experiment][_weights] = os.path.abspath(self.config[_experiment]\
+            .get(_weights, self._set_path(self._base_folder_path_config, default_results_weights)) \
+            .format(self.config[_experiment][_dataset]))
+        self.config[_experiment][_performance] = os.path.abspath(self.config[_experiment]\
+            .get(_performance, self._set_path(self._base_folder_path_config, default_results_performance)) \
+            .format(self.config[_experiment][_dataset]))
 
         self.config[_experiment][_dataloader] = self.config[_experiment].get(_dataloader, "DataSetLoader")
 
@@ -105,23 +124,53 @@ class NameSpaceModel:
                   _log_folder, _dataloader, _splitting, _prefiltering, _evaluation, _external_models_path,
                   _print_triplets, _config_test, _negative_sampling, _binarize]:
             if p == _data_config:
-                side_information = self.config[_experiment][p].get("side_information", {})
-                side_information.update({k: self._set_path(self._base_folder_path_config,
-                                                           v.format(self.config[_experiment][_dataset]))
-                                         for k, v in side_information.items() if isinstance(v, str)})
-                side_information = SimpleNamespace(**side_information)
-                self.config[_experiment][p].update({k: self._set_path(self._base_folder_path_config,
-                                                                      v.format(self.config[_experiment][_dataset]))
-                                                    for k, v in self.config[_experiment][p].items() if
-                                                    isinstance(v, str)})
-                self.config[_experiment][p]["side_information"] = side_information
-                self.config[_experiment][p][_dataloader] = self.config[_experiment][p].get(_dataloader, "DataSetLoader")
-                setattr(self.base_namespace, p, SimpleNamespace(**self.config[_experiment][p]))
+                side_information = self.config[_experiment][p].get("side_information", None)
+
+                if side_information:
+                    if isinstance(side_information, list):
+                        side_information = [SimpleNamespace(**{k: self._safe_set_path(self._base_folder_path_config, v, self.config[_experiment][_dataset])
+                                                 for k, v in side.items()}) for side in side_information]
+                        self.config[_experiment][p].update({k: self._safe_set_path(self._base_folder_path_config, v, self.config[_experiment][_dataset])
+                                                            for k, v in self.config[_experiment][p].items()})
+                        # self.config[_experiment][p].update({k: self._set_path(self._base_folder_path_config,
+                        #                                                       v.format(
+                        #                                                           self.config[_experiment][_dataset]))
+                        #                                     for k, v in self.config[_experiment][p].items() if
+                        #                                     isinstance(v, str)})
+                        self.config[_experiment][p]["side_information"] = side_information
+                        self.config[_experiment][p][_dataloader] = "DataSetLoader"
+                        setattr(self.base_namespace, p, SimpleNamespace(**self.config[_experiment][p]))
+                    elif isinstance(side_information, dict):
+                        side_information = self.config[_experiment][p].get("side_information", {})
+                        side_information.update({k: self._safe_set_path(self._base_folder_path_config, v, self.config[_experiment][_dataset])
+                                                 for k, v in side_information.items()})
+                        # side_information.update({k: self._set_path(self._base_folder_path_config,
+                        #                                            v.format(self.config[_experiment][_dataset]))
+                        #                          for k, v in side_information.items() if isinstance(v, str)})
+                        side_information = SimpleNamespace(**side_information)
+                        self.config[_experiment][p].update({k: self._safe_set_path(self._base_folder_path_config, v, self.config[_experiment][_dataset])
+                                                            for k, v in self.config[_experiment][p].items()})
+                        # self.config[_experiment][p].update({k: self._set_path(self._base_folder_path_config,
+                        #                                                       v.format(
+                        #                                                           self.config[_experiment][_dataset]))
+                        #                                     for k, v in self.config[_experiment][p].items() if
+                        #                                     isinstance(v, str)})
+                        self.config[_experiment][p]["side_information"] = side_information
+                        self.config[_experiment][p][_dataloader] = self.config[_experiment][p].get(_dataloader,
+                                                                                                   "DataSetLoader")
+                        setattr(self.base_namespace, p, SimpleNamespace(**self.config[_experiment][p]))
+                    else:
+                        raise Exception("Side information is neither a list nor a dict. No other options are allowed.")
+                else:
+                    setattr(self.base_namespace, p, SimpleNamespace())
+
             elif p == _splitting and self.config[_experiment].get(p, {}):
-                self.config[_experiment][p].update({k: self._set_path(self._base_folder_path_config,
-                                                                      v.format(self.config[_experiment][_dataset]))
-                                                    for k, v in self.config[_experiment][p].items() if
-                                                    isinstance(v, str)})
+                self.config[_experiment][p].update({k: self._safe_set_path(self._base_folder_path_config, v, self.config[_experiment][_dataset])
+                                                    for k, v in self.config[_experiment][p].items()})
+                # self.config[_experiment][p].update({k: self._set_path(self._base_folder_path_config,
+                #                                                       v.format(self.config[_experiment][_dataset]))
+                #                                     for k, v in self.config[_experiment][p].items() if
+                #                                     isinstance(v, str)})
 
                 test_splitting = self.config[_experiment][p].get("test_splitting", {})
                 validation_splitting = self.config[_experiment][p].get("validation_splitting", {})
@@ -145,27 +194,41 @@ class NameSpaceModel:
                 setattr(self.base_namespace, p, self.config[_experiment][p])
 
             elif p == _negative_sampling and self.config[_experiment].get(p, {}):
-                negative_sampling_strategy = SimpleNamespace(**self.config[_experiment][p])
-                self.config[_experiment][p] = negative_sampling_strategy
+                self.config[_experiment][p].update({k: self._safe_set_path(self._base_folder_path_config, v, self.config[_experiment][_dataset])
+                                                    for k, v in self.config[_experiment][p].items()})
+                self.config[_experiment][p] = SimpleNamespace(**self.config[_experiment][p])
                 setattr(self.base_namespace, p, self.config[_experiment][p])
             elif p == _evaluation and self.config[_experiment].get(p, {}):
                 complex_metrics = self.config[_experiment][p].get("complex_metrics", {})
                 paired_ttest = self.config[_experiment][p].get("paired_ttest", {})
                 wilcoxon_test = self.config[_experiment][p].get("wilcoxon_test", {})
                 for complex_metric in complex_metrics:
-                    complex_metric.update({k: self._set_path(self._base_folder_path_config,
-                                                      v.format(self.config[_experiment][_dataset]))
-                                    for k, v in complex_metric.items() if isinstance(v, str)})
+                    complex_metric.update({k: self._safe_set_path(self._base_folder_path_config, v, self.config[_experiment][_dataset])
+                                           for k, v in complex_metric.items()})
+                    # complex_metric.update({k: self._set_path(self._base_folder_path_config,
+                    #                                   v.format(self.config[_experiment][_dataset]))
+                    #                 for k, v in complex_metric.items() if isinstance(v, str)})
                 self.config[_experiment][p]["complex_metrics"] = complex_metrics
                 self.config[_experiment][p]["paired_ttest"] = paired_ttest
                 self.config[_experiment][p]["wilcoxon_test"] = wilcoxon_test
                 setattr(self.base_namespace, p, SimpleNamespace(**self.config[_experiment][p]))
-            elif p == _logger_config and not self.config[_experiment].get(p, False):
-                setattr(self.base_namespace, p, f"{self._base_folder_path_elliot}/config/logger_config.yml")
-            elif p == _log_folder and not self.config[_experiment].get(p, False):
-                setattr(self.base_namespace, p, f"{self._base_folder_path_elliot}/../log/")
+            elif p == _logger_config:
+                if not self.config[_experiment].get(p, False):
+                    setattr(self.base_namespace, p, os.path.abspath(os.sep.join([self._base_folder_path_elliot, "config", "logger_config.yml"])))
+                else:
+                    setattr(self.base_namespace, p,
+                            self._safe_set_path(self._base_folder_path_config, self.config[_experiment][p], self.config[_experiment][_dataset]))
+                # setattr(self.base_namespace, p, f"{self._base_folder_path_elliot}/config/logger_config.yml")
+            elif p == _log_folder:
+                if not self.config[_experiment].get(p, False):
+                    setattr(self.base_namespace, p, os.path.abspath(os.sep.join([self._base_folder_path_elliot, "..", "log"])))
+                else:
+                    setattr(self.base_namespace, p,
+                            self._safe_set_path(self._base_folder_path_config, self.config[_experiment][p], self.config[_experiment][_dataset]))
+
+                # setattr(self.base_namespace, p, f"{self._base_folder_path_elliot}/../log/")
             elif p == _external_models_path and self.config[_experiment].get(p, False):
-                self.config[_experiment][p] = self._set_path(self._base_folder_path_config, self.config[_experiment][p])
+                self.config[_experiment][p] = self._safe_set_path(self._base_folder_path_config, self.config[_experiment][p], "")
                 setattr(self.base_namespace, p, self.config[_experiment][p])
             elif p == _config_test:
                 setattr(self.base_namespace, p, self.config[_experiment].get(p, False))
@@ -227,7 +290,7 @@ class NameSpaceModel:
                         for file_ in onlyfiles:
                             local_model_name_space = copy.copy(model_name_space)
                             local_model_name_space.path = os.path.join(folder_path, file_)
-                            yield "external.ProxyRecommender", local_model_name_space
+                            yield "ProxyRecommender", local_model_name_space
                     else:
                         raise Exception("RecommendationFolder meta-model must expose the folder field.")
                 else:

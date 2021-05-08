@@ -18,8 +18,6 @@ from elliot.recommender.latent_factor_models.Slim.slim_model import SlimModel
 from elliot.recommender.recommender_utils_mixin import RecMixin
 from elliot.utils.write import store_recommendation
 
-np.random.seed(42)
-
 
 class Slim(RecMixin, BaseRecommenderModel):
     r"""
@@ -64,7 +62,7 @@ class Slim(RecMixin, BaseRecommenderModel):
     @property
     def name(self):
         return "Slim" \
-               + "_e:" + str(self._epochs) \
+               + f"_{self.get_base_params_shortcut()}" \
                + f"_{self.get_params_shortcut()}"
 
     def get_recommendations(self, k: int = 10):

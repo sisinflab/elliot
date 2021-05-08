@@ -7,19 +7,16 @@ __version__ = '0.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
-import numpy as np
 from ast import literal_eval as make_tuple
+
+import numpy as np
 from tqdm import tqdm
 
-from elliot.dataset.samplers import pointwise_pos_neg_sampler as pws
-from elliot.recommender.neural.NeuMF.neural_matrix_factorization_model import NeuralMatrixFactorizationModel
-from elliot.recommender.recommender_utils_mixin import RecMixin
-from elliot.utils.write import store_recommendation
-
+from elliot.recommender.neural.NeuMF import custom_sampler as ps
 from elliot.recommender.base_recommender_model import BaseRecommenderModel
 from elliot.recommender.base_recommender_model import init_charger
-
-np.random.seed(42)
+from elliot.recommender.neural.NeuMF.neural_matrix_factorization_model import NeuralMatrixFactorizationModel
+from elliot.recommender.recommender_utils_mixin import RecMixin
 
 
 class NeuMF(RecMixin, BaseRecommenderModel):
@@ -58,20 +55,22 @@ class NeuMF(RecMixin, BaseRecommenderModel):
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
 
-        self._random = np.random
-
-        self._sampler = pws.Sampler(self._data.i_train_dict)
 
         self._params_list = [
             ("_learning_rate", "lr", "lr", 0.001, None, None),
             ("_mf_factors", "mf_factors", "mffactors", 10, int, None),
-            ("_mlp_factors", "mlp_factors", "mlpfactors", 10, int, None),
-            ("_mlp_hidden_size", "mlp_hidden_size", "mlpunits", "(64,32)", lambda x: list(make_tuple(str(x))), lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
+            #("_mlp_factors", "mlp_factors", "mlpfactors", 10, int, None),
+            #("_mlp_hidden_size", "mlp_hidden_size", "mlpunits", "(64,32)", lambda x: list(make_tuple(str(x))), lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
             ("_dropout", "dropout", "drop", 0, None, None),
             ("_is_mf_train", "is_mf_train", "mftrain", True, None, None),
             ("_is_mlp_train", "is_mlp_train", "mlptrain", True, None, None),
+            ("_m", "m", "m", 0, int, None)
         ]
         self.autoset_params()
+
+        self._sampler = ps.Sampler(self._data.i_train_dict, self._m)
+        self._mlp_hidden_size = (self._mf_factors*4, self._mf_factors*2, self._mf_factors)
+        self._mlp_factors = self._mf_factors
 
         if self._batch_size < 1:
             self._batch_size = self._data.transactions
@@ -88,42 +87,24 @@ class NeuMF(RecMixin, BaseRecommenderModel):
     @property
     def name(self):
         return "NeuMF"\
-               + "_e:" + str(self._epochs) \
-               + "_bs:" + str(self._batch_size) \
+               + f"_{self.get_base_params_shortcut()}" \
                + f"_{self.get_params_shortcut()}"
 
     def train(self):
         if self._restore:
             return self.restore_weights()
 
-        # best_metric_value = 0
-
         for it in range(self._epochs):
             loss = 0
             steps = 0
-            with tqdm(total=int(self._data.transactions // self._batch_size), disable=not self._verbose) as t:
-                for batch in self._sampler.step(self._data.transactions, self._batch_size):
+            with tqdm(total=int(self._data.transactions * (self._m + 1) // self._batch_size), disable=not self._verbose) as t:
+                for batch in self._sampler.step(self._batch_size):
                     steps += 1
                     loss += self._model.train_step(batch).numpy()
                     t.set_postfix({'loss': f'{loss / steps:.5f}'})
                     t.update()
 
             self.evaluate(it, loss)
-
-            # if not (it + 1) % self._validation_rate:
-            #     recs = self.get_recommendations(self.evaluator.get_needed_recommendations())
-            #     result_dict = self.evaluator.eval(recs)
-            #     self._results.append(result_dict)
-            #
-            #     print(f'Epoch {(it + 1)}/{self._epochs} loss {loss/steps:.5f}')
-            #
-            #     if self._results[-1][self._validation_k]["val_results"][self._validation_metric] > best_metric_value:
-            #         print("******************************************")
-            #         best_metric_value = self._results[-1][self._validation_k]["val_results"][self._validation_metric]
-            #         if self._save_weights:
-            #             self._model.save_weights(self._saving_filepath)
-            #         if self._save_recs:
-            #             store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}-it:{it + 1}.tsv")
 
     def get_recommendations(self, k: int = 100):
         predictions_top_k_test = {}
@@ -134,14 +115,8 @@ class NeuMF(RecMixin, BaseRecommenderModel):
                 (
                     np.repeat(np.array(list(range(offset, offset_stop)))[:, None], repeats=self._num_items, axis=1),
                     np.array([self._i_items_set for _ in range(offset, offset_stop)])
-                 )
+                )
             )
-            # v, i = self._model.get_top_k(predictions, self.get_train_mask(offset, offset_stop), k=k)
-
-            # items_ratings_pair = [list(zip(map(self._data.private_items.get, u_list[0]), u_list[1]))
-            #                       for u_list in list(zip(i.numpy(), v.numpy()))]
-            # predictions_top_k.update(dict(zip(map(self._data.private_users.get,
-            #                                       range(offset, offset_stop)), items_ratings_pair)))
             recs_val, recs_test = self.process_protocol(k, predictions, offset, offset_stop)
 
             predictions_top_k_val.update(recs_val)

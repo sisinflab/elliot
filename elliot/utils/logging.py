@@ -21,7 +21,7 @@ def init(path_config, folder_log, log_level=logging.WARNING):
     # Pull in Logging Config
     path = os.path.join(path_config)
     build_log_folder(folder_log)
-    folder_log = f'{folder_log}elliot.log'
+    folder_log = os.path.abspath(os.sep.join([folder_log, "elliot.log"]))
     pattern = re.compile('.*?\${(\w+)}.*?')
     loader = yaml.SafeLoader
     loader.add_implicit_resolver('!CUSTOM', pattern, None)
@@ -78,7 +78,7 @@ def prepare_logger(name, path, log_level=logging.DEBUG):
     logger = logging.getLogger(name)
     logger.addFilter(TimeFilter())
     logger.setLevel(log_level)
-    logfilepath = f'''{path}/{name}-{datetime.datetime.now().strftime('%b-%d-%Y_%H-%M-%S')}.log'''
+    logfilepath = os.path.abspath(os.sep.join([path, f"{name}-{datetime.datetime.now().strftime('%b-%d-%Y_%H-%M-%S')}.log"]))
     fh = logging.FileHandler(logfilepath)
     sh = logging.StreamHandler(sys.stdout)
     fh.setLevel(log_level)

@@ -18,8 +18,6 @@ from elliot.recommender.knowledge_aware.kaHFM_batch.tfidf_utils import TFIDF
 from elliot.recommender.recommender_utils_mixin import RecMixin
 from elliot.utils.write import store_recommendation
 
-np.random.seed(42)
-
 
 class KaHFMBatch(RecMixin, BaseRecommenderModel):
     r"""
@@ -71,7 +69,6 @@ class KaHFMBatch(RecMixin, BaseRecommenderModel):
                                       [l_w, l_b]: regularization,
                                       lr: learning rate}
         """
-        self._random = np.random
 
         self._ratings = self._data.train_dict
         self._sampler = cs.Sampler(self._data.i_train_dict)

@@ -3,6 +3,11 @@ Module description:
 
 """
 import logging as pylog
+import os
+
+import numpy as np
+import random
+
 from elliot.evaluation.evaluator import Evaluator
 from elliot.utils.folder import build_model_folder
 
@@ -55,6 +60,7 @@ class BaseRecommenderModel(ABC):
         self._validation_rate = getattr(self._params.meta, "validation_rate", 1)
         self._optimize_internal_loss = getattr(self._params.meta, "optimize_internal_loss", False)
         self._epochs = getattr(self._params, "epochs", 2)
+        self._seed = getattr(self._params, "seed", 42)
         self._iteration = 0
         if self._epochs < self._validation_rate:
             raise Exception(f"The first validation epoch ({self._validation_rate}) "
@@ -68,8 +74,15 @@ class BaseRecommenderModel(ABC):
         self._results = []
         self._params_list = []
 
+    def get_base_params_shortcut(self):
+        return "_".join([str(k) + "=" + str(v).replace(".", "$") for k, v in
+                         dict({"seed": self._seed,
+                               "e": self._epochs,
+                               "bs": self._batch_size}).items()
+                         ])
+
     def get_params_shortcut(self):
-        return "_".join([str(p[2])+":"+ str(p[5](getattr(self, p[0])) if p[5] else getattr(self, p[0])) for p in self._params_list])
+        return "_".join([str(p[2])+"="+ str(p[5](getattr(self, p[0])) if p[5] else getattr(self, p[0])).replace(".", "$") for p in self._params_list])
 
     def autoset_params(self):
         """
@@ -126,6 +139,10 @@ def init_charger(init):
         BaseRecommenderModel.__init__(self, *args, **kwargs)
         self.logger = logging.get_logger(self.__class__.__name__, pylog.CRITICAL if self._config.config_test else
                                          pylog.DEBUG)
+        np.random.seed(self._seed)
+        random.seed(self._seed)
+        self._nprandom = np.random
+        self._random = random
         self._num_items = self._data.num_items
         self._num_users = self._data.num_users
 
@@ -134,6 +151,6 @@ def init_charger(init):
         self.evaluator = Evaluator(self._data, self._params)
         self._params.name = self.name
         build_model_folder(self._config.path_output_rec_weight, self.name)
-        self._saving_filepath = f'{self._config.path_output_rec_weight}{self.name}/best-weights-{self.name}'
+        self._saving_filepath = os.path.abspath(os.sep.join([self._config.path_output_rec_weight, self.name, f"best-weights-{self.name}"]))
 
     return new_init

@@ -13,54 +13,51 @@ import time
 
 from elliot.recommender.recommender_utils_mixin import RecMixin
 from elliot.utils.write import store_recommendation
-import scipy.sparse as sp
 
 from elliot.recommender.base_recommender_model import BaseRecommenderModel
-from elliot.recommender.NN.attribute_item_knn.attribute_item_knn_similarity import Similarity
+from elliot.recommender.knn.item_knn.item_knn_similarity import Similarity
+from elliot.recommender.knn.item_knn.aiolli_ferrari import AiolliSimilarity
 from elliot.recommender.base_recommender_model import init_charger
 
-np.random.seed(42)
 
-
-class AttributeItemKNN(RecMixin, BaseRecommenderModel):
+class ItemKNN(RecMixin, BaseRecommenderModel):
     r"""
-    Attribute Item-kNN proposed in MyMediaLite Recommender System Library
+    Amazon.com recommendations: item-to-item collaborative filtering
 
-    For further details, please refer to the `paper <https://www.researchgate.net/publication/221141162_MyMediaLite_A_free_recommender_system_library>`_
+    For further details, please refer to the `paper <http://ieeexplore.ieee.org/document/1167344/>`_
 
     Args:
         neighbors: Number of item neighbors
         similarity: Similarity function
+        implementation: Implementation type ('aiolli', 'classical')
 
     To include the recommendation model, add it to the config file adopting the following pattern:
 
     .. code:: yaml
 
       models:
-        AttributeItemKNN:
+        ItemKNN:
           meta:
             save_recs: True
           neighbors: 40
           similarity: cosine
+          implementation: aiolli
     """
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
-        self._random = np.random
 
         self._params_list = [
             ("_num_neighbors", "neighbors", "nn", 40, int, None),
-            ("_similarity", "similarity", "sim", "cosine", None, None)
+            ("_similarity", "similarity", "sim", "cosine", None, None),
+            ("_implementation", "implementation", "imp", "standard", None, None)
         ]
         self.autoset_params()
 
         self._ratings = self._data.train_dict
-
-        self._i_feature_dict = {i_item: [self._data.public_features[feature] for feature
-                                         in self._data.side_information_data.feature_map[item]] for item, i_item
-                                in self._data.public_items.items()}
-        self._sp_i_features = self.build_feature_sparse()
-
-        self._model = Similarity(self._data, self._sp_i_features, self._num_neighbors, self._similarity)
+        if self._implementation == "aiolli":
+            self._model = AiolliSimilarity(self._data, maxk=self._num_neighbors, shrink=100, similarity=self._similarity, normalize=True)
+        else:
+            self._model = Similarity(self._data, self._num_neighbors, self._similarity)
 
     def get_single_recommendation(self, mask, k, *args):
         return {u: self._model.get_user_recs(u, mask, k) for u in self._ratings.keys()}
@@ -76,18 +73,9 @@ class AttributeItemKNN(RecMixin, BaseRecommenderModel):
 
         return predictions_top_k_val, predictions_top_k_test
 
-    def build_feature_sparse(self):
-
-        rows_cols = [(i, f) for i, features in self._i_feature_dict.items() for f in features]
-        rows = [u for u, _ in rows_cols]
-        cols = [i for _, i in rows_cols]
-        data = sp.csr_matrix((np.ones_like(rows), (rows, cols)), dtype='float32',
-                             shape=(self._num_items, len(self._data.public_features)))
-        return data
-
     @property
     def name(self):
-        return f"AttributeItemKNN_{self.get_params_shortcut()}"
+        return f"ItemKNN_{self.get_params_shortcut()}"
 
     def train(self):
         if self._restore:

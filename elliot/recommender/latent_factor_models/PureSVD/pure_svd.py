@@ -17,8 +17,6 @@ from elliot.recommender.latent_factor_models.PureSVD.pure_svd_model import PureS
 from elliot.recommender.base_recommender_model import BaseRecommenderModel
 from elliot.recommender.base_recommender_model import init_charger
 
-np.random.seed(42)
-
 
 class PureSVD(RecMixin, BaseRecommenderModel):
     r"""
@@ -44,7 +42,6 @@ class PureSVD(RecMixin, BaseRecommenderModel):
 
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
-        self._random = np.random
 
         self._params_list = [
             ("_factors", "factors", "factors", 10, None, None),

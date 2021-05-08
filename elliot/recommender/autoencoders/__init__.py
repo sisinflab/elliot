@@ -9,3 +9,4 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
 from .dae.multi_dae import MultiDAE
 from .vae.multi_vae import MultiVAE
+from .EASE_R import EASER

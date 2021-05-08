@@ -16,14 +16,10 @@ from tqdm import tqdm
 
 import elliot.dataset.samplers.custom_sparse_sampler as css
 from elliot.recommender import BaseRecommenderModel
+from elliot.recommender.base_recommender_model import init_charger
 from elliot.recommender.recommender_utils_mixin import RecMixin
 from elliot.recommender.visual_recommenders.ACF.ACF_model import ACF_model
 from elliot.utils.write import store_recommendation
-
-np.random.seed(0)
-tf.random.set_seed(0)
-
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 
 class ACF(RecMixin, BaseRecommenderModel):
@@ -57,12 +53,8 @@ class ACF(RecMixin, BaseRecommenderModel):
           layers_component: (64, 1)
           layers_item: (64, 1)
     """
+    @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
-        super().__init__(data, config, params, *args, **kwargs)
-
-        self._num_items = self._data.num_items
-        self._num_users = self._data.num_users
-        self._random = np.random
 
         self._layers_component = self._params.layers_component
         self._layers_item = self._params.layers_item
@@ -100,15 +92,12 @@ class ACF(RecMixin, BaseRecommenderModel):
     @property
     def name(self):
         return "ACF" \
-               + "_e:" + str(self._epochs) \
-               + "_bs:" + str(self._batch_size) \
+               + f"_{self.get_base_params_shortcut()}" \
                + f"_{self.get_params_shortcut()}"
 
     def train(self):
         if self._restore:
             return self.restore_weights()
-
-        best_metric_value = 0
 
         for it in range(self._epochs):
             loss = 0
@@ -120,18 +109,4 @@ class ACF(RecMixin, BaseRecommenderModel):
                     t.set_postfix({'loss': f'{loss.numpy()/steps:.5f}'})
                     t.update()
 
-            if not (it + 1) % self._validation_rate:
-                recs = self.get_recommendations(self.evaluator.get_needed_recommendations())
-                result_dict = self.evaluator.eval(recs)
-                self._results.append(result_dict)
-
-                print(f'Epoch {(it + 1)}/{self._epochs} loss {loss/steps:.5f}')
-
-                if self._results[-1][self._validation_k]["val_results"][self._validation_metric] > best_metric_value:
-                    print("******************************************")
-                    best_metric_value = self._results[-1][self._validation_k]["val_results"][self._validation_metric]
-                    if self._save_weights:
-                        self._model.save_weights(self._saving_filepath)
-                    if self._save_recs:
-                        store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}-it:{it + 1}.tsv")
-
+            self.evaluate(it, loss.numpy())

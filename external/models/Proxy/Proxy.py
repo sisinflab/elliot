@@ -1,26 +1,19 @@
-import operator
 import ntpath
 import numpy as np
 import pandas as pd
 
-from elliot.evaluation.evaluator import Evaluator
 from elliot.recommender.base_recommender_model import BaseRecommenderModel
 from elliot.recommender.recommender_utils_mixin import RecMixin
-from elliot.utils.folder import build_model_folder
-from elliot.utils.write import store_recommendation
 from elliot.recommender.base_recommender_model import init_charger
-
-np.random.seed(0)
 
 
 class ProxyRecommender(RecMixin, BaseRecommenderModel):
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
         """
-        Create a Most Popular recommender.
-        :param data: data loader object
-        :param path_output_rec_result: path to the directory rec. results
-        :param path_output_rec_weight: path to the directory rec. model parameters
+        Create a Proxy recommender to evaluate already generated recommendations.
+        :param name: data loader object
+        :param path: path to the directory rec. results
         :param args: parameters
         """
         self._random = np.random
@@ -58,9 +51,6 @@ class ProxyRecommender(RecMixin, BaseRecommenderModel):
     def get_single_recommendation(self, mask, k):
 
         nonzero = mask.nonzero()
-        num_mask_samples = len(nonzero[0])
-        # pairs = list(zip(*nonzero))
-        # pairs = list(map(lambda x: (self._data.private_users[x[0]], self._data.private_items[x[1]]), zip(*nonzero)))
         candidate_items = {}
         [candidate_items.setdefault(self._data.private_users[user], set()).add(self._data.private_items[item]) for user, item in zip(*nonzero)]
         recs = {}
@@ -77,14 +67,11 @@ class ProxyRecommender(RecMixin, BaseRecommenderModel):
 
     def read_recommendations(self, path):
         recs = {}
-        user_recs_items = {}
         column_names = ["userId", "itemId", "prediction", "timestamp"]
         data = pd.read_csv(path, sep="\t", header=None, names=column_names)
-        # data = pd.DataFrame(data, columns=column_names)
         user_groups = data.groupby(['userId'])
         for name, group in user_groups:
             recs[name] = sorted(data.loc[group.index][['itemId', 'prediction']].apply(tuple, axis=1).to_list(), key=lambda x: x[1], reverse=True)
-            # user_recs_items[name] = data.loc[group.index][['itemId']].to_set()
         return recs
 
 

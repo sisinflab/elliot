@@ -16,8 +16,6 @@ from elliot.recommender.latent_factor_models.WRMF.wrmf_model import WRMFModel
 from elliot.recommender.base_recommender_model import BaseRecommenderModel
 from elliot.recommender.base_recommender_model import init_charger
 
-np.random.seed(42)
-
 
 class WRMF(RecMixin, BaseRecommenderModel):
     r"""
@@ -47,7 +45,6 @@ class WRMF(RecMixin, BaseRecommenderModel):
 
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
-        self._random = np.random
 
         self._params_list = [
             ("_factors", "factors", "factors", 10, None, None),
@@ -76,34 +73,19 @@ class WRMF(RecMixin, BaseRecommenderModel):
     @property
     def name(self):
         return "WRMF" \
-               + "_e:" + str(self._epochs) \
+               + f"_{self.get_base_params_shortcut()}" \
                + f"_{self.get_params_shortcut()}"
 
     def train(self):
         if self._restore:
             return self.restore_weights()
 
-        best_metric_value = 0
         for it in range(self._epochs):
             self._model.train_step()
 
             print("Iteration Finished")
 
-            if not (it + 1) % self._validation_rate:
-                recs = self.get_recommendations(self.evaluator.get_needed_recommendations())
-                result_dict = self.evaluator.eval(recs)
-                self._results.append(result_dict)
-
-                print(f'Epoch {(it + 1)}/{self._epochs}')
-
-                if self._results[-1][self._validation_k]["val_results"][self._validation_metric] > best_metric_value:
-                    print("******************************************")
-                    best_metric_value = self._results[-1][self._validation_k]["val_results"][self._validation_metric]
-                    if self._save_weights:
-                        with open(self._saving_filepath, "wb") as f:
-                            pickle.dump(self._model.get_model_state(), f)
-                    if self._save_recs:
-                        store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}-it:{it + 1}.tsv")
+            self.evaluate(it)
 
     def restore_weights(self):
         try:

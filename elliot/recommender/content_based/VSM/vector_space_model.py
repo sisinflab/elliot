@@ -22,8 +22,6 @@ from elliot.recommender.content_based.VSM.vector_space_model_similarity import S
 from elliot.recommender.content_based.VSM.tfidf_utils import TFIDF
 from elliot.recommender.base_recommender_model import init_charger
 
-np.random.seed(42)
-
 
 class VSM(RecMixin, BaseRecommenderModel):
     r"""
@@ -55,7 +53,7 @@ class VSM(RecMixin, BaseRecommenderModel):
         self._params_list = [
             ("_similarity", "similarity", "sim", "cosine", None, None),
             ("_user_profile_type", "user_profile", "up", "tfidf", None, None),
-            ("_item_profile_type", "item_profile", "ip", "tfidf", None, None),
+            ("_item_profile_type", "item_profile", "ip", "tfidf", None, None)
         ]
         self.autoset_params()
 

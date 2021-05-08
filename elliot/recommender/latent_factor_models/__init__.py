@@ -24,3 +24,5 @@ from .Slim import Slim
 from .CML import CML
 from .FISM import FISM
 from .SVDpp import SVDpp
+from .iALS import iALS
+from .MF2020 import MF2020

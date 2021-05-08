@@ -15,11 +15,9 @@ from elliot.recommender.recommender_utils_mixin import RecMixin
 from elliot.utils.write import store_recommendation
 
 from elliot.recommender.base_recommender_model import BaseRecommenderModel
-from elliot.recommender.NN.user_knn.user_knn_similarity import Similarity
-from elliot.recommender.NN.user_knn.aiolli_ferrari import AiolliSimilarity
+from elliot.recommender.knn.user_knn.user_knn_similarity import Similarity
+from elliot.recommender.knn.user_knn.aiolli_ferrari import AiolliSimilarity
 from elliot.recommender.base_recommender_model import init_charger
-
-np.random.seed(42)
 
 
 class UserKNN(RecMixin, BaseRecommenderModel):
@@ -47,7 +45,6 @@ class UserKNN(RecMixin, BaseRecommenderModel):
     """
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
-        self._random = np.random
 
         self._params_list = [
             ("_num_neighbors", "neighbors", "nn", 40, int, None),

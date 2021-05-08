@@ -17,7 +17,7 @@ from elliot.utils.write import store_recommendation
 
 from elliot.recommender.base_recommender_model import BaseRecommenderModel
 from .item_knn_similarity import Similarity
-from elliot.recommender.NN.item_knn.aiolli_ferrari import AiolliSimilarity
+from elliot.recommender.knn.item_knn.aiolli_ferrari import AiolliSimilarity
 from elliot.recommender.base_recommender_model import init_charger
 
 np.random.seed(42)

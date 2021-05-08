@@ -21,8 +21,6 @@ from elliot.recommender.latent_factor_models.BPRMF_batch.BPRMF_batch_model impor
 from elliot.recommender.recommender_utils_mixin import RecMixin
 from elliot.recommender.base_recommender_model import init_charger
 
-np.random.seed(42)
-
 
 class BPRMF_batch(RecMixin, BaseRecommenderModel):
     r"""
@@ -64,7 +62,6 @@ class BPRMF_batch(RecMixin, BaseRecommenderModel):
                                       [l_w, l_b]: regularization,
                                       lr: learning rate}
         """
-        self._random = np.random
 
         self._params_list = [
             ("_factors", "factors", "factors", 10, None, None),
@@ -90,16 +87,14 @@ class BPRMF_batch(RecMixin, BaseRecommenderModel):
 
     @property
     def name(self):
-        return "BPR_NN" \
-               + "_e:" + str(self._epochs) \
-               + "_bs:" + str(self._batch_size) \
+        return "BPRNN" \
+               + f"_{self.get_base_params_shortcut()}" \
                + f"_{self.get_params_shortcut()}"
 
     def train(self):
         if self._restore:
             return self.restore_weights()
 
-        best_metric_value = 0
         for it in range(self._epochs):
             loss = 0
             steps = 0
@@ -110,32 +105,18 @@ class BPRMF_batch(RecMixin, BaseRecommenderModel):
                     t.set_postfix({'loss': f'{loss.numpy() / steps:.5f}'})
                     t.update()
 
-            if not (it + 1) % self._validation_rate:
-                recs = self.get_recommendations(self.evaluator.get_needed_recommendations())
-                result_dict = self.evaluator.eval(recs)
-                self._results.append(result_dict)
-
-                print(f'Epoch {(it + 1)}/{self._epochs} loss {loss  / steps:.3f}')
-
-                if self._results[-1][self._validation_k]["val_results"][self._validation_metric] > best_metric_value:
-                    print("******************************************")
-                    best_metric_value = self._results[-1][self._validation_k]["val_results"][self._validation_metric]
-                    if self._save_weights:
-                        self._model.save_weights(self._saving_filepath)
-                    if self._save_recs:
-                        store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}-it:{it + 1}.tsv")
+            self.evaluate(it, loss.numpy())
 
     def get_recommendations(self, k: int = 100):
-        predictions_top_k = {}
-        for index, offset in enumerate(range(0, self._num_users, self._params.batch_size)):
-            offset_stop = min(offset+self._params.batch_size, self._num_users)
+        predictions_top_k_test = {}
+        predictions_top_k_val = {}
+        for index, offset in enumerate(range(0, self._num_users, self._batch_size)):
+            offset_stop = min(offset + self._batch_size, self._num_users)
             predictions = self._model.predict(offset, offset_stop)
-            mask = self.get_train_mask(offset, offset_stop)
-            v, i = self._model.get_top_k(predictions, mask, k=k)
-            items_ratings_pair = [list(zip(map(self._data.private_items.get, u_list[0]), u_list[1]))
-                                  for u_list in list(zip(i.numpy(), v.numpy()))]
-            predictions_top_k.update(dict(zip(range(offset, offset_stop), items_ratings_pair)))
-        return predictions_top_k
+            recs_val, recs_test = self.process_protocol(k, predictions, offset, offset_stop)
+            predictions_top_k_val.update(recs_val)
+            predictions_top_k_test.update(recs_test)
+        return predictions_top_k_val, predictions_top_k_test
 
     def restore_weights(self):
         try:

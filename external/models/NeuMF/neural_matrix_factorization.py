@@ -18,8 +18,6 @@ from elliot.recommender.base_recommender_model import init_charger
 from .neural_matrix_factorization_model import NeuralMatrixFactorizationModel
 from elliot.recommender.recommender_utils_mixin import RecMixin
 
-np.random.seed(42)
-
 
 class NeuMF(RecMixin, BaseRecommenderModel):
     r"""
@@ -56,8 +54,6 @@ class NeuMF(RecMixin, BaseRecommenderModel):
     """
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
-
-        self._random = np.random
 
 
         self._params_list = [

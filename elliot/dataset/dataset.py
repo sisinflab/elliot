@@ -20,8 +20,10 @@ from elliot.prefiltering.standard_prefilters import PreFilter
 from elliot.negative_sampling.negative_sampling import NegativeSampler
 from elliot.utils import logging
 
+from elliot.dataset.modular_loaders.loader_coordinator_mixin import LoaderCoordinator
 
-class DataSetLoader:
+
+class DataSetLoader(LoaderCoordinator):
     """
     Load train and test dataset
     """
@@ -45,7 +47,8 @@ class DataSetLoader:
             path_val_data = getattr(config.data_config, "validation_path", None)
             path_test_data = config.data_config.test_path
 
-            self.train_dataframe = pd.read_csv(path_train_data, sep="\t", header=None, names=self.column_names)
+            self.train_dataframe, self.side_information = self.coordinate_information(path_train_data, sep="\t", header=None, names=self.column_names, sides=config.data_config.side_information)
+            # self.train_dataframe = pd.read_csv(path_train_data, sep="\t", header=None, names=self.column_names)
 
             self.train_dataframe = self.check_timestamp(self.train_dataframe)
 
@@ -74,7 +77,11 @@ class DataSetLoader:
             self.logger.info("There will be the splitting")
             path_dataset = config.data_config.dataset_path
 
-            self.dataframe = pd.read_csv(path_dataset, sep="\t", header=None, names=self.column_names)
+            self.dataframe, self.side_information = self.coordinate_information(path_dataset, sep="\t",
+                                                                                header=None,
+                                                                                names=self.column_names,
+                                                                                sides=config.data_config.side_information)
+            # self.dataframe = pd.read_csv(path_dataset, sep="\t", header=None, names=self.column_names)
 
             self.dataframe = self.check_timestamp(self.dataframe)
 
@@ -121,11 +128,11 @@ class DataSetLoader:
                 # validation level
                 val_list = []
                 for train, val in train_val:
-                    single_dataobject = DataSet(self.config, (train,val,test), self.args, self.kwargs)
+                    single_dataobject = DataSet(self.config, (train,val,test), self.side_information, self.args, self.kwargs)
                     val_list.append(single_dataobject)
                 data_list.append(val_list)
             else:
-                single_dataobject = DataSet(self.config, (train_val, test), self.args,
+                single_dataobject = DataSet(self.config, (train_val, test), self.side_information, self.args,
                                                               self.kwargs)
                 data_list.append([single_dataobject])
         return data_list
@@ -148,7 +155,7 @@ class DataSet(AbstractDataset):
     Load train and test dataset
     """
 
-    def __init__(self, config, data_tuple, *args, **kwargs):
+    def __init__(self, config, data_tuple, side_information_data, *args, **kwargs):
         """
         Constructor of DataSet
         :param path_train_data: relative path for train file
@@ -159,6 +166,7 @@ class DataSet(AbstractDataset):
         self.config = config
         self.args = args
         self.kwargs = kwargs
+        self.side_information = side_information_data
         self.train_dict = self.dataframe_to_dict(data_tuple[0])
 
         self.users = list(self.train_dict.keys())

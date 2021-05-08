@@ -17,8 +17,6 @@ from elliot.recommender.neural.UserAutoRec.userautorec_model import UserAutoRecM
 from elliot.recommender.recommender_utils_mixin import RecMixin
 from elliot.utils.write import store_recommendation
 
-np.random.seed(42)
-
 
 class UserAutoRec(RecMixin, BaseRecommenderModel):
     r"""
@@ -57,7 +55,6 @@ class UserAutoRec(RecMixin, BaseRecommenderModel):
             *args:
             **kwargs:
         """
-        self._random = np.random
 
         self._params_list = [
             ("_lr", "lr", "lr", 0.0001, None, None),
@@ -81,15 +78,12 @@ class UserAutoRec(RecMixin, BaseRecommenderModel):
     @property
     def name(self):
         return "UserAutoRec" \
-               + "_e:" + str(self._epochs) \
-               + "_bs:" + str(self._batch_size) \
+               + f"_{self.get_base_params_shortcut()}" \
                + f"_{self.get_params_shortcut()}"
 
     def train(self):
         if self._restore:
             return self.restore_weights()
-
-        best_metric_value = 0
 
         for it in range(self._epochs):
             loss = 0
@@ -101,17 +95,4 @@ class UserAutoRec(RecMixin, BaseRecommenderModel):
                     t.set_postfix({'loss': f'{loss.numpy()/steps:.5f}'})
                     t.update()
 
-            if not (it + 1) % self._validation_rate:
-                recs = self.get_recommendations(self.evaluator.get_needed_recommendations())
-                result_dict = self.evaluator.eval(recs)
-                self._results.append(result_dict)
-
-                print(f'Epoch {(it + 1)}/{self._epochs} loss {loss/steps:.5f}')
-
-                if self._results[-1][self._validation_k]["val_results"][self._validation_metric] > best_metric_value:
-                    print("******************************************")
-                    best_metric_value = self._results[-1][self._validation_k]["val_results"][self._validation_metric]
-                    if self._save_weights:
-                        self._model.save_weights(self._saving_filepath)
-                    if self._save_recs:
-                        store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}-it:{it + 1}.tsv")
+            self.evaluate(it, loss.numpy())

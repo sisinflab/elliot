@@ -22,7 +22,6 @@ from elliot.recommender.neural.NFM.neural_fm_model import NeuralFactorizationMac
 from elliot.recommender.recommender_utils_mixin import RecMixin
 from elliot.utils.write import store_recommendation
 from elliot.recommender.base_recommender_model import init_charger
-np.random.seed(42)
 
 
 class NFM(RecMixin, BaseRecommenderModel):
@@ -56,7 +55,6 @@ class NFM(RecMixin, BaseRecommenderModel):
         """
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
-        self._random = np.random
 
         self._params_list = [
             ("_factors", "factors", "factors", 10, None, None),
@@ -68,8 +66,6 @@ class NFM(RecMixin, BaseRecommenderModel):
             ("_l_w", "reg", "reg", 0.1, None, None)
         ]
         self.autoset_params()
-
-
 
         if self._batch_size < 1:
             self._batch_size = self._data.transactions
@@ -87,8 +83,7 @@ class NFM(RecMixin, BaseRecommenderModel):
     @property
     def name(self):
         return "NFM" \
-               + "_e:" + str(self._epochs) \
-               + "_bs:" + str(self._batch_size) \
+               + f"_{self.get_base_params_shortcut()}" \
                + f"_{self.get_params_shortcut()}"
 
     def predict(self, u: int, i: int):
@@ -109,20 +104,7 @@ class NFM(RecMixin, BaseRecommenderModel):
                     t.set_postfix({'loss': f'{loss.numpy() / steps:.5f}'})
                     t.update()
 
-            if not (it + 1) % self._validation_rate:
-                recs = self.get_recommendations(self.evaluator.get_needed_recommendations())
-                result_dict = self.evaluator.eval(recs)
-                self._results.append(result_dict)
-
-                print(f'Epoch {(it + 1)}/{self._epochs} loss {loss  / steps:.3f}')
-
-                if self._results[-1][self._validation_k]["val_results"][self._validation_metric] > best_metric_value:
-                    print("******************************************")
-                    best_metric_value = self._results[-1][self._validation_k]["val_results"][self._validation_metric]
-                    if self._save_weights:
-                        self._model.save_weights(self._saving_filepath)
-                    if self._save_recs:
-                        store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}-it:{it + 1}.tsv")
+            self.evaluate(it, loss.numpy())
 
     def get_recommendations(self, k: int = 100):
         predictions_top_k = {}

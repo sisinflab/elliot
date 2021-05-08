@@ -21,8 +21,6 @@ from elliot.recommender.base_recommender_model import init_charger
 from elliot.recommender.recommender_utils_mixin import RecMixin
 from elliot.utils.write import store_recommendation
 
-np.random.seed(42)
-
 
 class BPRMF(RecMixin, BaseRecommenderModel):
     r"""
@@ -66,7 +64,6 @@ class BPRMF(RecMixin, BaseRecommenderModel):
 
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
-        self._random = np.random
 
         self._params_list = [
             ("_factors", "factors", "f", 10, int, None),

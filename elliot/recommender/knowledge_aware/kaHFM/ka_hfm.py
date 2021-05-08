@@ -11,8 +11,6 @@ from elliot.utils.write import store_recommendation
 from elliot.recommender.knowledge_aware.kaHFM.tfidf_utils import TFIDF
 from elliot.recommender.base_recommender_model import init_charger
 
-np.random.seed(42)
-
 
 class MF(object):
     """
@@ -202,7 +200,6 @@ class KaHFM(RecMixin, BaseRecommenderModel):
     """
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
-        self._random = np.random
         self._sample_negative_items_empirically = True
 
         self._params_list = [
