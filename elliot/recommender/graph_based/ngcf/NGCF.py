@@ -136,7 +136,6 @@ class NGCF(RecMixin, BaseRecommenderModel):
         if self._restore:
             return self.restore_weights()
 
-        best_metric_value = 0
         for it in range(self._epochs):
             loss = 0
             steps = 0

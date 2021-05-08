@@ -123,8 +123,8 @@ class NeuMF(RecMixin, BaseRecommenderModel):
             predictions_top_k_test.update(recs_test)
         return predictions_top_k_val, predictions_top_k_test
 
-    def get_single_recommendation(self, mask, k, predictions, offset, offset_stop):
-        v, i = self._model.get_top_k(predictions, mask[offset: offset_stop], k=k)
-        items_ratings_pair = [list(zip(map(self._data.private_items.get, u_list[0]), u_list[1]))
-                              for u_list in list(zip(i.numpy(), v.numpy()))]
-        return dict(zip(map(self._data.private_users.get, range(offset, offset_stop)), items_ratings_pair))
+    # def get_single_recommendation(self, mask, k, predictions, offset, offset_stop):
+    #     v, i = self._model.get_top_k(predictions, mask[offset: offset_stop], k=k)
+    #     items_ratings_pair = [list(zip(map(self._data.private_items.get, u_list[0]), u_list[1]))
+    #                           for u_list in list(zip(i.numpy(), v.numpy()))]
+    #     return dict(zip(map(self._data.private_users.get, range(offset, offset_stop)), items_ratings_pair))
