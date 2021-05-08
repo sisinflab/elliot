@@ -88,8 +88,19 @@ class VSM(RecMixin, BaseRecommenderModel):
 
         self._model = Similarity(self._data, self._sp_i_user_features, self._sp_i_item_features, self._similarity)
 
-    def get_recommendations(self, k: int = 100):
-        return {u: self._model.get_user_recs(u, k) for u in self._ratings.keys()}
+    def get_single_recommendation(self, mask, k, *args):
+        return {u: self._model.get_user_recs(u, mask, k) for u in self._ratings.keys()}
+
+    def get_recommendations(self, k: int = 10):
+        predictions_top_k_val = {}
+        predictions_top_k_test = {}
+
+        recs_val, recs_test = self.process_protocol(k)
+
+        predictions_top_k_val.update(recs_val)
+        predictions_top_k_test.update(recs_test)
+
+        return predictions_top_k_val, predictions_top_k_test
 
     @property
     def name(self):
@@ -104,24 +115,7 @@ class VSM(RecMixin, BaseRecommenderModel):
         end = time.time()
         print(f"The similarity computation has taken: {end - start}")
 
-        print(f"Transactions: {self._data.transactions}")
-
-        best_metric_value = 0
-
-        print("Computing recommendations..")
-        recs = self.get_recommendations(self.evaluator.get_needed_recommendations())
-        result_dict = self.evaluator.eval(recs)
-        self._results.append(result_dict)
-        print(f'Finished')
-
-        if self._results[-1][self._validation_k]["val_results"][self._validation_metric] > best_metric_value:
-            print("******************************************")
-            if self._save_weights:
-                with open(self._saving_filepath, "wb") as f:
-                    print("Saving Model")
-                    pickle.dump(self._model.get_model_state(), f)
-            if self._save_recs:
-                store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}.tsv")
+        self.evaluate()
 
     def compute_binary_profile(self, user_items_dict: t.Dict):
         user_features = {}

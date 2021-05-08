@@ -130,14 +130,7 @@ class WideAndDeep(RecMixin, BaseRecommenderModel):
                     t.set_postfix({'loss': f'{loss.numpy() / steps:.5f}'})
                     t.update()
 
-            if not (it + 1) % self._validation_rate:
-                recs = self.get_recommendations(self.evaluator.get_needed_recommendations())
-                result_dict = self.evaluator.eval(recs)
-                self._results.append(result_dict)
-
-                print(f'Epoch {(it + 1)}/{self._epochs} loss {loss/steps:.5f}')
-
-                self.evaluate(it, loss.numpy())
+            self.evaluate(it, loss.numpy())
 
     def get_recommendations(self, k: int = 100):
         predictions_top_k_test = {}

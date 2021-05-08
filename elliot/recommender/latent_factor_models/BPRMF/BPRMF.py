@@ -11,9 +11,6 @@ __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
 import pickle
-import time
-
-import numpy as np
 
 from elliot.dataset.samplers import custom_sampler as cs
 from elliot.recommender.base_recommender_model import BaseRecommenderModel
@@ -95,9 +92,6 @@ class BPRMF(RecMixin, BaseRecommenderModel):
                               self._negative_item_regularization)
         self._sampler = cs.Sampler(self._data.i_train_dict)
 
-    # def get_recommendations(self, k: int = 100):
-    #     return {u: self._model.get_user_recs(u, k) for u in self._ratings.keys()}
-
     def get_recommendations(self, k: int = 10):
         predictions_top_k_val = {}
         predictions_top_k_test = {}
@@ -112,35 +106,12 @@ class BPRMF(RecMixin, BaseRecommenderModel):
     def get_single_recommendation(self, mask, k, *args):
         return {u: self._model.get_user_predictions(u, mask, k) for u in self._ratings.keys()}
 
-    # def predict(self, u: int, i: int):
-    #     """
-    #     Get prediction on the user item pair.
-    #
-    #     Returns:
-    #         A single float vaue.
-    #     """
-    #     return self._model.predict(u, i)
-
     @property
     def name(self):
         return "BPRMF" \
-               + "_e:" + str(self._epochs) \
-               + "_bs:" + str(self._batch_size) \
+               + f"_{self.get_base_params_shortcut()}" \
                + f"_{self.get_params_shortcut()}"
 
-    # def train_step(self):
-    #     start_it = time.perf_counter()
-    #     print()
-    #     print("Sampling...")
-    #     samples = self._sampler.step(self._data.transactions)
-    #     start = time.perf_counter()
-    #     print(f"Sampled in {round(start-start_it, 2)} seconds")
-    #     start = time.perf_counter()
-    #     print("Computing..")
-    #     for u, i, j in samples:
-    #         self.update_factors(u, i, j)
-    #     t2 = time.perf_counter()
-    #     print(f"Computed and updated in {round(t2-start, 2)} seconds")
 
     def train(self):
         if self._restore:
@@ -159,57 +130,6 @@ class BPRMF(RecMixin, BaseRecommenderModel):
                     t.update()
 
             self.evaluate(it)
-
-        # print(f"Transactions: {self._data.transactions}")
-        # # best_metric_value = -np.inf
-        # for it in range(self._epochs):
-        #     print(f"\n********** Iteration: {it + 1}")
-        #     self._iteration = it
-        #
-        #     self.train_step()
-        #
-        #     self.evaluate(it)
-        #     # if not (it + 1) % self._validation_rate:
-        #     #     recs = self.get_recommendations(self.evaluator.get_needed_recommendations())
-        #     #     result_dict = self.evaluator.eval(recs)
-        #     #     self._results.append(result_dict)
-        #     #
-        #     #     if self._results[-1][self._validation_k]["val_results"][self._validation_metric] > best_metric_value:
-        #     #         print("******************************************")
-        #     #         best_metric_value = self._results[-1][self._validation_k]["val_results"][self._validation_metric]
-        #     #         if self._save_weights:
-        #     #             with open(self._saving_filepath, "wb") as f:
-        #     #                 pickle.dump(self._model.get_model_state(), f)
-        #     #         if self._save_recs:
-        #     #             store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}-it:{it + 1}.tsv")
-
-    # def update_factors(self, u: int, i: int, j: int):
-    #     user_factors = self._model.get_user_factors(u)
-    #     item_factors_i = self._model.get_item_factors(i)
-    #     item_factors_j = self._model.get_item_factors(j)
-    #     item_bias_i = self._model.get_item_bias(i)
-    #     item_bias_j = self._model.get_item_bias(j)
-    #
-    #     z = 1/(1 + np.exp(self.predict(u, i)-self.predict(u, j)))
-    #     # update bias i
-    #     d_bi = (z - self._bias_regularization*item_bias_i)
-    #     self._model.set_item_bias(i, item_bias_i + (self._learning_rate * d_bi))
-    #
-    #     # update bias j
-    #     d_bj = (-z - self._bias_regularization*item_bias_j)
-    #     self._model.set_item_bias(j, item_bias_j + (self._learning_rate * d_bj))
-    #
-    #     # update user factors
-    #     d_u = ((item_factors_i - item_factors_j)*z - self._user_regularization*user_factors)
-    #     self._model.set_user_factors(u, user_factors + (self._learning_rate * d_u))
-    #
-    #     # update item i factors
-    #     d_i = (user_factors*z - self._positive_item_regularization*item_factors_i)
-    #     self._model.set_item_factors(i, item_factors_i + (self._learning_rate * d_i))
-    #
-    #     # update item j factors
-    #     d_j = (-user_factors*z - self._negative_item_regularization*item_factors_j)
-    #     self._model.set_item_factors(j, item_factors_j + (self._learning_rate * d_j))
 
     def restore_weights(self):
         try:

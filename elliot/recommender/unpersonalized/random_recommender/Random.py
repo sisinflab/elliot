@@ -22,10 +22,9 @@ class Random(RecMixin, BaseRecommenderModel):
         :param path_output_rec_weight: path to the directory rec. model parameters
         :param args: parameters
         """
-        self._random = np.random
 
         self._params_list = [
-            ("_seed", "random_seed", "seed", 42, None, None)
+            ("_seed", "random_seed", "seed", 42, int, None)
         ]
         self.autoset_params()
 
@@ -36,15 +35,9 @@ class Random(RecMixin, BaseRecommenderModel):
         return f"Random_{self.get_params_shortcut()}"
 
     def train(self):
-        # recs = self.get_recommendations(self.evaluator.get_needed_recommendations())
-        # result_dict = self.evaluator.eval(recs)
-        # self._results.append(result_dict)
-        #
-        # if self._save_recs:
-        #     store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}.tsv")
         self.evaluate()
 
-    def get_recommendations(self, top_k):
+    def get_recommendations(self, top_k: int = 100):
         predictions_top_k_val = {}
         predictions_top_k_test = {}
 
@@ -55,7 +48,7 @@ class Random(RecMixin, BaseRecommenderModel):
 
         return predictions_top_k_val, predictions_top_k_test
 
-    def get_single_recommendation(self, mask, top_k):
+    def get_single_recommendation(self, mask, top_k, *args):
         r_int = np.random.randint
         n_items = self._num_items
         # items = self._data.items

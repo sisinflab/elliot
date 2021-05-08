@@ -71,17 +71,20 @@ class NonNegMF(RecMixin, BaseRecommenderModel):
                + f"_{self.get_base_params_shortcut()}" \
                + f"_{self.get_params_shortcut()}"
 
-    def get_recommendations(self, k: int = 100):
-        return {u: self._model.get_user_recs(u, k) for u in self._ratings.keys()}
+    def get_recommendations(self, k: int = 10):
+        predictions_top_k_val = {}
+        predictions_top_k_test = {}
 
-    def predict(self, u: int, i: int):
-        """
-        Get prediction on the user item pair.
+        recs_val, recs_test = self.process_protocol(k)
 
-        Returns:
-            A single float vaue.
-        """
-        return self._model.predict(u, i)
+        predictions_top_k_val.update(recs_val)
+        predictions_top_k_test.update(recs_test)
+
+        return predictions_top_k_val, predictions_top_k_test
+
+    def get_single_recommendation(self, mask, k, *args):
+        return {u: self._model.get_user_recs(u, mask, k) for u in self._data.train_dict.keys()}
+
 
     def train(self):
         print(f"Transactions: {self._data.transactions}")

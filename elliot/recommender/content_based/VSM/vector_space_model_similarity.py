@@ -59,15 +59,13 @@ class Similarity(object):
         else:
             raise Exception("Not implemented similarity")
 
-    def get_transactions(self):
-        return self._transactions
-
-    def get_user_recs(self, u, k):
-        user_items = self._ratings[u].keys()
-        indexed_user_items = [self._public_items[i] for i in user_items]
-        predictions = {self._private_items[i]: v for i, v in enumerate(self._similarity_matrix[self._public_users[u]]) if i not in indexed_user_items}
-
-        indices, values = zip(*predictions.items())
+    def get_user_recs(self, u, mask, k):
+        user_id = self._data.public_users.get(u)
+        user_recs = self._similarity_matrix[user_id]
+        user_recs_mask = mask[user_id]
+        user_recs[~user_recs_mask] = -np.inf
+        indices, values = zip(*[(self._data.private_items.get(u_list[0]), u_list[1])
+                              for u_list in enumerate(user_recs)])
         indices = np.array(indices)
         values = np.array(values)
         local_k = min(k, len(values))

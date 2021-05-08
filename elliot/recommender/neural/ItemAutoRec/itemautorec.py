@@ -15,7 +15,6 @@ from elliot.recommender.base_recommender_model import BaseRecommenderModel
 from elliot.recommender.base_recommender_model import init_charger
 from elliot.recommender.neural.ItemAutoRec.itemautorec_model import ItemAutoRecModel
 from elliot.recommender.recommender_utils_mixin import RecMixin
-from elliot.utils.write import store_recommendation
 
 
 class ItemAutoRec(RecMixin, BaseRecommenderModel):
@@ -98,14 +97,25 @@ class ItemAutoRec(RecMixin, BaseRecommenderModel):
             self.evaluate(it, loss.numpy())
 
     def get_recommendations(self, k: int = 100):
-        predictions_top_k = {}
+        predictions_top_k_test = {}
+        predictions_top_k_val = {}
         for batch in self._sampler.step(self._num_items, self._num_items):
             predictions = self._model.get_recs(batch)
-        predictions = np.transpose(
-            np.array(predictions))  # We have to build the transpose since we query the model by items.
-        v, i = self._model.get_top_k(predictions, self.get_train_mask(0, self._data.num_users), k=k)
-        items_ratings_pair = [list(zip(map(self._data.private_items.get, u_list[0]), u_list[1]))
-                              for u_list in list(zip(i.numpy(), v.numpy()))]
-        predictions_top_k.update(dict(zip(map(self._data.private_users.get,
-                                              range(self._data.num_users)), items_ratings_pair)))
-        return predictions_top_k
+        predictions = np.transpose(np.array(predictions))  # We have to build the transpose since we query the model by items.
+        recs_val, recs_test = self.process_protocol(k, predictions, 0, self._data.num_users)
+        predictions_top_k_val.update(recs_val)
+        predictions_top_k_test.update(recs_test)
+        return predictions_top_k_val, predictions_top_k_test
+
+    # def get_recommendations(self, k: int = 100):
+    #     predictions_top_k = {}
+    #     for batch in self._sampler.step(self._num_items, self._num_items):
+    #         predictions = self._model.get_recs(batch)
+    #     predictions = np.transpose(
+    #         np.array(predictions))  # We have to build the transpose since we query the model by items.
+    #     v, i = self._model.get_top_k(predictions, self.get_train_mask(0, self._data.num_users), k=k)
+    #     items_ratings_pair = [list(zip(map(self._data.private_items.get, u_list[0]), u_list[1]))
+    #                           for u_list in list(zip(i.numpy(), v.numpy()))]
+    #     predictions_top_k.update(dict(zip(map(self._data.private_users.get,
+    #                                           range(self._data.num_users)), items_ratings_pair)))
+    #     return predictions_top_k

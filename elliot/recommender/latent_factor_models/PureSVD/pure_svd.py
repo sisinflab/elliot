@@ -53,11 +53,6 @@ class PureSVD(RecMixin, BaseRecommenderModel):
         self._sp_i_train = self._data.sp_i_train
         self._model = PureSVDModel(self._factors, self._data, self._seed)
 
-    # def get_recommendations(self, k: int = 100):
-    #     return {u: self._model.get_user_recs(u, k) for u in self._ratings.keys()}
-    #
-    #
-
     def get_recommendations(self, k: int = 10):
         predictions_top_k_val = {}
         predictions_top_k_test = {}
@@ -93,21 +88,6 @@ class PureSVD(RecMixin, BaseRecommenderModel):
         self._model.train_step()
 
         self.evaluate()
-
-        # print("Computation finished, producing recommendations")
-        #
-        # recs = self.get_recommendations(self.evaluator.get_needed_recommendations())
-        # result_dict = self.evaluator.eval(recs)
-        # self._results.append(result_dict)
-        #
-        # print("******************************************")
-        # print("Saving to files")
-        #
-        # if self._save_weights:
-        #     with open(self._saving_filepath, "wb") as f:
-        #         pickle.dump(self._model.get_model_state(), f)
-        # if self._save_recs:
-        #     store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}.tsv")
 
     def restore_weights(self):
         try:

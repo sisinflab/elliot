@@ -93,8 +93,7 @@ class MultiVAE(RecMixin, BaseRecommenderModel):
     @property
     def name(self):
         return "MultiVAE" \
-               + "_e:" + str(self._epochs) \
-               + "_bs:" + str(self._batch_size) \
+               + f"_{self.get_base_params_shortcut()}" \
                + f"_{self.get_params_shortcut()}"
 
     def train(self):

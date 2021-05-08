@@ -74,14 +74,9 @@ class GMF(RecMixin, BaseRecommenderModel):
                + f"_{self.get_base_params_shortcut()}" \
                + f"_{self.get_params_shortcut()}"
 
-    def predict(self, u: int, i: int):
-        pass
-
     def train(self):
         if self._restore:
             return self.restore_weights()
-
-        best_metric_value = 0
 
         for it in range(self._epochs):
             loss = 0

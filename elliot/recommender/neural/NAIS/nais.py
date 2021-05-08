@@ -106,7 +106,6 @@ class NAIS(RecMixin, BaseRecommenderModel):
     def train(self):
         if self._restore:
             return self.restore_weights()
-        best_metric_value = 0
 
         for it in range(self._epochs):
             loss = 0
@@ -131,22 +130,3 @@ class NAIS(RecMixin, BaseRecommenderModel):
             predictions_top_k_test.update(recs_test)
         return predictions_top_k_val, predictions_top_k_test
 
-    # def restore_weights(self):
-    #     try:
-    #         with open(self._saving_filepath, "rb") as f:
-    #             self._model.set_model_state(pickle.load(f))
-    #         print(f"Model correctly Restored")
-    #
-    #         recs = self.get_recommendations(self.evaluator.get_needed_recommendations())
-    #         result_dict = self.evaluator.eval(recs)
-    #         self._results.append(result_dict)
-    #
-    #         print("******************************************")
-    #         if self._save_recs:
-    #             store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}.tsv")
-    #         return True
-    #
-    #     except Exception as ex:
-    #         print(f"Error in model restoring operation! {ex}")
-    #
-    #     return False
