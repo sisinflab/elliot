@@ -14,8 +14,6 @@ import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers
 
-tf.random.set_seed(42)
-
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 
@@ -26,9 +24,12 @@ class Encoder(layers.Layer):
                  intermediate_dim=600,
                  dropout_rate=0,
                  regularization_lambda=0.01,
+                 random_seed=42,
                  name="encoder",
                  **kwargs):
         super().__init__(name=name, **kwargs)
+        tf.random.set_seed(random_seed)
+
         self.l2_normalizer = layers.Lambda(lambda x: keras.backend.l2_normalize(x, axis=1))
         self.input_dropout = layers.Dropout(dropout_rate)
         self.dense_proj = layers.Dense(intermediate_dim,
@@ -52,8 +53,10 @@ class Encoder(layers.Layer):
 class Decoder(layers.Layer):
     """Converts z, the encoded vector, back into a uaser interaction vector."""
 
-    def __init__(self, original_dim, intermediate_dim=600, name="decoder", regularization_lambda=0.01, **kwargs):
+    def __init__(self, original_dim, intermediate_dim=600, name="decoder", regularization_lambda=0.01,
+                 random_seed=42, **kwargs):
         super().__init__(name=name, **kwargs)
+        tf.random.set_seed(random_seed)
         self.dense_proj = layers.Dense(intermediate_dim,
                                        activation="tanh",
                                        kernel_initializer=keras.initializers.GlorotNormal(),
@@ -78,18 +81,22 @@ class DenoisingAutoEncoder(keras.Model):
                  learning_rate=0.001,
                  dropout_rate=0,
                  regularization_lambda=0.01,
+                 random_seed=42,
                  name="DenoisingAutoEncoder",
                  **kwargs
     ):
         super().__init__(name=name, **kwargs)
+        tf.random.set_seed(random_seed)
         self.original_dim = original_dim
         self.encoder = Encoder(latent_dim=latent_dim,
                                intermediate_dim=intermediate_dim,
                                dropout_rate=dropout_rate,
-                               regularization_lambda=regularization_lambda)
+                               regularization_lambda=regularization_lambda,
+                               random_seed=random_seed)
         self.decoder = Decoder(original_dim,
                                intermediate_dim=intermediate_dim,
-                               regularization_lambda=regularization_lambda)
+                               regularization_lambda=regularization_lambda,
+                               random_seed=random_seed)
         self.optimizer = tf.optimizers.Adam(learning_rate)
 
     def get_config(self):

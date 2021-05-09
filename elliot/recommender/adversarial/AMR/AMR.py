@@ -114,7 +114,8 @@ class AMR(RecMixin, BaseRecommenderModel):
                                 self._l_adv,
                                 self._data.visual_features[item_indices],
                                 self._num_users,
-                                self._num_items)
+                                self._num_items,
+                                self._seed)
 
 
     @property

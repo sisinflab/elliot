@@ -104,7 +104,8 @@ class IRGAN(RecMixin, BaseRecommenderModel):
                                   self._d_pretrain_epochs,
                                   self._g_epochs,
                                   self._d_epochs,
-                                  self._sample_lambda)
+                                  self._sample_lambda,
+                                  self._seed)
 
     @property
     def name(self):

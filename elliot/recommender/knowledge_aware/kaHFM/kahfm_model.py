@@ -1,3 +1,5 @@
+import pickle
+
 import numpy as np
 import typing as t
 
@@ -177,6 +179,14 @@ class KAHFMModel(object):
         self._item_bias = saving_dict['_item_bias']
         self._user_factors = saving_dict['_user_factors']
         self._item_factors = saving_dict['_item_factors']
+
+    def load_weights(self, path):
+        with open(path, "rb") as f:
+            self.set_model_state(pickle.load(f))
+
+    def save_weights(self, path):
+        with open(path, "wb") as f:
+            pickle.dump(self.get_model_state(), f)
 
     # def get_user_bias(self, user: int):
     #

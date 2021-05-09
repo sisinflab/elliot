@@ -14,7 +14,6 @@ from tensorflow import keras
 from elliot.dataset.samplers import pointwise_pos_neg_sampler as pws
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-tf.random.set_seed(0)
 
 
 class Generator(keras.Model):
@@ -28,7 +27,6 @@ class Generator(keras.Model):
                  name="CFGAN-GEN",
                  **kwargs):
         super().__init__(name=name, **kwargs)
-        tf.random.set_seed(42)
 
         self._learning_rate = learning_rate
         self._l_w = l_w
@@ -86,7 +84,6 @@ class Discriminator(keras.Model):
                  name="CFGAN-DIS",
                  **kwargs):
         super().__init__(name=name, **kwargs)
-        tf.random.set_seed(42)
 
         self._learning_rate = learning_rate
         self._l_w = l_w
@@ -143,10 +140,11 @@ class CFGAN_model(keras.Model):
                  g_epochs=5,
                  d_epochs=1,
                  s_zr=0, s_pm=0,
+                 random_seed=42,
                  name="CFGAN",
                  **kwargs):
         super().__init__(name=name, **kwargs)
-        tf.random.set_seed(42)
+        tf.random.set_seed(random_seed)
 
         self._data = data
         self._learning_rate = learning_rate

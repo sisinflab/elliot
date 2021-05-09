@@ -13,8 +13,6 @@ import numpy as np
 import tensorflow as tf
 from tensorflow import keras
 
-tf.random.set_seed(0)
-# logging.disable(logging.WARNING)
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 
@@ -25,10 +23,11 @@ class KaHFMEmbeddingsModel(keras.Model):
                  item_factors,
                  learning_rate=0.001,
                  l_w=0, l_b=0,
+                 random_seed=42,
                  name="NNBPRMF",
                  **kwargs):
         super().__init__(name=name, **kwargs)
-        tf.random.set_seed(42)
+        tf.random.set_seed(random_seed)
 
         # self._factors = factors
         self._learning_rate = learning_rate

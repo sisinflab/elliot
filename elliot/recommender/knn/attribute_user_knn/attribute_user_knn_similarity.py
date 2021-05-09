@@ -1,10 +1,9 @@
+import pickle
 
 import numpy as np
 from scipy import sparse
 from sklearn.metrics.pairwise import cosine_similarity, euclidean_distances, haversine_distances, chi2_kernel, manhattan_distances
 from sklearn.metrics import pairwise_distances
-
-
 
 
 class Similarity(object):
@@ -185,3 +184,11 @@ class Similarity(object):
         self._neighbors = saving_dict['_neighbors']
         self._similarity = saving_dict['_similarity']
         self._num_neighbors = saving_dict['_num_neighbors']
+
+    def load_weights(self, path):
+        with open(path, "rb") as f:
+            self.set_model_state(pickle.load(f))
+
+    def save_weights(self, path):
+        with open(path, "wb") as f:
+            pickle.dump(self.get_model_state(), f)

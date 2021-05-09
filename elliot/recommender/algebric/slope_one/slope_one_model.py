@@ -4,6 +4,7 @@
 Lemire, Daniel, and Anna Maclachlan. "Slope one predictors for online rating-based collaborative filtering."
 Proceedings of the 2005 SIAM International Conference on Data Mining. Society for Industrial and Applied Mathematics
 """
+import pickle
 
 import numpy as np
 
@@ -73,3 +74,11 @@ class SlopeOneModel:
         self.freq = saving_dict['freq']
         self.dev = saving_dict['dev']
         self.user_mean = saving_dict['user_mean']
+
+    def load_weights(self, path):
+        with open(path, "rb") as f:
+            self.set_model_state(pickle.load(f))
+
+    def save_weights(self, path):
+        with open(path, "wb") as f:
+            pickle.dump(self.get_model_state(), f)

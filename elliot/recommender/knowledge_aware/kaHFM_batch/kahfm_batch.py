@@ -114,7 +114,8 @@ class KaHFMBatch(RecMixin, BaseRecommenderModel):
                                   self._item_factors,
                                   self._params.lr,
                                   self._params.l_w,
-                                  self._params.l_b)
+                                  self._params.l_b,
+                                  self._seed)
 
     @property
     def name(self):

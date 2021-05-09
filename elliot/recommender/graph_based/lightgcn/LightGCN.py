@@ -89,7 +89,8 @@ class LightGCN(RecMixin, BaseRecommenderModel):
             l_w=self._l_w,
             n_fold=self._n_fold,
             adjacency=self._adjacency,
-            laplacian=self._laplacian
+            laplacian=self._laplacian,
+            random_seed=self._seed
         )
 
     def _create_adj_mat(self):

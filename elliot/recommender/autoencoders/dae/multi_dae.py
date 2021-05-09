@@ -79,7 +79,8 @@ class MultiDAE(RecMixin, BaseRecommenderModel):
                                            self._latent_dim,
                                            self._learning_rate,
                                            self._dropout_rate,
-                                           self._lambda)
+                                           self._lambda,
+                                           self._seed)
 
     @property
     def name(self):

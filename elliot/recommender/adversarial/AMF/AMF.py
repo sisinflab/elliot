@@ -90,13 +90,14 @@ class AMF(RecMixin, BaseRecommenderModel):
         self._sampler = cs.Sampler(self._data.i_train_dict)
 
         self._model = AMF_model(self._factors,
-                                    self._learning_rate,
-                                    self._l_w,
-                                    self._l_b,
-                                    self._eps,
-                                    self._l_adv,
-                                    self._num_users,
-                                    self._num_items)
+                                self._learning_rate,
+                                self._l_w,
+                                self._l_b,
+                                self._eps,
+                                self._l_adv,
+                                self._num_users,
+                                self._num_items,
+                                self._seed)
 
     @property
     def name(self):

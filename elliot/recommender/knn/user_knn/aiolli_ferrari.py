@@ -5,6 +5,7 @@ Created on 23/10/17
 @author: Maurizio Ferrari Dacrema
 
 """
+import pickle
 
 import numpy as np
 import time, sys
@@ -176,6 +177,28 @@ class AiolliSimilarity(object):
         mat = sp.csc_matrix((ratings, (rows, cols)), shape=(user_num, item_num))
 
         return mat
+
+    def get_model_state(self):
+        saving_dict = {}
+        saving_dict['_preds'] = self._preds
+        saving_dict['_similarity'] = self._similarity
+        saving_dict['_num_neighbors'] = self._num_neighbors
+        saving_dict['_implicit'] = self._implicit
+        return saving_dict
+
+    def set_model_state(self, saving_dict):
+        self._preds = saving_dict['_preds']
+        self._similarity = saving_dict['_similarity']
+        self._num_neighbors = saving_dict['_num_neighbors']
+        self._implicit = saving_dict['_implicit']
+
+    def load_weights(self, path):
+        with open(path, "rb") as f:
+            self.set_model_state(pickle.load(f))
+
+    def save_weights(self, path):
+        with open(path, "wb") as f:
+            pickle.dump(self.get_model_state(), f)
 
 
 class Compute_Similarity:

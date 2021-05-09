@@ -19,10 +19,11 @@ class AMR_model(keras.Model):
                  emb_image=None,
                  num_users=100,
                  num_items=100,
+                 random_seed=42,
                  name="AMR",
                  **kwargs):
         super().__init__(name=name, **kwargs)
-        tf.random.set_seed(42)
+        tf.random.set_seed(random_seed)
 
         self._factors = factors
         self._factors_d = factors_d

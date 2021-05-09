@@ -53,14 +53,7 @@ class MultiVAE(RecMixin, BaseRecommenderModel):
     def __init__(self, data, config, params, *args, **kwargs):
         """
         """
-        self._random = np.random
-        self._random_p = random
 
-        self._ratings = self._data.train_dict
-        self._sampler = sp.Sampler(self._data.sp_i_train)
-
-        if self._batch_size < 1:
-            self._batch_size = self._num_users
 
         ######################################
 
@@ -70,20 +63,24 @@ class MultiVAE(RecMixin, BaseRecommenderModel):
             ("_lambda", "reg_lambda", "reg_lambda", 0.01, None, None),
             ("_learning_rate", "lr", "lr", 0.001, None, None),
             ("_dropout_rate", "dropout_pkeep", "dropout_pkeep", 1, None, None),
-            # ("_seed", "seed", "seed", 42, None, None)
         ]
         self.autoset_params()
-        # np.random.seed(self._seed)
-        # random.seed(self._seed)
+
+        self._ratings = self._data.train_dict
+        self._sampler = sp.Sampler(self._data.sp_i_train)
+
+        if self._batch_size < 1:
+            self._batch_size = self._num_users
 
         self._dropout_rate = 1. - self._dropout_rate
 
         self._model = VariationalAutoEncoder(self._num_items,
-                                           self._intermediate_dim,
-                                           self._latent_dim,
-                                           self._learning_rate,
-                                           self._dropout_rate,
-                                           self._lambda)
+                                             self._intermediate_dim,
+                                             self._latent_dim,
+                                             self._learning_rate,
+                                             self._dropout_rate,
+                                             self._lambda,
+                                             self._seed)
 
         # the total number of gradient updates for annealing
         self._total_anneal_steps = 200000
@@ -119,20 +116,4 @@ class MultiVAE(RecMixin, BaseRecommenderModel):
                     t.update()
                     self._update_count += 1
 
-            # if not (it + 1) % self._validation_rate:
-            #     recs = self.get_recommendations(self.evaluator.get_needed_recommendations())
-            #     result_dict = self.evaluator.eval(recs)
-            #     self._results.append(result_dict)
-            #
-            #     print(f'Epoch {(it + 1)}/{self._epochs} loss {loss/steps:.5f}')
-            #
-            #     if self._results[-1][self._validation_k]["val_results"][self._validation_metric] > best_metric_value:
-            #         print("******************************************")
-            #         best_metric_value = self._results[-1][self._validation_k]["val_results"][self._validation_metric]
-            #         if self._save_weights:
-            #             self._model.save_weights(self._saving_filepath)
-            #         if self._save_recs:
-            #             store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}-it:{it + 1}.tsv")
-
-            # self.losses.append(loss)
             self.evaluate(it, loss)

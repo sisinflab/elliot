@@ -13,9 +13,6 @@ import numpy as np
 import tensorflow as tf
 from tensorflow import keras
 
-tf.random.set_seed(42)
-
-# logging.disable(logging.WARNING)
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 
@@ -34,10 +31,12 @@ class NGCFModel(keras.Model):
                  n_fold,
                  adjacency,
                  laplacian,
+                 random_seed,
                  name="NGFC",
                  **kwargs
                  ):
         super().__init__(name=name, **kwargs)
+        tf.random.set_seed(random_seed)
 
         self.num_users = num_users
         self.num_items = num_items

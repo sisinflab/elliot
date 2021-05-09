@@ -105,7 +105,8 @@ class CFGAN(RecMixin, BaseRecommenderModel):
                                   self._g_epochs,
                                   self._d_epochs,
                                   self._s_zr,
-                                  self._s_pm
+                                  self._s_pm,
+                                  self._seed
                                   )
 
     @property
