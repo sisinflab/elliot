@@ -11,11 +11,17 @@ class Similarity(object):
     Simple kNN class
     """
 
-    def __init__(self, data, num_neighbors, similarity):
+    def __init__(self, data, num_neighbors, similarity, implicit):
         self._data = data
         self._ratings = data.train_dict
         self._num_neighbors = num_neighbors
         self._similarity = similarity
+        self._implicit = implicit
+
+        if self._implicit:
+            self._URM = self._data.sp_i_train
+        else:
+            self._URM = self._data.sp_i_train_ratings
 
         self._users = self._data.users
         self._items = self._data.items
@@ -29,17 +35,17 @@ class Similarity(object):
         This function initialize the data model
         """
 
-        supported_similarities = ["cosine", "dot", ]
-        supported_dissimilarities = ["euclidean", "manhattan", "haversine",  "chi2", 'cityblock', 'l1', 'l2', 'braycurtis', 'canberra', 'chebyshev', 'correlation', 'dice', 'hamming', 'jaccard', 'kulsinski', 'mahalanobis', 'minkowski', 'rogerstanimoto', 'russellrao', 'seuclidean', 'sokalmichener', 'sokalsneath', 'sqeuclidean', 'yule']
-        print(f"\nSupported Similarities: {supported_similarities}")
-        print(f"Supported Distances/Dissimilarities: {supported_dissimilarities}\n")
+        self.supported_similarities = ["cosine", "dot", ]
+        self.supported_dissimilarities = ["euclidean", "manhattan", "haversine",  "chi2", 'cityblock', 'l1', 'l2', 'braycurtis', 'canberra', 'chebyshev', 'correlation', 'dice', 'hamming', 'jaccard', 'kulsinski', 'mahalanobis', 'minkowski', 'rogerstanimoto', 'russellrao', 'seuclidean', 'sokalmichener', 'sokalsneath', 'sqeuclidean', 'yule']
+        print(f"\nSupported Similarities: {self.supported_similarities}")
+        print(f"Supported Distances/Dissimilarities: {self.supported_dissimilarities}\n")
 
-        self._item_ratings = {}
-        for u, user_items in self._ratings.items():
-            for i, v in user_items.items():
-                self._item_ratings.setdefault(i, {}).update({u: v})
+        # self._item_ratings = {}
+        # for u, user_items in self._ratings.items():
+        #     for i, v in user_items.items():
+        #         self._item_ratings.setdefault(i, {}).update({u: v})
 
-        self._transactions = self._data.transactions
+        # self._transactions = self._data.transactions
 
         self._similarity_matrix = np.empty((len(self._items), len(self._items)))
 
@@ -68,7 +74,7 @@ class Similarity(object):
 
         W_sparse = sparse.csc_matrix((data, rows_indices, cols_indptr),
                                      shape=(len(self._data.items), len(self._data.items)), dtype=np.float32).tocsr()
-        self._preds = self._data.sp_i_train_ratings.dot(W_sparse).toarray()
+        self._preds = self._URM.dot(W_sparse).toarray()
         ##############
         # self.compute_neighbors()
 
@@ -89,24 +95,26 @@ class Similarity(object):
         if similarity == "cosine":
             # x, y = np.triu_indices(self._similarity_matrix.shape[0], k=1)
             # self._similarity_matrix[x, y] = cosine_similarity(self._data.sp_i_train_ratings.T)[x, y]
-            self._similarity_matrix = cosine_similarity(self._data.sp_i_train_ratings.T)
+            self._similarity_matrix = cosine_similarity(self._URM.T)
         elif similarity == "dot":
-            self._similarity_matrix = (self._data.sp_i_train_ratings.T @ self._data.sp_i_train_ratings).toarray()
+            self._similarity_matrix = (self._URM.T @ self._URM).toarray()
         elif similarity == "euclidean":
-            self._similarity_matrix = (1 / (1 + euclidean_distances(self._data.sp_i_train_ratings.T)))
+            self._similarity_matrix = (1 / (1 + euclidean_distances(self._URM.T)))
         elif similarity == "manhattan":
-            self._similarity_matrix = (1 / (1 + manhattan_distances(self._data.sp_i_train_ratings.T)))
+            self._similarity_matrix = (1 / (1 + manhattan_distances(self._URM.T)))
         elif similarity == "haversine":
-            self._similarity_matrix = (1 / (1 + haversine_distances(self._data.sp_i_train_ratings.T)))
+            self._similarity_matrix = (1 / (1 + haversine_distances(self._URM.T)))
         elif similarity == "chi2":
-            self._similarity_matrix = (1 / (1 + chi2_kernel(self._data.sp_i_train_ratings.T)))
+            self._similarity_matrix = (1 / (1 + chi2_kernel(self._URM.T)))
         elif similarity in ['cityblock', 'l1', 'l2']:
-            self._similarity_matrix = (1 / (1 + pairwise_distances(self._data.sp_i_train_ratings.T, metric=similarity)))
+            self._similarity_matrix = (1 / (1 + pairwise_distances(self._URM.T, metric=similarity)))
         elif similarity in ['braycurtis', 'canberra', 'chebyshev', 'correlation', 'dice', 'hamming', 'jaccard', 'kulsinski', 'mahalanobis', 'minkowski', 'rogerstanimoto', 'russellrao', 'seuclidean', 'sokalmichener', 'sokalsneath', 'sqeuclidean', 'yule']:
 
-            self._similarity_matrix = (1 / (1 + pairwise_distances(self._data.sp_i_train_ratings.T.toarray(), metric=similarity)))
+            self._similarity_matrix = (1 / (1 + pairwise_distances(self._URM.T.toarray(), metric=similarity)))
         else:
-            raise Exception("Not implemented similarity")
+            raise ValueError("Compute Similarity: value for parameter 'similarity' not recognized."
+                             f"\nAllowed values are: {self.supported_similarities}, {self.supported_dissimilarities}."
+                             f"\nPassed value was {similarity}\nTry with implementation: aiolli")
 
     # def process_cosine(self):
     #     x, y = np.triu_indices(self._similarity_matrix.shape[0], k=1)
@@ -175,9 +183,11 @@ class Similarity(object):
         saving_dict['_neighbors'] = self._neighbors
         saving_dict['_similarity'] = self._similarity
         saving_dict['_num_neighbors'] = self._num_neighbors
+        saving_dict['_implicit'] = self._implicit
         return saving_dict
 
     def set_model_state(self, saving_dict):
         self._neighbors = saving_dict['_neighbors']
         self._similarity = saving_dict['_similarity']
         self._num_neighbors = saving_dict['_num_neighbors']
+        self._implicit = saving_dict['_implicit']

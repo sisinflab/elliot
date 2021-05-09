@@ -53,36 +53,39 @@ class VSM(RecMixin, BaseRecommenderModel):
         self._params_list = [
             ("_similarity", "similarity", "sim", "cosine", None, None),
             ("_user_profile_type", "user_profile", "up", "tfidf", None, None),
-            ("_item_profile_type", "item_profile", "ip", "tfidf", None, None)
+            ("_item_profile_type", "item_profile", "ip", "tfidf", None, None),
+            ("_loader", "loader", "load", "ItemAttributes", None, None),
         ]
         self.autoset_params()
 
         self._ratings = self._data.train_dict
 
+        self._side = getattr(self._data.side_information, self._loader, None)
+
         if self._user_profile_type == "tfidf":
-            self._tfidf_obj = TFIDF(self._data.side_information_data.feature_map)
+            self._tfidf_obj = TFIDF(self._side.feature_map)
             self._tfidf = self._tfidf_obj.tfidf()
             self._user_profiles = self._tfidf_obj.get_profiles(self._ratings)
         else:
             self._user_profiles = {user: self.compute_binary_profile(user_items)
                                    for user, user_items in self._ratings.items()}
 
-        self._i_user_feature_dict = {self._data.public_users[user]: {self._data.public_features[feature]: value
+        self._i_user_feature_dict = {self._data.public_users[user]: {self._side.public_features[feature]: value
                                                                      for feature, value in user_features.items()}
                                      for user, user_features in self._user_profiles.items()}
         self._sp_i_user_features = self.build_feature_sparse_values(self._i_user_feature_dict, self._num_users)
 
         if self._item_profile_type == "tfidf":
-            self._tfidf_obj = TFIDF(self._data.side_information_data.feature_map)
+            self._tfidf_obj = TFIDF(self._side.feature_map)
             self._tfidf = self._tfidf_obj.tfidf()
             self._i_item_feature_dict = {
-                i_item: {self._data.public_features[feature]: self._tfidf[item].get(feature, 0)
-                         for feature in self._data.side_information_data.feature_map[item]}
+                i_item: {self._side.public_features[feature]: self._tfidf[item].get(feature, 0)
+                         for feature in self._side.feature_map[item]}
                 for item, i_item in self._data.public_items.items()}
             self._sp_i_item_features = self.build_feature_sparse_values(self._i_item_feature_dict, self._num_items)
         else:
-            self._i_item_feature_dict = {i_item: [self._data.public_features[feature] for feature
-                                                  in self._data.side_information_data.feature_map[item]]
+            self._i_item_feature_dict = {i_item: [self._side.public_features[feature] for feature
+                                                  in self._side.feature_map[item]]
                                          for item, i_item in self._data.public_items.items()}
             self._sp_i_item_features = self.build_feature_sparse(self._i_item_feature_dict, self._num_items)
 
@@ -121,7 +124,7 @@ class VSM(RecMixin, BaseRecommenderModel):
         user_features = {}
         # partial = 1/len(user_items_dict)
         for item in user_items_dict.keys():
-            for feature in self._data.side_information_data.feature_map.get(item, []):
+            for feature in self._side.feature_map.get(item, []):
                 # user_features[feature] = user_features.get(feature, 0) + partial
                 user_features[feature] = user_features.get(feature, 1)
         return user_features
@@ -132,7 +135,7 @@ class VSM(RecMixin, BaseRecommenderModel):
         rows = [u for u, _ in rows_cols]
         cols = [i for _, i in rows_cols]
         data = sp.csr_matrix((np.ones_like(rows), (rows, cols)), dtype='float32',
-                             shape=(num_entities, len(self._data.public_features)))
+                             shape=(num_entities, len(self._side.public_features)))
         return data
 
     def build_feature_sparse_values(self, feature_dict, num_entities):
@@ -142,7 +145,7 @@ class VSM(RecMixin, BaseRecommenderModel):
         values = [r for _, _, r in rows_cols_values]
 
         data = sp.csr_matrix((values, (rows, cols)), dtype='float32',
-                             shape=(num_entities, len(self._data.public_features)))
+                             shape=(num_entities, len(self._side.public_features)))
 
         return data
 

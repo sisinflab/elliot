@@ -12,12 +12,18 @@ class Similarity(object):
     Simple kNN class
     """
 
-    def __init__(self, data, attribute_matrix, num_neighbors, similarity):
+    def __init__(self, data, attribute_matrix, num_neighbors, similarity, implicit):
         self._data = data
         self._ratings = data.train_dict
         self._attribute_matrix = attribute_matrix
         self._num_neighbors = num_neighbors
         self._similarity = similarity
+        self._implicit = implicit
+
+        if self._implicit:
+            self._URM = self._data.sp_i_train
+        else:
+            self._URM = self._data.sp_i_train_ratings
 
         self._users = self._data.users
         self._items = self._data.items
@@ -36,12 +42,12 @@ class Similarity(object):
         print(f"\nSupported Similarities: {supported_similarities}")
         print(f"Supported Distances/Dissimilarities: {supported_dissimilarities}\n")
 
-        self._item_ratings = {}
-        for u, user_items in self._ratings.items():
-            for i, v in user_items.items():
-                self._item_ratings.setdefault(i, {}).update({u: v})
-
-        self._transactions = self._data.transactions
+        # self._item_ratings = {}
+        # for u, user_items in self._ratings.items():
+        #     for i, v in user_items.items():
+        #         self._item_ratings.setdefault(i, {}).update({u: v})
+        #
+        # self._transactions = self._data.transactions
 
         self._similarity_matrix = np.empty((len(self._items), len(self._items)))
 
@@ -67,7 +73,7 @@ class Similarity(object):
 
         W_sparse = sparse.csc_matrix((data, rows_indices, cols_indptr),
                                      shape=(len(self._data.items), len(self._data.items)), dtype=np.float32).tocsr()
-        self._preds = self._data.sp_i_train.dot(W_sparse).toarray()
+        self._preds = self._URM.dot(W_sparse).toarray()
         ##############
         # self.compute_neighbors()
 

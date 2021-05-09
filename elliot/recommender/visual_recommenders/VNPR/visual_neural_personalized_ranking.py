@@ -61,11 +61,14 @@ class VNPR(RecMixin, BaseRecommenderModel):
             ("_l_w", "l_w", "l_w", 0.001, None, None),
             ("_mf_factors", "mf_factors", "mffactors", 10, None, None),
             ("_mlp_hidden_size", "mlp_hidden_size", "mlpunits", "(32,1)", lambda x: list(make_tuple(str(x))), lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
-            ("_dropout", "dropout", "drop", 0.2, None, None)
+            ("_dropout", "dropout", "drop", 0.2, None, None),
+            ("_loader", "loader", "load", "ItemAttributes", None, None),
         ]
         self.autoset_params()
 
-        item_indices = [self._data.item_mapping[self._data.private_items[item]] for item in range(self._num_items)]
+        self._side = getattr(self._data.side_information, self._loader, None)
+
+        item_indices = [self._side.item_mapping[self._data.private_items[item]] for item in range(self._num_items)]
 
         if self._batch_size < 1:
             self._batch_size = self._data.transactions
@@ -78,7 +81,7 @@ class VNPR(RecMixin, BaseRecommenderModel):
                                                      self._mlp_hidden_size,
                                                      self._dropout,
                                                      self._learning_rate,
-                                                     self._data.visual_features[item_indices])
+                                                     self._side.visual_features[item_indices])
 
     @property
     def name(self):

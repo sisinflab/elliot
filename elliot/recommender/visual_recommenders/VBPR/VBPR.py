@@ -63,7 +63,8 @@ class VBPR(RecMixin, BaseRecommenderModel):
             ("_learning_rate", "lr", "lr", 0.0005, None, None),
             ("_l_w", "l_w", "l_w", 0.000025, None, None),
             ("_l_b", "l_b", "l_b", 0, None, None),
-            ("_l_e", "l_e", "l_e", 0.002, None, None)
+            ("_l_e", "l_e", "l_e", 0.002, None, None),
+            ("_loader", "loader", "load", "ItemAttributes", None, None),
         ]
         self.autoset_params()
 
@@ -72,9 +73,11 @@ class VBPR(RecMixin, BaseRecommenderModel):
 
         self._ratings = self._data.train_dict
 
+        self._side = getattr(self._data.side_information, self._loader, None)
+
         self._sampler = cs.Sampler(self._data.i_train_dict)
 
-        item_indices = [self._data.item_mapping[self._data.private_items[item]] for item in range(self._num_items)]
+        item_indices = [self._side.item_mapping[self._data.private_items[item]] for item in range(self._num_items)]
 
         self._model = VBPR_model(self._factors,
                                  self._factors_d,
@@ -82,7 +85,7 @@ class VBPR(RecMixin, BaseRecommenderModel):
                                  self._l_w,
                                  self._l_b,
                                  self._l_e,
-                                 self._data.visual_features[item_indices],
+                                 self._side.visual_features[item_indices],
                                  self._num_users,
                                  self._num_items)
 

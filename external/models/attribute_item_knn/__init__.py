@@ -1,2 +1,2 @@
 
-from elliot.recommender.knn.attribute_item_knn.attribute_item_knn import AttributeItemKNN
+from .attribute_item_knn import AttributeItemKNN

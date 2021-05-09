@@ -46,8 +46,16 @@ def check_matrix(X, format='csc', dtype=np.float32):
 
 
 class AiolliSimilarity(object):
-    def __init__(self, data, maxk=40, shrink=100,
-                 similarity='cosine', normalize=True):
+    def __init__(self, data,
+                 maxk=40,
+                 shrink=100,
+                 similarity='cosine',
+                 implicit=False,
+                 normalize=True,
+                 asymmetric_alpha=0.5,
+                 tversky_alpha = 1.0,
+                 tversky_beta = 1.0,
+                 row_weights = None):
         """
         ItemKNN recommender
         Parameters
@@ -60,7 +68,12 @@ class AiolliSimilarity(object):
         normalize : bool, whether calculate similarity with normalized value
         """
         self._data = data
-        self._train_set = data.sp_i_train
+        self._implicit = implicit
+
+        if self._implicit:
+            self._train_set = data.sp_i_train
+        else:
+            self._train_set = self._data.sp_i_train_ratings
 
         self._private_users = self._data.private_users
         self._public_users = self._data.public_users
@@ -74,6 +87,10 @@ class AiolliSimilarity(object):
         self.shrink = shrink
         self.normalize = normalize
         self.similarity = similarity
+        self.asymmetric_alpha = asymmetric_alpha
+        self.tversky_alpha = tversky_alpha
+        self.tversky_beta = tversky_beta
+        self.row_weights = row_weights
 
         self.RECOMMENDER_NAME = "ItemKNNCFRecommender"
 
@@ -98,17 +115,29 @@ class AiolliSimilarity(object):
                                         shrink=self.shrink,
                                         topK=self.k,
                                         normalize=self.normalize,
-                                        similarity=self.similarity)
+                                        similarity=self.similarity,
+                                        asymmetric_alpha=self.asymmetric_alpha,
+                                        tversky_alpha=self.tversky_alpha,
+                                        tversky_beta=self.tversky_beta,
+                                        row_weights=self.row_weights
+                                        )
 
         w_sparse = similarity.compute_similarity()
         w_sparse = w_sparse.tocsc()
 
-        self.pred_mat = train.dot(w_sparse).tolil()
+        # self.pred_mat = train.dot(w_sparse).tolil()
+        self.pred_mat = train.dot(w_sparse).toarray()
 
-    def get_user_recs(self, user, k=100):
-        user_items = self._data.train_dict[user].keys()
-        predictions = {i: self.predict(user, i) for i in self._data.items if i not in user_items}
-        indices, values = zip(*predictions.items())
+    def get_user_recs(self, u, mask, k):
+        user_id = self._data.public_users.get(u)
+        user_recs = self.pred_mat[user_id]
+        # user_items = self._ratings[u].keys()
+        user_recs_mask = mask[user_id]
+        user_recs[~user_recs_mask] = -np.inf
+        indices, values = zip(*[(self._data.private_items.get(u_list[0]), u_list[1])
+                              for u_list in enumerate(user_recs)])
+
+        # indices, values = zip(*predictions.items())
         indices = np.array(indices)
         values = np.array(values)
         local_k = min(k, len(values))
@@ -118,13 +147,26 @@ class AiolliSimilarity(object):
         local_top_k = real_values.argsort()[::-1]
         return [(real_indices[item], real_values[item]) for item in local_top_k]
 
-    def predict(self, u, i):
-        indexed_user = self._public_users[u]
-        indexed_item = self._public_items[i]
-        if indexed_user >= self.user_num or indexed_item >= self.item_num:
-            raise ValueError('User and/or item is unkown.')
+    # def get_user_recs(self, user, k=100):
+    #     user_items = self._data.train_dict[user].keys()
+    #     predictions = {i: self.predict(user, i) for i in self._data.items if i not in user_items}
+    #     indices, values = zip(*predictions.items())
+    #     indices = np.array(indices)
+    #     values = np.array(values)
+    #     local_k = min(k, len(values))
+    #     partially_ordered_preds_indices = np.argpartition(values, -local_k)[-local_k:]
+    #     real_values = values[partially_ordered_preds_indices]
+    #     real_indices = indices[partially_ordered_preds_indices]
+    #     local_top_k = real_values.argsort()[::-1]
+    #     return [(real_indices[item], real_values[item]) for item in local_top_k]
 
-        return self.pred_mat[indexed_user, indexed_item]
+    # def predict(self, u, i):
+    #     indexed_user = self._public_users[u]
+    #     indexed_item = self._public_items[i]
+    #     if indexed_user >= self.user_num or indexed_item >= self.item_num:
+    #         raise ValueError('User and/or item is unkown.')
+    #
+    #     return self.pred_mat[indexed_user, indexed_item]
 
     def _convert_df(self, user_num, item_num, df):
         """Process Data to make ItemKNN available"""
@@ -210,10 +252,10 @@ class Compute_Similarity:
         elif similarity == "cosine":
             pass
         else:
-            raise ValueError("Cosine_Similarity: value for parameter 'mode' not recognized."
-                             " Allowed values are: 'cosine', 'pearson', 'adjusted', 'asymmetric', 'jaccard', 'tanimoto',"
+            raise ValueError("Compute_Similarity: value for parameter 'mode' not recognized."
+                             "\nAllowed values are: 'cosine', 'pearson', 'adjusted', 'asymmetric', 'jaccard', 'tanimoto',"
                              "dice, tversky."
-                             " Passed value was '{}'".format(similarity))
+                             "\nPassed value was '{}'\nTry with implementation: standard".format(similarity))
 
         self.use_row_weights = False
 

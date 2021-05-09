@@ -66,7 +66,8 @@ class ACF(RecMixin, BaseRecommenderModel):
             ("_layers_component", "layers_component", "layers_component", "(64,1)", lambda x: list(make_tuple(x)),
              lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
             ("_layers_item", "layers_item", "layers_item", "(64,1)", lambda x: list(make_tuple(x)),
-             lambda x: self._batch_remove(str(x), " []").replace(",", "-"))
+             lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
+            ("_loader", "loader", "load", "ItemAttributes", None, None),
         ]
 
         self.autoset_params()
@@ -74,16 +75,18 @@ class ACF(RecMixin, BaseRecommenderModel):
         if self._batch_size < 1:
             self._batch_size = self._data.transactions
 
+        self._side = getattr(self._data.side_information, self._loader, None)
+
         self._sampler = css.Sampler(self._data.i_train_dict, self._data.sp_i_train)
 
-        item_indices = [self._data.item_mapping[self._data.private_items[item]] for item in range(self._num_items)]
+        item_indices = [self._side.item_mapping[self._data.private_items[item]] for item in range(self._num_items)]
 
         self._model = ACF_model(self._factors,
                                 self._layers_component,
                                 self._layers_item,
                                 self._learning_rate,
                                 self._l_w,
-                                self._data.visual_features[item_indices],
+                                self._side.visual_features[item_indices],
                                 self._data.sp_i_train.toarray(),
                                 self._num_users,
                                 self._num_items)

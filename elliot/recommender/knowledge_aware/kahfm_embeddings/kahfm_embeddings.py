@@ -69,41 +69,45 @@ class KaHFMEmbeddings(RecMixin, BaseRecommenderModel):
                                       [l_w, l_b]: regularization,
                                       lr: learning rate}
         """
-
-        self._ratings = self._data.train_dict
-        self._sampler = cs.Sampler(self._data.i_train_dict)
-
-        self._tfidf_obj = TFIDF(self._data.side_information_data.feature_map)
-        self._tfidf = self._tfidf_obj.tfidf()
-        self._user_profiles = self._tfidf_obj.get_profiles(self._ratings)
-
-        self._user_factors = \
-            np.zeros(shape=(len(self._data.users), len(self._data.features)))
-        self._item_factors = \
-            np.zeros(shape=(len(self._data.items), len(self._data.features)))
-
-        for i, f_dict in self._tfidf.items():
-            if i in self._data.items:
-                for f, v in f_dict.items():
-                    self._item_factors[self._data.public_items[i]][self._data.public_features[f]] = v
-
-        for u, f_dict in self._user_profiles.items():
-            for f, v in f_dict.items():
-                self._user_factors[self._data.public_users[u]][self._data.public_features[f]] = v
-
-        if self._batch_size < 1:
-            self._batch_size = self._num_users
-
         ######################################
 
         self._params_list = [
             ("_learning_rate", "lr", "lr", 0.0001, None, None),
             ("_l_w", "l_w", "l_w", 0.005, None, None),
             ("_l_b", "l_b", "l_b", 0, None, None),
+            ("_loader", "loader", "load", "ChainedKG", None, None),
         ]
         self.autoset_params()
 
-        self._factors = self._data.factors
+        self._ratings = self._data.train_dict
+
+        self._side = getattr(self._data.side_information, self._loader, None)
+
+        self._sampler = cs.Sampler(self._data.i_train_dict)
+
+        self._tfidf_obj = TFIDF(self._side.feature_map)
+        self._tfidf = self._tfidf_obj.tfidf()
+        self._user_profiles = self._tfidf_obj.get_profiles(self._ratings)
+
+        self._user_factors = \
+            np.zeros(shape=(len(self._data.users), len(self._side.features)))
+        self._item_factors = \
+            np.zeros(shape=(len(self._data.items), len(self._side.features)))
+
+        for i, f_dict in self._tfidf.items():
+            if i in self._data.items:
+                for f, v in f_dict.items():
+                    self._item_factors[self._data.public_items[i]][self._side.public_features[f]] = v
+
+        for u, f_dict in self._user_profiles.items():
+            for f, v in f_dict.items():
+                self._user_factors[self._data.public_users[u]][self._side.public_features[f]] = v
+
+        if self._batch_size < 1:
+            self._batch_size = self._num_users
+
+
+        # self._factors = self._data.factors
 
         self._transactions_per_epoch = self._data.transactions
 

@@ -57,7 +57,8 @@ class FM(RecMixin, BaseRecommenderModel):
             ("_factors", "factors", "factors", 10, int, None),
             ("_learning_rate", "lr", "lr", 0.001, float, None),
             ("_l_w", "reg", "reg", 0.1, float, None),
-            ("_simplify", "mf_simplification", "mf", False, None, None)
+            ("_simplify", "mf_simplification", "mf", False, None, None),
+            ("_loader", "loader", "load", "ItemAttributes", None, None),
         ]
         self.autoset_params()
 
@@ -65,11 +66,14 @@ class FM(RecMixin, BaseRecommenderModel):
             self._batch_size = self._data.transactions
 
         self._ratings = self._data.train_dict
+
+        self._side = getattr(self._data.side_information, self._loader, None)
+
         self._sp_i_train = self._data.sp_i_train
         self._i_items_set = list(range(self._num_items))
 
-        if ((not self._simplify) and hasattr(self._data, "nfeatures")) and (hasattr(self._data, "side_information_data")) and (hasattr(self._data.side_information_data, "feature_map")):
-            self._nfeatures = self._data.nfeatures
+        if ((not self._simplify) and hasattr(self._side, "nfeatures")) and (hasattr(self._side, "feature_map")):
+            self._nfeatures = self._side.nfeatures
             self._item_array = self.get_item_fragment()
         else:
             self._nfeatures = 0
@@ -125,9 +129,9 @@ class FM(RecMixin, BaseRecommenderModel):
             item_oh = np.zeros(self._num_items, dtype=np.float32)  # item one-hot encoding
             item_oh[item] = 1
             if self._nfeatures:
-                feature_oh = np.zeros(self._data.nfeatures, dtype=np.float32)  # feature(s) one-hot encoding
-                i_features = [self._data.public_features[f] for f in
-                              self._data.side_information_data.feature_map[self._data.private_items[item]]]
+                feature_oh = np.zeros(self._side.nfeatures, dtype=np.float32)  # feature(s) one-hot encoding
+                i_features = [self._side.public_features[f] for f in
+                              self._side.feature_map[self._data.private_items[item]]]
                 feature_oh[i_features] = 1
                 transactions.append(np.concatenate((item_oh, feature_oh)))
             else:
@@ -140,8 +144,9 @@ class FM(RecMixin, BaseRecommenderModel):
         return np.hstack((np.tile(user_oh, (self._num_items, 1)), self._item_array))
 
     def get_recommendations(self, k: int = 100):
+        predictions_top_k_test = {}
+        predictions_top_k_val = {}
         local_batch = (self._batch_size)
-        predictions_top_k = {}
         for index, offset in enumerate(range(0, self._num_users, local_batch)):
             offset_stop = min(offset + local_batch, self._num_users)
 
@@ -151,12 +156,29 @@ class FM(RecMixin, BaseRecommenderModel):
                 predictions = self._model.get_recs(
                     (np.repeat(np.array(list(range(offset, offset_stop)))[:, None], repeats=self._num_items, axis=1),
                      np.array([self._i_items_set for _ in range(offset, offset_stop)])))
-            v, i = self._model.get_top_k(predictions, self.get_train_mask(offset, offset_stop), k=k)
-            items_ratings_pair = [list(zip(map(self._data.private_items.get, u_list[0]), u_list[1]))
-                                  for u_list in list(zip(i.numpy(), v.numpy()))]
-            predictions_top_k.update(dict(zip(map(self._data.private_users.get,
-                                                  range(offset, offset_stop)), items_ratings_pair)))
-        return predictions_top_k
+            recs_val, recs_test = self.process_protocol(k, predictions, offset, offset_stop)
+            predictions_top_k_val.update(recs_val)
+            predictions_top_k_test.update(recs_test)
+        return predictions_top_k_val, predictions_top_k_test
+
+    # def get_recommendations(self, k: int = 100):
+    #     local_batch = (self._batch_size)
+    #     predictions_top_k = {}
+    #     for index, offset in enumerate(range(0, self._num_users, local_batch)):
+    #         offset_stop = min(offset + local_batch, self._num_users)
+    #
+    #         if self._nfeatures:
+    #             predictions = self._model.get_recs([self.get_user_full_array(u) for u in range(offset, offset_stop)])
+    #         else:
+    #             predictions = self._model.get_recs(
+    #                 (np.repeat(np.array(list(range(offset, offset_stop)))[:, None], repeats=self._num_items, axis=1),
+    #                  np.array([self._i_items_set for _ in range(offset, offset_stop)])))
+    #         v, i = self._model.get_top_k(predictions, self.get_train_mask(offset, offset_stop), k=k)
+    #         items_ratings_pair = [list(zip(map(self._data.private_items.get, u_list[0]), u_list[1]))
+    #                               for u_list in list(zip(i.numpy(), v.numpy()))]
+    #         predictions_top_k.update(dict(zip(map(self._data.private_users.get,
+    #                                               range(offset, offset_stop)), items_ratings_pair)))
+    #     return predictions_top_k
 
     def restore_weights(self):
         try:

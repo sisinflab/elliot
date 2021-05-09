@@ -81,6 +81,10 @@ class ModelCoordinator(object):
         and params, and results being required by the framework
         """
 
+        self.logger.info("Hyperparameters:")
+        for k, v in self.params.__dict__.items():
+            self.logger.info(f"{k} set to {v}")
+
         losses = []
         results = []
         for data_obj in self.data_objs:

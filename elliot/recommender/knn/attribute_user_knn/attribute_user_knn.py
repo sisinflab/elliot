@@ -51,25 +51,29 @@ class AttributeUserKNN(RecMixin, BaseRecommenderModel):
         self._params_list = [
             ("_num_neighbors", "neighbors", "nn", 40, int, None),
             ("_similarity", "similarity", "sim", "cosine", None, None),
-            ("_profile_type", "profile", "profile", "binary", None, None)
+            ("_profile_type", "profile", "profile", "binary", None, None),
+            ("_implicit", "implicit", "bin", False, None, None),
+            ("_loader", "loader", "load", "ItemAttributes", None, None),
         ]
         self.autoset_params()
 
         self._ratings = self._data.train_dict
 
+        self._side = getattr(self._data.side_information, self._loader, None)
+
         if self._profile_type == "tfidf":
-            self._tfidf_obj = TFIDF(self._data.side_information_data.feature_map)
+            self._tfidf_obj = TFIDF(self._side.feature_map)
             self._tfidf = self._tfidf_obj.tfidf()
             self._user_profiles = self._tfidf_obj.get_profiles(self._ratings)
         else:
             self._user_profiles = {user: self.compute_binary_profile(user_items) for user, user_items in self._ratings.items()}
 
-        self._i_feature_dict = {self._data.public_users[user]: {self._data.public_features[feature]: value
+        self._i_feature_dict = {self._data.public_users[user]: {self._side.public_features[feature]: value
                                                                 for feature, value in user_features.items()}
                                 for user, user_features in self._user_profiles.items()}
         self._sp_i_features = self.build_feature_sparse_values()
 
-        self._model = Similarity(self._data, self._sp_i_features, self._num_neighbors, self._similarity)
+        self._model = Similarity(data=self._data, attribute_matrix=self._sp_i_features, num_neighbors=self._num_neighbors, similarity=self._similarity, implicit=self._implicit)
 
     def get_single_recommendation(self, mask, k, *args):
         return {u: self._model.get_user_recs(u, mask, k) for u in self._ratings.keys()}
@@ -141,7 +145,7 @@ class AttributeUserKNN(RecMixin, BaseRecommenderModel):
         user_features = {}
         partial = 1/len(user_items_dict)
         for item in user_items_dict.keys():
-            for feature in self._data.side_information_data.feature_map.get(item,[]):
+            for feature in self._side.feature_map.get(item,[]):
                 user_features[feature] = user_features.get(feature, 0) + partial
         return user_features
 
@@ -151,7 +155,7 @@ class AttributeUserKNN(RecMixin, BaseRecommenderModel):
         rows = [u for u, _ in rows_cols]
         cols = [i for _, i in rows_cols]
         data = sp.csr_matrix((np.ones_like(rows), (rows, cols)), dtype='float32',
-                             shape=(self._num_items, len(self._data.public_features)))
+                             shape=(self._num_items, len(self._side.public_features)))
         return data
 
     def build_feature_sparse_values(self):
@@ -161,6 +165,6 @@ class AttributeUserKNN(RecMixin, BaseRecommenderModel):
         values = [r for _, _, r in rows_cols_values]
 
         data = sp.csr_matrix((values, (rows, cols)), dtype='float32',
-                             shape=(self._num_users, len(self._data.public_features)))
+                             shape=(self._num_users, len(self._side.public_features)))
 
         return data

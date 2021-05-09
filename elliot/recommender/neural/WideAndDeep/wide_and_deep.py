@@ -67,7 +67,7 @@ class WideAndDeep(RecMixin, BaseRecommenderModel):
     .. code:: yaml
 
       models:
-        NPR:
+        WideAndDeep:
           meta:
             save_recs: True
           epochs: 10

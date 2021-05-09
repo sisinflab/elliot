@@ -7,7 +7,6 @@ __version__ = '0.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
-import numpy as np
 import pickle
 import time
 
@@ -49,15 +48,33 @@ class ItemKNN(RecMixin, BaseRecommenderModel):
         self._params_list = [
             ("_num_neighbors", "neighbors", "nn", 40, int, None),
             ("_similarity", "similarity", "sim", "cosine", None, None),
-            ("_implementation", "implementation", "imp", "standard", None, None)
+            ("_implementation", "implementation", "imp", "standard", None, None),
+            ("_implicit", "implicit", "bin", False, None, None),
+            ("_shrink", "shrink", "shrink", 0, None, None),
+            ("_normalize", "normalize", "norm", True, None, None),
+            ("_asymmetric_alpha", "asymmetric_alpha", "asymalpha", False, None, lambda x: x if x else ""),
+            ("_tversky_alpha", "tversky_alpha", "tvalpha", False, None, lambda x: x if x else ""),
+            ("_tversky_beta", "tversky_beta", "tvbeta", False, None, lambda x: x if x else ""),
+            ("_row_weights", "normalize", "rweights", False, None, lambda x: x if x else "")
         ]
         self.autoset_params()
 
         self._ratings = self._data.train_dict
         if self._implementation == "aiolli":
-            self._model = AiolliSimilarity(self._data, maxk=self._num_neighbors, shrink=100, similarity=self._similarity, normalize=True)
+            self._model = AiolliSimilarity(data=self._data,
+                                           maxk=self._num_neighbors,
+                                           shrink=self._shrink,
+                                           similarity=self._similarity,
+                                           implicit=self._implicit,
+                                           normalize=self._normalize,
+                                           asymmetric_alpha=self._asymmetric_alpha,
+                                           tversky_alpha=self._tversky_alpha,
+                                           tversky_beta=self._tversky_beta,
+                                           row_weights=self._row_weights)
         else:
-            self._model = Similarity(self._data, self._num_neighbors, self._similarity)
+            if (not self._normalize) or (self._asymmetric_alpha) or (self._tversky_alpha) or (self._tversky_beta) or (self._row_weights) or (self._shrink):
+                print("Options normalize, asymmetric_alpha, tversky_alpha, tversky_beta, row_weights are ignored with standard implementation. Try with implementation: aiolli")
+            self._model = Similarity(data=self._data, num_neighbors=self._num_neighbors, similarity=self._similarity, implicit=self._implicit)
 
     def get_single_recommendation(self, mask, k, *args):
         return {u: self._model.get_user_recs(u, mask, k) for u in self._ratings.keys()}
