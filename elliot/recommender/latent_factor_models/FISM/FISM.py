@@ -3,9 +3,9 @@ Module description:
 
 """
 
-__version__ = '0.1'
-__author__ = 'Felice Antonio Merra, Vito Walter Anelli, Claudio Pomo'
-__email__ = 'felice.merra@poliba.it, vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
+__version__ = '0.2'
+__author__ = 'Zhankui (Aaron) He, Vito Walter Anelli, Claudio Pomo, Felice Antonio Merra'
+__email__ = 'zkhe15@fudan.edu.cn, vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, felice.merra@poliba.it'
 __paper__ = 'FISM: Factored Item Similarity Models for Top-N Recommender Systems by Santosh Kabbur, Xia Ning, and George Karypis'
 
 import numpy as np
@@ -30,10 +30,11 @@ class FISM(RecMixin, BaseRecommenderModel):
     Args:
         factors: Number of factors of feature embeddings
         lr: Learning rate
-        l_w: Regularization coefficient for latent factors
-        l_b: Regularization coefficient for bias
+        beta: Regularization coefficient for latent factors
+        lambda: Regularization coefficient for user bias
+        gamma: Regularization coefficient for item bias
         alpha: Alpha parameter (a value between 0 and 1)
-        neg_ratio:
+        neg_ratio: ratio of sampled negative items
 
     To include the recommendation model, add it to the config file adopting the following pattern:
 
@@ -47,16 +48,16 @@ class FISM(RecMixin, BaseRecommenderModel):
           batch_size: 512
           factors: 10
           lr: 0.001
-          l_w: 0.001
-          l_b: 0.001
           alpha: 0.5
-          neg_ratio:
+          beta: 0.001
+          lambda: 0.001
+          gamma: 0.001
+          neg_ratio: 0.5
     """
 
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
         """
-
         Create a FISM instance.
         (see http://glaros.dtc.umn.edu/gkhome/node/1068 for details about the algorithm design choices).
 
@@ -70,8 +71,9 @@ class FISM(RecMixin, BaseRecommenderModel):
         self._params_list = [
             ("_factors", "factors", "factors", 100, None, None),
             ("_lr", "lr", "lr", 0.001, None, None),
-            ("_l_w", "l_w", "l_w", 0.001, None, None),
-            ("_l_b", "l_b", "l_b", 0.001, None, None),
+            ("_beta", "beta", "beta", 0.001, None, None),
+            ("_lambda", "lambda", "lambda", 0.001, None, None),
+            ("_gamma", "gamma", "gamma", 0.001, None, None),
             ("_alpha", "alpha", "alpha", 0.5, lambda x: min(max(0, x), 1), None),
             ("_neg_ratio", "neg_ratio", "neg_ratio", 0.5, None, None),
         ]
@@ -85,19 +87,19 @@ class FISM(RecMixin, BaseRecommenderModel):
         self._sampler = pws.Sampler(self._data.i_train_dict, self._data.sp_i_train_ratings, self._neg_ratio)
 
         self._model = FISM_model(self._data,
-                                self._factors,
-                                self._lr,
-                                self._l_w,
-                                self._l_b,
-                                self._alpha,
-                                self._num_users,
-                                self._num_items)
+                                 self._factors,
+                                 self._lr,
+                                 self._alpha,
+                                 self._beta,
+                                 self._lambda,
+                                 self._gamma,
+                                 self._num_users,
+                                 self._num_items)
 
     @property
     def name(self):
         return "FISM" \
-               + "_e:" + str(self._epochs) \
-               + "_bs:" + str(self._batch_size) \
+               + f"_{self.get_base_params_shortcut()}" \
                + f"_{self.get_params_shortcut()}"
 
     def train(self):
