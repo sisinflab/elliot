@@ -83,14 +83,7 @@ class RecMixin(object):
         try:
             self._model.load_weights(self._saving_filepath)
             print(f"Model correctly Restored")
-
-            recs = self.get_recommendations(self.evaluator.get_needed_recommendations())
-            result_dict = self.evaluator.eval(recs)
-            self._results.append(result_dict)
-
-            print("******************************************")
-            if self._save_recs:
-                store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}.tsv")
+            self.evaluate()
             return True
 
         except Exception as ex:

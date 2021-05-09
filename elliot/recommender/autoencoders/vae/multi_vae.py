@@ -100,7 +100,6 @@ class MultiVAE(RecMixin, BaseRecommenderModel):
         if self._restore:
             return self.restore_weights()
 
-        best_metric_value = 0
         self._update_count = 0
 
         for it in range(self._epochs):
