@@ -21,7 +21,7 @@ class MFModel(object):
                  negative_item_regularization,
                  random_seed,
                  *args):
-        np.random.seed(self._seed)
+        np.random.seed(random_seed)
         self._factors = F
         self._users = data.users
         self._items = data.items

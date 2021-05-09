@@ -1,9 +1,9 @@
 experiment:
-  dataset: ncf_ml1m
+  dataset: ncf_pinterest
   data_config:
     strategy: fixed
-    train_path: ../data/{0}/ml-1m.train.rating
-    test_path: ../data/{0}/ml-1m.test.rating
+    train_path: ../data/{0}/pinterest-20.train.rating
+    test_path: ../data/{0}/pinterest-20.test.rating
   prefiltering:
     - strategy: global_threshold
       threshold: 4
@@ -16,7 +16,7 @@ experiment:
         test_ratio: 0.2
   negative_sampling:
     strategy: fixed
-    files: ["/home/cheggynho/PycharmProjects/elliot/data/ncf_ml1m/ml-1m.test.negative"]
+    files: ["/home/cheggynho/PycharmProjects/elliot/data/ncf_pinterest/pinterest-20.test.negative"]
   top_k: 10
   evaluation:
     cutoffs: [10, 9, 8, 7, 6, 5, 4, 3, 2, 1]
@@ -89,10 +89,18 @@ experiment:
 #      epochs: 50
 #      lr: [0.0001, 0.0005, 0.001, 0.005]
 #      m: 4
-    RecommendationFolder:
-      folder: /home/cheggynho/Downloads/recsys_first
-#    external.ProxyRecommender:
-#      path: /home/cheggynho/PycharmProjects/elliot/data/ncf_ml1m/ml-1m.test.rating
+#    ItemKNN:
+#      meta:
+#        verbose: True
+#        save_recs: True
+#        validation_metric: nDCG@10
+#      neighbors: 10
+#      similarity: cosine
+#      implementation: standard
+#    RecommendationFolder:
+#      folder: /home/cheggynho/Downloads/recsys_first
+    external.ProxyRecommender:
+      path: /media/cheggynho/WalterBackup03/KARS_pomo/MF_e:256_f:192_lr:0.007_reg:0.01_m:10_seed:42-it:168.tsv
 #    external.RendleMF: # from original paper
 #      meta:
 #        hyper_max_evals: 20
