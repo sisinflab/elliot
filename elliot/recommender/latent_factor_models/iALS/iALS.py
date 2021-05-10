@@ -16,6 +16,7 @@ from elliot.recommender.latent_factor_models.iALS.iALS_model import iALSModel
 from elliot.recommender.base_recommender_model import BaseRecommenderModel
 from elliot.recommender.base_recommender_model import init_charger
 
+
 class iALS(RecMixin, BaseRecommenderModel):
     r"""
     Weighted XXX Matrix Factorization
@@ -44,7 +45,6 @@ class iALS(RecMixin, BaseRecommenderModel):
 
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
-        self._random = np.random
 
         self._params_list = [
             ("_factors", "factors", "factors", 10, int, None),
@@ -58,7 +58,12 @@ class iALS(RecMixin, BaseRecommenderModel):
         self._ratings = self._data.train_dict
         self._sp_i_train = self._data.sp_i_train
 
-        self._model = iALSModel(self._factors, self._data, self._random, self._alpha, self._epsilon, self._reg,
+        self._model = iALSModel(self._factors,
+                                self._data,
+                                self._nprandom,
+                                self._alpha,
+                                self._epsilon,
+                                self._reg,
                                 self._scaling)
 
     def get_recommendations(self, k: int = 10):
@@ -94,22 +99,3 @@ class iALS(RecMixin, BaseRecommenderModel):
 
             self.evaluate(it)
 
-    def restore_weights(self):
-        try:
-            with open(self._saving_filepath, "rb") as f:
-                self._model.set_model_state(pickle.load(f))
-            print(f"Model correctly Restored")
-
-            recs = self.get_recommendations(self.evaluator.get_needed_recommendations())
-            result_dict = self.evaluator.eval(recs)
-            self._results.append(result_dict)
-
-            print("******************************************")
-            if self._save_recs:
-                store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}.tsv")
-            return True
-
-        except Exception as ex:
-            print(f"Error in model restoring operation! {ex}")
-
-        return False

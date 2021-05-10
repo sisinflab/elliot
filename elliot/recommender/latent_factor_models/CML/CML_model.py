@@ -13,7 +13,6 @@ import tensorflow as tf
 from tensorflow import keras
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-tf.random.set_seed(0)
 
 
 class CML_model(keras.Model):
@@ -25,10 +24,11 @@ class CML_model(keras.Model):
                  l_w=0, l_b=0, margin=0.5,
                  num_users=100,
                  num_items=100,
+                 random_seed=42,
                  name="CML",
                  **kwargs):
         super().__init__(name=name, **kwargs)
-        tf.random.set_seed(42)
+        tf.random.set_seed(random_seed)
 
         self._user_factors = user_factors
         self._item_factors = item_factors

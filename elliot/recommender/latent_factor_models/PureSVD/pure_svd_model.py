@@ -7,6 +7,8 @@ __version__ = '0.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
+import pickle
+
 import numpy as np
 from scipy import sparse as sp
 from sklearn.utils.extmath import randomized_svd
@@ -81,3 +83,11 @@ class PureSVDModel(object):
     def set_model_state(self, saving_dict):
         self.user_vec = saving_dict['user_vec']
         self.item_vec = saving_dict['item_vec']
+
+    def load_weights(self, path):
+        with open(path, "rb") as f:
+            self.set_model_state(pickle.load(f))
+
+    def save_weights(self, path):
+        with open(path, "wb") as f:
+            pickle.dump(self.get_model_state(), f)

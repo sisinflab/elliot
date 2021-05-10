@@ -7,6 +7,8 @@ __version__ = '0.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
+import pickle
+
 import numpy as np
 from scipy import sparse as sp
 
@@ -102,3 +104,11 @@ class iALSModel(object):
 
     def prepare_predictions(self):
         self.pred_mat = self.X.dot(self.Y.T)
+
+    def load_weights(self, path):
+        with open(path, "rb") as f:
+            self.set_model_state(pickle.load(f))
+
+    def save_weights(self, path):
+        with open(path, "wb") as f:
+            pickle.dump(self.get_model_state(), f)

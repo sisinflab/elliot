@@ -44,8 +44,7 @@ class PureSVD(RecMixin, BaseRecommenderModel):
     def __init__(self, data, config, params, *args, **kwargs):
 
         self._params_list = [
-            ("_factors", "factors", "factors", 10, None, None),
-            ("_seed", "seed", "seed", 42, None, None)
+            ("_factors", "factors", "factors", 10, None, None)
         ]
         self.autoset_params()
 

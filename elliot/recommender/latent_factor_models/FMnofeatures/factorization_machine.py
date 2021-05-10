@@ -67,14 +67,16 @@ class FMnofeatures(RecMixin, BaseRecommenderModel):
 
         self._sampler = pws.Sampler(self._data.i_train_dict, self._sp_i_train)
 
-        self._model = FactorizationMachineModelnofeatures(self._num_users, self._num_items, self._factors,
-                                               self._l_w, self._learning_rate)
+        self._model = FactorizationMachineModelnofeatures(self._num_users,
+                                                          self._num_items,
+                                                          self._factors,
+                                                          self._l_w,
+                                                          self._learning_rate)
 
     @property
     def name(self):
         return "FM" \
-               + "_e:" + str(self._epochs) \
-               + "_bs:" + str(self._batch_size) \
+               + f"_{self.get_base_params_shortcut()}" \
                + f"_{self.get_params_shortcut()}"
 
     def predict(self, u: int, i: int):
@@ -84,7 +86,6 @@ class FMnofeatures(RecMixin, BaseRecommenderModel):
         if self._restore:
             return self.restore_weights()
 
-        best_metric_value = 0
         for it in range(self._epochs):
             loss = 0
             steps = 0
@@ -113,23 +114,3 @@ class FMnofeatures(RecMixin, BaseRecommenderModel):
             predictions_top_k_val.update(recs_val)
             predictions_top_k_test.update(recs_test)
         return predictions_top_k_val, predictions_top_k_test
-
-    def restore_weights(self):
-        try:
-            with open(self._saving_filepath, "rb") as f:
-                self._model.set_model_state(pickle.load(f))
-            print(f"Model correctly Restored")
-
-            recs = self.get_recommendations(self.evaluator.get_needed_recommendations())
-            result_dict = self.evaluator.eval(recs)
-            self._results.append(result_dict)
-
-            print("******************************************")
-            if self._save_recs:
-                store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}.tsv")
-            return True
-
-        except Exception as ex:
-            print(f"Error in model restoring operation! {ex}")
-
-        return False

@@ -7,6 +7,8 @@ __version__ = '0.1'
 __author__ = 'Felice Antonio Merra, Vito Walter Anelli, Claudio Pomo'
 __email__ = 'felice.merra@poliba.it, vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
+import pickle
+
 import numpy as np
 
 
@@ -112,3 +114,11 @@ class NonNegMFModel(object):
         self._item_bias = saving_dict['_item_bias']
         self._user_embeddings = saving_dict['_user_embeddings']
         self._item_embeddings = saving_dict['_item_embeddings']
+
+    def load_weights(self, path):
+        with open(path, "rb") as f:
+            self.set_model_state(pickle.load(f))
+
+    def save_weights(self, path):
+        with open(path, "wb") as f:
+            pickle.dump(self.get_model_state(), f)

@@ -13,7 +13,6 @@ import tensorflow as tf
 from tensorflow import keras
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-tf.random.set_seed(0)
 
 
 class BPRMF_batch_model(keras.Model):
@@ -25,9 +24,10 @@ class BPRMF_batch_model(keras.Model):
                  num_users=100,
                  num_items=100,
                  name="NNBPRMF",
+                 random_seed=42,
                  **kwargs):
         super().__init__(name=name, **kwargs)
-        tf.random.set_seed(42)
+        tf.random.set_seed(random_seed)
 
         self._factors = factors
         self._learning_rate = learning_rate

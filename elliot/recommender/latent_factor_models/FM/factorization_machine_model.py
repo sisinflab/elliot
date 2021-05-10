@@ -15,7 +15,6 @@ from tensorflow import keras
 from typing import Optional, Union, Text
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-tf.random.set_seed(0)
 
 
 class FactorizationMachineModel(keras.Model):
@@ -26,10 +25,11 @@ class FactorizationMachineModel(keras.Model):
                  factors,
                  lambda_weights,
                  learning_rate=0.01,
+                 random_seed=42,
                  name="FM",
                  **kwargs):
         super().__init__(name=name, **kwargs)
-        tf.random.set_seed(42)
+        tf.random.set_seed(random_seed)
         self.num_users = num_users
         self.num_items = num_items
         self.num_features = num_features

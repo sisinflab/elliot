@@ -67,7 +67,7 @@ class SVDpp(RecMixin, BaseRecommenderModel):
         self._sampler = cpss.Sampler(self._data.i_train_dict, self._sp_i_train)
 
         self._model = SVDppModel(self._num_users, self._num_items, self._factors,
-                                   self._lambda_weights, self._lambda_bias, self._learning_rate)
+                                   self._lambda_weights, self._lambda_bias, self._learning_rate, self._seed)
 
     @property
     def name(self):

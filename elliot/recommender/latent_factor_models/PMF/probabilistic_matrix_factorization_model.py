@@ -15,7 +15,6 @@ import tensorflow as tf
 from tensorflow import keras
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-tf.random.set_seed(0)
 
 
 class ProbabilisticMatrixFactorizationModel(keras.Model):
@@ -26,10 +25,11 @@ class ProbabilisticMatrixFactorizationModel(keras.Model):
                  lambda_weights,
                  gaussian_variance,
                  learning_rate=0.01,
+                 random_seed=42,
                  name="MF",
                  **kwargs):
         super().__init__(name=name, **kwargs)
-        tf.random.set_seed(42)
+        tf.random.set_seed(random_seed)
         self.num_users = num_users
         self.num_items = num_items
         self.embed_mf_size = embed_mf_size

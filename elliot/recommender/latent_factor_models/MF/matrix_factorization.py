@@ -65,8 +65,12 @@ class MF(RecMixin, BaseRecommenderModel):
 
         self._sampler = pws.Sampler(self._data.i_train_dict)
 
-        self._model = MatrixFactorizationModel(self._num_users, self._num_items, self._factors,
-                                               self._l_w, self._learning_rate)
+        self._model = MatrixFactorizationModel(self._num_users,
+                                               self._num_items,
+                                               self._factors,
+                                               self._l_w,
+                                               self._learning_rate,
+                                               self._seed)
 
     @property
     def name(self):

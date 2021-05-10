@@ -7,6 +7,7 @@ __version__ = '0.1'
 __author__ = 'Felice Antonio Merra, Vito Walter Anelli, Claudio Pomo'
 __email__ = 'felice.merra@poliba.it, vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
+import pickle
 import time
 import numpy as np
 import sys
@@ -16,7 +17,7 @@ from sklearn.linear_model import ElasticNet
 
 class SlimModel(object):
     def __init__(self,
-                 data, num_users, num_items, l1_ratio, alpha, epochs, neighborhood):
+                 data, num_users, num_items, l1_ratio, alpha, epochs, neighborhood, random_seed):
 
         self._data = data
         self._num_users = num_users
@@ -34,7 +35,7 @@ class SlimModel(object):
                              precompute=True,
                              selection='random',
                              max_iter=100,
-                             random_state=42,
+                             random_state=random_seed,
                              tol=1e-4)
 
         self._w_sparse = None
@@ -139,3 +140,11 @@ class SlimModel(object):
 
     def set_model_state(self, saving_dict):
         self._A_tilde = saving_dict['_A_tilde']
+
+    def load_weights(self, path):
+        with open(path, "rb") as f:
+            self.set_model_state(pickle.load(f))
+
+    def save_weights(self, path):
+        with open(path, "wb") as f:
+            pickle.dump(self.get_model_state(), f)

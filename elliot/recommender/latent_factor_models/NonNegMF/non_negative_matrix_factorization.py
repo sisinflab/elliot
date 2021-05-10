@@ -62,8 +62,14 @@ class NonNegMF(RecMixin, BaseRecommenderModel):
         self._sp_i_train = self._data.sp_i_train
         self._i_items_set = list(range(self._num_items))
 
-        self._model = NonNegMFModel(self._data, self._num_users, self._num_items, self._global_mean, self._factors,
-                                    self._l_w, self._learning_rate, random_seed=42)
+        self._model = NonNegMFModel(self._data,
+                                    self._num_users,
+                                    self._num_items,
+                                    self._global_mean,
+                                    self._factors,
+                                    self._l_w,
+                                    self._learning_rate,
+                                    random_seed=self._seed)
 
     @property
     def name(self):
@@ -99,22 +105,3 @@ class NonNegMF(RecMixin, BaseRecommenderModel):
 
             self.evaluate(it)
 
-    def restore_weights(self):
-        try:
-            with open(self._saving_filepath, "rb") as f:
-                self._model.set_model_state(pickle.load(f))
-            print(f"Model correctly Restored")
-
-            recs = self.get_recommendations(self.evaluator.get_needed_recommendations())
-            result_dict = self.evaluator.eval(recs)
-            self._results.append(result_dict)
-
-            print("******************************************")
-            if self._save_recs:
-                store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}.tsv")
-            return True
-
-        except Exception as ex:
-            print(f"Error in model restoring operation! {ex}")
-
-        return False

@@ -94,7 +94,8 @@ class FISM(RecMixin, BaseRecommenderModel):
                                  self._lambda,
                                  self._gamma,
                                  self._num_users,
-                                 self._num_items)
+                                 self._num_items,
+                                 self._seed)
 
     @property
     def name(self):

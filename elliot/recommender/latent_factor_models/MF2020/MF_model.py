@@ -7,9 +7,9 @@ __version__ = '0.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
-import numpy as np
+import pickle
 
-np.random.seed(42)
+import numpy as np
 
 
 class MFModel(object):
@@ -17,9 +17,9 @@ class MFModel(object):
                  data,
                  lr,
                  reg,
-                 random,
+                 random_seed,
                  *args):
-        np.random.seed(random)
+        np.random.seed(random_seed)
         self._factors = F
         self._users = data.users
         self._items = data.items
@@ -163,4 +163,12 @@ class MFModel(object):
         self._item_bias = saving_dict['_item_bias']
         self._user_factors = saving_dict['_user_factors']
         self._item_factors = saving_dict['_item_factors']
+
+    def load_weights(self, path):
+        with open(path, "rb") as f:
+            self.set_model_state(pickle.load(f))
+
+    def save_weights(self, path):
+        with open(path, "wb") as f:
+            pickle.dump(self.get_model_state(), f)
 
