@@ -89,7 +89,8 @@ class DVBPR(RecMixin, BaseRecommenderModel):
                                   self._lambda_1,
                                   self._lambda_2,
                                   self._num_users,
-                                  self._num_items)
+                                  self._num_items,
+                                  self._seed)
 
     @property
     def name(self):

@@ -87,7 +87,8 @@ class VBPR(RecMixin, BaseRecommenderModel):
                                  self._l_e,
                                  self._side.visual_features[item_indices],
                                  self._num_users,
-                                 self._num_items)
+                                 self._num_items,
+                                 self._seed)
 
     @property
     def name(self):

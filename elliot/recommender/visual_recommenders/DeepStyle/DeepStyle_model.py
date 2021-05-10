@@ -16,8 +16,6 @@ import numpy as np
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-tf.random.set_seed(42)
-
 
 class DeepStyle_model(keras.Model):
     def __init__(self,
@@ -27,9 +25,12 @@ class DeepStyle_model(keras.Model):
                  emb_image=None,
                  num_users=100,
                  num_items=100,
+                 random_seed=42,
                  name="DeepStyle",
                  **kwargs):
         super().__init__(name=name, **kwargs)
+
+        tf.random.set_seed(random_seed)
 
         self._factors = factors
         self._learning_rate = learning_rate

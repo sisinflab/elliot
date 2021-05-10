@@ -76,7 +76,8 @@ class DeepStyle(RecMixin, BaseRecommenderModel):
                                       self._side.visual_features[item_indices],
                                       self._side.visual_features.shape[1],
                                       self._num_users,
-                                      self._num_items)
+                                      self._num_items,
+                                      self._seed)
 
     @property
     def name(self):

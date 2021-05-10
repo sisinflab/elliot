@@ -78,10 +78,11 @@ class VNPR(RecMixin, BaseRecommenderModel):
         self._i_items_set = list(range(self._num_items))
 
         self._model = VNPRModel(self._num_users, self._num_items, self._mf_factors, self._l_w,
-                                                     self._mlp_hidden_size,
-                                                     self._dropout,
-                                                     self._learning_rate,
-                                                     self._side.visual_features[item_indices])
+                                self._mlp_hidden_size,
+                                self._dropout,
+                                self._learning_rate,
+                                self._side.visual_features[item_indices],
+                                self._seed)
 
     @property
     def name(self):

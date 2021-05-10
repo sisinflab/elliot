@@ -15,7 +15,6 @@ from tensorflow import keras
 
 from elliot.recommender.visual_recommenders.DVBPR.FeatureExtractor import FeatureExtractor
 
-tf.random.set_seed(42)
 os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
 
 
@@ -27,9 +26,11 @@ class DVBPR_model(keras.Model):
                  lambda_2=0,
                  num_users=100,
                  num_items=100,
+                 random_seed=42,
                  name="DVBPR",
                  **kwargs):
         super().__init__(name=name, **kwargs)
+        tf.random.set_seed(random_seed)
 
         self._factors = factors
         self._learning_rate = learning_rate

@@ -89,7 +89,8 @@ class ACF(RecMixin, BaseRecommenderModel):
                                 self._side.visual_features[item_indices],
                                 self._data.sp_i_train.toarray(),
                                 self._num_users,
-                                self._num_items)
+                                self._num_items,
+                                self._seed)
 
 
     @property
