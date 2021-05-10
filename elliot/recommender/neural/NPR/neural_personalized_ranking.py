@@ -71,10 +71,14 @@ class NPR(RecMixin, BaseRecommenderModel):
         self._sp_i_train = self._data.sp_i_train
         self._i_items_set = list(range(self._num_items))
 
-        self._model = NPRModel(self._num_users, self._num_items, self._mf_factors, self._l_w,
-                                                     self._mlp_hidden_size,
-                                                     self._dropout,
-                                                     self._learning_rate)
+        self._model = NPRModel(self._num_users,
+                               self._num_items,
+                               self._mf_factors,
+                               self._l_w,
+                               self._mlp_hidden_size,
+                               self._dropout,
+                               self._learning_rate,
+                               self._seed)
 
     @property
     def name(self):

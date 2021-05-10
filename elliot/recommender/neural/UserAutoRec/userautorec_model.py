@@ -14,7 +14,6 @@ import tensorflow as tf
 from tensorflow import keras
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-tf.random.set_seed(0)
 
 
 class Encoder(tf.keras.layers.Layer):
@@ -60,10 +59,11 @@ class UserAutoRecModel(keras.Model):
                  lr,
                  hidden_neuron,
                  l_w,
+                 random_seed=42,
                  name="UserAutoRec",
                  **kwargs):
         super().__init__(name=name, **kwargs)
-        tf.random.set_seed(42)
+        tf.random.set_seed(random_seed)
 
         self.data = data
         self.num_users = num_users

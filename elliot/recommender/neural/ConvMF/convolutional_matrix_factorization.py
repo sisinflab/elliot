@@ -7,19 +7,17 @@ __version__ = '0.1'
 __author__ = 'Felice Antonio Merra, Vito Walter Anelli, Claudio Pomo'
 __email__ = 'felice.merra@poliba.it, vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
-import numpy as np
 from ast import literal_eval as make_tuple
+
+import numpy as np
 from tqdm import tqdm
-import pickle
 
 from elliot.dataset.samplers import pointwise_pos_neg_sampler as pws
+from elliot.recommender.base_recommender_model import BaseRecommenderModel
+from elliot.recommender.base_recommender_model import init_charger
 from elliot.recommender.neural.ConvMF.convolutional_matrix_factorization_model import \
     ConvMatrixFactorizationModel
 from elliot.recommender.recommender_utils_mixin import RecMixin
-from elliot.utils.write import store_recommendation
-
-from elliot.recommender.base_recommender_model import BaseRecommenderModel
-from elliot.recommender.base_recommender_model import init_charger
 
 
 class ConvMF(RecMixin, BaseRecommenderModel):
@@ -93,9 +91,10 @@ class ConvMF(RecMixin, BaseRecommenderModel):
         self._i_items_set = list(range(self._num_items))
 
         self._model = ConvMatrixFactorizationModel(self._num_users, self._num_items, self._embedding_size,
-                                                         self._lr, self._cnn_channels, self._cnn_kernels,
-                                                         self._cnn_strides, self._dropout_prob, self._l_w, self._l_b
-                                                         )
+                                                   self._lr, self._cnn_channels, self._cnn_kernels,
+                                                   self._cnn_strides, self._dropout_prob, self._l_w, self._l_b,
+                                                   self._seed
+                                                   )
 
     @property
     def name(self):
@@ -136,22 +135,3 @@ class ConvMF(RecMixin, BaseRecommenderModel):
             predictions_top_k_test.update(recs_test)
         return predictions_top_k_val, predictions_top_k_test
 
-    def restore_weights(self):
-        try:
-            with open(self._saving_filepath, "rb") as f:
-                self._model.set_model_state(pickle.load(f))
-            print(f"Model correctly Restored")
-
-            recs = self.get_recommendations(self.evaluator.get_needed_recommendations())
-            result_dict = self.evaluator.eval(recs)
-            self._results.append(result_dict)
-
-            print("******************************************")
-            if self._save_recs:
-                store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}.tsv")
-            return True
-
-        except Exception as ex:
-            print(f"Error in model restoring operation! {ex}")
-
-        return False

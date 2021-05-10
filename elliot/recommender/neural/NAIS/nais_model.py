@@ -13,9 +13,6 @@ import tensorflow as tf
 from tensorflow import keras
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-tf.random.set_seed(0)
-
-tf.random.set_seed(0)
 
 
 class NAIS_model(keras.Model):
@@ -32,10 +29,11 @@ class NAIS_model(keras.Model):
                  beta,
                  num_users,
                  num_items,
+                 random_seed=42,
                  name="NAIS",
                  **kwargs):
         super().__init__(name=name, **kwargs)
-        tf.random.set_seed(42)
+        tf.random.set_seed(random_seed)
 
         self._data = data
         self._algorithm = algorithm

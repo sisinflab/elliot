@@ -66,7 +66,8 @@ class GMF(RecMixin, BaseRecommenderModel):
         self._model = GeneralizedMatrixFactorizationModel(self._num_users, self._num_items,
                                                           self._mf_factors,
                                                           self._is_edge_weight_train,
-                                                          self._learning_rate)
+                                                          self._learning_rate,
+                                                          self._seed)
 
     @property
     def name(self):

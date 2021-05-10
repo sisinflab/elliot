@@ -107,7 +107,8 @@ class WideAndDeep(RecMixin, BaseRecommenderModel):
 
         self._model = WideAndDeepModel(self._data, self._num_users, self._num_items, self._factors,
                                        self._mlp_hidden_size,
-                                       self._dropout_prob, self._lr, self._l_w, self._l_b
+                                       self._dropout_prob, self._lr, self._l_w, self._l_b,
+                                       self._seed
                                        )
 
     @property

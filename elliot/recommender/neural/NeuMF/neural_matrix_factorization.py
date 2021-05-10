@@ -82,7 +82,7 @@ class NeuMF(RecMixin, BaseRecommenderModel):
         self._model = NeuralMatrixFactorizationModel(self._num_users, self._num_items, self._mf_factors,
                                                      self._mlp_factors, self._mlp_hidden_size,
                                                      self._dropout, self._is_mf_train, self._is_mlp_train,
-                                                     self._learning_rate)
+                                                     self._learning_rate, self._seed)
 
     @property
     def name(self):

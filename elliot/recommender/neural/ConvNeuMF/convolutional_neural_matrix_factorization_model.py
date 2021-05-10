@@ -14,7 +14,6 @@ import tensorflow as tf
 from tensorflow import keras
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-tf.random.set_seed(0)
 
 
 class ConvolutionalComponent(tf.keras.Model):
@@ -72,11 +71,12 @@ class ConvNeuralMatrixFactorizationModel(keras.Model):
                  num_users, num_items, embedding_size,
                  lr, cnn_channels, cnn_kernels,
                  cnn_strides, dropout_prob, l_w, l_b,
+                 random_seed=42,
                  name="ConvNeuralMatrixFactorizationModel",
                  **kwargs):
         super().__init__(name=name, **kwargs)
 
-        tf.random.set_seed(42)
+        tf.random.set_seed(random_seed)
         self.num_users = num_users
         self.num_items = num_items
 

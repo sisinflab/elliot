@@ -73,7 +73,7 @@ class UserAutoRec(RecMixin, BaseRecommenderModel):
         self._i_items_set = list(range(self._num_items))
 
         self._model = UserAutoRecModel(self._data, self._num_users, self._num_items, self._lr,
-                                       self._hidden_neuron, self._l_w)
+                                       self._hidden_neuron, self._l_w, self._seed)
 
     @property
     def name(self):

@@ -78,7 +78,8 @@ class DMF(RecMixin, BaseRecommenderModel):
         self._model = DeepMatrixFactorizationModel(self._num_users, self._num_items, self._user_mlp,
                                                    self._item_mlp, self._reg,
                                                    self._similarity, self._max_ratings,
-                                                   self._data.sp_i_train_ratings, self._learning_rate)
+                                                   self._data.sp_i_train_ratings, self._learning_rate,
+                                                   self._seed)
 
     @property
     def name(self):

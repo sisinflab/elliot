@@ -15,7 +15,6 @@ import tensorflow as tf
 from tensorflow import keras
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-tf.random.set_seed(0)
 
 
 class DeepFMModel(keras.Model):
@@ -26,10 +25,11 @@ class DeepFMModel(keras.Model):
                  hidden_layers,
                  lambda_weights,
                  learning_rate=0.01,
+                 random_seed=42,
                  name="DeepFM",
                  **kwargs):
         super().__init__(name=name, **kwargs)
-        tf.random.set_seed(42)
+        tf.random.set_seed(random_seed)
         self.num_users = num_users
         self.num_items = num_items
         self.embed_mf_size = embed_mf_size
