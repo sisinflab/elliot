@@ -35,7 +35,7 @@ class LoaderCoordinator:
         for side in sides:
             dataloader_class = getattr(importlib.import_module("elliot.dataset.modular_loaders.loaders"), side.dataloader)
             if issubclass(dataloader_class, AbstractLoader):
-                side_obj = dataloader_class(dataframe, side)
+                side_obj = dataloader_class(users, items, side)
                 side_info_objs.append(side_obj)
                 users_items.append(side_obj.get_mapped())
             else:

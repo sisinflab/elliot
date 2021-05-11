@@ -1,47 +1,39 @@
 from collections import Counter
 from types import SimpleNamespace
 import pandas as pd
+import typing as t
 
 from elliot.dataset.modular_loaders.abstract_loader import AbstractLoader
 
 
 class ChainedKG(AbstractLoader):
-    def __init__(self, data: pd.DataFrame, ns: SimpleNamespace):
-        self.data = data.copy(deep=True)
+    def __init__(self, users: t.Set, items: t.Set, ns: SimpleNamespace):
         self.attribute_file = getattr(ns, "map", None)
         self.feature_file = getattr(ns, "features", None)
         self.properties_file = getattr(ns, "properties", None)
         self.additive = getattr(ns, "additive", True)
         self.threshold = getattr(ns, "threshold", 10)
-
-        self.items = set(data["itemId"].unique())
+        self.users = users
+        self.items = items
         
         if (self.attribute_file is not None) & (self.feature_file is not None) & (self.properties_file is not None):
             self.map_ = self.load_attribute_file(self.attribute_file)
             self.feature_names = self.load_feature_names(self.feature_file)
             self.properties = self.load_properties(self.properties_file)
             self.map_ = self.reduce_attribute_map_property_selection(self.map_, self.items, self.feature_names, self.properties, self.additive, self.threshold)
-            self.items = set(self.map_.keys())
-            self.data = self.data[self.data['itemId'].isin(self.items)]
-        self.users = set(self.data['userId'].unique())
+            self.items = self.items and set(self.map_.keys())
 
     def get_mapped(self):
         return self.users, self.items
 
     def filter(self, users, items):
-        self.data = self.data[self.data['userId'].isin(users)]
-        self.data = self.data[self.data['itemId'].isin(items)]
-        self.users = set(self.data['userId'].unique())
-        self.items = set(self.data['itemId'].unique())
+        self.users = self.users and users
+        self.items = self.items and items
         self.map_ = {k:v for k,v in self.map_.items() if k in self.items}
 
         self.map_ = self.reduce_attribute_map_property_selection(self.map_, self.items, self.feature_names,
                                                                  self.properties, self.additive, self.threshold)
-        self.items = set(self.map_.keys())
-        self.data = self.data[self.data['itemId'].isin(self.items)]
-        self.users = set(self.data['userId'].unique())
-
-        # return self.get_mapped()
+        self.items = self.items and set(self.map_.keys())
 
     def create_namespace(self):
         ns = SimpleNamespace()

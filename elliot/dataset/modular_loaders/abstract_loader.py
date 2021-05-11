@@ -7,7 +7,7 @@ import pandas as pd
 
 class AbstractLoader(ABC):
     @abstractmethod
-    def __init__(self, data: pd.DataFrame, ns: SimpleNamespace):
+    def __init__(self, users: t.Set, items: t.Set, ns: SimpleNamespace):
         raise NotImplementedError
 
     @abstractmethod

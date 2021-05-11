@@ -1,28 +1,24 @@
 from types import SimpleNamespace
 import pandas as pd
+import typing as t
 
 from elliot.dataset.modular_loaders.abstract_loader import AbstractLoader
 
 
 class ItemAttributes(AbstractLoader):
-    def __init__(self, data: pd.DataFrame, ns: SimpleNamespace):
-        self.data = data.copy(deep=True)
+    def __init__(self, users: t.Set, items: t.Set, ns: SimpleNamespace):
         self.attribute_file = getattr(ns, "attribute_file", None)
-
+        self.users = users
+        self.items = items
         self.map_ = self.load_attribute_file(self.attribute_file)
-        self.items = set(self.map_.keys())
-        self.data = self.data[self.data['itemId'].isin(self.items)]
-        self.users = set(self.data['userId'].unique())
-        self.items = set(self.data['itemId'].unique())
+        self.items = self.items and set(self.map_.keys())
 
     def get_mapped(self):
         return self.users, self.items
 
     def filter(self, users, items):
-        self.data = self.data[self.data['userId'].isin(users)]
-        self.data = self.data[self.data['itemId'].isin(items)]
-        self.users = set(self.data['userId'].unique())
-        self.items = set(self.data['itemId'].unique())
+        self.users = self.users and users
+        self.items = self.items and items
 
     def create_namespace(self):
         ns = SimpleNamespace()
