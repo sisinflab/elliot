@@ -69,7 +69,8 @@ class RecMixin(object):
     def process_protocol(self, k, *args):
 
         if not self._negative_sampling:
-            return {}, self.get_single_recommendation(self.get_candidate_mask(), k, *args)
+            recs = self.get_single_recommendation(self.get_candidate_mask(), k, *args)
+            return recs, recs
         else:
             return self.get_single_recommendation(self.get_candidate_mask(validation=True), k, *args) if hasattr(self._data, "val_dict") else {}, \
                    self.get_single_recommendation(self.get_candidate_mask(), k, *args)

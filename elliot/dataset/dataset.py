@@ -47,16 +47,16 @@ class DataSetLoader(LoaderCoordinator):
             path_val_data = getattr(config.data_config, "validation_path", None)
             path_test_data = config.data_config.test_path
 
-            self.train_dataframe, self.side_information = self.coordinate_information(path_train_data, sep="\t", header=None, names=self.column_names, sides=config.data_config.side_information)
+            self.train_dataframe = pd.read_csv(path_train_data, sep="\t", header=None, names=self.column_names)
+            self.test_dataframe = pd.read_csv(path_test_data, sep="\t", header=None, names=self.column_names)
+
+            # self.train_dataframe, self.side_information = self.coordinate_information(self.train_dataframe, sides=config.data_config.side_information)
             # self.train_dataframe = pd.read_csv(path_train_data, sep="\t", header=None, names=self.column_names)
 
             self.train_dataframe = self.check_timestamp(self.train_dataframe)
+            self.test_dataframe = self.check_timestamp(self.test_dataframe)
 
             self.logger.info(f"{path_train_data} - Loaded")
-
-            self.test_dataframe = pd.read_csv(path_test_data, sep="\t", header=None, names=self.column_names)
-
-            self.test_dataframe = self.check_timestamp(self.test_dataframe)
 
             if config.binarize == True or all(self.train_dataframe["rating"].isna()):
                 self.test_dataframe["rating"] = 1
@@ -70,19 +70,24 @@ class DataSetLoader(LoaderCoordinator):
                     self.validation_dataframe["rating"] = 1
 
                 self.tuple_list = [([(self.train_dataframe, self.validation_dataframe)], self.test_dataframe)]
+                self.tuple_list, self.side_information = self.coordinate_information(self.tuple_list,
+                                                                                     sides=config.data_config.side_information)
             else:
                 self.tuple_list = [(self.train_dataframe, self.test_dataframe)]
+                self.tuple_list, self.side_information = self.coordinate_information(self.tuple_list,
+                                                                                     sides=config.data_config.side_information)
 
         elif config.data_config.strategy == "hierarchy":
             self.tuple_list = self.read_splitting(config.data_config.root_folder)
+
+            self.tuple_list, self.side_information = self.coordinate_information(self.tuple_list, sides=config.data_config.side_information)
 
         elif config.data_config.strategy == "dataset":
             self.logger.info("There will be the splitting")
             path_dataset = config.data_config.dataset_path
 
-            self.dataframe, self.side_information = self.coordinate_information(path_dataset, sep="\t",
-                                                                                header=None,
-                                                                                names=self.column_names,
+            self.dataframe = pd.read_csv(path_dataset, sep="\t", header=None, names=self.column_names)
+            self.dataframe, self.side_information = self.coordinate_information(self.dataframe,
                                                                                 sides=config.data_config.side_information)
             # self.dataframe = pd.read_csv(path_dataset, sep="\t", header=None, names=self.column_names)
 
@@ -110,15 +115,15 @@ class DataSetLoader(LoaderCoordinator):
         tuple_list = []
         for dirs in os.listdir(folder_path):
             for test_dir in dirs:
-                test_ = pd.read_csv(f"{folder_path}{test_dir}/test.tsv", sep="\t")
-                val_dirs = [f"{folder_path}{test_dir}/{val_dir}/" for val_dir in os.listdir(f"{folder_path}{test_dir}") if os.path.isdir(f"{folder_path}{test_dir}/{val_dir}")]
+                test_ = pd.read_csv(os.sep.join([folder_path, test_dir, "test.tsv"]), sep="\t")
+                val_dirs = [os.sep.join([folder_path, test_dir, val_dir]) for val_dir in os.listdir(os.sep.join([folder_path, test_dir])) if os.path.isdir(os.sep.join([folder_path, test_dir, val_dir]))]
                 val_list = []
                 for val_dir in val_dirs:
-                    train_ = pd.read_csv(f"{val_dir}/train.tsv", sep="\t")
-                    val_ = pd.read_csv(f"{val_dir}/val.tsv", sep="\t")
+                    train_ = pd.read_csv(os.sep.join([val_dir, "train.tsv"]), sep="\t")
+                    val_ = pd.read_csv(os.sep.join([val_dir, "val.tsv"]), sep="\t")
                     val_list.append((train_, val_))
                 if not val_list:
-                    val_list = pd.read_csv(f"{folder_path}{test_dir}/train.tsv", sep="\t")
+                    val_list = pd.read_csv(os.sep.join([folder_path, test_dir, "train.tsv"]), sep="\t")
                 tuple_list.append((val_list, test_))
 
         return tuple_list
@@ -209,6 +214,7 @@ class DataSet(AbstractDataset):
                 self.test_mask = np.where((test_candidate_items.toarray() == True), True, False)
 
         self.allunrated_mask = np.where((self.sp_i_train.toarray() == 0), True, False)
+        pass
 
     def dataframe_to_dict(self, data):
         users = list(data['userId'].unique())
