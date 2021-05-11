@@ -95,7 +95,7 @@ class NameSpaceModel:
                     # the string is an attribute but not a path
                     return local_path
         else:
-            raw_local_path
+            return raw_local_path
 
     def fill_base(self):
 
@@ -162,7 +162,13 @@ class NameSpaceModel:
                     else:
                         raise Exception("Side information is neither a list nor a dict. No other options are allowed.")
                 else:
-                    setattr(self.base_namespace, p, SimpleNamespace())
+                    self.config[_experiment][p]["side_information"] = []
+                    self.config[_experiment][p][_dataloader] = self.config[_experiment][p].get(_dataloader,
+                                                                                               "DataSetLoader")
+                    self.config[_experiment][p].update(
+                        {k: self._safe_set_path(self._base_folder_path_config, v, self.config[_experiment][_dataset])
+                         for k, v in self.config[_experiment][p].items()})
+                    setattr(self.base_namespace, p, SimpleNamespace(**self.config[_experiment][p]))
 
             elif p == _splitting and self.config[_experiment].get(p, {}):
                 self.config[_experiment][p].update({k: self._safe_set_path(self._base_folder_path_config, v, self.config[_experiment][_dataset])

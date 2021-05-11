@@ -94,7 +94,7 @@ class iALS(RecMixin, BaseRecommenderModel):
 
     @property
     def name(self):
-        return "WRMF" \
+        return "iALS" \
                + "_e:" + str(self._epochs) \
                + f"_{self.get_params_shortcut()}"
 

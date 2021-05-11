@@ -65,7 +65,7 @@ class NDCGRendle2020(BaseMetric):
         Metric Name Getter
         :return: returns the public name of the metric
         """
-        return "NDCGRendle2020"
+        return "nDCGRendle2020"
 
     def __user_ndcg(self, user_recommendations: t.List, user, cutoff: int):
         """

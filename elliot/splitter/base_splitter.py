@@ -76,10 +76,10 @@ class Splitter:
                 self.save_on_disk = True
                 self.save_folder = splitting_ns.save_folder
 
-                if os.path.exists(os.path.dirname(self.save_folder)):
-                    shutil.rmtree(os.path.dirname(self.save_folder), ignore_errors=True)
+                if os.path.exists(self.save_folder):
+                    shutil.rmtree(self.save_folder, ignore_errors=True)
 
-                os.makedirs(os.path.dirname(self.save_folder))
+                os.makedirs(self.save_folder)
             else:
                 raise Exception("Train or Test paths are missing")
 
@@ -109,11 +109,11 @@ class Splitter:
 
     def store_splitting(self, tuple_list):
         for i, (train_val, test) in enumerate(tuple_list):
-            actual_test_folder = create_folder_by_index(self.save_folder, i)
+            actual_test_folder = create_folder_by_index(self.save_folder, str(i))
             test.to_csv(os.path.abspath(os.sep.join([actual_test_folder, "test.tsv"])), sep='\t', index=False)
             if isinstance(train_val, list):
                 for j, (train, val) in enumerate(train_val):
-                    actual_val_folder = create_folder_by_index(actual_test_folder, j)
+                    actual_val_folder = create_folder_by_index(actual_test_folder, str(j))
                     val.to_csv(os.path.abspath(os.sep.join([actual_val_folder, "val.tsv"])), sep='\t', index=False)
                     train.to_csv(os.path.abspath(os.sep.join([actual_val_folder, "train.tsv"])), sep='\t', index=False)
             else:
