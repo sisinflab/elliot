@@ -69,18 +69,18 @@ class KaHFM(RecMixin, BaseRecommenderModel):
 
         self._params_list = [
             ("_learning_rate", "lr", "lr", 0.05, None, None),
-            ("_bias_regularization", "bias_regularization", "bias_regularization", 0, None, None),
-            ("_user_regularization", "user_regularization", "user_regularization", 0.0025,
+            ("_bias_regularization", "bias_regularization", "b_reg", 0, None, None),
+            ("_user_regularization", "user_regularization", "u_reg", 0.0025,
              None, None),
-            ("_positive_item_regularization", "positive_item_regularization", "positive_item_regularization", 0.0025,
+            ("_positive_item_regularization", "positive_item_regularization", "pos_i_reg", 0.0025,
              None, None),
-            ("_negative_item_regularization", "negative_item_regularization", "negative_item_regularization", 0.00025,
+            ("_negative_item_regularization", "negative_item_regularization", "neg_it_reg", 0.00025,
              None, None),
-            ("_update_negative_item_factors", "update_negative_item_factors", "update_negative_item_factors",True,
-             None, None),
-            ("_update_users", "update_users", "update_users", True, None, None),
-            ("_update_items", "update_items", "update_items", True, None, None),
-            ("_update_bias", "update_bias", "update_bias", True, None, None),
+            # ("_update_negative_item_factors", "update_negative_item_factors", "update_neg_item_factors",True,
+            #  None, None),
+            # ("_update_users", "update_users", "update_users", True, None, None),
+            # ("_update_items", "update_items", "update_items", True, None, None),
+            # ("_update_bias", "update_bias", "update_bias", True, None, None),
             ("_loader", "loader", "load", "ChainedKG", None, None),
         ]
         self.autoset_params()

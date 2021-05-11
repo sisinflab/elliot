@@ -18,6 +18,7 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 from abc import ABC
 from abc import abstractmethod
 from functools import wraps
+from types import SimpleNamespace
 from elliot.utils import logging
 
 
@@ -61,6 +62,7 @@ class BaseRecommenderModel(ABC):
         self._optimize_internal_loss = getattr(self._params.meta, "optimize_internal_loss", False)
         self._epochs = getattr(self._params, "epochs", 2)
         self._seed = getattr(self._params, "seed", 42)
+        self._early_stopping = SimpleNamespace(**getattr(self._params, "early_stopping", {}))
         self._iteration = 0
         if self._epochs < self._validation_rate:
             raise Exception(f"The first validation epoch ({self._validation_rate}) "

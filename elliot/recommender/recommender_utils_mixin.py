@@ -52,6 +52,7 @@ class RecMixin(object):
                         store_recommendation(recs[1], os.path.abspath(os.sep.join([self._config.path_output_rec_result, f"{self.name}_it={it + 1}.tsv"])))
                     else:
                         store_recommendation(recs[1], os.path.abspath(os.sep.join([self._config.path_output_rec_result, f"{self.name}.tsv"])))
+            self.check_early_stopping()
 
     def get_recommendations(self, k: int = 100):
         predictions_top_k_test = {}
@@ -118,3 +119,34 @@ class RecMixin(object):
         else:
             val_results = np.argmax([r[self._validation_k]["val_results"][self._validation_metric] for r in self._results])
         return val_results
+
+    def check_early_stopping(self):
+        if not len(self._early_stopping.__dict__):
+            return False
+        else:
+
+            if not hasattr(self._early_stopping, "patience"):
+                self._early_stopping.patience = 0
+            if getattr(self._early_stopping, "monitor", self._validation_metric) == "loss":
+                if not hasattr(self._early_stopping, "mode"):
+                    self._early_stopping.mode = "min"
+                observed_quantity = self._losses
+            else:
+                if not hasattr(self._early_stopping, "mode"):
+                    self._early_stopping.mode = "max"
+                observed_quantity = [r[self._validation_k]["val_results"][self._early_stopping.monitor] for r in self._results]
+            if not (hasattr(self._early_stopping, "min_val") or (hasattr(self._early_stopping, "rel_val"))):
+                self._early_stopping.min_val = 0
+            self._early_stopping.setup = True
+        pass
+
+
+
+
+
+
+
+
+
+
+
