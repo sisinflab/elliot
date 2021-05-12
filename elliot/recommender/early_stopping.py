@@ -80,7 +80,7 @@ class EarlyStopping:
                         print(f"Analyzed pair: ({round(observed_quantity[p], 5)}, {round(observed_quantity[p + 1], 5)}): {check[-1]}")
                 if self.verbose:
                     print(f"Check List: {check}")
-                if all(check):
+                if check and all(check):
                     return True
                 else:
                     return False
