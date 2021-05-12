@@ -7,9 +7,6 @@ __version__ = '0.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
-import random
-
-import numpy as np
 from tqdm import tqdm
 
 from elliot.dataset.samplers import sparse_sampler as sp
@@ -17,7 +14,6 @@ from elliot.recommender import BaseRecommenderModel
 from elliot.recommender.autoencoders.vae.multi_vae_model import VariationalAutoEncoder
 from elliot.recommender.base_recommender_model import init_charger
 from elliot.recommender.recommender_utils_mixin import RecMixin
-from elliot.utils.write import store_recommendation
 
 
 class MultiVAE(RecMixin, BaseRecommenderModel):
@@ -100,6 +96,9 @@ class MultiVAE(RecMixin, BaseRecommenderModel):
         self._update_count = 0
 
         for it in range(self._epochs):
+            if self._early_stopping.stop(self._losses[:], self._results):
+                self.logger.info(f"Matched Early Stopping conditions: {self._early_stopping}")
+                break
             loss = 0
             steps = 0
             with tqdm(total=int(self._num_users // self._batch_size), disable=not self._verbose) as t:
@@ -116,4 +115,4 @@ class MultiVAE(RecMixin, BaseRecommenderModel):
                     t.update()
                     self._update_count += 1
 
-            self.evaluate(it, loss)
+            self.evaluate(it, loss/(it + 1))

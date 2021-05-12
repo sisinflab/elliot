@@ -20,6 +20,7 @@ from abc import abstractmethod
 from functools import wraps
 from types import SimpleNamespace
 from elliot.utils import logging
+from elliot.recommender.early_stopping import EarlyStopping
 
 
 class BaseRecommenderModel(ABC):
@@ -62,7 +63,7 @@ class BaseRecommenderModel(ABC):
         self._optimize_internal_loss = getattr(self._params.meta, "optimize_internal_loss", False)
         self._epochs = getattr(self._params, "epochs", 2)
         self._seed = getattr(self._params, "seed", 42)
-        self._early_stopping = SimpleNamespace(**getattr(self._params, "early_stopping", {}))
+        self._early_stopping = EarlyStopping(SimpleNamespace(**getattr(self._params, "early_stopping", {})), self._validation_metric, self._validation_k, _cutoff_k, data.config.evaluation.simple_metrics)
         self._iteration = 0
         if self._epochs < self._validation_rate:
             raise Exception(f"The first validation epoch ({self._validation_rate}) "

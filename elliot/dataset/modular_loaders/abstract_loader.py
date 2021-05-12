@@ -2,8 +2,6 @@ from abc import ABC, abstractmethod
 import typing as t
 from types import SimpleNamespace
 
-import pandas as pd
-
 
 class AbstractLoader(ABC):
     @abstractmethod
