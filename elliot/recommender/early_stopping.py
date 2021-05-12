@@ -1,6 +1,7 @@
 from types import SimpleNamespace
 import typing as t
 
+
 class EarlyStopping:
     def __init__(self, early_stopping_ns: SimpleNamespace, validation_metric:str, validation_k:int, cutoffs: t.List, simple_metrics: t.List, ):
 
@@ -8,6 +9,7 @@ class EarlyStopping:
         self.validation_k = validation_k
         self.cutoffs = cutoffs
         self.simple_metrics = simple_metrics
+        self.monitor = getattr(early_stopping_ns, "monitor", self.validation_metric)
 
         if not len(early_stopping_ns.__dict__):
             self.active = False
@@ -17,7 +19,7 @@ class EarlyStopping:
             else:
                 self.patience = early_stopping_ns.patience
     
-            if getattr(early_stopping_ns, "monitor", self.validation_metric) == "loss":
+            if self.monitor == "loss":
                 if not hasattr(early_stopping_ns, "mode"):
                     self.mode = "min"
                 elif early_stopping_ns.mode == "auto":
@@ -31,7 +33,7 @@ class EarlyStopping:
                 elif early_stopping_ns.mode == "auto":
                     self.mode = "max"
     
-                metric = (early_stopping_ns.monitor).split("@")
+                metric = self.monitor.split("@")
                 if metric[0].lower() not in [m.lower() for m in self.simple_metrics]:
                     raise Exception("Early stopping metric must be in the list of simple metrics")
     

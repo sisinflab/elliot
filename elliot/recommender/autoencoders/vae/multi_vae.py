@@ -95,10 +95,7 @@ class MultiVAE(RecMixin, BaseRecommenderModel):
 
         self._update_count = 0
 
-        for it in range(self._epochs):
-            if self._early_stopping.stop(self._losses[:], self._results):
-                self.logger.info(f"Matched Early Stopping conditions: {self._early_stopping}")
-                break
+        for it in self.iterate(self._epochs):
             loss = 0
             steps = 0
             with tqdm(total=int(self._num_users // self._batch_size), disable=not self._verbose) as t:

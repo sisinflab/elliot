@@ -121,5 +121,13 @@ class RecMixin(object):
             val_results = np.argmax([r[self._validation_k]["val_results"][self._validation_metric] for r in self._results])
         return val_results
 
+    def iterate(self, epochs):
+        for iteration in range(epochs):
+            if self._early_stopping.stop(self._losses[:], self._results):
+                self.logger.info(f"Met Early Stopping conditions: {self._early_stopping}")
+                break
+            else:
+                yield iteration
+
 
 
