@@ -1,10 +1,13 @@
 from types import SimpleNamespace
 import typing as t
 
+from elliot.utils import logging
+import logging as pylog
+
 
 class EarlyStopping:
     def __init__(self, early_stopping_ns: SimpleNamespace, validation_metric:str, validation_k:int, cutoffs: t.List, simple_metrics: t.List, ):
-
+        self.logger = logging.get_logger(self.__class__.__name__, pylog.DEBUG)
         self.validation_metric = validation_metric
         self.validation_k = validation_k
         self.cutoffs = cutoffs
@@ -77,6 +80,7 @@ class EarlyStopping:
                     else:
                         check.append(False)
                     if self.verbose:
+                        self.logger.info(f"Analyzed pair: ({round(observed_quantity[p], 5)}, {round(observed_quantity[p + 1], 5)}): {check[-1]}")
                         print(f"Analyzed pair: ({round(observed_quantity[p], 5)}, {round(observed_quantity[p + 1], 5)}): {check[-1]}")
                 if self.verbose:
                     print(f"Check List: {check}")
