@@ -48,7 +48,6 @@ class VSM(RecMixin, BaseRecommenderModel):
     """
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
-        self._random = np.random
 
         self._params_list = [
             ("_similarity", "similarity", "sim", "cosine", None, None),

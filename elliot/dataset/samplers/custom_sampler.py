@@ -8,11 +8,11 @@ __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
 import numpy as np
-np.random.seed(42)
 
 
 class Sampler:
     def __init__(self, indexed_ratings):
+        np.random.seed(42)
         self._indexed_ratings = indexed_ratings
         self._users = list(self._indexed_ratings.keys())
         self._nusers = len(self._users)

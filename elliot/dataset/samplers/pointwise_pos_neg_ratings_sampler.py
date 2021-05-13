@@ -7,14 +7,12 @@ __version__ = '0.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
-import random
-
 import numpy as np
-np.random.seed(42)
 
 
 class Sampler:
     def __init__(self, indexed_ratings, sparse_i_ratings):
+        np.random.seed(42)
         self._sparse_i_ratings = sparse_i_ratings
         self._indexed_ratings = indexed_ratings
         self._users = list(self._indexed_ratings.keys())

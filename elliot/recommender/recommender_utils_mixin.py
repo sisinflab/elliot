@@ -22,7 +22,7 @@ class RecMixin(object):
                     t.set_postfix({'loss': f'{loss/steps:.5f}'})
                     t.update()
 
-            self.evaluate(it, loss)
+            self.evaluate(it, loss/(it + 1))
 
     def evaluate(self, it = None, loss = 0):
         if (it is None) or (not (it + 1) % self._validation_rate):
@@ -38,7 +38,18 @@ class RecMixin(object):
             else:
                 self.logger.info(f'Finished')
 
+            if self._save_recs:
+                self.logger.info(f"Writing recommendations at: {self._config.path_output_rec_result}")
+                if it is not None:
+                    store_recommendation(recs[1], os.path.abspath(
+                        os.sep.join([self._config.path_output_rec_result, f"{self.name}_it={it + 1}.tsv"])))
+                else:
+                    store_recommendation(recs[1], os.path.abspath(
+                        os.sep.join([self._config.path_output_rec_result, f"{self.name}.tsv"])))
+
             if (len(self._results) - 1) == self.get_best_arg():
+                if it is not None:
+                    self._params.best_iteration = it + 1
                 self.logger.info("******************************************")
                 self.best_metric_value = self._results[-1][self._validation_k]["val_results"][self._validation_metric]
                 if self._save_weights:
@@ -46,12 +57,7 @@ class RecMixin(object):
                         self._model.save_weights(self._saving_filepath)
                     else:
                         self.logger.warning("Saving weights FAILED. No model to save.")
-                if self._save_recs:
-                    self.logger.info(f"Writing recommendations at: {self._config.path_output_rec_result}")
-                    if it is not None:
-                        store_recommendation(recs[1], os.path.abspath(os.sep.join([self._config.path_output_rec_result, f"{self.name}_it={it + 1}.tsv"])))
-                    else:
-                        store_recommendation(recs[1], os.path.abspath(os.sep.join([self._config.path_output_rec_result, f"{self.name}.tsv"])))
+
 
 
     def get_recommendations(self, k: int = 100):

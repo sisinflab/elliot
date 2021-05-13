@@ -61,13 +61,15 @@ Nested Hold-Out
 
 
 class Splitter:
-    def __init__(self, data: pd.DataFrame, splitting_ns: SimpleNamespace):
+    def __init__(self, data: pd.DataFrame, splitting_ns: SimpleNamespace, random_seed=42):
+        self.random_seed = random_seed
         self.data = data
         self.splitting_ns = splitting_ns
         self.save_on_disk = False
         self.save_folder = None
 
     def process_splitting(self):
+        np.random.seed(self.random_seed)
         data = self.data
         splitting_ns = self.splitting_ns
 

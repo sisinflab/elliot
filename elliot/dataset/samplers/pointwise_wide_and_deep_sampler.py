@@ -8,15 +8,14 @@ __author__ = 'Felice Antonio Merra, Vito Walter Anelli, Claudio Pomo'
 __email__ = 'felice.merra@poliba.it, vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
 import random
-
 import numpy as np
 import itertools
-
-np.random.seed(42)
 
 
 class Sampler:
     def __init__(self, data):
+        np.random.seed(42)
+        random.seed()
         self._data = data
         self._indexed_ratings = self._data.i_train_dict
         self._users = list(self._indexed_ratings.keys())

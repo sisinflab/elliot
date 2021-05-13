@@ -12,12 +12,12 @@ from PIL import Image
 
 import numpy as np
 import random
-np.random.seed(42)
-random.seed(42)
 
 
 class Sampler:
     def __init__(self, indexed_ratings, item_indices, images_path, output_image_size, epochs):
+        np.random.seed(42)
+        random.seed(42)
         self._indexed_ratings = indexed_ratings
         self._item_indices = item_indices
         self._users = list(self._indexed_ratings.keys())

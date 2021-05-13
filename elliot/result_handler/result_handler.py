@@ -64,9 +64,9 @@ class ResultHandler:
                 f'triplets_rec_cutoff_{k}_relthreshold_{self.rel_threshold}_{datetime.now().strftime("%Y_%m_%d_%H_%M_%S")}.tsv'])),
                 sep='\t', index=False, header=["model", "metric", "value"])
 
-    def save_best_models(self, output='../results/', default_metric = "nDCG"):
+    def save_best_models(self, output='../results/', default_metric = "nDCG", default_k = [10]):
         global_results = dict(self.oneshot_recommenders)
-        k = self.ks[0]
+        k = default_k[0]
         models = [{"default_validation_metric": default_metric,
                    "default_validation_cutoff": k,
                    "rel_threshold": self.rel_threshold}]

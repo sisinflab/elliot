@@ -100,7 +100,7 @@ class DataSetLoader(LoaderCoordinator):
             if config.binarize == True or all(self.dataframe["rating"].isna()):
                 self.dataframe["rating"] = 1
 
-            splitter = Splitter(self.dataframe, self.config.splitting)
+            splitter = Splitter(self.dataframe, self.config.splitting, self.config.random_seed)
             self.tuple_list = splitter.process_splitting()
 
         else:
@@ -146,6 +146,7 @@ class DataSetLoader(LoaderCoordinator):
         return data_list
 
     def generate_dataobjects_mock(self) -> t.List[object]:
+        np.random.seed(self.config.random_seed)
         _column_names = ['userId', 'itemId', 'rating']
         training_set = np.hstack(
             (np.random.randint(0, 5 * 20, size=(5 * 20, 2)), np.random.randint(0, 2, size=(5 * 20, 1))))
@@ -214,7 +215,6 @@ class DataSet(AbstractDataset):
                 self.test_mask = np.where((test_candidate_items.toarray() == True), True, False)
 
         self.allunrated_mask = np.where((self.sp_i_train.toarray() == 0), True, False)
-        pass
 
     def dataframe_to_dict(self, data):
         users = list(data['userId'].unique())

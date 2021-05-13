@@ -92,11 +92,12 @@ class Evaluator(object):
         return result_dict
 
     def eval_at_k(self, recommendations, k):
+        val_test = ["Validation", "Test"]
         result_list = []
         for p, (test_data, eval_objs) in enumerate(self._get_test_data()):
             if eval_objs is not None:
                 eval_objs.cutoff = k
-            results, statistical_results = self._process_test_data(recommendations[p], test_data, eval_objs)
+            results, statistical_results = self._process_test_data(recommendations[p], test_data, eval_objs, val_test[p])
             result_list.append((results, statistical_results))
 
         if (not result_list[0][0]):
@@ -113,7 +114,7 @@ class Evaluator(object):
                  self._evaluation_objects if hasattr(self, '_evaluation_objects') else None)
                 ]
 
-    def _process_test_data(self, recommendations, test_data, eval_objs):
+    def _process_test_data(self, recommendations, test_data, eval_objs, val_test):
         if (not test_data) or (not eval_objs):
             return None, None
         else:
@@ -130,6 +131,7 @@ class Evaluator(object):
             str_results = {k: str(round(v, rounding_factor)) for k, v in results.items()}
             # res_print = "\t".join([":".join(e) for e in str_results.items()])
             self.logger.info("")
+            self.logger.info(f"{val_test} Evaluation results")
             self.logger.info(f"Cut-off: {eval_objs.cutoff}")
             self.logger.info(f"Eval Time: {time() - eval_start_time}")
             self.logger.info(f"Results")
