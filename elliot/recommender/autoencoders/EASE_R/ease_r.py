@@ -88,7 +88,7 @@ class EASER(RecMixin, BaseRecommenderModel):
         self._similarity_matrix[diagonal_indices] = 0.0
 
         end = time.time()
-        print(f"The similarity computation has taken: {end - start}")
+        self.logger.info(f"The similarity computation has taken: {end - start}")
 
         self._preds = self._train.dot(self._similarity_matrix)
 

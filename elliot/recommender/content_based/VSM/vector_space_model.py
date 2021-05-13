@@ -115,7 +115,7 @@ class VSM(RecMixin, BaseRecommenderModel):
         start = time.time()
         self._model.initialize()
         end = time.time()
-        print(f"The similarity computation has taken: {end - start}")
+        self.logger.info(f"The similarity computation has taken: {end - start}")
 
         self.evaluate()
 

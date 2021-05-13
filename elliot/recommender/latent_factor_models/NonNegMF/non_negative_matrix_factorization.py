@@ -97,7 +97,7 @@ class NonNegMF(RecMixin, BaseRecommenderModel):
         if self._restore:
             return self.restore_weights()
 
-        for it in range(self._epochs):
+        for it in self.iterate(self._epochs):
             print(f"\n********** Iteration: {it + 1}")
             self._iteration = it
 

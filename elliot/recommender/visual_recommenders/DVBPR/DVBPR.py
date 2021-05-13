@@ -108,20 +108,24 @@ class DVBPR(RecMixin, BaseRecommenderModel):
 
         with tqdm(total=int(self._data.transactions // self._batch_size), disable=not self._verbose) as t:
             for batch in self._next_batch:
-                steps += 1
-                loss += self._model.train_step(batch)
-                t.set_postfix({'loss': f'{loss.numpy() / steps:.5f}'})
-                t.update()
+                if self._early_stopping.stop(self._losses[:], self._results):
+                    self.logger.info(f"Met Early Stopping conditions: {self._early_stopping}")
+                    break
+                else:
+                    steps += 1
+                    loss += self._model.train_step(batch)
+                    t.set_postfix({'loss': f'{loss.numpy() / steps:.5f}'})
+                    t.update()
 
-                # epoch is over
-                if steps == self._data.transactions // self._batch_size:
-                    t.reset()
+                    # epoch is over
+                    if steps == self._data.transactions // self._batch_size:
+                        t.reset()
 
-                    self.evaluate(it, loss.numpy())
+                        self.evaluate(it, loss.numpy()/(it + 1))
 
-                    it += 1
-                    steps = 0
-                    loss = 0
+                        it += 1
+                        steps = 0
+                        loss = 0
 
     def get_recommendations(self, k: int = 100):
         predictions_top_k_test = {}

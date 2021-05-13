@@ -94,7 +94,7 @@ class NeuMF(RecMixin, BaseRecommenderModel):
         if self._restore:
             return self.restore_weights()
 
-        for it in range(self._epochs):
+        for it in self.iterate(self._epochs):
             loss = 0
             steps = 0
             with tqdm(total=int(self._data.transactions * (self._m + 1) // self._batch_size), disable=not self._verbose) as t:
@@ -104,7 +104,7 @@ class NeuMF(RecMixin, BaseRecommenderModel):
                     t.set_postfix({'loss': f'{loss / steps:.5f}'})
                     t.update()
 
-            self.evaluate(it, loss)
+            self.evaluate(it, loss/(it + 1))
 
     def get_recommendations(self, k: int = 100):
         predictions_top_k_test = {}

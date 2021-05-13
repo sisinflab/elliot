@@ -104,8 +104,7 @@ class BPRSlim(RecMixin, BaseRecommenderModel):
         if self._restore:
             return self.restore_weights()
 
-        best_metric_value = 0
-        for it in range(self._epochs):
+        for it in self.iterate(self._epochs):
             loss = 0
             steps = 0
             with tqdm(total=int(self._data.transactions // self._batch_size), disable=not self._verbose) as t:
@@ -115,24 +114,7 @@ class BPRSlim(RecMixin, BaseRecommenderModel):
                     t.set_postfix({'loss': f'{loss / steps:.5f}'})
                     t.update()
 
-            if not (it + 1) % self._validation_rate:
-
-                print("Computing recommendations..")
-                recs = self.get_recommendations(self.evaluator.get_needed_recommendations())
-                result_dict = self.evaluator.eval(recs)
-                self._results.append(result_dict)
-                print(f'Finished')
-
-                print(f'Epoch {(it + 1)}/{self._epochs} loss {loss  / steps:.3f}')
-
-                if self._results[-1][self._validation_k]["val_results"][self._validation_metric] > best_metric_value:
-                    print("******************************************")
-                    best_metric_value = self._results[-1][self._validation_k]["val_results"][self._validation_metric]
-                    if self._save_weights:
-                        with open(self._saving_filepath, "wb") as f:
-                            pickle.dump(self._model.get_model_state(), f)
-                    if self._save_recs:
-                        store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}-it:{it + 1}.tsv")
+            self.evaluate(it, loss/(it + 1))
 
     def restore_weights(self):
         try:

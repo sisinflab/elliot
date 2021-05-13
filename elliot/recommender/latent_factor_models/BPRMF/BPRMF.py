@@ -116,7 +116,7 @@ class BPRMF(RecMixin, BaseRecommenderModel):
 
         print(f"Transactions: {self._data.transactions}")
 
-        for it in range(self._epochs):
+        for it in self.iterate(self._epochs):
             print(f"\n********** Iteration: {it + 1}")
             loss = 0
             steps = 0

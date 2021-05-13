@@ -92,7 +92,7 @@ class iALS(RecMixin, BaseRecommenderModel):
         if self._restore:
             return self.restore_weights()
 
-        for it in range(self._epochs):
+        for it in self.iterate(self._epochs):
             self._model.train_step()
 
             print("Iteration Finished")

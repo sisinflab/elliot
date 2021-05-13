@@ -109,7 +109,7 @@ class AMF(RecMixin, BaseRecommenderModel):
         if self._restore:
             return self.restore_weights()
 
-        for it in range(self._epochs):
+        for it in self.iterate(self._epochs):
             user_adv_train = False if it < self._adversarial_epochs else True
             loss = 0
             steps = 0
@@ -121,7 +121,7 @@ class AMF(RecMixin, BaseRecommenderModel):
                     t.set_postfix({'(APR)-loss' if user_adv_train else '(BPR)-loss': f'{loss.numpy() / steps:.5f}'})
                     t.update()
 
-            self.evaluate(it, loss.numpy())
+            self.evaluate(it, loss.numpy()/(it + 1))
 
     def get_recommendations(self, k: int = 100):
         predictions_top_k_test = {}

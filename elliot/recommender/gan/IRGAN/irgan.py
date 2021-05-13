@@ -117,8 +117,7 @@ class IRGAN(RecMixin, BaseRecommenderModel):
         if self._restore:
             return self.restore_weights()
 
-        best_metric_value = 0
-        for it in range(self._epochs):
+        for it in self.iterate(self._epochs):
             dis_loss, gen_loss = 0, 0
             with tqdm(total=1, disable=not self._verbose) as t:
                 update_dis_loss, update_gen_loss = self._model.train_step()
@@ -128,7 +127,7 @@ class IRGAN(RecMixin, BaseRecommenderModel):
                     {'Dis loss': f'{dis_loss.numpy():.5f}', 'Gen loss': f'{gen_loss.numpy():.5f}'})
                 t.update()
 
-            self.evaluate(it, dis_loss.numpy())
+            self.evaluate(it, dis_loss.numpy()/(it + 1))
 
     def get_recommendations(self, k: int = 100):
         predictions_top_k_test = {}
