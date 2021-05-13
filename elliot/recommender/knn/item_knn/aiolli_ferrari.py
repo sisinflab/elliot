@@ -93,6 +93,8 @@ class AiolliSimilarity(object):
         self.tversky_beta = tversky_beta
         self.row_weights = row_weights
 
+        self.w_sparse = None
+
         self.RECOMMENDER_NAME = "ItemKNNCFRecommender"
 
         # self.pred_mat = None
@@ -123,11 +125,11 @@ class AiolliSimilarity(object):
                                         row_weights=self.row_weights
                                         )
 
-        w_sparse = similarity.compute_similarity()
-        w_sparse = w_sparse.tocsc()
+        self.w_sparse = similarity.compute_similarity()
+        self.w_sparse = self.w_sparse.tocsc()
 
         # self.pred_mat = train.dot(w_sparse).tolil()
-        self.pred_mat = train.dot(w_sparse).toarray()
+        self.pred_mat = train.dot(self.w_sparse).toarray()
 
     def get_user_recs(self, u, mask, k):
         user_id = self._data.public_users.get(u)
@@ -181,16 +183,16 @@ class AiolliSimilarity(object):
 
     def get_model_state(self):
         saving_dict = {}
-        saving_dict['_preds'] = self._preds
-        saving_dict['_similarity'] = self._similarity
-        saving_dict['_num_neighbors'] = self._num_neighbors
+        saving_dict['_preds'] = self.pred_mat
+        saving_dict['_similarity'] = self.w_sparse
+        saving_dict['_num_neighbors'] = self.k
         saving_dict['_implicit'] = self._implicit
         return saving_dict
 
     def set_model_state(self, saving_dict):
-        self._preds = saving_dict['_preds']
-        self._similarity = saving_dict['_similarity']
-        self._num_neighbors = saving_dict['_num_neighbors']
+        self.pred_mat = saving_dict['_preds']
+        self.w_sparse = saving_dict['_similarity']
+        self.k = saving_dict['_num_neighbors']
         self._implicit = saving_dict['_implicit']
 
     def load_weights(self, path):

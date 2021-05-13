@@ -6,7 +6,8 @@ import logging as pylog
 
 
 class EarlyStopping:
-    def __init__(self, early_stopping_ns: SimpleNamespace, validation_metric:str, validation_k:int, cutoffs: t.List, simple_metrics: t.List, ):
+    def __init__(self, early_stopping_ns: SimpleNamespace, validation_metric: str, validation_k: int, cutoffs: t.List,
+                 simple_metrics: t.List, ):
         self.logger = logging.get_logger(self.__class__.__name__, pylog.DEBUG)
         self.validation_metric = validation_metric
         self.validation_k = validation_k

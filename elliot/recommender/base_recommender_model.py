@@ -63,7 +63,9 @@ class BaseRecommenderModel(ABC):
         self._optimize_internal_loss = getattr(self._params.meta, "optimize_internal_loss", False)
         self._epochs = getattr(self._params, "epochs", 2)
         self._seed = getattr(self._params, "seed", 42)
-        self._early_stopping = EarlyStopping(SimpleNamespace(**getattr(self._params, "early_stopping", {})), self._validation_metric, self._validation_k, _cutoff_k, data.config.evaluation.simple_metrics)
+        self._early_stopping = EarlyStopping(SimpleNamespace(**getattr(self._params, "early_stopping", {})),
+                                             self._validation_metric, self._validation_k, _cutoff_k,
+                                             data.config.evaluation.simple_metrics)
         self._iteration = 0
         if self._epochs < self._validation_rate:
             raise Exception(f"The first validation epoch ({self._validation_rate}) "
@@ -140,7 +142,7 @@ def init_charger(init):
     @wraps(init)
     def new_init(self, *args, **kwargs):
         BaseRecommenderModel.__init__(self, *args, **kwargs)
-        self.logger = logging.get_logger(self.__class__.__name__, pylog.CRITICAL if self._config.config_test else
+        self.logger = logging.get_logger_model(self.__class__.__name__, pylog.CRITICAL if self._config.config_test else
                                          pylog.DEBUG)
         np.random.seed(self._seed)
         random.seed(self._seed)

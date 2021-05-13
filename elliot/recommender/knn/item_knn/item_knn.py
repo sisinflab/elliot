@@ -55,7 +55,7 @@ class ItemKNN(RecMixin, BaseRecommenderModel):
             ("_asymmetric_alpha", "asymmetric_alpha", "asymalpha", False, None, lambda x: x if x else ""),
             ("_tversky_alpha", "tversky_alpha", "tvalpha", False, None, lambda x: x if x else ""),
             ("_tversky_beta", "tversky_beta", "tvbeta", False, None, lambda x: x if x else ""),
-            ("_row_weights", "normalize", "rweights", None, None, lambda x: x if x else "")
+            ("_row_weights", "row_weights", "rweights", None, None, lambda x: x if x else "")
         ]
         self.autoset_params()
 
