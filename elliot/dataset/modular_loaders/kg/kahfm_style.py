@@ -21,19 +21,19 @@ class ChainedKG(AbstractLoader):
             self.feature_names = self.load_feature_names(self.feature_file)
             self.properties = self.load_properties(self.properties_file)
             self.map_ = self.reduce_attribute_map_property_selection(self.map_, self.items, self.feature_names, self.properties, self.additive, self.threshold)
-            self.items = self.items and set(self.map_.keys())
+            self.items = self.items & set(self.map_.keys())
 
     def get_mapped(self):
         return self.users, self.items
 
     def filter(self, users, items):
-        self.users = self.users and users
-        self.items = self.items and items
+        self.users = self.users & users
+        self.items = self.items & items
         self.map_ = {k:v for k,v in self.map_.items() if k in self.items}
 
         self.map_ = self.reduce_attribute_map_property_selection(self.map_, self.items, self.feature_names,
                                                                  self.properties, self.additive, self.threshold)
-        self.items = self.items and set(self.map_.keys())
+        self.items = self.items & set(self.map_.keys())
 
     def create_namespace(self):
         ns = SimpleNamespace()

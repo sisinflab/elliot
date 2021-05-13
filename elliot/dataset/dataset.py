@@ -78,7 +78,7 @@ class DataSetLoader(LoaderCoordinator):
                                                                                      sides=config.data_config.side_information)
 
         elif config.data_config.strategy == "hierarchy":
-            self.tuple_list = self.read_splitting(config.data_config.root_folder)
+            self.tuple_list = self.read_splitting(config.data_config.root_folder, column_names=self.column_names)
 
             self.tuple_list, self.side_information = self.coordinate_information(self.tuple_list, sides=config.data_config.side_information)
 
@@ -111,19 +111,19 @@ class DataSetLoader(LoaderCoordinator):
             d = d.drop(columns=["timestamp"]).reset_index(drop=True)
         return d
 
-    def read_splitting(self, folder_path):
+    def read_splitting(self, folder_path, column_names):
         tuple_list = []
         for dirs in os.listdir(folder_path):
             for test_dir in dirs:
-                test_ = pd.read_csv(os.sep.join([folder_path, test_dir, "test.tsv"]), sep="\t")
+                test_ = pd.read_csv(os.sep.join([folder_path, test_dir, "test.tsv"]), sep="\t", names=self.column_names)
                 val_dirs = [os.sep.join([folder_path, test_dir, val_dir]) for val_dir in os.listdir(os.sep.join([folder_path, test_dir])) if os.path.isdir(os.sep.join([folder_path, test_dir, val_dir]))]
                 val_list = []
                 for val_dir in val_dirs:
-                    train_ = pd.read_csv(os.sep.join([val_dir, "train.tsv"]), sep="\t")
-                    val_ = pd.read_csv(os.sep.join([val_dir, "val.tsv"]), sep="\t")
+                    train_ = pd.read_csv(os.sep.join([val_dir, "train.tsv"]), sep="\t", names=self.column_names)
+                    val_ = pd.read_csv(os.sep.join([val_dir, "val.tsv"]), sep="\t", names=self.column_names)
                     val_list.append((train_, val_))
                 if not val_list:
-                    val_list = pd.read_csv(os.sep.join([folder_path, test_dir, "train.tsv"]), sep="\t")
+                    val_list = pd.read_csv(os.sep.join([folder_path, test_dir, "train.tsv"]), sep="\t", names=self.column_names)
                 tuple_list.append((val_list, test_))
 
         return tuple_list

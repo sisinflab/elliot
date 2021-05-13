@@ -110,24 +110,24 @@ class Splitter:
     def store_splitting(self, tuple_list):
         for i, (train_val, test) in enumerate(tuple_list):
             actual_test_folder = create_folder_by_index(self.save_folder, str(i))
-            test.to_csv(os.path.abspath(os.sep.join([actual_test_folder, "test.tsv"])), sep='\t', index=False)
+            test.to_csv(os.path.abspath(os.sep.join([actual_test_folder, "test.tsv"])), sep='\t', index=False, header=False)
             if isinstance(train_val, list):
                 for j, (train, val) in enumerate(train_val):
                     actual_val_folder = create_folder_by_index(actual_test_folder, str(j))
-                    val.to_csv(os.path.abspath(os.sep.join([actual_val_folder, "val.tsv"])), sep='\t', index=False)
-                    train.to_csv(os.path.abspath(os.sep.join([actual_val_folder, "train.tsv"])), sep='\t', index=False)
+                    val.to_csv(os.path.abspath(os.sep.join([actual_val_folder, "val.tsv"])), sep='\t', index=False, header=False)
+                    train.to_csv(os.path.abspath(os.sep.join([actual_val_folder, "train.tsv"])), sep='\t', index=False, header=False)
             else:
-                train_val.to_csv(os.path.abspath(os.sep.join([actual_test_folder, "train.tsv"])), sep='\t', index=False)
+                train_val.to_csv(os.path.abspath(os.sep.join([actual_test_folder, "train.tsv"])), sep='\t', index=False, header=False)
 
-    def read_folder(self, folder_path):
-        for root, dirs, files in os.walk(folder_path):
-            if not dirs:
-                # leggi i due file
-
-                pass
-            else:
-                pass
-            pass
+    # def read_folder(self, folder_path):
+    #     for root, dirs, files in os.walk(folder_path):
+    #         if not dirs:
+    #             # leggi i due file
+    #
+    #             pass
+    #         else:
+    #             pass
+    #         pass
 
     def handle_hierarchy(self, data: pd.DataFrame, valtest_splitting_ns: SimpleNamespace) -> t.List[
         t.Tuple[pd.DataFrame, pd.DataFrame]]:

@@ -11,14 +11,14 @@ class ItemAttributes(AbstractLoader):
         self.users = users
         self.items = items
         self.map_ = self.load_attribute_file(self.attribute_file)
-        self.items = self.items and set(self.map_.keys())
+        self.items = self.items & set(self.map_.keys())
 
     def get_mapped(self):
         return self.users, self.items
 
     def filter(self, users, items):
-        self.users = self.users and users
-        self.items = self.items and items
+        self.users = self.users & users
+        self.items = self.items & items
 
     def create_namespace(self):
         ns = SimpleNamespace()

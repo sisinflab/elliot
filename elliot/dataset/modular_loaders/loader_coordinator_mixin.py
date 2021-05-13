@@ -13,17 +13,17 @@ class LoaderCoordinator:
             users = set()
             items = set()
             train, test = dataframe[0]
-            users = users or set(test["userId"].unique())
-            items = items or set(test["itemId"].unique())
+            users = users | set(test["userId"].unique())
+            items = items | set(test["itemId"].unique())
             if not isinstance(train, list):
-                users = users or set(train["userId"].unique())
-                items = items or set(train["itemId"].unique())
+                users = users | set(train["userId"].unique())
+                items = items | set(train["itemId"].unique())
             else:
                 train, val = train[0]
-                users = users or set(train["userId"].unique())
-                items = items or set(train["itemId"].unique())
-                users = users or set(val["userId"].unique())
-                items = items or set(val["itemId"].unique())
+                users = users | set(train["userId"].unique())
+                items = items | set(train["itemId"].unique())
+                users = users | set(val["userId"].unique())
+                items = items | set(val["itemId"].unique())
         else:
             users = set(dataframe["userId"].unique())
             items = set(dataframe["itemId"].unique())
@@ -45,9 +45,9 @@ class LoaderCoordinator:
             new_users = users
             new_items = items
             for us_, is_ in users_items:
-                new_users = new_users and us_
-                new_items = new_items and is_
-            if (len(new_users) == len(users)) and (len(new_items) == len(items)):
+                new_users = new_users & us_
+                new_items = new_items & is_
+            if (len(new_users) == len(users)) & (len(new_items) == len(items)):
                 break
             else:
                 users = new_users
