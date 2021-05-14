@@ -1,0 +1,1 @@
+from .DistMult import DistMult

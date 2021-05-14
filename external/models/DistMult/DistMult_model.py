@@ -48,11 +48,11 @@ class DistMultModel(keras.Model):
 
         self.initializer = tf.initializers.GlorotUniform()
 
-        self.entity_embeddings = keras.layers.Embedding(input_dim=side.nb_entities, output_dim=self.factors,
+        self.entity_embeddings = keras.layers.Embedding(input_dim=self.side.nb_entities, output_dim=self.factors,
                                                         embeddings_initializer=self.initializer,
                                                         # embeddings_regularizer=keras.regularizers.l2(self.l_w),
                                                         trainable=True, dtype=tf.float32)
-        self.predicate_embeddings = keras.layers.Embedding(input_dim=self.nb_predicates, output_dim=self.factors,
+        self.predicate_embeddings = keras.layers.Embedding(input_dim=self.side.nb_predicates, output_dim=self.factors,
                                                            embeddings_initializer=self.initializer,
                                                            # embeddings_regularizer=keras.regularizers.l2(self.l_w),
                                                            trainable=True, dtype=tf.float32)
@@ -64,10 +64,10 @@ class DistMultModel(keras.Model):
 
         self.optimizer = tf.optimizers.Adam(self.learning_rate)
         if self.blackbox_lambda is None:
-            self.loss_function = tf.keras.losses.BinaryCrossentropy()
+            self.loss_function = tf.keras.losses.SparseCategoricalCrossentropy()
         else:
             #TODO: NegativeMRR(lambda=blackbox_lambda)
-            self.loss_function = tf.keras.losses.BinaryCrossentropy()
+            self.loss_function = tf.keras.losses.SparseCategoricalCrossentropy()
 
         #TODO: masks
 
@@ -82,11 +82,11 @@ class DistMultModel(keras.Model):
         res = tf.reduce_sum(rel * arg1 * arg2, 1)
         return res
 
-    @tf.function
+    # @tf.function
     def call(self,
-             rel: t.Optional[tf.Tensor],
-             arg1: t.Optional[tf.Tensor],
-             arg2: t.Optional[tf.Tensor],
+             rel: t.Optional[tf.Tensor] = None,
+             arg1: t.Optional[tf.Tensor] = None,
+             arg2: t.Optional[tf.Tensor] = None,
              entity_embeddings: t.Optional[tf.Tensor] = None,
              predicate_embeddings:  t.Optional[tf.Tensor] = None,
              *args, **kwargs) -> tf.Tensor:
@@ -101,17 +101,17 @@ class DistMultModel(keras.Model):
 
         # [B, N] = [B, E] @ [E, N]
         if rel is None:
-            scores = (arg1 * arg2) @ tf.transpose(ent_emb)
+            scores = (arg1 * arg2) @ tf.transpose(ent_emb.weights[0])
         elif arg1 is None:
-            scores = (rel * arg2) @ tf.transpose(pred_emb)
+            scores = (rel * arg2) @ tf.transpose(pred_emb.weights[0])
         elif arg2 is None:
-            scores = (rel * arg1) @ tf.transpose(ent_emb)
+            scores = (rel * arg1) @ tf.transpose(ent_emb.weights[0])
 
         assert scores is not None
 
         return scores
 
-    @tf.function
+    # @tf.function
     def train_step(self, batch):
         with tf.GradientTape() as tape:
             xp_batch, xs_batch, xo_batch, xi_batch = batch
@@ -127,21 +127,21 @@ class DistMultModel(keras.Model):
                 # if self.mask is True:
                 #     po_scores = po_scores + mask_po[xi_batch, :]
 
-                loss += self.loss_function(po_scores, xs_batch)
+                loss += self.loss_function(xs_batch, po_scores)
 
             if 'o' in self.corruption:
                 sp_scores = self.call(xp_batch_emb, xs_batch_emb, None)
                 # if self.mask is True:
                 #     sp_scores = sp_scores + mask_sp[xi_batch, :]
 
-                loss += self.loss_function(sp_scores, xo_batch)
+                loss += self.loss_function(xo_batch, sp_scores)
 
             if 'p' in self.corruption:
                 so_scores = self.call(None, xs_batch_emb, xo_batch_emb)
                 # if elf.mask is True:
                 #     so_scores = so_scores + mask_so[xi_batch, :]
 
-                loss += self.loss_function(so_scores, xp_batch)
+                loss += self.loss_function(xp_batch, so_scores)
 
             factors = [e for e in [xp_batch_emb, xs_batch_emb, xo_batch_emb]]
 
