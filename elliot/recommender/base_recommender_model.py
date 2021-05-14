@@ -2,6 +2,7 @@
 Module description:
 
 """
+import inspect
 import logging as pylog
 import os
 
@@ -142,8 +143,9 @@ def init_charger(init):
     @wraps(init)
     def new_init(self, *args, **kwargs):
         BaseRecommenderModel.__init__(self, *args, **kwargs)
-        self.logger = logging.get_logger_model(self.__class__.__name__, pylog.CRITICAL if self._config.config_test else
-                                         pylog.DEBUG)
+        package_name = inspect.getmodule(self).__package__
+        rec_name = f"external.{self.__class__.__name__}" if "external" in package_name else self.__class__.__name__
+        self.logger = logging.get_logger_model(rec_name, pylog.CRITICAL if self._config.config_test else pylog.DEBUG)
         np.random.seed(self._seed)
         random.seed(self._seed)
         self._nprandom = np.random
