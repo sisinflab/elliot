@@ -46,7 +46,7 @@ from elliot.evaluation.metrics.fairness.reo import REO
 from elliot.evaluation.metrics.statistical_array_metric import StatisticalMetric
 
 _metric_dictionary = {
-    "nDCG": NDCG,
+    "nDCG": nDCG,
     "nDCGRendle2020": nDCGRendle2020,
     "Precision": Precision,
     "Recall": Recall,
