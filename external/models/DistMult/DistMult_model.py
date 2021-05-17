@@ -82,7 +82,7 @@ class DistMultModel(keras.Model):
         res = tf.reduce_sum(rel * arg1 * arg2, 1)
         return res
 
-    # @tf.function
+    @tf.function
     def call(self,
              rel: t.Optional[tf.Tensor] = None,
              arg1: t.Optional[tf.Tensor] = None,
@@ -101,9 +101,9 @@ class DistMultModel(keras.Model):
 
         # [B, N] = [B, E] @ [E, N]
         if rel is None:
-            scores = (arg1 * arg2) @ tf.transpose(ent_emb.weights[0])
+            scores = (arg1 * arg2) @ tf.transpose(pred_emb.weights[0])
         elif arg1 is None:
-            scores = (rel * arg2) @ tf.transpose(pred_emb.weights[0])
+            scores = (rel * arg2) @ tf.transpose(ent_emb.weights[0])
         elif arg2 is None:
             scores = (rel * arg1) @ tf.transpose(ent_emb.weights[0])
 
@@ -111,7 +111,7 @@ class DistMultModel(keras.Model):
 
         return scores
 
-    # @tf.function
+    @tf.function
     def train_step(self, batch):
         with tf.GradientTape() as tape:
             xp_batch, xs_batch, xo_batch, xi_batch = batch
@@ -157,14 +157,13 @@ class DistMultModel(keras.Model):
 
         return loss
 
-    # @tf.function
-    # def predict_batch(self, start, stop):
-    #     return tf.transpose(self.item_bias_embedding.weights[0]) + tf.matmul(self.user_embedding.weights[0][start:stop], self.item_embedding.weights[0], transpose_b=True)
-
     @tf.function
-    def predict(self, inputs, training=False, **kwargs):
-        logits, _ = self.call(inputs=inputs, training=True)
-        return logits
+    def predict(self, xp_batch=None, xs_batch=None, xo_batch=None, training=False, **kwargs):
+        xp_batch_emb = self.predicate_embeddings(xp_batch) if xp_batch is not None else None
+        xs_batch_emb = self.entity_embeddings(xs_batch) if xs_batch is not None else None
+        xo_batch_emb = self.entity_embeddings(xo_batch) if xo_batch is not None else None
+        scores = self.call(xp_batch_emb, xs_batch_emb, xo_batch_emb)
+        return scores
 
     @tf.function
     def get_top_k(self, preds, train_mask, k=100):

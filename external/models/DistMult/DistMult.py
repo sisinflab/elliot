@@ -14,6 +14,7 @@ from elliot.recommender import BaseRecommenderModel
 from elliot.recommender.base_recommender_model import init_charger
 from .DistMult_model import DistMultModel
 from elliot.recommender.recommender_utils_mixin import RecMixin
+from elliot.lp_evaluation.evaluator import LPEvaluator
 
 
 class DistMult(RecMixin, BaseRecommenderModel):
@@ -43,6 +44,8 @@ class DistMult(RecMixin, BaseRecommenderModel):
         self._ratings = self._data.train_dict
 
         self._side = getattr(self._data.side_information, self._loader, None)
+
+        self._lp_evaluator = LPEvaluator(self._side, self._config, self._params)
 
         self._sampler = TS(self._side, self._seed)
 
@@ -81,20 +84,34 @@ class DistMult(RecMixin, BaseRecommenderModel):
                     loss += self._model.train_step(batch)
                     t.set_postfix({'loss': f'{loss.numpy() / steps:.5f}'})
                     t.update()
+            self.evaluate(it, loss/(it + 1))
 
-            # self.evaluate(it, loss.numpy()/(it + 1))
+    def evaluate(self, it = None, loss = 0):
+        if (it is None) or (not (it + 1) % self._validation_rate):
+            lp_result_dict = self._lp_evaluator.eval(self._model)
 
-        # for it in self.iterate(self._epochs):
-        #     loss = 0
-        #     steps = 0
-        #     with tqdm(total=int(self._transactions_per_epoch // self._batch_size), disable=not self._verbose) as t:
-        #         for batch in self._sampler.step(self._transactions_per_epoch, self._batch_size):
-        #             steps += 1
-        #             loss += self._model.train_step(batch)
-        #             t.set_postfix({'loss': f'{loss.numpy() / steps:.5f}'})
-        #             t.update()
-        #
-        #     self.evaluate(it, loss.numpy()/(it + 1))
+            self._losses.append(loss)
+
+            self._results.append(lp_result_dict)
+
+            if it is not None:
+                self.logger.info(f'Epoch {(it + 1)}/{self._epochs} loss {loss/(it + 1):.5f}')
+            else:
+                self.logger.info(f'Finished')
+
+            if self._save_recs:
+                self.logger.info(f"Writing recommendations at: {self._config.path_output_rec_result}")
+
+            if (len(self._results) - 1) == self.get_best_arg():
+                if it is not None:
+                    self._params.best_iteration = it + 1
+                self.logger.info("******************************************")
+                self.best_metric_value = self._results[-1][self._validation_k]["val_results"][self._validation_metric]
+                if self._save_weights:
+                    if hasattr(self, "_model"):
+                        self._model.save_weights(self._saving_filepath)
+                    else:
+                        self.logger.warning("Saving weights FAILED. No model to save.")
 
     def get_recommendations(self, k: int = 100):
         predictions_top_k_test = {}

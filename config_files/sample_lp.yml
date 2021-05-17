@@ -1,0 +1,44 @@
+experiment:
+  dataset: movielens_1m
+  data_config:
+    strategy: fixed
+    dataset_path: ../data/{0}/dataset.tsv
+    train_path: ../data/{0}/splitting/0/train.tsv
+    test_path: ../data/{0}/splitting/0/test.tsv
+    side_information:
+      - dataloader: KGCompletion
+        train_path: ../data/nations/train.tsv
+        dev_path: ../data/nations/dev.tsv
+        test_path: ../data/nations/test.tsv
+  top_k: 10
+  mode: rec
+  evaluation:
+    cutoffs: [10, 1]
+    simple_metrics: [nDCG, nDCGRendle2020, HR]
+    paired_ttest: True
+    wilcoxon_test: True
+  lp_evaluation:
+    batch_size: 512
+    cutoffs: [1, 3, 5, 10, 20, 50, 100]
+    simple_metrics: [nDCG, HR, MRR, MRRAtN, Precision, AP, Recall, AUC]
+#  gpu: -1
+  external_models_path: ../external/models/__init__.py
+  models:
+    external.DistMult:
+      meta:
+        hyper_max_evals: 3
+        hyper_opt_alg: tpe
+        verbose: False
+        validation_rate: 10
+        validation_metric: nDCG@10
+      lr: [loguniform, -10, -1]
+      epochs: 10000
+      batch_size: 512
+      early_stopping:
+        patience: 10
+        monitor: HR@10
+        mode: auto
+        verbose: True
+        min_delta: 0.001
+#        rel_delta: 0.1
+#        baseline: 0.1

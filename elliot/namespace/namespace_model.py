@@ -57,6 +57,7 @@ _hyper_opt_alg = 'hyper_opt_alg'
 _data_paths = 'data_paths'
 _meta = 'meta'
 _random_seed = 'random_seed'
+_lp_evaluation = "lp_evaluation"
 
 
 class NameSpaceModel:
@@ -123,7 +124,7 @@ class NameSpaceModel:
 
         for p in [_data_config, _weights, _recs, _dataset, _top_k, _performance, _logger_config,
                   _log_folder, _dataloader, _splitting, _prefiltering, _evaluation, _external_models_path,
-                  _print_triplets, _config_test, _negative_sampling, _binarize, _random_seed]:
+                  _print_triplets, _config_test, _negative_sampling, _binarize, _random_seed, _lp_evaluation]:
             if p == _data_config:
                 side_information = self.config[_experiment][p].get("side_information", None)
 
@@ -206,6 +207,20 @@ class NameSpaceModel:
                 self.config[_experiment][p] = SimpleNamespace(**self.config[_experiment][p])
                 setattr(self.base_namespace, p, self.config[_experiment][p])
             elif p == _evaluation and self.config[_experiment].get(p, {}):
+                complex_metrics = self.config[_experiment][p].get("complex_metrics", {})
+                paired_ttest = self.config[_experiment][p].get("paired_ttest", {})
+                wilcoxon_test = self.config[_experiment][p].get("wilcoxon_test", {})
+                for complex_metric in complex_metrics:
+                    complex_metric.update({k: self._safe_set_path(self._base_folder_path_config, v, self.config[_experiment][_dataset])
+                                           for k, v in complex_metric.items()})
+                    # complex_metric.update({k: self._set_path(self._base_folder_path_config,
+                    #                                   v.format(self.config[_experiment][_dataset]))
+                    #                 for k, v in complex_metric.items() if isinstance(v, str)})
+                self.config[_experiment][p]["complex_metrics"] = complex_metrics
+                self.config[_experiment][p]["paired_ttest"] = paired_ttest
+                self.config[_experiment][p]["wilcoxon_test"] = wilcoxon_test
+                setattr(self.base_namespace, p, SimpleNamespace(**self.config[_experiment][p]))
+            elif p == _lp_evaluation and self.config[_experiment].get(p, {}):
                 complex_metrics = self.config[_experiment][p].get("complex_metrics", {})
                 paired_ttest = self.config[_experiment][p].get("paired_ttest", {})
                 wilcoxon_test = self.config[_experiment][p].get("wilcoxon_test", {})

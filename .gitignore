@@ -52,3 +52,4 @@ docs/source/_templates
 !/data/cat_dbpedia_movielens_1m/properties.conf
 !/data/movielens_1m/i_pop.tsv
 !/data/movielens_1m/u_pop.tsv
+!/data/nations
