@@ -77,6 +77,7 @@ def get_logger(name, log_level=logging.DEBUG):
 def get_logger_model(name, log_level=logging.DEBUG):
     logger = logging.root.manager.loggerDict[name]
     logger_es = logging.root.manager.loggerDict["EarlyStopping"]
+    logger_es.addFilter(TimeFilter())
     logger_es.addHandler(logger.handlers[0])
     logger_es.setLevel(log_level)
     logger.setLevel(log_level)
