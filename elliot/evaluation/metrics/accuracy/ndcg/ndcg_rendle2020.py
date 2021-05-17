@@ -14,7 +14,7 @@ import numpy as np
 from elliot.evaluation.metrics.base_metric import BaseMetric
 
 
-class NDCGRendle2020(BaseMetric):
+class nDCGRendle2020(BaseMetric):
     r"""
     normalized Discounted Cumulative Gain
 

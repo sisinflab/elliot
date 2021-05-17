@@ -12,7 +12,7 @@ import typing as t
 from elliot.evaluation.metrics.base_metric import BaseMetric
 
 
-class NDCG(BaseMetric):
+class nDCG(BaseMetric):
     r"""
     normalized Discounted Cumulative Gain
 

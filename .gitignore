@@ -20,8 +20,6 @@ pip-selfcheck.json
 
 /results/
 /data/*
-!/data/cat_dbpedia_movielens_1m
-!/data/movielens_1m
 /share/
 **/__pycache__/**
 *.log
@@ -47,3 +45,10 @@ MANIFEST
 docs/source/_build
 docs/source/_static
 docs/source/_templates
+
+
+!/data/cat_dbpedia_movielens_1m/features.tsv
+!/data/cat_dbpedia_movielens_1m/map.tsv
+!/data/cat_dbpedia_movielens_1m/properties.conf
+!/data/movielens_1m/i_pop.tsv
+!/data/movielens_1m/u_pop.tsv
