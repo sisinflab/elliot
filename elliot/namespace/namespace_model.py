@@ -269,18 +269,16 @@ class NameSpaceModel:
                              ]
                         if isinstance(value[0], str) and value[0] in valid_functions:
                             func_ = getattr(hp, value[0].replace(" ","").split("(")[0])
-                            val_string = value[0].replace(" ","").split("(")[1].split(")")[0] if len(value[0].replace(" ","").split("(")) > 1 else None
+                            val_string = value[0].replace(" ", "").split("(")[1].split(")")[0] \
+                                if len(value[0].replace(" ", "").split("(")) > 1 else None
                             val = [literal_eval(val_string) if val_string else None]
-                            val.extend([literal_eval(val.replace(" ","").replace(")","")) if isinstance(val, str) else val for val in value[1:]])
+                            val.extend([literal_eval(val.replace(" ", "").replace(")", "")) if isinstance(val, str) else
+                                        val for val in value[1:]])
                             val = [v for v in val if v is not None]
                             space_list.append((k, func_(k, *val)))
+                        elif all(isinstance(item, str) for item in value):
+                            space_list.append((k, hp.choice(k, value)))
                         else:
-                            # if not all([isinstance(v, str) for v in value]):
-                            #     space_list.append((k, hp.choice(k, value)))
-                            # else:
-                            #     space_list.append((k, hp.choice(k, literal_eval(
-                            #         "["+str(",".join([str(v) for v in value]))+"]")
-                            #                                     )))
                             space_list.append((k, hp.choice(k, literal_eval(
                                 "[" + str(",".join([str(v) for v in value])) + "]")
                                                             )))
