@@ -289,13 +289,9 @@ class NameSpaceModel:
                             val.extend([literal_eval(val.replace(" ","").replace(")","")) if isinstance(val, str) else val for val in value[1:]])
                             val = [v for v in val if v is not None]
                             space_list.append((k, func_(k, *val)))
+                        elif all(isinstance(item, str) for item in value):
+                            space_list.append((k, hp.choice(k, value)))
                         else:
-                            # if not all([isinstance(v, str) for v in value]):
-                            #     space_list.append((k, hp.choice(k, value)))
-                            # else:
-                            #     space_list.append((k, hp.choice(k, literal_eval(
-                            #         "["+str(",".join([str(v) for v in value]))+"]")
-                            #                                     )))
                             space_list.append((k, hp.choice(k, literal_eval(
                                 "[" + str(",".join([str(v) for v in value])) + "]")
                                                             )))
