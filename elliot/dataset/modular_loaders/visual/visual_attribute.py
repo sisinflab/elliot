@@ -14,6 +14,7 @@ class VisualAttribute(AbstractLoader):
         self.visual_feat_map_feature_folder_path = getattr(ns, "visual_feat_map_features", None)
         self.images_folder_path = getattr(ns, "images_src_folder", None)
 
+        self.item_mapping = {}
         self.visual_features_shape = None
         self.visual_pca_features_shape = None
         self.visual_feat_map_features_shape = None
@@ -41,6 +42,8 @@ class VisualAttribute(AbstractLoader):
         ns.visual_feat_map_feature_folder_path = self.visual_feat_map_feature_folder_path
         ns.images_folder_path = self.images_folder_path
 
+        ns.item_mapping = self.item_mapping
+
         ns.visual_features_shape = self.visual_features_shape
         ns.visual_pca_features_shape = self.visual_pca_features_shape
         ns.visual_feat_map_features_shape = self.visual_feat_map_features_shape
@@ -66,6 +69,9 @@ class VisualAttribute(AbstractLoader):
         if self.images_folder_path:
             items_folder = os.listdir(self.visual_feature_folder_path)
             items.union(*[int(f.split('.')[0]) for f in items_folder])
+
+        if items:
+            self.item_mapping = {item: val for val, item in enumerate(items)}
         return items
 
 
