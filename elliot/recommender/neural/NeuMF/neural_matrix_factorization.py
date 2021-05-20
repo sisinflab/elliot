@@ -12,7 +12,7 @@ from ast import literal_eval as make_tuple
 import numpy as np
 from tqdm import tqdm
 
-from elliot.recommender.neural.NeuMF import tf_custom_sampler as ts
+from elliot.recommender.neural.NeuMF import custom_sampler as ts
 from elliot.recommender.base_recommender_model import BaseRecommenderModel
 from elliot.recommender.base_recommender_model import init_charger
 from elliot.recommender.neural.NeuMF.neural_matrix_factorization_model import NeuralMatrixFactorizationModel
@@ -74,7 +74,8 @@ class NeuMF(RecMixin, BaseRecommenderModel):
         if self._batch_size < 1:
             self._batch_size = self._data.transactions
 
-        self._sampler = ts.Sampler(self._data.i_train_dict, self._m, self._data.transactions, self._seed)
+        # self._sampler = ts.Sampler(self._data.i_train_dict, self._m, self._data.transactions, self._seed)
+        self._sampler = ts.Sampler(self._data.i_train_dict, self._m)
 
         self._ratings = self._data.train_dict
         self._sp_i_train = self._data.sp_i_train
@@ -99,8 +100,8 @@ class NeuMF(RecMixin, BaseRecommenderModel):
             loss = 0
             steps = 0
             with tqdm(total=int(self._data.transactions * (self._m + 1) // self._batch_size), disable=not self._verbose) as t:
-                for batch in self._sampler.create_dataset(self._batch_size):
-                # for batch in self._sampler.step(self._batch_size):
+                # for batch in self._sampler.create_dataset(self._batch_size):
+                for batch in self._sampler.step(self._batch_size):
                     steps += 1
                     loss += self._model.train_step(batch).numpy()
                     t.set_postfix({'loss': f'{loss / steps:.5f}'})
