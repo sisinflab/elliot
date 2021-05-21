@@ -55,20 +55,22 @@ class VisualAttribute(AbstractLoader):
         items = set()
         if self.visual_feature_folder_path:
             items_folder = os.listdir(self.visual_feature_folder_path)
-            items.union(*[int(f.split('.')[0]) for f in items_folder])
-            self.visual_features_shape = np.load(self.visual_feature_folder_path + items_folder[0]).shape[0]
+            items = items.union(set([int(f.split('.')[0]) for f in items_folder]))
+            self.visual_features_shape = np.load(os.path.join(self.visual_feature_folder_path,
+                                                              items_folder[0])).shape[0]
         if self.visual_pca_feature_folder_path:
             items_folder = os.listdir(self.visual_feature_folder_path)
-            items.union(*[int(f.split('.')[0]) for f in items_folder])
-            self.visual_pca_features_shape = np.load(self.visual_pca_feature_folder_path + items_folder[0]).shape[0]
+            items = items.union(set([int(f.split('.')[0]) for f in items_folder]))
+            self.visual_pca_features_shape = np.load(os.path.join(self.visual_pca_feature_folder_path,
+                                                                  items_folder[0])).shape[0]
         if self.visual_feat_map_feature_folder_path:
             items_folder = os.listdir(self.visual_feature_folder_path)
-            items.union(*[int(f.split('.')[0]) for f in items_folder])
-            self.visual_feat_map_features_shape = np.load(self.visual_feat_map_feature_folder_path +
-                                                          items_folder[0]).shape
+            items = items.union(set([int(f.split('.')[0]) for f in items_folder]))
+            self.visual_feat_map_features_shape = np.load(os.path.join(self.visual_feat_map_feature_folder_path,
+                                                          items_folder[0])).shape
         if self.images_folder_path:
             items_folder = os.listdir(self.visual_feature_folder_path)
-            items.union(*[int(f.split('.')[0]) for f in items_folder])
+            items = items.union(set([int(f.split('.')[0]) for f in items_folder]))
 
         if items:
             self.item_mapping = {item: val for val, item in enumerate(items)}
