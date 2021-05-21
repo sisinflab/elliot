@@ -73,8 +73,8 @@ class ACF(RecMixin, BaseRecommenderModel):
         self._side = getattr(self._data.side_information, self._loader, None)
 
         self._sampler = ppsa.Sampler(self._data.i_train_dict,
-                                     self._data.side_information_data.visual_feat_map_feature_path,
-                                     self._data.visual_feat_map_features_shape,
+                                     self._side.visual_feat_map_feature_folder_path,
+                                     self._side.visual_feat_map_features_shape,
                                      self._epochs)
 
         self._next_batch = self._sampler.pipeline(self._data.transactions, self._batch_size)
@@ -84,7 +84,7 @@ class ACF(RecMixin, BaseRecommenderModel):
                                 self._layers_item,
                                 self._learning_rate,
                                 self._l_w,
-                                self._data.visual_feat_map_features_shape,
+                                self._side.visual_feat_map_features_shape,
                                 self._num_users,
                                 self._num_items,
                                 self._seed)
