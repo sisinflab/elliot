@@ -15,7 +15,7 @@ from elliot.recommender import BaseRecommenderModel
 from elliot.recommender.base_recommender_model import init_charger
 from elliot.recommender.recommender_utils_mixin import RecMixin
 from elliot.recommender.visual_recommenders.ACF.ACF_model import ACF_model
-from elliot.recommender.visual_recommenders.ACF.pairwise_pipeline_sampler_acf import Sampler as ppsa
+from elliot.recommender.visual_recommenders.ACF import pairwise_pipeline_sampler_acf as ppsa
 
 
 class ACF(RecMixin, BaseRecommenderModel):
@@ -51,9 +51,6 @@ class ACF(RecMixin, BaseRecommenderModel):
     """
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
-
-        self._num_items = self._data.num_items
-        self._num_users = self._data.num_users
         self._layers_component = self._params.layers_component
         self._layers_item = self._params.layers_item
 
@@ -104,14 +101,28 @@ class ACF(RecMixin, BaseRecommenderModel):
         if self._restore:
             return self.restore_weights()
 
-        for it in self.iterate(self._epochs):
-            loss = 0
-            steps = 0
-            with tqdm(total=int(self._num_users // self._batch_size), disable=not self._verbose) as t:
-                for batch in self._sampler.step(self._num_users, self._batch_size):
-                    steps += 1
-                    loss += self._model.train_step(batch)
-                    t.set_postfix({'loss': f'{loss.numpy()/steps:.5f}'})
-                    t.update()
+        loss = 0
+        steps = 0
+        it = 0
+        with tqdm(total=int(self._data.transactions // self._batch_size), disable=not self._verbose) as t:
+            for batch in self._next_batch:
+                steps += 1
+                loss += self._model.train_step(batch)
+                t.set_postfix({'loss': f'{loss.numpy() / steps:.5f}'})
+                t.update()
 
-            self.evaluate(it, loss.numpy()/(it + 1))
+                if steps == self._data.transactions // self._batch_size:
+                    t.reset()
+                    self.evaluate(it, loss.numpy() / (it + 1))
+                    it += 1
+
+    def get_recommendations(self, k: int = 100):
+        predictions_top_k_test = {}
+        predictions_top_k_val = {}
+        for user_id, batch in enumerate(self._next_eval_batch):
+            user, user_pos, feat_pos = batch
+            predictions = self._model.predict(user, user_pos, feat_pos)
+            recs_val, recs_test = self.process_protocol(k, predictions, user_id, user_id + 1)
+            predictions_top_k_val.update(recs_val)
+            predictions_top_k_test.update(recs_test)
+        return predictions_top_k_val, predictions_top_k_test
