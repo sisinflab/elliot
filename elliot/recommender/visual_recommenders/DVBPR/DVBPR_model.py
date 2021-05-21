@@ -86,7 +86,7 @@ class DVBPR_model(keras.Model):
         return loss
 
     @tf.function
-    def predict_batch(self, start, stop, phi):
+    def predict_item_batch(self, start, stop, phi):
         return tf.matmul(self.Tu[start:stop], phi, transpose_b=True)
 
     @tf.function
