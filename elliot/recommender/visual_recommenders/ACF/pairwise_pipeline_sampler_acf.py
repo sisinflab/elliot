@@ -34,7 +34,7 @@ class Sampler:
         # load positive and negative item features
         item_pos = np.empty((user_pos.shape[0], *self._cnn_features_shape))
         for idx in range(user_pos.shape[0]):
-            item_pos[idx] = np.load(self._cnn_features_path + str(user_pos[idx].numpy()) + '.npy')
+            item_pos[idx] = np.load(os.path.join(self._cnn_features_path, str(user_pos[idx].numpy())) + '.npy')
 
         return user.numpy(), pos.numpy(), neg.numpy(), user_pos.numpy(), item_pos
 
@@ -123,6 +123,6 @@ class Sampler:
     def read_features_eval(self, user, user_pos):
         item = np.empty((user_pos.shape[0], *self._cnn_features_shape))
         for idx in range(user_pos.shape[0]):
-            item[idx] = np.load(self._cnn_features_path + str(user_pos[idx].numpy()) + '.npy')
+            item[idx] = np.load(os.path.join(self._cnn_features_path, str(user_pos[idx].numpy())) + '.npy')
 
         return user.numpy(), user_pos.numpy(), item
