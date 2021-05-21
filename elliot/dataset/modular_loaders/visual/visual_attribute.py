@@ -75,5 +75,3 @@ class VisualAttribute(AbstractLoader):
         if items:
             self.item_mapping = {item: val for val, item in enumerate(items)}
         return items
-
-
