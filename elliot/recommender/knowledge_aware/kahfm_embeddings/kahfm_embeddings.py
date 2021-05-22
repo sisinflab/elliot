@@ -129,6 +129,7 @@ class KaHFMEmbeddings(RecMixin, BaseRecommenderModel):
             return self.restore_weights()
 
         for it in self.iterate(self._epochs):
+            self.print_info(13, 2858)
             loss = 0
             steps = 0
             with tqdm(total=int(self._transactions_per_epoch // self._batch_size), disable=not self._verbose) as t:
@@ -139,6 +140,7 @@ class KaHFMEmbeddings(RecMixin, BaseRecommenderModel):
                     t.update()
 
             self.evaluate(it, loss.numpy()/(it + 1))
+            print()
 
     def get_recommendations(self, k: int = 100):
         predictions_top_k_test = {}
@@ -150,3 +152,39 @@ class KaHFMEmbeddings(RecMixin, BaseRecommenderModel):
             predictions_top_k_val.update(recs_val)
             predictions_top_k_test.update(recs_test)
         return predictions_top_k_val, predictions_top_k_test
+
+    def print_info(self, user, item):
+        iidx = self._data.public_items[item]
+        uidx = self._data.public_users[user]
+        print(f"Analyzing user {user}")
+        print(f"History:")
+        for i, v in self._data.train_dict[user].items():
+            print(f"Item [{self._side.item_names[i]}] -> {v}")
+        print(f"Analyzing item {item}:\t{self._side.item_names[item]}")
+
+        #user
+        top_10_indexed_features = np.argsort(- self._model.user_embedding(uidx).numpy())[:30]
+        top_10_features = [self._side.private_features[f] for f in top_10_indexed_features]
+
+        for p, f in enumerate(top_10_features):
+            fidx = top_10_indexed_features[p]
+            print(f"User Feature {self._side.feature_names[f]} -> {self._model.user_embedding.weights[0][uidx, fidx]}")
+
+        #item
+        top_10_indexed_features = np.argsort(- self._model.item_embedding(iidx).numpy())[:10]
+        top_10_features = [self._side.private_features[f] for f in top_10_indexed_features]
+
+        for p, f in enumerate(top_10_features):
+            fidx = top_10_indexed_features[p]
+            print(f"Feature [{self._side.feature_names[f]}] -> {self._model.item_embedding.weights[0][iidx,fidx]}")
+
+        #interation
+        dot_unpack = self._model.user_embedding(uidx).numpy() * self._model.item_embedding(iidx).numpy()
+        bias = self._model.item_bias_embedding(iidx).numpy()
+        print(f"Score: {sum(dot_unpack) + bias} -- Dot: {sum(dot_unpack)} -- Bias: {bias}")
+        top_10_indexed_features = np.argsort(- dot_unpack)[:10]
+        top_10_features = [self._side.private_features[f] for f in top_10_indexed_features]
+        print("Most interacted features:")
+        for p, f in enumerate(top_10_features):
+            fidx = top_10_indexed_features[p]
+            print(f"Feature [{self._side.feature_names[f]}] -> {dot_unpack[fidx]}")

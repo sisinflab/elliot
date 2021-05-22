@@ -50,7 +50,7 @@ class ItemKNN(RecMixin, BaseRecommenderModel):
             ("_similarity", "similarity", "sim", "cosine", None, None),
             ("_implementation", "implementation", "imp", "standard", None, None),
             ("_implicit", "implicit", "bin", False, None, None),
-            ("_shrink", "shrink", "shrink", 0, None, None),
+            ("_shrink", "shrink", "shrink", 0, int, None),
             ("_normalize", "normalize", "norm", True, None, None),
             ("_asymmetric_alpha", "asymmetric_alpha", "asymalpha", False, None, lambda x: x if x else ""),
             ("_tversky_alpha", "tversky_alpha", "tvalpha", False, None, lambda x: x if x else ""),
