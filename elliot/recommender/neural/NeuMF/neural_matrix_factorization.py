@@ -100,14 +100,12 @@ class NeuMF(RecMixin, BaseRecommenderModel):
             loss = 0
             steps = 0
             with tqdm(total=int(self._data.transactions * (self._m + 1) // self._batch_size), disable=not self._verbose) as t:
-                TIME = time.time()
                 # for batch in self._trainer:
                 for batch in self._sampler.step(self._batch_size):
                     steps += 1
                     loss += self._model.train_step(batch).numpy()
                     t.set_postfix({'loss': f'{loss / steps:.5f}'})
                     t.update()
-                print(f"TIME: {time.time()-TIME}")
             self.evaluate(it, loss/(it + 1))
 
     def get_recommendations(self, k: int = 100):

@@ -71,9 +71,6 @@ class Sampler():
             yield u, i, b
 
     def create_tf_dataset(self):
-        print(f"POS: {len(self._POS)} -- M:{self._M} --- {len(self._POS)*(self._M +1)//self._batch_size}")
-        print(f"{self._transactions*(self._M + 1)//self._batch_size}")
-
         data = tf.data.Dataset.from_generator(generator=self._full_generator,
                                               output_types=(np.int64, np.int64, np.int64),
                                               )
