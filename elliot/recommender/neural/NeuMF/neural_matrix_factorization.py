@@ -7,12 +7,12 @@ __version__ = '0.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
-from ast import literal_eval as make_tuple
+import time
 
 import numpy as np
 from tqdm import tqdm
 
-from elliot.recommender.neural.NeuMF import custom_sampler as ts
+from elliot.recommender.neural.NeuMF import tf_custom_sampler_2 as ts
 from elliot.recommender.base_recommender_model import BaseRecommenderModel
 from elliot.recommender.base_recommender_model import init_charger
 from elliot.recommender.neural.NeuMF.neural_matrix_factorization_model import NeuralMatrixFactorizationModel
@@ -55,10 +55,10 @@ class NeuMF(RecMixin, BaseRecommenderModel):
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
 
-
         self._params_list = [
             ("_learning_rate", "lr", "lr", 0.001, None, None),
             ("_mf_factors", "mf_factors", "mffactors", 10, int, None),
+            # If the user prefer a generalized model (WARNING: not coherent with the paper) can uncomment the following options
             #("_mlp_factors", "mlp_factors", "mlpfactors", 10, int, None),
             #("_mlp_hidden_size", "mlp_hidden_size", "mlpunits", "(64,32)", lambda x: list(make_tuple(str(x))), lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
             ("_dropout", "dropout", "drop", 0, None, None),
@@ -74,8 +74,8 @@ class NeuMF(RecMixin, BaseRecommenderModel):
         if self._batch_size < 1:
             self._batch_size = self._data.transactions
 
-        # self._sampler = ts.Sampler(self._data.i_train_dict, self._m, self._data.transactions, self._seed)
-        self._sampler = ts.Sampler(self._data.i_train_dict, self._m)
+        self._sampler = ts.Sampler(self._data.i_train_dict, self._m, self._num_users, self._num_items, self._data.transactions, self._batch_size, self._seed)
+        self._trainer = self._sampler.create_tf_dataset()
 
         self._ratings = self._data.train_dict
         self._sp_i_train = self._data.sp_i_train
@@ -100,13 +100,14 @@ class NeuMF(RecMixin, BaseRecommenderModel):
             loss = 0
             steps = 0
             with tqdm(total=int(self._data.transactions * (self._m + 1) // self._batch_size), disable=not self._verbose) as t:
-                # for batch in self._sampler.create_dataset(self._batch_size):
+                TIME = time.time()
+                # for batch in self._trainer:
                 for batch in self._sampler.step(self._batch_size):
                     steps += 1
                     loss += self._model.train_step(batch).numpy()
                     t.set_postfix({'loss': f'{loss / steps:.5f}'})
                     t.update()
-
+                print(f"TIME: {time.time()-TIME}")
             self.evaluate(it, loss/(it + 1))
 
     def get_recommendations(self, k: int = 100):
@@ -125,9 +126,3 @@ class NeuMF(RecMixin, BaseRecommenderModel):
             predictions_top_k_val.update(recs_val)
             predictions_top_k_test.update(recs_test)
         return predictions_top_k_val, predictions_top_k_test
-
-    # def get_single_recommendation(self, mask, k, predictions, offset, offset_stop):
-    #     v, i = self._model.get_top_k(predictions, mask[offset: offset_stop], k=k)
-    #     items_ratings_pair = [list(zip(map(self._data.private_items.get, u_list[0]), u_list[1]))
-    #                           for u_list in list(zip(i.numpy(), v.numpy()))]
-    #     return dict(zip(map(self._data.private_users.get, range(offset, offset_stop)), items_ratings_pair))
