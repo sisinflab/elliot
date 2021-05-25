@@ -15,7 +15,7 @@ import tensorflow as tf
 from elliot.recommender import BaseRecommenderModel
 from elliot.recommender.base_recommender_model import init_charger
 from elliot.recommender.recommender_utils_mixin import RecMixin
-from elliot.recommender.visual_recommenders.DeepStyle.DeepStyle_model import DeepStyle_model
+from elliot.recommender.visual_recommenders.DeepStyle.DeepStyle_model import DeepStyleModel
 from elliot.recommender.visual_recommenders.DeepStyle import pairwise_pipeline_sampler_deepstyle as ppsd
 
 
@@ -75,13 +75,13 @@ class DeepStyle(RecMixin, BaseRecommenderModel):
 
         self._next_batch = self._sampler.pipeline(self._data.transactions, self._batch_size)
 
-        self._model = DeepStyle_model(self._factors,
-                                      self._learning_rate,
-                                      self._l_w,
-                                      self._side.visual_features_shape,
-                                      self._num_users,
-                                      self._num_items,
-                                      self._seed)
+        self._model = DeepStyleModel(self._factors,
+                                     self._learning_rate,
+                                     self._l_w,
+                                     self._side.visual_features_shape,
+                                     self._num_users,
+                                     self._num_items,
+                                     self._seed)
 
         # only for evaluation purposes
         self._next_eval_batch = self._sampler.pipeline_eval(self._batch_eval)
@@ -108,8 +108,10 @@ class DeepStyle(RecMixin, BaseRecommenderModel):
 
                 if steps == self._data.transactions // self._batch_size:
                     t.reset()
-                    self.evaluate(it, loss.numpy() / (it + 1))
+                    self.evaluate(it, loss.numpy() / steps)
                     it += 1
+                    steps = 0
+                    loss = 0
 
     def get_recommendations(self, k: int = 100):
         predictions_top_k_test = {}

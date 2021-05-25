@@ -12,12 +12,12 @@ import os
 
 import numpy as np
 import random
-np.random.seed(42)
-random.seed(42)
 
 
 class Sampler:
     def __init__(self, indexed_ratings, item_indices, cnn_features_path, epochs):
+        np.random.seed(42)
+        random.seed(42)
         self._indexed_ratings = indexed_ratings
         self._item_indices = item_indices
         self._users = list(self._indexed_ratings.keys())
@@ -96,7 +96,7 @@ class Sampler:
     def pipeline_eval(self, batch_size):
         def load_func(i_r, i_a):
             b = tf.py_function(
-                self.read_features,
+                self.read_features_eval,
                 (i_r, i_a,),
                 (np.int64, np.int64, np.float32)
             )
@@ -112,7 +112,7 @@ class Sampler:
         return data
 
     # this is only for evaluation
-    def read_features(self, item_rel, item_abs):
+    def read_features_eval(self, item_rel, item_abs):
         feat = np.load(os.path.join(self._cnn_features_path, str(item_abs.numpy())) + '.npy')
 
         return item_rel, item_abs, feat

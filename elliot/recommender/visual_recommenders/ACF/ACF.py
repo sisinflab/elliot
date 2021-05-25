@@ -14,7 +14,7 @@ from tqdm import tqdm
 from elliot.recommender import BaseRecommenderModel
 from elliot.recommender.base_recommender_model import init_charger
 from elliot.recommender.recommender_utils_mixin import RecMixin
-from elliot.recommender.visual_recommenders.ACF.ACF_model import ACF_model
+from elliot.recommender.visual_recommenders.ACF.ACF_model import ACFModel
 from elliot.recommender.visual_recommenders.ACF import pairwise_pipeline_sampler_acf as ppsa
 
 
@@ -51,9 +51,6 @@ class ACF(RecMixin, BaseRecommenderModel):
     """
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
-        self._layers_component = self._params.layers_component
-        self._layers_item = self._params.layers_item
-
         self._params_list = [
             ("_factors", "factors", "factors", 100, None, None),
             ("_learning_rate", "lr", "lr", 0.0005, None, None),
@@ -79,15 +76,15 @@ class ACF(RecMixin, BaseRecommenderModel):
 
         self._next_batch = self._sampler.pipeline(self._data.transactions, self._batch_size)
 
-        self._model = ACF_model(self._factors,
-                                self._layers_component,
-                                self._layers_item,
-                                self._learning_rate,
-                                self._l_w,
-                                self._side.visual_feat_map_features_shape,
-                                self._num_users,
-                                self._num_items,
-                                self._seed)
+        self._model = ACFModel(self._factors,
+                               self._layers_component,
+                               self._layers_item,
+                               self._learning_rate,
+                               self._l_w,
+                               self._side.visual_feat_map_features_shape,
+                               self._num_users,
+                               self._num_items,
+                               self._seed)
         # only for evaluation purposes
         self._next_eval_batch = self._sampler.pipeline_eval()
 
@@ -113,8 +110,10 @@ class ACF(RecMixin, BaseRecommenderModel):
 
                 if steps == self._data.transactions // self._batch_size:
                     t.reset()
-                    self.evaluate(it, loss.numpy() / (it + 1))
+                    self.evaluate(it, loss.numpy() / steps)
                     it += 1
+                    steps = 0
+                    loss = 0
 
     def get_recommendations(self, k: int = 100):
         predictions_top_k_test = {}

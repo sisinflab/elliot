@@ -15,7 +15,7 @@ from elliot.recommender.visual_recommenders.DVBPR import pairwise_pipeline_sampl
 from elliot.recommender import BaseRecommenderModel
 from elliot.recommender.base_recommender_model import init_charger
 from elliot.recommender.recommender_utils_mixin import RecMixin
-from elliot.recommender.visual_recommenders.DVBPR.DVBPR_model import DVBPR_model
+from elliot.recommender.visual_recommenders.DVBPR.DVBPR_model import DVBPRModel
 
 
 class DVBPR(RecMixin, BaseRecommenderModel):
@@ -29,6 +29,7 @@ class DVBPR(RecMixin, BaseRecommenderModel):
         epochs: Number of epochs
         factors: Number of latent factors
         batch_size: Batch size
+        batch_eval: Batch for evaluation
         lambda_1: Regularization coefficient
         lambda_2: CNN regularization coefficient
 
@@ -44,6 +45,7 @@ class DVBPR(RecMixin, BaseRecommenderModel):
           epochs: 50
           factors: 100
           batch_size: 128
+          batch_eval: 128
           lambda_1: 0.0001
           lambda_2: 1.0
     """
@@ -78,13 +80,13 @@ class DVBPR(RecMixin, BaseRecommenderModel):
         )
         self._next_batch = self._sampler.pipeline(self._data.transactions, self._batch_size)
 
-        self._model = DVBPR_model(self._factors,
-                                  self._learning_rate,
-                                  self._lambda_1,
-                                  self._lambda_2,
-                                  self._num_users,
-                                  self._num_items,
-                                  self._seed)
+        self._model = DVBPRModel(self._factors,
+                                 self._learning_rate,
+                                 self._lambda_1,
+                                 self._lambda_2,
+                                 self._num_users,
+                                 self._num_items,
+                                 self._seed)
 
     @property
     def name(self):
@@ -108,8 +110,10 @@ class DVBPR(RecMixin, BaseRecommenderModel):
 
                 if steps == self._data.transactions // self._batch_size:
                     t.reset()
-                    self.evaluate(it, loss.numpy() / (it + 1))
+                    self.evaluate(it, loss.numpy() / steps)
                     it += 1
+                    steps = 0
+                    loss = 0
 
     def get_recommendations(self, k: int = 100):
         predictions_top_k_test = {}
@@ -121,7 +125,7 @@ class DVBPR(RecMixin, BaseRecommenderModel):
             stop_batch = min(start_batch + self._batch_eval, len(self._item_indices))
             images = np.zeros(shape=(stop_batch - start_batch, *self._side.image_size_tuple, 3))
             for start_image in range(start_batch, stop_batch):
-                _, image = self._sampler.read_image(start_image)
+                _, image = self._sampler.read_image(self._item_indices[start_image])
                 images[start_image % self._batch_eval] = image
             features[start_batch:stop_batch] = self._model.Cnn(images, training=False).numpy()
 

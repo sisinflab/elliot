@@ -12,7 +12,7 @@ import tensorflow as tf
 from tensorflow import keras
 
 
-class ACF_model(keras.Model):
+class ACFModel(keras.Model):
     def __init__(self, factors=200,
                  layers_component=(64, 1),
                  layers_item=(64, 1),

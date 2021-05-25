@@ -7,18 +7,14 @@ __version__ = '0.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malitesta@poliba.it'
 
-import os
-
 import numpy as np
 import tensorflow as tf
 from tensorflow import keras
 
 from elliot.recommender.visual_recommenders.DVBPR.FeatureExtractor import FeatureExtractor
 
-os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
 
-
-class DVBPR_model(keras.Model):
+class DVBPRModel(keras.Model):
     def __init__(self,
                  factors=200,
                  learning_rate=0.001,

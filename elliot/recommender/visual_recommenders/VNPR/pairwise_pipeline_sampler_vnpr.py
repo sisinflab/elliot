@@ -8,17 +8,18 @@ __author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta, Felice Antoni
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malitesta@poliba.it, felice.merra@poliba.it'
 
 import tensorflow as tf
+import os
 
 import numpy as np
 import random
-import os
+np.random.seed(42)
+random.seed(42)
 
 
 class Sampler:
-    def __init__(self, indexed_ratings, cnn_features_path, cnn_features_shape, epochs):
-        np.random.seed(42)
-        random.seed(42)
+    def __init__(self, indexed_ratings, item_indices, cnn_features_path, epochs):
         self._indexed_ratings = indexed_ratings
+        self._item_indices = item_indices
         self._users = list(self._indexed_ratings.keys())
         self._nusers = len(self._users)
         self._items = list({k for a in self._indexed_ratings.values() for k in a.keys()})
@@ -27,16 +28,14 @@ class Sampler:
         self._lui_dict = {u: len(v) for u, v in self._ui_dict.items()}
 
         self._cnn_features_path = cnn_features_path
-        self._cnn_features_shape = cnn_features_shape
         self._epochs = epochs
 
-    def read_features_triple(self, user, pos, neg, user_pos):
+    def read_features_triple(self, user, pos, neg):
         # load positive and negative item features
-        item_pos = np.empty((user_pos.shape[0], *self._cnn_features_shape))
-        for idx in range(user_pos.shape[0]):
-            item_pos[idx] = np.load(os.path.join(self._cnn_features_path, str(user_pos[idx].numpy())) + '.npy')
+        feat_pos = np.load(os.path.join(self._cnn_features_path, str(pos.numpy())) + '.npy')
+        feat_neg = np.load(os.path.join(self._cnn_features_path, str(neg.numpy())) + '.npy')
 
-        return user.numpy(), pos.numpy(), neg.numpy(), user_pos.numpy(), item_pos
+        return user.numpy(), pos.numpy(), feat_pos, neg.numpy(), feat_neg
 
     def step(self, events: int, batch_size: int):
         r_int = np.random.randint
@@ -60,7 +59,7 @@ class Sampler:
             j = r_int(n_items)
             while j in ui:
                 j = r_int(n_items)
-            return u, i, j, ui
+            return u, i, j
 
         for ep in range(self._epochs):
             for _ in range(events):
@@ -71,16 +70,17 @@ class Sampler:
                     counter_inter += 1
 
     def pipeline(self, num_users, batch_size):
-        def load_func(u, p, n, up):
+        def load_func(u, p, n):
             b = tf.py_function(
                 self.read_features_triple,
-                (u, p, n, up),
-                (np.int64, np.int64, np.int64, np.int64, np.float32)
+                (u, p, n,),
+                (np.int64, np.int64, np.float32, np.int64, np.float32)
             )
             return b
+
         data = tf.data.Dataset.from_generator(generator=self.step,
-                                              output_shapes=((), (), (), (None,)),
-                                              output_types=(tf.int64, tf.int64, tf.int64, tf.int64),
+                                              output_shapes=((), (), ()),
+                                              output_types=(tf.int64, tf.int64, tf.int64),
                                               args=(num_users, batch_size))
         data = data.map(load_func, num_parallel_calls=tf.data.experimental.AUTOTUNE)
         data = data.batch(batch_size=batch_size)
@@ -89,34 +89,30 @@ class Sampler:
         return data
 
     def step_eval(self):
-        n_users = self._nusers
-        ui_dict = self._ui_dict
-
-        for u in range(n_users):
-            yield u, ui_dict[u]
+        for i_rel, i_abs in enumerate(self._item_indices):
+            yield i_rel, i_abs
 
     # this is only for evaluation
-    def pipeline_eval(self):
-        def load_func(u, up):
+    def pipeline_eval(self, batch_size):
+        def load_func(i_r, i_a):
             b = tf.py_function(
-                self.read_features_eval,
-                (u, up),
+                self.read_features,
+                (i_r, i_a,),
                 (np.int64, np.int64, np.float32)
             )
             return b
 
         data = tf.data.Dataset.from_generator(generator=self.step_eval,
-                                              output_shapes=((), (None,)),
+                                              output_shapes=((), ()),
                                               output_types=(tf.int64, tf.int64))
         data = data.map(load_func, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+        data = data.batch(batch_size=batch_size)
         data = data.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
 
         return data
 
     # this is only for evaluation
-    def read_features_eval(self, user, user_pos):
-        item = np.empty((user_pos.shape[0], *self._cnn_features_shape))
-        for idx in range(user_pos.shape[0]):
-            item[idx] = np.load(os.path.join(self._cnn_features_path, str(user_pos[idx].numpy())) + '.npy')
+    def read_features(self, item_rel, item_abs):
+        feat = np.load(os.path.join(self._cnn_features_path, str(item_abs.numpy())) + '.npy')
 
-        return user.numpy(), user_pos.numpy(), item
+        return item_rel, item_abs, feat
