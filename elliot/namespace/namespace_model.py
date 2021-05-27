@@ -9,19 +9,19 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
 import copy
 import os
-from os.path import isfile, join
-import sys
-from types import SimpleNamespace
+import re
 from ast import literal_eval
+from collections import OrderedDict
 from functools import reduce
+from os.path import isfile, join
+from types import SimpleNamespace
 
 from hyperopt import hp
 from yaml import FullLoader as FullLoader
 from yaml import load
-from collections import OrderedDict
-from elliot.utils.folder import manage_directories
+
 import elliot.hyperoptimization as ho
-import re
+from elliot.utils.folder import manage_directories
 
 regexp = re.compile(r'[\D][\w-]+\.[\w-]+')
 
@@ -133,11 +133,6 @@ class NameSpaceModel:
                                                  for k, v in side.items()}) for side in side_information]
                         self.config[_experiment][p].update({k: self._safe_set_path(self._base_folder_path_config, v, self.config[_experiment][_dataset])
                                                             for k, v in self.config[_experiment][p].items()})
-                        # self.config[_experiment][p].update({k: self._set_path(self._base_folder_path_config,
-                        #                                                       v.format(
-                        #                                                           self.config[_experiment][_dataset]))
-                        #                                     for k, v in self.config[_experiment][p].items() if
-                        #                                     isinstance(v, str)})
                         self.config[_experiment][p]["side_information"] = side_information
                         self.config[_experiment][p][_dataloader] = "DataSetLoader"
                         setattr(self.base_namespace, p, SimpleNamespace(**self.config[_experiment][p]))
@@ -145,17 +140,9 @@ class NameSpaceModel:
                         side_information = self.config[_experiment][p].get("side_information", {})
                         side_information.update({k: self._safe_set_path(self._base_folder_path_config, v, self.config[_experiment][_dataset])
                                                  for k, v in side_information.items()})
-                        # side_information.update({k: self._set_path(self._base_folder_path_config,
-                        #                                            v.format(self.config[_experiment][_dataset]))
-                        #                          for k, v in side_information.items() if isinstance(v, str)})
                         side_information = SimpleNamespace(**side_information)
                         self.config[_experiment][p].update({k: self._safe_set_path(self._base_folder_path_config, v, self.config[_experiment][_dataset])
                                                             for k, v in self.config[_experiment][p].items()})
-                        # self.config[_experiment][p].update({k: self._set_path(self._base_folder_path_config,
-                        #                                                       v.format(
-                        #                                                           self.config[_experiment][_dataset]))
-                        #                                     for k, v in self.config[_experiment][p].items() if
-                        #                                     isinstance(v, str)})
                         self.config[_experiment][p]["side_information"] = side_information
                         self.config[_experiment][p][_dataloader] = self.config[_experiment][p].get(_dataloader,
                                                                                                    "DataSetLoader")
@@ -174,11 +161,6 @@ class NameSpaceModel:
             elif p == _splitting and self.config[_experiment].get(p, {}):
                 self.config[_experiment][p].update({k: self._safe_set_path(self._base_folder_path_config, v, self.config[_experiment][_dataset])
                                                     for k, v in self.config[_experiment][p].items()})
-                # self.config[_experiment][p].update({k: self._set_path(self._base_folder_path_config,
-                #                                                       v.format(self.config[_experiment][_dataset]))
-                #                                     for k, v in self.config[_experiment][p].items() if
-                #                                     isinstance(v, str)})
-
                 test_splitting = self.config[_experiment][p].get("test_splitting", {})
                 validation_splitting = self.config[_experiment][p].get("validation_splitting", {})
 

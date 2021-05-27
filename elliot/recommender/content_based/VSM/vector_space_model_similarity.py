@@ -78,15 +78,11 @@ class Similarity(object):
 
     def get_model_state(self):
         saving_dict = {}
-        saving_dict['_neighbors'] = self._neighbors
         saving_dict['_similarity'] = self._similarity
-        saving_dict['_num_neighbors'] = self._num_neighbors
         return saving_dict
 
     def set_model_state(self, saving_dict):
-        self._neighbors = saving_dict['_neighbors']
         self._similarity = saving_dict['_similarity']
-        self._num_neighbors = saving_dict['_num_neighbors']
 
     def load_weights(self, path):
         with open(path, "rb") as f:

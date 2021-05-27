@@ -28,14 +28,6 @@ class Sampler:
         r_int = np.random.randint
         n_items = self._nitems
         ui_dict = self._ui_dict
-        lui_dict = self._lui_dict
-
-        # def sample_pos(u):
-        #     ui = ui_dict[u]
-        #     lui = lui_dict[u]
-        #     if lui == n_items:
-        #         return None
-        #     return ui[r_int(lui)]
         pos = {(u, i, 1) for u, items in ui_dict.items() for i in items}
 
         neg = set()
@@ -50,7 +42,6 @@ class Sampler:
         samples = list(pos)
         samples.extend(list(neg))
         samples = random.sample(samples, len(samples))
-        # samples_zip = list(zip(samples))
 
         for start in range(0, len(samples), batch_size):
             u, i, b = map(np.array, zip(*samples[start:min(start + batch_size, len(samples))]))

@@ -106,6 +106,12 @@ class DataSetLoader(LoaderCoordinator):
         else:
             raise Exception("Strategy option not recognized")
 
+        if isinstance(self.tuple_list, list) or (isinstance(self.tuple_list[0][0], list)):
+            self.logger.warning("You are using a splitting strategy with folds. "
+                                "Paired TTest and Wilcoxon Test are not available!")
+            self.config.evaluation.paired_ttest = False
+            self.config.evaluation.wilcoxon_test = False
+
     def check_timestamp(self, d: pd.DataFrame) -> pd.DataFrame:
         if all(d["timestamp"].isna()):
             d = d.drop(columns=["timestamp"]).reset_index(drop=True)

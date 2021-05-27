@@ -32,7 +32,6 @@ class FM(RecMixin, BaseRecommenderModel):
         factors: Number of factors of feature embeddings
         lr: Learning rate
         reg: Regularization coefficient
-        mf_simplification: mode to avoid involving features in pairwise interactions (much faster)
 
     To include the recommendation model, add it to the config file adopting the following pattern:
 
@@ -47,7 +46,6 @@ class FM(RecMixin, BaseRecommenderModel):
           factors: 10
           lr: 0.001
           reg: 0.1
-          mf_simplification: True
     """
 
     @init_charger
@@ -57,7 +55,6 @@ class FM(RecMixin, BaseRecommenderModel):
             ("_factors", "factors", "factors", 10, int, None),
             ("_learning_rate", "lr", "lr", 0.001, float, None),
             ("_l_w", "reg", "reg", 0.1, float, None),
-            ("_simplify", "mf_simplification", "mf", False, None, None),
             ("_loader", "loader", "load", "ItemAttributes", None, None),
         ]
         self.autoset_params()
@@ -72,7 +69,7 @@ class FM(RecMixin, BaseRecommenderModel):
         self._sp_i_train = self._data.sp_i_train
         self._i_items_set = list(range(self._num_items))
 
-        if ((not self._simplify) and hasattr(self._side, "nfeatures")) and (hasattr(self._side, "feature_map")):
+        if (hasattr(self._side, "nfeatures")) and (hasattr(self._side, "feature_map")):
             self._nfeatures = self._side.nfeatures
             self._item_array = self.get_item_fragment()
         else:

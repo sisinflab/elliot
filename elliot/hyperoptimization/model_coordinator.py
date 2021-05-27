@@ -107,7 +107,8 @@ class ModelCoordinator(object):
             'name': model.name
         }
 
-    def _average_results(self, results_list):
+    @staticmethod
+    def _average_results(results_list):
         ks = list(results_list[0].keys())
         eval_result_types = ["val_results", "test_results"]
         metrics = list(results_list[0][ks[0]]["val_results"].keys())
