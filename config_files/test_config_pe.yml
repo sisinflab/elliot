@@ -1,0 +1,318 @@
+experiment:
+#  dataset: movielens_1m
+#  dataset: ml1m_20210410
+  dataset: cat_dbpedia_movielens_1m
+  data_config:
+    strategy: fixed
+    root_folder: ../data/{0}/splitting
+    dataset_path: ../data/{0}/dataset.tsv
+    train_path: ../data/{0}/splitting/0/train.tsv
+    test_path: ../data/{0}/splitting/0/test.tsv
+#    side_information:
+#      - dataloader: KGCompletion
+#        train_path: /home/cheggynho/Downloads/ctp-master/data/umls/train.tsv
+#        dev_path: /home/cheggynho/Downloads/ctp-master/data/umls/dev.tsv
+#        test_path: /home/cheggynho/Downloads/ctp-master/data/umls/test.tsv
+    side_information:
+    - dataloader: ModChainedKG
+      map: ../data/{0}/map.tsv
+      features: ../data/{0}/features.tsv
+      properties: ../data/{0}/properties.conf
+      item_mapping: ../data/{0}/movies.tsv
+      threshold: 0.993
+      additive: True
+#    - dataloader: ItemAttributes
+#      attribute_file: ../data/{0}/movies.tsv
+#  prefiltering:
+#    - strategy: global_threshold
+#      threshold: 3
+#    - strategy: iterative_k_core
+#      core: 5
+  binarize: True
+  splitting:
+#    save_on_disk: True
+#    save_folder: ../data/{0}/splitting
+    test_splitting:
+        strategy: temporal_hold_out
+        test_ratio: 0.2
+#  negative_sampling:
+#    strategy: fixed
+#    files: ["/home/cheggynho/PycharmProjects/elliot/data/ncf_ml1m/ml-1m.test.negative"]
+  top_k: 10
+  mode: rec
+  evaluation:
+    cutoffs: [10, 1]
+#    simple_metrics: [nDCG, nDCGRendle2020, HR, LAUC, F1, MAP, MAR, MRR, ACLT, APLT, ARP, PopREO, PopRSP, ItemCoverage, UserCoverage, NumRetrived, UserCoverage, Gini, SEntropy, EFD, EPC]
+    simple_metrics: [nDCG, nDCGRendle2020, HR]
+    paired_ttest: True
+    wilcoxon_test: True
+#  lp_evaluation:
+#    batch_size: 512
+#    cutoffs: [1, 3, 5, 10, 20, 50, 100]
+#    simple_metrics: [nDCG, HR, MRR, MRRAtN, Precision, AP, Recall, AUC]
+#  gpu: -1
+  external_models_path: ../external/models/__init__.py
+  models:
+#    external.DistMult:
+#      meta:
+#        hyper_max_evals: 3
+#        hyper_opt_alg: tpe
+#        verbose: False
+#        validation_rate: 10
+#        validation_metric: nDCG@10
+#      lr: [loguniform, -10, -1]
+#      epochs: 10000
+#      batch_size: 512
+#      early_stopping:
+#        patience: 10
+#        monitor: HR@10
+#        mode: auto
+#        verbose: True
+#        min_delta: 0.001
+#        rel_delta: 0.1
+#        baseline: 0.1
+#    MultiVAE:
+#      meta:
+##        hyper_max_evals: 3
+##        hyper_opt_alg: tpe
+#        validation_rate: 10
+#        verbose: True
+##        save_weights: True
+#        save_recs: False
+#        restore: False
+##        optimize_internal_loss: True
+#      lr: 0.02718457840118028
+#      epochs: 100
+#      intermediate_dim: 200
+#      latent_dim: 100
+#      batch_size: -1
+#      dropout_pkeep: 1
+#      reg_lambda: 0.001
+#      early_stopping:
+##        patience: 0
+#        monitor: nDCG@10
+#        mode: auto
+#        verbose: True
+#        min_delta: 0.001
+#        rel_delta: 0.1
+#        baseline: 0.1
+#    external.KaHVSM:
+#      meta:
+#        hyper_max_evals: 1
+#        hyper_opt_alg: tpe
+#        validation_rate: 1
+#        verbose: True
+#        save_weights: False
+#        save_recs: False
+#        validation_metric: nDCG
+#        restore: False
+#      lr: 0.0001
+#      epochs: 100
+#      l_b: 0
+#      l_w: 0.00025
+#      feature_weighting: TFIDF
+#      k1: 2
+#    external.KaHUserKNN:
+#      meta:
+#        hyper_max_evals: 1
+#        hyper_opt_alg: tpe
+#        validation_rate: 1
+#        verbose: True
+#        save_weights: False
+#        save_recs: False
+#        validation_metric: nDCG
+#        restore: False
+#      lr: 0.0001
+#      epochs: 100
+#      l_b: 0
+#      l_w: 0.00025
+#      feature_weighting: TFIDF
+#      k1: 2
+#    external.KaHItemKNN:
+#      meta:
+#        hyper_max_evals: 1
+#        hyper_opt_alg: tpe
+#        validation_rate: 1
+#        verbose: True
+#        save_weights: False
+#        save_recs: False
+#        validation_metric: nDCG
+#        restore: False
+#      lr: 0.0001
+#      epochs: 100
+#      l_b: 0
+#      l_w: 0.00025
+#      feature_weighting: TFIDF
+#      k1: 2
+    external.KaHFMEmbeddings:
+      meta:
+        hyper_max_evals: 1
+        hyper_opt_alg: tpe
+        validation_rate: 1
+        verbose: True
+        save_weights: False
+        save_recs: False
+        validation_metric: nDCG
+        restore: False
+      lr: 0.0001
+      epochs: 100
+      l_b: 0
+      l_w: 0.00025
+      feature_weighting: TFIDF
+#      k1: 2
+#    BPRMF_batch:
+#      meta:
+#        hyper_max_evals: 1
+#        hyper_opt_alg: tpe
+#        validation_rate: 1
+#        verbose: True
+#        save_weights: False
+#        save_recs: True
+#        validation_metric: nDCG
+#        restore: False
+#      lr: [0.001]
+#      epochs: 10
+#      embed_k: [50,100,125,150,200]
+#      batch_size: 512
+#      l_w: 0.0025
+#      l_b: 0
+#    Random:
+#      meta:
+#        save_recs: False
+#    external.MostPop:
+#      meta:
+#        verbose: True
+#        save_recs: False
+#        save_weights: False
+#    MultiVAE:
+#      meta:
+##        hyper_max_evals: 3
+##        hyper_opt_alg: tpe
+#        validation_rate: 1
+#        verbose: True
+##        save_weights: True
+#        save_recs: False
+#        restore: False
+##        optimize_internal_loss: True
+#      lr: 0.002718457840118028
+#      epochs: 100
+#      intermediate_dim: 91
+#      latent_dim: 100
+#      batch_size: -1
+#      dropout_pkeep: 1
+#      reg_lambda: 0.01
+#      early_stopping:
+##        patience: 0
+#        monitor: nDCG@10
+#        mode: auto
+#        verbose: True
+#        min_delta: 0.001
+#        rel_delta: 0.1
+#        baseline: 0.1
+
+#    external.RendleMF:
+#      meta:
+#        verbose: True
+#        save_recs: False
+#      epochs: 10
+#      factors: 10
+#      lr: 0.01
+#      reg: 0.0025
+#    external.EASER:
+#      meta:
+#        verbose: True
+#        save_recs: False
+#      l2_norm: 3e3
+#    external.RP3beta:
+#      meta:
+#        verbose: True
+#        save_recs: False
+#      neighborhood: 100
+#      alpha: 1
+#      beta: 0.6
+#      normalize_similarity: True
+#    NeuMF: #from the original paper + Rendle
+#      meta:
+#        hyper_max_evals: 1
+#        hyper_opt_alg: tpe
+#        verbose: True
+#        save_recs: True
+#        validation_rate: 1
+#        # optimize_internal_loss: True
+#      mf_factors:  4 #[8, 16, 32, 64, 128, 256]
+#      dropout: 0
+#      is_mf_train: True
+#      is_mlp_train: True
+#      batch_size: 128 #[128, 256, 512, 1024]
+#      epochs: 50
+#      lr: [0.0001, 0.0005, 0.001, 0.005]
+#      m: 2
+#    UserKNN:
+#      meta:
+#        hyper_max_evals: 1
+#        hyper_opt_alg: tpe
+#        verbose: True
+#        save_recs: False
+#        validation_metric: nDCG@10
+#      neighbors: 10
+#      shrink: 0
+#      similarity: cosine
+#      implementation: aiolli
+#    external.ItemKNN:
+#      meta:
+#        verbose: True
+#        save_recs: True
+#        validation_metric: nDCG@10
+#      neighbors: 10
+#      similarity: cosine
+#      shrink: 100
+#      implementation: standard
+#    UserKNN:
+#      meta:
+#        verbose: True
+#        save_recs: False
+#        validation_metric: nDCG@10
+#      neighbors: 100
+#      similarity: cosine
+#      profile: binary
+#      implicit: False
+#      implementation: aiolli
+#    AttributeItemKNN:
+#      meta:
+#        verbose: True
+#        save_recs: False
+#        validation_metric: nDCG@10
+#      neighbors: 100
+#      similarity: jaccard
+#    external.AttributeItemKNN:
+#      meta:
+#        verbose: True
+#        save_recs: False
+#        validation_metric: nDCG@10
+#      neighbors: 100
+#      similarity: jaccard
+#    RecommendationFolder:
+#      folder: /home/cheggynho/Downloads/recsys_first
+#    external.ProxyRecommender:
+#      path: /home/cheggynho/PycharmProjects/elliot/data/ncf_ml1m/ml-1m.test.rating
+#    external.RendleMF: # from original paper
+#      meta:
+#        hyper_max_evals: 20
+#        hyper_opt_alg: tpe
+#        verbose: True
+#        save_recs: True
+#        # optimize_internal_loss: True
+#      epochs: 50 # 256 original paper but 50 comes from NeuMF paper
+#      factors: 8 #[8, 16, 32, 64, 128, 256]
+#      lr: [0.001, 0.003, 0.01]
+#      reg: [0.001, 0.003, 0.01]
+#      m: 4
+#      seed: 42
+#    external.iALS:
+#      meta:
+#        verbose: True
+#        save_recs: False
+#      factors: 20
+#      alpha: 1
+#      epsilon: 1
+#      reg: 0.001

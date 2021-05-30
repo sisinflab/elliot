@@ -11,3 +11,7 @@ from .attribute_item_knn import AttributeItemKNN
 from .user_knn import UserKNN
 from .attribute_user_knn import AttributeUserKNN
 from .DistMult import DistMult
+from .kahfm_embeddings import KaHFMEmbeddings
+from .kahitemknn import KaHItemKNN
+from .kahuserknn import KaHUserKNN
+from .kahvsm import KaHVSM
