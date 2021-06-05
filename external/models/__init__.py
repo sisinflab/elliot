@@ -11,3 +11,4 @@ from .attribute_item_knn import AttributeItemKNN
 from .user_knn import UserKNN
 from .attribute_user_knn import AttributeUserKNN
 from .DistMult import DistMult
+from .ComplEx import ComplEx
