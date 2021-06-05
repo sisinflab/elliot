@@ -31,12 +31,9 @@ class DistMult(RecMixin, BaseRecommenderModel):
         self._params_list = [
             ("_learning_rate", "lr", "lr", 0.1, None, None),
             ("_factors", "factors", "f", 100, int, None),
-            ("_F2", "F2", "F2", 0, None, None),
-            ("_N3", "N3", "N3", 0, None, None),
-            ("_corruption", "corruption", "c", "so", None, None),
+            ("_F2_weight", "F2_weight", "F2_weight", 0, None, None),
+            ("_N3_weight", "N3_weight", "N3_weight", 0.001, None, None),
             ("_input_type", "input_type", "intype", "standard", None, None),
-            ("_blackbox_lambda", "blackbox_lambda", "bl", 0, None, None),
-            ("_mask", "mask", "mask", False, None, None),
             ("_loader", "loader", "load", "KGCompletion", None, None),
         ]
         self.autoset_params()
@@ -57,12 +54,9 @@ class DistMult(RecMixin, BaseRecommenderModel):
         self._model = DistMultModel(self._side,
                                     self._learning_rate,
                                     self._factors,
-                                    self._F2,
-                                    self._N3,
-                                    self._corruption,
+                                    self._F2_weight,
+                                    self._N3_weight,
                                     self._input_type,
-                                    self._blackbox_lambda,
-                                    self._mask,
                                     self._seed)
 
     @property
