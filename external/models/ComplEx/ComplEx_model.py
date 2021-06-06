@@ -52,8 +52,8 @@ class ComplExModel(keras.Model):
                                                            trainable=True, dtype=tf.float32)
 
         # XXX: Wow I hate this hack :)
-        self.entity_embeddings(0)
-        self.predicate_embeddings(0)
+        assert self.entity_embeddings(0).shape == (self.factors,)
+        assert self.predicate_embeddings(0).shape == (self.factors,)
 
         self.entity_embeddings.weights[0] = self.entity_embeddings.weights[0] * init_size
         self.predicate_embeddings.weights[0] = self.predicate_embeddings.weights[0] * init_size
