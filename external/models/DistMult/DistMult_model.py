@@ -51,11 +51,13 @@ class DistMultModel(keras.Model):
                                                            embeddings_initializer=self.initializer,
                                                            trainable=True, dtype=tf.float32)
 
-        # XXX: Why these?
+        # XXX: Wow I hate this hack :)
         self.entity_embeddings(0)
         self.predicate_embeddings(0)
 
-        # TODO: Scale operation multiplying the embeddings with init_size
+        self.entity_embeddings.weights[0] = self.entity_embeddings.weights[0] * init_size
+        self.predicate_embeddings.weights[0] = self.predicate_embeddings.weights[0] * init_size
+
         self.optimizer = tf.optimizers.Adagrad(self.learning_rate)
 
         # Is this the correct loss function to use? Why "sparse"? Check with Walter.
