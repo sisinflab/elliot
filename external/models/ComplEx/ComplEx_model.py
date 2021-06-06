@@ -113,7 +113,7 @@ class ComplExModel(keras.Model):
 
         rank = embedding_size // 2
 
-        ent_real, ent_img = ent_emb.embeddings[:, :rank], ent_emb.embeddings[:, rank:]
+        ent_real, ent_img = ent_emb.weights[0][:, :rank], ent_emb.weights[0][:, rank:]
 
         # [B, N] = [B, E] @ [E, N]
         if arg1 is None:
