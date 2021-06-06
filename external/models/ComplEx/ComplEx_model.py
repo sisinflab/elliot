@@ -51,7 +51,7 @@ class ComplExModel(keras.Model):
                                                            embeddings_initializer=self.initializer,
                                                            trainable=True, dtype=tf.float32)
 
-        # XXX: Wow I hate this hack :)
+        # Note: we need to call the embedding layer to materialise the embedding matrix
         assert self.entity_embeddings(0).shape == (self.factors,)
         assert self.predicate_embeddings(0).shape == (self.factors,)
 
