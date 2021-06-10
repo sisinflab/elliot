@@ -51,8 +51,8 @@ class LPEvaluator(object):
         else:
             eval_obj_ns.batch_size = self._batch_size
         eval_obj_ns.type = type
-        eval_obj_ns.test_triples: t.Tuple[str, str, str] = eval_triples
-        eval_obj_ns.all_triples: t.Tuple[str, str, str] = all_triples
+        eval_obj_ns.test_triples: t.List[t.Tuple[str, str, str]] = eval_triples
+        eval_obj_ns.all_triples: t.List[t.Tuple[str, str, str]] = all_triples
         eval_obj_ns.entity_to_index: t.Dict[str, int] = entity_to_index
         eval_obj_ns.predicate_to_index: t.Dict[str, int] = predicate_to_index
 
