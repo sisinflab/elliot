@@ -20,7 +20,7 @@ This is a part of config file to handle this kind of solution
 Another possible solution to address this feature is to choose a *uniform random* strategy. With this approach the
 configuration file must be report also the number of negative samples to take into account.
 
-Be careful: to guarantee the reproducibility of the experiment, in this casa Elliot store in the dataset folder the
+Be careful: to guarantee the reproducibility of the experiment, in this case Elliot store in the dataset folder the
 computed negative items following the following schema for a generic tab-separated-value
 
 ``(user_id, item_test_id)   neg_item1   neg_item2 ....``
