@@ -21,19 +21,23 @@ prefiltering:
 class NegativeSampler:
 
     @staticmethod
-    def sample(ns: SimpleNamespace, public_users: t.Dict, public_items: t.Dict, i_train: sp.csr_matrix,
+    def sample(ns: SimpleNamespace, public_users: t.Dict, public_items: t.Dict, private_users: t.Dict,
+               private_items: t.Dict, i_train: sp.csr_matrix,
                val: t.Dict = None, test: t.Dict = None) -> t.Tuple[sp.csr_matrix, sp.csr_matrix]:
 
-        val_negative_items = NegativeSampler.process_sampling(ns, public_users, public_items, i_train,
+        val_negative_items = NegativeSampler.process_sampling(ns, public_users, public_items, private_users,
+                                                              private_items, i_train,
                                                               test, validation=True) if val != None else None
 
-        test_negative_items = NegativeSampler.process_sampling(ns, public_users, public_items, i_train,
+        test_negative_items = NegativeSampler.process_sampling(ns, public_users, public_items, private_users,
+                                                              private_items, i_train,
                                                                test) if test != None else None
 
         return (val_negative_items, test_negative_items) if val_negative_items else (test_negative_items, test_negative_items)
 
     @staticmethod
-    def process_sampling(ns: SimpleNamespace, public_users: t.Dict, public_items: t.Dict, i_train: sp.csr_matrix,
+    def process_sampling(ns: SimpleNamespace, public_users: t.Dict, public_items: t.Dict, private_users: t.Dict,
+                         private_items: t.Dict, i_train: sp.csr_matrix,
                          test: t.Dict, validation=False) -> sp.csr_matrix:
         i_test = [(public_users[user], public_items[i])
                   for user, items in test.items() if user in public_users.keys()
@@ -44,16 +48,29 @@ class NegativeSampler:
                                shape=(len(public_users.keys()), len(public_items.keys())))
 
         candidate_negatives = ((i_test + i_train).astype('bool') != True)
-
         ns = ns.negative_sampling
 
         strategy = getattr(ns, "strategy", None)
 
         if strategy == "random":
             num_items = getattr(ns, "num_items", None)
+            file_path = getattr(ns, "file_path", None)
             if num_items is not None:
                 if str(num_items).isdigit():
                     negative_items = NegativeSampler.sample_by_random_uniform(candidate_negatives, num_items)
+
+                    nnz = negative_items.nonzero()
+                    old_ind = 0
+                    basic_negative = []
+                    for u, v in enumerate(negative_items.indptr[1:]):
+                        basic_negative.append([(private_users[u],), list(map(private_items.get, nnz[1][old_ind:v]))])
+                        old_ind = v
+
+                    with open(file_path, "w") as file:
+                        for ele in basic_negative:
+                            line = str(ele[0]) + '\t' + '\t'.join(map(str, ele[1]))+'\n'
+                            file.write(line)
+
                     pass
                 else:
                     raise Exception("Number of negative items value not recognized")

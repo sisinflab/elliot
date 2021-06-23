@@ -55,6 +55,7 @@ in control of the framework.
 
    guide/alg_intro
    guide/hyper_optimization
+   guide/early_stopping
    guide/new_alg
    guide/recommenders
 
@@ -64,6 +65,7 @@ in control of the framework.
 
    guide/metrics_intro
    guide/metrics_summary
+   guide/proxy_model
 
 .. toctree::
    :maxdepth: 1

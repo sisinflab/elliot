@@ -204,7 +204,9 @@ class DataSet(AbstractDataset):
         if len(data_tuple) == 2:
             self.test_dict = self.build_dict(data_tuple[1], self.users)
             if hasattr(config, "negative_sampling"):
-                val_neg_samples, test_neg_samples = NegativeSampler.sample(config, self.public_users, self.public_items, self.sp_i_train, None, self.test_dict)
+                val_neg_samples, test_neg_samples = NegativeSampler.sample(config, self.public_users, self.public_items,
+                                                                           self.private_users, self.private_items,
+                                                                           self.sp_i_train, None, self.test_dict)
                 sp_i_test = self.to_bool_sparse(self.test_dict)
                 test_candidate_items = test_neg_samples + sp_i_test
                 self.test_mask = np.where((test_candidate_items.toarray() == True), True, False)
@@ -212,7 +214,9 @@ class DataSet(AbstractDataset):
             self.val_dict = self.build_dict(data_tuple[1], self.users)
             self.test_dict = self.build_dict(data_tuple[2], self.users)
             if hasattr(config, "negative_sampling"):
-                val_neg_samples, test_neg_samples = NegativeSampler.sample(config, self.public_users, self.public_items, self.sp_i_train, self.val_dict, self.test_dict)
+                val_neg_samples, test_neg_samples = NegativeSampler.sample(config, self.public_users, self.public_items,
+                                                                           self.private_users, self.private_items,
+                                                                           self.sp_i_train, self.val_dict, self.test_dict)
                 sp_i_val = self.to_bool_sparse(self.val_dict)
                 sp_i_test = self.to_bool_sparse(self.test_dict)
                 val_candidate_items = val_neg_samples + sp_i_val

@@ -19,6 +19,7 @@ Summary
     mar.mar.MAR
     mrr.mrr.MRR
     ndcg.ndcg.NDCG
+    ndcg.ndcg.nDCGRendle2020
     precision.precision.Precision
     recall.recall.Recall
 
@@ -86,6 +87,12 @@ nDCG
 ~~~~~~~~~~~~~~~~
 .. module:: elliot.evaluation.metrics.accuracy.ndcg.ndcg
 .. autoclass:: NDCG
+    :show-inheritance:
+
+nDCGRendle2020
+~~~~~~~~~~~~~~~~
+.. module:: elliot.evaluation.metrics.accuracy.ndcg.ndcg_rendle2020
+.. autoclass:: nDCGRendle2020
     :show-inheritance:
 
 Precision

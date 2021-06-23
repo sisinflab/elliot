@@ -8,17 +8,19 @@ The first key component of the config file is the ``data_config`` section.
     experiment:
       data_config:
         strategy: dataset|fixed|hierarchy
-        dataloader: KnowledgeChainsLoader|DataSetLoader
         dataset_path: this/is/the/path.tsv
         root_folder: this/is/the/path
         train_path: this/is/the/path.tsv
         validation_path: this/is/the/path.tsv
         test_path: this/is/the/path.tsv
+      binarize: True
         side_information:
-            feature_data: this/is/the/path.tsv
+            - dataloader: FeatureLoader1
             map: this/is/the/path.tsv
             features: this/is/the/path.tsv
             properties: this/is/the/path.conf
+            - dataloader: FeatureLoader2
+            folder_map_features: this/is/the/path/folder
 
 In this section, we can define which input files and how they should be loaded.
 
@@ -64,6 +66,10 @@ Here, the data is assumed as split and no further prefiltering and splitting ope
 
 ``hierarchy`` takes one mandatory parameter, ``root_folder``, that points to the folder where we previously stored the split files.
 
+When ``fixed`` or ``dataset`` strategy is selected it is also possible to use the flag ``binarize`` to transform explicit
+user/item feedbacks into implicit ones.
+
+
 .. code:: yaml
 
     experiment:
@@ -75,6 +81,7 @@ Here, the data is assumed as split and no further prefiltering and splitting ope
    :maxdepth: 1
 
    loading
-   data_loaders
+   loaders
+   negative
    prefiltering
    splitting

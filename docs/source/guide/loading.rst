@@ -8,14 +8,9 @@ can be stored and loaded to save future computation. Data-driven extensions can 
 features, and semantic features extracted from knowledge graphs. Once a side-information-aware Loading module is chosen,
 it filters out the items devoiding the required information to grant a fair comparison.
 
-Within the ``data_config`` section, we can also enable data-specific Data Loaders.
-Each Data Loader is designed to handle a specific kind of additional data.
-
-It is possible to enable a Data Loader by inserting the field ``dataloader`` and passing the corresponding name.
-For instance, the Visual Data Loader lets the user consider precomputed visual feature vectors or (inclusive) images.
-
-To pass the required parameters to the Data Loader, we use a specific subsection, named ``side_information``.
-There we can enable the required (by the specific Data Loader) fields and insert the corresponding values.
+It is possible to enable a specific Loader by inserting the field ``side_information`` and passing:
+    - ``dataloader`` the name of a specific loader
+    - a list of possible file or folder which get side information accordingly to loader
 
 An example can be:
 
@@ -24,9 +19,9 @@ An example can be:
     experiment:
       data_config:
         strategy: fixed
-        dataloader: VisualLoader
         train_path: this/is/the/path.tsv
         test_path: this/is/the/path.tsv
         side_information:
-            feature_data: this/is/the/path/to/features.npy
+            - dataloader: FeatureLoader1
+            map: this/is/the/path.tsv
 
