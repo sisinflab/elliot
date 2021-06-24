@@ -57,6 +57,7 @@ in control of the framework.
    guide/hyper_optimization
    guide/early_stopping
    guide/new_alg
+   guide/loaders
    guide/recommenders
 
 .. toctree::
