@@ -8,7 +8,8 @@ from elliot.dataset.modular_loaders.abstract_loader import AbstractLoader
 
 
 class KGCompletion(AbstractLoader):
-    def __init__(self, users: t.Set, items: t.Set, ns: SimpleNamespace):
+    def __init__(self, users: t.Set, items: t.Set, ns: SimpleNamespace, logger: object):
+        self.logger = logger
         self.train_path = getattr(ns, "train_path", None)
         self.dev_path = getattr(ns, "dev_path", None)
         self.test_path = getattr(ns, "test_path", None)
@@ -79,6 +80,7 @@ class KGCompletion(AbstractLoader):
     def create_namespace(self):
         ns = SimpleNamespace()
         ns.__name__ = "KGCompletion"
+        ns.object = self
         ns.__dict__.update(self.__dict__)
         return ns
 

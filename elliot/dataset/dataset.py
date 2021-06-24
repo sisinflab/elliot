@@ -7,7 +7,10 @@ __version__ = '0.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
+import copy
 import os
+from types import SimpleNamespace
+
 import numpy as np
 import pandas as pd
 import scipy.sparse as sp
@@ -71,16 +74,19 @@ class DataSetLoader(LoaderCoordinator):
 
                 self.tuple_list = [([(self.train_dataframe, self.validation_dataframe)], self.test_dataframe)]
                 self.tuple_list, self.side_information = self.coordinate_information(self.tuple_list,
-                                                                                     sides=config.data_config.side_information)
+                                                                                     sides=config.data_config.side_information,
+                                                                                     logger=self.logger)
             else:
                 self.tuple_list = [(self.train_dataframe, self.test_dataframe)]
                 self.tuple_list, self.side_information = self.coordinate_information(self.tuple_list,
-                                                                                     sides=config.data_config.side_information)
+                                                                                     sides=config.data_config.side_information,
+                                                                                     logger=self.logger)
 
         elif config.data_config.strategy == "hierarchy":
             self.tuple_list = self.read_splitting(config.data_config.root_folder, column_names=self.column_names)
 
-            self.tuple_list, self.side_information = self.coordinate_information(self.tuple_list, sides=config.data_config.side_information)
+            self.tuple_list, self.side_information = self.coordinate_information(self.tuple_list, sides=config.data_config.side_information,
+                                                                                     logger=self.logger)
 
         elif config.data_config.strategy == "dataset":
             self.logger.info("There will be the splitting")
@@ -88,7 +94,8 @@ class DataSetLoader(LoaderCoordinator):
 
             self.dataframe = pd.read_csv(path_dataset, sep="\t", header=None, names=self.column_names)
             self.dataframe, self.side_information = self.coordinate_information(self.dataframe,
-                                                                                sides=config.data_config.side_information)
+                                                                                sides=config.data_config.side_information,
+                                                                                logger=self.logger)
             # self.dataframe = pd.read_csv(path_dataset, sep="\t", header=None, names=self.column_names)
 
             self.dataframe = self.check_timestamp(self.dataframe)
@@ -136,16 +143,18 @@ class DataSetLoader(LoaderCoordinator):
 
     def generate_dataobjects(self) -> t.List[object]:
         data_list = []
-        for train_val, test in self.tuple_list:
+        for p1, (train_val, test) in enumerate(self.tuple_list):
             # testset level
             if isinstance(train_val, list):
                 # validation level
                 val_list = []
-                for train, val in train_val:
+                for p2, (train, val) in enumerate(train_val):
+                    self.logger.info(f"Test Fold {p1} - Validation Fold {p2}")
                     single_dataobject = DataSet(self.config, (train,val,test), self.side_information, self.args, self.kwargs)
                     val_list.append(single_dataobject)
                 data_list.append(val_list)
             else:
+                self.logger.info(f"Test Fold {p1}")
                 single_dataobject = DataSet(self.config, (train_val, test), self.side_information, self.args,
                                                               self.kwargs)
                 data_list.append([single_dataobject])
@@ -181,7 +190,9 @@ class DataSet(AbstractDataset):
         self.config = config
         self.args = args
         self.kwargs = kwargs
-        self.side_information = side_information_data
+
+        self.side_information = self.align_with_training(train=data_tuple[0], side_information_data=side_information_data)
+
         self.train_dict = self.dataframe_to_dict(data_tuple[0])
 
         self.users = list(self.train_dict.keys())
@@ -189,6 +200,10 @@ class DataSet(AbstractDataset):
         self.num_users = len(self.users)
         self.num_items = len(self.items)
         self.transactions = sum(len(v) for v in self.train_dict.values())
+
+        sparsity = 1 - (self.transactions / (self.num_users * self.num_items))
+        self.logger.info(f"Statistics\tUsers:\t{self.num_users}\tItems:\t{self.num_items}\tTransactions:\t{self.transactions}\t"
+                         f"Sparsity:\t{sparsity}")
 
         self.private_users = {p: u for p, u in enumerate(self.users)}
         self.public_users = {v: k for k, v in self.private_users.items()}
@@ -234,12 +249,6 @@ class DataSet(AbstractDataset):
         for u in users:
             sel_ = data[data['userId'] == u]
             ratings[u] = dict(zip(sel_['itemId'], sel_['rating']))
-        n_users = len(ratings.keys())
-        n_items = len({k for a in ratings.values() for k in a.keys()})
-        transactions = sum([len(a) for a in ratings.values()])
-        sparsity = 1 - (transactions / (n_users * n_items))
-        self.logger.info(f"Statistics\tUsers:\t{n_users}\tItems:\t{n_items}\tTransactions:\t{transactions}\t"
-                         f"Sparsity:\t{sparsity}")
         return ratings
 
     def build_dict(self, dataframe, users):
@@ -284,3 +293,44 @@ class DataSet(AbstractDataset):
         i_test = sp.csr_matrix((np.ones_like(rows), (rows, cols)), dtype='bool',
                                shape=(len(self.public_users.keys()), len(self.public_items.keys())))
         return i_test
+
+    def align_with_training(self, train, side_information_data):
+        """Alignment with training"""
+        def equal(a, b, c):
+            return len(a) == len(b) == len(c)
+        train_dict = self.dataframe_to_dict(train)
+        users = set(train_dict.keys())
+        items = set({k for a in train_dict.values() for k in a.keys()})
+        users_items = []
+        side_objs = []
+        for k, v in side_information_data.__dict__.items():
+            new_v = copy.deepcopy(v)
+            users_items.append(new_v.object.get_mapped())
+            side_objs.append(new_v)
+        while True:
+            condition = True
+            new_users = users
+            new_items = items
+            for us_, is_ in users_items:
+                temp_users = new_users & us_
+                temp_items = new_items & is_
+                condition &= equal(new_users, us_, temp_users)
+                condition &= equal(new_items, is_, temp_items)
+                new_users = temp_users
+                new_items = temp_items
+            if condition:
+                break
+            else:
+                users = new_users
+                items = new_items
+                new_users_items = []
+                for v in side_objs:
+                    v.object.filter(users, items)
+                    new_users_items.append(v.object.get_mapped())
+                users_items = new_users_items
+        ns = SimpleNamespace()
+        for side_obj in side_objs:
+            side_ns = side_obj.object.create_namespace()
+            name = side_ns.__name__
+            setattr(ns, name, side_ns)
+        return ns

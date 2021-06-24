@@ -39,7 +39,7 @@ def run_experiment(config_path: str = ''):
     for key, model_base in builder.models():
         test_results = []
         test_trials = []
-        for data_test in data_test_list:
+        for test_fold_index, data_test in enumerate(data_test_list):
             logging_project.prepare_logger(key, base.base_namespace.path_log_folder)
             if key.startswith("external."):
                 spec = importlib.util.spec_from_file_location("external",
@@ -52,7 +52,7 @@ def run_experiment(config_path: str = ''):
                 model_class = getattr(importlib.import_module("elliot.recommender"), key)
 
 
-            model_placeholder = ho.ModelCoordinator(data_test, base.base_namespace, model_base, model_class)
+            model_placeholder = ho.ModelCoordinator(data_test, base.base_namespace, model_base, model_class, test_fold_index)
             if isinstance(model_base, tuple):
                 logger.info(f"Tuning begun for {model_class.__name__}\n")
                 trials = Trials()

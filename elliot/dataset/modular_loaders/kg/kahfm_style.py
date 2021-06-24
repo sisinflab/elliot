@@ -7,7 +7,8 @@ from elliot.dataset.modular_loaders.abstract_loader import AbstractLoader
 
 
 class ChainedKG(AbstractLoader):
-    def __init__(self, users: t.Set, items: t.Set, ns: SimpleNamespace):
+    def __init__(self, users: t.Set, items: t.Set, ns: SimpleNamespace, logger: object):
+        self.logger = logger
         self.attribute_file = getattr(ns, "map", None)
         self.feature_file = getattr(ns, "features", None)
         self.properties_file = getattr(ns, "properties", None)
@@ -29,7 +30,7 @@ class ChainedKG(AbstractLoader):
     def filter(self, users, items):
         self.users = self.users & users
         self.items = self.items & items
-        self.map_ = {k:v for k,v in self.map_.items() if k in self.items}
+        self.map_ = {k: v for k, v in self.map_.items() if k in self.items}
 
         self.map_ = self.reduce_attribute_map_property_selection(self.map_, self.items, self.feature_names,
                                                                  self.properties, self.additive, self.threshold)
@@ -38,6 +39,7 @@ class ChainedKG(AbstractLoader):
     def create_namespace(self):
         ns = SimpleNamespace()
         ns.__name__ = "ChainedKG"
+        ns.object = self
         ns.feature_map = self.map_
         ns.features = list({f for i in self.items for f in ns.feature_map[i]})
         ns.nfeatures = len(ns.features)
@@ -95,17 +97,17 @@ class ChainedKG(AbstractLoader):
                     if feature[1][0] not in properties:
                         acceptable_features.add(int(feature[0]))
 
-        print(f"Acceptable Features:\t{len(acceptable_features)}\tMapped items:\t{len(map)}")
+        self.logger.info(f"Acceptable Features:\t{len(acceptable_features)}\tMapped items:\t{len(map)}")
 
         nmap = {k: v for k, v in map.items() if k in items}
 
         feature_occurrences_dict = Counter([x for xs in nmap.values() for x in xs  if x in acceptable_features])
         features_popularity = {k: v for k, v in feature_occurrences_dict.items() if v > threshold}
 
-        print(f"Features above threshold:\t{len(features_popularity)}")
+        self.logger.info(f"Features above threshold:\t{len(features_popularity)}")
 
         new_map = {k:[value for value in v if value in features_popularity.keys()] for k,v in nmap.items()}
         new_map = {k:v for k,v in new_map.items() if len(v)>0}
-        print(f"Final #items:\t{len(new_map.keys())}")
+        self.logger.info(f"Final #items:\t{len(new_map.keys())}")
 
         return new_map

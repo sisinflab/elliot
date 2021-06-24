@@ -8,7 +8,8 @@ from elliot.dataset.modular_loaders.abstract_loader import AbstractLoader
 
 
 class VisualAttribute(AbstractLoader):
-    def __init__(self, users: t.Set, items: t.Set, ns: SimpleNamespace):
+    def __init__(self, users: t.Set, items: t.Set, ns: SimpleNamespace, logger: object):
+        self.logger = logger
         self.visual_feature_folder_path = getattr(ns, "visual_features", None)
         self.visual_pca_feature_folder_path = getattr(ns, "visual_pca_features", None)
         self.visual_feat_map_feature_folder_path = getattr(ns, "visual_feat_map_features", None)
@@ -37,6 +38,7 @@ class VisualAttribute(AbstractLoader):
     def create_namespace(self) -> SimpleNamespace:
         ns = SimpleNamespace()
         ns.__name__ = "VisualAttributes"
+        ns.object = self
         ns.visual_feature_folder_path = self.visual_feature_folder_path
         ns.visual_pca_feature_folder_path = self.visual_pca_feature_folder_path
         ns.visual_feat_map_feature_folder_path = self.visual_feat_map_feature_folder_path

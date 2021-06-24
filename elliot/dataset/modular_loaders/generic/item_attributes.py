@@ -6,7 +6,8 @@ from elliot.dataset.modular_loaders.abstract_loader import AbstractLoader
 
 
 class ItemAttributes(AbstractLoader):
-    def __init__(self, users: t.Set, items: t.Set, ns: SimpleNamespace):
+    def __init__(self, users: t.Set, items: t.Set, ns: SimpleNamespace, logger: object):
+        self.logger = logger
         self.attribute_file = getattr(ns, "attribute_file", None)
         self.users = users
         self.items = items
@@ -23,6 +24,7 @@ class ItemAttributes(AbstractLoader):
     def create_namespace(self):
         ns = SimpleNamespace()
         ns.__name__ = "ItemAttributes"
+        ns.object = self
         ns.feature_map = self.map_
         ns.features = list({f for i in self.items for f in ns.feature_map[i]})
         ns.nfeatures = len(ns.features)

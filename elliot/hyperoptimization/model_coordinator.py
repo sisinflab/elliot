@@ -22,7 +22,7 @@ class ModelCoordinator(object):
     This class handles the selection of hyperparameters for the hyperparameter tuning realized with HyperOpt.
     """
 
-    def __init__(self, data_objs, base: SimpleNamespace, params, model_class: t.ClassVar):
+    def __init__(self, data_objs, base: SimpleNamespace, params, model_class: t.ClassVar, test_fold_index: int):
         """
         The constructor creates a Placeholder of the recommender model.
 
@@ -35,6 +35,8 @@ class ModelCoordinator(object):
         self.base = base
         self.params = params
         self.model_class = model_class
+        self.test_fold_index = test_fold_index
+        self.model_config_index = 0
 
     def objective(self, args):
         """
@@ -47,17 +49,22 @@ class ModelCoordinator(object):
         model_params = SimpleNamespace(**self.params[0].__dict__)
 
         self.logger.info("Hyperparameter tuning exploration:")
-        for k, v in sampled_namespace.__dict__.items():
+        for (k, v) in sampled_namespace.__dict__.items():
             model_params.__setattr__(k, v)
             self.logger.info(f"{k} set to {model_params.__getattribute__(k)}")
 
         losses = []
         results = []
-        for data_obj in self.data_objs:
+        for trainval_index, data_obj in enumerate(self.data_objs):
+            self.logger.info(f"Exploration: Hyperparameter exploration number {self.model_config_index+1}")
+            self.logger.info(f"Exploration: Test Fold exploration number {self.test_fold_index+1}")
+            self.logger.info(f"Exploration: Train-Validation Fold exploration number {trainval_index+1}")
             model = self.model_class(data=data_obj, config=self.base, params=model_params)
             model.train()
             losses.append(model.get_loss())
             results.append(model.get_results())
+
+        self.model_config_index += 1
 
         loss = np.average(losses)
         results = self._average_results(results)
@@ -87,7 +94,9 @@ class ModelCoordinator(object):
 
         losses = []
         results = []
-        for data_obj in self.data_objs:
+        for trainval_index, data_obj in enumerate(self.data_objs):
+            self.logger.info(f"Exploration: Test Fold exploration number {self.test_fold_index+1}")
+            self.logger.info(f"Exploration: Train-Validation Fold exploration number {trainval_index+1}")
             model = self.model_class(data=data_obj, config=self.base, params=self.params)
             model.train()
             losses.append(model.get_loss())

@@ -8,7 +8,8 @@ from elliot.dataset.modular_loaders.abstract_loader import AbstractLoader
 
 class LoaderCoordinator:
     def coordinate_information(self, dataframe: t.Union[pd.DataFrame, t.List],
-                               sides: t.List[SimpleNamespace]=[]) -> t.Tuple[pd.DataFrame, SimpleNamespace]:
+                               sides: t.List[SimpleNamespace]=[],
+                               logger: object = None) -> t.Tuple[pd.DataFrame, SimpleNamespace]:
         if isinstance(dataframe, list):
             users = set()
             items = set()
@@ -35,7 +36,7 @@ class LoaderCoordinator:
         for side in sides:
             dataloader_class = getattr(importlib.import_module("elliot.dataset.modular_loaders.loaders"), side.dataloader)
             if issubclass(dataloader_class, AbstractLoader):
-                side_obj = dataloader_class(users, items, side)
+                side_obj = dataloader_class(users, items, side, logger)
                 side_info_objs.append(side_obj)
                 users_items.append(side_obj.get_mapped())
             else:
