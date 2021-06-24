@@ -128,25 +128,21 @@ Talk about Elliot on social media with the hashtag **#elliotrs**.
 
 ## Cite
 
-If you find Elliot useful for your research or development, please cite the following [paper](https://arxiv.org/abs/2103.02590):
+If you find Elliot useful for your research or development, please cite the following [paper](http://sisinflab.poliba.it/publications/2021/ABFMMPDD21/_RUN__SIGIR2021_RecSys_Framework.pdf):
 
 ```
 
-@article{DBLP:journals/corr/abs-2103-02590,
-  author    = {Vito Walter Anelli and
-               Alejandro Bellog{\'{\i}}n and
-               Antonio Ferrara and
-               Daniele Malitesta and
-               Felice Antonio Merra and
-               Claudio Pomo and
-               Francesco M. Donini and
-               Tommaso Di Noia},
-  title     = {Elliot: a Comprehensive and Rigorous Framework for Reproducible Recommender
-               Systems Evaluation},
-  journal   = {CoRR},
-  volume    = {abs/2103.02590},
-  year      = {2021}
-}
+@InProceedings{ABFMMPDD21,
+  author = {Vito Walter Anelli and Alejandro Bellogin and Antonio Ferrara and 
+            Daniele Malitesta and Felice Antonio Merra and Claudio Pomo and 
+            Francesco M. Donini and Tommaso {Di Noia}},
+  title = "Elliot: a Comprehensive and RigorousFramework for Reproducible 
+           Recommender Systems Evaluation",
+  booktitle = "SIGIR '21: Proceedings of the 44rd International ACM SIGIR 
+               Conference on Research and Development in Information Retrieval",
+  year = "2021",
+  url = "http://sisinflab.poliba.it/publications/2021/ABFMMPDD21"
+} 
 
 ```
 
