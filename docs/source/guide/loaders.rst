@@ -42,11 +42,13 @@ The ``__init__`` method creates its local attributes and retrieve the necessary 
 Then, it loads the side information file and aligns it with users and items as provided by the Elliot pipeline.
 
 The method ``get_mapped()``(mandatory), returns a tuple of aligned users and items.
+
 .. code:: python
     def get_mapped(self) -> t.Tuple[t.Set[int], t.Set[int]]:
         return self.users, self.items
 
 The method ``filter``(mandatory), provides the functionality of filtering users, items, and side information data structures based on the sets of users and items passed as arguments.
+
 .. code:: python
     def filter(self, users, items):
         self.users = self.users & users
@@ -55,6 +57,7 @@ The method ``filter``(mandatory), provides the functionality of filtering users,
 Finally, the method ``create_namespace`` creates the namespace that will be passed to our recommendation algorithms.
 Be sure that the mandatory attributes (__name__, and object), and all the necessary data are present.
 Pay Attention! The name you choose here is the same you will use in your configuration file.
+
 .. code:: python
     def create_namespace(self):
         ns = SimpleNamespace()
