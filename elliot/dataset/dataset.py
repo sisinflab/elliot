@@ -191,7 +191,10 @@ class DataSet(AbstractDataset):
         self.args = args
         self.kwargs = kwargs
 
-        self.side_information = self.align_with_training(train=data_tuple[0], side_information_data=side_information_data)
+        if self.config.align_side_with_train == True:
+            self.side_information = self.align_with_training(train=data_tuple[0], side_information_data=side_information_data)
+        else:
+            self.side_information = side_information_data
 
         self.train_dict = self.dataframe_to_dict(data_tuple[0])
 

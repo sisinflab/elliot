@@ -57,6 +57,7 @@ _hyper_opt_alg = 'hyper_opt_alg'
 _data_paths = 'data_paths'
 _meta = 'meta'
 _random_seed = 'random_seed'
+_align_side_with_train = "align_side_with_train"
 
 
 class NameSpaceModel:
@@ -123,7 +124,7 @@ class NameSpaceModel:
 
         for p in [_data_config, _weights, _recs, _dataset, _top_k, _performance, _logger_config,
                   _log_folder, _dataloader, _splitting, _prefiltering, _evaluation, _external_models_path,
-                  _print_triplets, _config_test, _negative_sampling, _binarize, _random_seed]:
+                  _print_triplets, _config_test, _negative_sampling, _binarize, _random_seed, _align_side_with_train]:
             if p == _data_config:
                 side_information = self.config[_experiment][p].get("side_information", None)
 
@@ -229,6 +230,8 @@ class NameSpaceModel:
                 setattr(self.base_namespace, p, self.config[_experiment].get(p, 42))
             elif p == _binarize:
                 setattr(self.base_namespace, p, self.config[_experiment].get(p, False))
+            elif p == _align_side_with_train:
+                setattr(self.base_namespace, p, self.config[_experiment].get(p, True))
             else:
                 if self.config[_experiment].get(p):
                     setattr(self.base_namespace, p, self.config[_experiment][p])
