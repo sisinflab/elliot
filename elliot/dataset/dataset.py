@@ -106,7 +106,7 @@ class DataSetLoader(LoaderCoordinator):
         else:
             raise Exception("Strategy option not recognized")
 
-        if isinstance(self.tuple_list, list) or (isinstance(self.tuple_list[0][0], list)):
+        if isinstance(self.tuple_list[0][1], list):
             self.logger.warning("You are using a splitting strategy with folds. "
                                 "Paired TTest and Wilcoxon Test are not available!")
             self.config.evaluation.paired_ttest = False

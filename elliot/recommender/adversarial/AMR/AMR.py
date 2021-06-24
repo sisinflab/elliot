@@ -7,20 +7,16 @@ __version__ = '0.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malitesta@poliba.it'
 
-import os
-
-import numpy as np
 import tensorflow as tf
+import numpy as np
+
 from tqdm import tqdm
 
-from elliot.dataset.samplers import custom_sampler as cs
-from elliot.recommender.base_recommender_model import init_charger
-from elliot.evaluation.evaluator import Evaluator
+from elliot.recommender.adversarial.AMR import pairwise_pipeline_sampler_vbpr as ppsv
 from elliot.recommender import BaseRecommenderModel
 from elliot.recommender.adversarial.AMR.AMR_model import AMR_model
+from elliot.recommender.base_recommender_model import init_charger
 from elliot.recommender.recommender_utils_mixin import RecMixin
-from elliot.utils.folder import build_model_folder
-from elliot.utils.write import store_recommendation
 
 
 class AMR(RecMixin, BaseRecommenderModel):
@@ -79,6 +75,7 @@ class AMR(RecMixin, BaseRecommenderModel):
         self._num_users = self._data.num_users
 
         self._params_list = [
+            ("_batch_eval", "batch_eval", "be", 512, int, None),
             ("_factors", "factors", "factors", 200, int, None),
             ("_factors_d", "factors_d", "factors_d", 20, int, None),
             ("_learning_rate", "lr", "lr", 0.001, None, None),
@@ -87,7 +84,8 @@ class AMR(RecMixin, BaseRecommenderModel):
             ("_l_e", "l_e", "l_e", 0.1, None, None),
             ("_eps", "eps", "eps", 0.1, None, None),
             ("_l_adv", "l_adv", "l_adv", 0.001, None, None),
-            ("_adversarial_epochs", "adversarial_epochs", "adv_epochs", self._epochs // 2, int, None)
+            ("_adversarial_epochs", "adversarial_epochs", "adv_epochs", self._epochs // 2, int, None),
+            ("_loader", "loader", "load", "VisualAttributes", None, None)
         ]
         self.autoset_params()
 
@@ -100,9 +98,16 @@ class AMR(RecMixin, BaseRecommenderModel):
 
         self._ratings = self._data.train_dict
 
-        self._sampler = cs.Sampler(self._data.i_train_dict)
+        self._side = getattr(self._data.side_information, self._loader, None)
 
-        item_indices = [self._data.item_mapping[self._data.private_items[item]] for item in range(self._num_items)]
+        item_indices = [self._side.item_mapping[self._data.private_items[item]] for item in range(self._num_items)]
+
+        self._sampler = ppsv.Sampler(self._data.i_train_dict,
+                                     item_indices,
+                                     self._side.visual_feature_folder_path,
+                                     self._epochs)
+
+        self._next_batch = self._sampler.pipeline(self._data.transactions, self._batch_size)
 
         self._model = AMR_model(self._factors,
                                 self._factors_d,
@@ -110,13 +115,14 @@ class AMR(RecMixin, BaseRecommenderModel):
                                 self._l_w,
                                 self._l_b,
                                 self._l_e,
-                                self._eps,
-                                self._l_adv,
-                                self._data.visual_features[item_indices],
+                                self._side.visual_features_shape,
                                 self._num_users,
                                 self._num_items,
+                                self._eps,
+                                self._l_adv,
                                 self._seed)
 
+        self._next_eval_batch = self._sampler.pipeline_eval(self._batch_eval)
 
     @property
     def name(self):
@@ -128,27 +134,39 @@ class AMR(RecMixin, BaseRecommenderModel):
         if self._restore:
             return self.restore_weights()
 
-        for it in self.iterate(self._epochs):
-            user_adv_train = False if it < self._adversarial_epochs else True
-            loss = 0
-            steps = 0
-            with tqdm(total=int(self._data.transactions // self._batch_size), disable=not self._verbose) as t:
-                for batch in self._sampler.step(self._data.transactions, self._batch_size):
-                    steps += 1
-                    loss += self._model.train_step(batch, user_adv_train)
-                    # t.set_postfix({'loss': f'{loss.numpy() / steps:.5f}'})
-                    t.set_postfix({'(APR)-loss' if user_adv_train else '(BPR)-loss': f'{loss.numpy() / steps:.5f}'})
-                    t.update()
+        loss = 0
+        steps = 0
+        it = 0
+        user_adv_train = (self._epochs - it) <= self._adversarial_epochs
+        with tqdm(total=int(self._data.transactions // self._batch_size), disable=not self._verbose) as t:
+            for batch in self._next_batch:
+                steps += 1
+                loss += self._model.train_step(batch, user_adv_train)
+                t.set_postfix({'(APR)-loss' if user_adv_train else '(BPR)-loss': f'{loss.numpy() / steps:.5f}'})
+                t.update()
 
-            self.evaluate(it, loss.numpy()/(it + 1))
+                if steps == self._data.transactions // self._batch_size:
+                    t.reset()
+                    self.evaluate(it, loss.numpy() / steps)
+                    it += 1
+                    steps = 0
+                    loss = 0
+                    user_adv_train = (self._epochs - it) <= self._adversarial_epochs
 
     def get_recommendations(self, k: int = 100):
         predictions_top_k_test = {}
         predictions_top_k_val = {}
-        for index, offset in enumerate(range(0, self._num_users, self._batch_size)):
-            offset_stop = min(offset + self._batch_size, self._num_users)
-            predictions = self._model.predict(offset, offset_stop)
+        for index, offset in enumerate(range(0, self._num_users, self._batch_eval)):
+            offset_stop = min(offset + self._batch_eval, self._num_users)
+            predictions = np.empty((offset_stop - offset, self._num_items))
+            for batch in self._next_eval_batch:
+                item_rel, item_abs, feat = batch
+                p = self._model.predict_item_batch(offset, offset_stop,
+                                                   item_rel[0], item_rel[-1],
+                                                   tf.Variable(feat))
+                predictions[:(offset_stop - offset), item_rel] = p
             recs_val, recs_test = self.process_protocol(k, predictions, offset, offset_stop)
             predictions_top_k_val.update(recs_val)
             predictions_top_k_test.update(recs_test)
         return predictions_top_k_val, predictions_top_k_test
+
