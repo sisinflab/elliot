@@ -1,4 +1,5 @@
 import copy
+import sys
 from abc import ABC, abstractmethod
 import typing as t
 from types import SimpleNamespace
@@ -21,13 +22,19 @@ class AbstractLoader(ABC):
     def create_namespace(self) -> SimpleNamespace:
         raise NotImplementedError
 
-    def __deepcopy__(self, memo = {}):
-        newself = object.__new__(self.__class__)
-        for method_name in dir(self.__class__):
-            newself.__dict__[method_name] = getattr(self, method_name)
-        for attribute_name, attribute_value in self.__dict__.items():
-            if attribute_value.__class__.__module__ == "builtins":
-                newself.__dict__[attribute_name] = copy.deepcopy(attribute_value)
-            else:
-                newself.__dict__[attribute_name] = attribute_value
-        return newself
+    if float(".".join([str(sys.version_info[0]),str(sys.version_info[1])])) < 3.8:
+        _version_warning = "WARNING: Your Python version is lower than 3.8. Consequently, Custom class objects created in Side Information Namespace will be created swallowly!!!!"
+        print(_version_warning, file=sys.stderr)
+
+        def __deepcopy__(self, memo = {}):
+            self.logger.warning(self._version_warning)
+            newself = object.__new__(self.__class__)
+            for method_name in dir(self.__class__):
+                newself.__dict__[method_name] = getattr(self, method_name)
+            for attribute_name, attribute_value in self.__dict__.items():
+                if attribute_value.__class__.__module__ == "builtins":
+                    newself.__dict__[attribute_name] = copy.deepcopy(attribute_value)
+                else:
+                    newself.__dict__[attribute_name] = attribute_value
+            return newself
+
