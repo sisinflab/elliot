@@ -16,11 +16,11 @@ The first key component of the config file is the ``data_config`` section.
       binarize: True
         side_information:
             - dataloader: FeatureLoader1
-            map: this/is/the/path.tsv
-            features: this/is/the/path.tsv
-            properties: this/is/the/path.conf
+              map: this/is/the/path.tsv
+              features: this/is/the/path.tsv
+              properties: this/is/the/path.conf
             - dataloader: FeatureLoader2
-            folder_map_features: this/is/the/path/folder
+              folder_map_features: this/is/the/path/folder
 
 In this section, we can define which input files and how they should be loaded.
 

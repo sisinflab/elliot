@@ -2,7 +2,8 @@ Splitting Data
 ======================
 
 If needed, the data is served to the Splitting module. In detail, Elliot provides (i)Temporal, (ii)Random, and (iii)Fix strategies.
-The Temporal strategy splits the user-item interactions based on the transaction timestamp, i.e., fixing the timestamp, find-ing the optimal one, or adopting a hold-out (HO) mechanism.
+The Temporal strategy splits the user-item interactions based on the transaction timestamp, i.e., fixing the timestamp,
+find-ing the optimal one, or adopting a hold-out (HO) mechanism.
 The Random strategy includes hold-out (HO),𝐾-repeated hold-out(K-HO), and cross-validation (CV). Table 1 provides further
 configuration details. Finally, the Fix strategy exploits a precomputed splitting.
 
