@@ -64,10 +64,10 @@ class BPRMF_batch(RecMixin, BaseRecommenderModel):
         """
 
         self._params_list = [
-            ("_factors", "factors", "factors", 10, None, None),
-            ("_learning_rate", "lr", "lr", 0.001, None, None),
-            ("_l_w", "l_w", "l_w", 0.1, None, None),
-            ("_l_b", "l_b", "l_b", 0.001, None, None),
+            ("_factors", "factors", "factors", 10, int, None),
+            ("_learning_rate", "lr", "lr", 0.001, float, None),
+            ("_l_w", "l_w", "l_w", 0.1, float, None),
+            ("_l_b", "l_b", "l_b", 0.001, float, None),
         ]
         self.autoset_params()
 

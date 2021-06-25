@@ -23,8 +23,8 @@ class BPRMF_batch_model(keras.Model):
                  l_w=0, l_b=0,
                  num_users=100,
                  num_items=100,
-                 name="NNBPRMF",
                  random_seed=42,
+                 name="NNBPRMF",
                  **kwargs):
         super().__init__(name=name, **kwargs)
         tf.random.set_seed(random_seed)
