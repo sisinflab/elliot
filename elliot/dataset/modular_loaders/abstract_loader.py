@@ -1,3 +1,4 @@
+import copy
 from abc import ABC, abstractmethod
 import typing as t
 from types import SimpleNamespace
@@ -19,3 +20,11 @@ class AbstractLoader(ABC):
     @abstractmethod
     def create_namespace(self) -> SimpleNamespace:
         raise NotImplementedError
+
+    def __deepcopy__(self, memo = {}):
+        newself = object.__new__(self.__class__)
+        for method_name in dir(self.__class__):
+            newself.__dict__[method_name] = getattr(self, method_name)
+        for attribute_name, attribute_value in self.__dict__.items():
+            newself.__dict__[attribute_name] = copy.deepcopy(attribute_value)
+        return newself
