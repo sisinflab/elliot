@@ -26,5 +26,8 @@ class AbstractLoader(ABC):
         for method_name in dir(self.__class__):
             newself.__dict__[method_name] = getattr(self, method_name)
         for attribute_name, attribute_value in self.__dict__.items():
-            newself.__dict__[attribute_name] = copy.deepcopy(attribute_value)
+            if attribute_value.__class__.__module__ == "builtins":
+                newself.__dict__[attribute_name] = copy.deepcopy(attribute_value)
+            else:
+                newself.__dict__[attribute_name] = attribute_value
         return newself
