@@ -57,6 +57,12 @@ in control of the framework.
    guide/hyper_optimization
    guide/early_stopping
    guide/new_alg
+   guide/recommenders
+
+.. toctree::
+   :maxdepth: 1
+   :caption: EXTENDING ELLIOT
+
    guide/loaders
    guide/recommenders
 

@@ -7,7 +7,7 @@ Subpackages
 .. toctree::
    :maxdepth: 4
 
-   elliot.recommender.NN
+   elliot.recommender.knn
    elliot.recommender.adversarial
    elliot.recommender.algebric
    elliot.recommender.autoencoders

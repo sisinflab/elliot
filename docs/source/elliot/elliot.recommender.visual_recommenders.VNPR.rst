@@ -4,18 +4,18 @@ elliot.recommender.visual\_recommenders.VNPR package
 Submodules
 ----------
 
-elliot.recommender.visual\_recommenders.VNPR.visual\_neural\_personalized\_ranking module
+elliot.recommender.visual\_recommenders.VNPR.VNPR module
 -----------------------------------------------------------------------------------------
 
-.. automodule:: elliot.recommender.visual_recommenders.VNPR.visual_neural_personalized_ranking
+.. automodule:: elliot.recommender.visual_recommenders.VNPR.VNPR
    :members:
    :undoc-members:
    :show-inheritance:
 
-elliot.recommender.visual\_recommenders.VNPR.visual\_neural\_personalized\_ranking\_model module
+elliot.recommender.visual\_recommenders.VNPR.VNPR\_model module
 ------------------------------------------------------------------------------------------------
 
-.. automodule:: elliot.recommender.visual_recommenders.VNPR.visual_neural_personalized_ranking_model
+.. automodule:: elliot.recommender.visual_recommenders.VNPR.VNPR_model
    :members:
    :undoc-members:
    :show-inheritance:

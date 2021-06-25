@@ -13,6 +13,6 @@ Recommendation Models
    recommenders/knowledge_aware
    recommenders/latent_factor_models
    recommenders/neural
-   recommenders/NN
+   recommenders/knn
    recommenders/unpersonalized
    recommenders/visual_recommenders

@@ -18,8 +18,8 @@ Summary
     map.map.MAP
     mar.mar.MAR
     mrr.mrr.MRR
-    ndcg.ndcg.NDCG
-    ndcg.ndcg.nDCGRendle2020
+    ndcg.ndcg.nDCG
+    ndcg.ndcg_rendle2020.nDCGRendle2020
     precision.precision.Precision
     recall.recall.Recall
 
@@ -86,7 +86,7 @@ MRR
 nDCG
 ~~~~~~~~~~~~~~~~
 .. module:: elliot.evaluation.metrics.accuracy.ndcg.ndcg
-.. autoclass:: NDCG
+.. autoclass:: nDCG
     :show-inheritance:
 
 nDCGRendle2020

@@ -13,13 +13,30 @@ The ``init`` method is devoted to capture all the configuration fields provided 
 Example: Suppose we want to create a side information loader for movie genres. The side information file is structured as a TSV file with no header.
 The first element of the row denotes the item id, whereas the other numbers indicate the ids of the genres.
 
-| item id | genre0 | genre1 | genreN |
-|---------|--------|--------|--------|
-| 1       | 0      | 1      | 5      |
-| 2       | 7      | 0      |        |
-| 3       | 2      | 3      |        |
+.. list-table::
+   :widths: 25 25 25 25
+   :header-rows: 1
+
+   * - item id
+     - genre0
+     - genre1
+     - genreN
+   * - 1
+     - 0
+     - 1
+     - 5
+   * - 2
+     - 7
+     - 0
+     -
+   * - 3
+     - 2
+     - 3
+     -
+
 
 .. code:: python
+
     def __init__(self, users: t.Set, items: t.Set, ns: SimpleNamespace, logger: object):
         self.logger = logger
         self.attribute_file = getattr(ns, "attribute_file", None)
@@ -32,6 +49,7 @@ The ``__init__`` (mandatory) method takes four mandatory arguments: users, items
 In our example, the namespace corresponds to the piece of the configuration file that refers to our side information loader (form now on named ItemAttributes).
 
 .. code:: yaml
+
     experiment:
       data_config:
         side_information:
@@ -41,15 +59,17 @@ In our example, the namespace corresponds to the piece of the configuration file
 The ``__init__`` method creates its local attributes and retrieve the necessary information from the namespace.
 Then, it loads the side information file and aligns it with users and items as provided by the Elliot pipeline.
 
-The method ``get_mapped()``(mandatory), returns a tuple of aligned users and items.
+The method ``get_mapped()`` (mandatory), returns a tuple of aligned users and items.
 
 .. code:: python
+
     def get_mapped(self) -> t.Tuple[t.Set[int], t.Set[int]]:
         return self.users, self.items
 
-The method ``filter``(mandatory), provides the functionality of filtering users, items, and side information data structures based on the sets of users and items passed as arguments.
+The method ``filter`` (mandatory), provides the functionality of filtering users, items, and side information data structures based on the sets of users and items passed as arguments.
 
 .. code:: python
+
     def filter(self, users, items):
         self.users = self.users & users
         self.items = self.items & items
@@ -59,6 +79,7 @@ Be sure that the mandatory attributes (__name__, and object), and all the necess
 Pay Attention! The name you choose here is the same you will use in your configuration file.
 
 .. code:: python
+
     def create_namespace(self):
         ns = SimpleNamespace()
         ns.__name__ = "ItemAttributes" #MANDATORY

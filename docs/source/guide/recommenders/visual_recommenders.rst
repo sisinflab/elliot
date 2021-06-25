@@ -13,7 +13,7 @@ Summary
     DeepStyle.DeepStyle.DeepStyle
     DVBPR.DVBPR.DVBPR
     VBPR.VBPR.VBPR
-    VNPR.visual_neural_personalized_ranking.VNPR
+    VNPR.VNPR.VNPR
     elliot.recommender.adversarial.AMR.AMR.AMR
 
 
@@ -44,7 +44,7 @@ VBPR
 VNPR
 ~~~~~~~~~~~~~~~~
 
-.. autoclass:: elliot.recommender.visual_recommenders.VNPR.visual_neural_personalized_ranking.VNPR
+.. autoclass:: elliot.recommender.visual_recommenders.VNPR.VNPR.VNPR
     :show-inheritance:
 
 AMR
