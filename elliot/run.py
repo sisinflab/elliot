@@ -45,9 +45,10 @@ def run_experiment(config_path: str = ''):
 
     if base.base_namespace.version != __version__:
         logger.error(f'Your config file use a different version of Elliot! '
-                     f'Be careful because some feature could be deprecated! Download latest version at this link '
+                     f'In different versions of Elliot the results may slightly change due to progressive improvement! '
+                     f'Some feature could be deprecated! Download latest version at this link '
                      f'https://github.com/sisinflab/elliot/releases')
-        raise Exception('Version mismatch!')
+        raise Exception('Version mismatch! In different versions of Elliot the results may slightly change due to progressive improvement!')
 
     logger.info("Start experiment")
     base.base_namespace.evaluation.relevance_threshold = getattr(base.base_namespace.evaluation, "relevance_threshold", 0)

@@ -17,6 +17,6 @@ by merely passing a list of possible hyperparameter values, e.g., neighbors: [50
 
 The reported models are selected according to nDCG@10.
 
-|To see the full configuration file please visit the following [link](config_files/basic_configuration.yml)|
+|To see the full configuration file please visit the following [link](config_files/basic_configuration_v030.yml)|
 |-------------------------------------------------------------------------------------------------------------|
 |**To run the experiment use the following [script](sample_basic.py)**|
