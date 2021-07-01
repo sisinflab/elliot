@@ -22,10 +22,9 @@ class Random(RecMixin, BaseRecommenderModel):
         :param path_output_rec_weight: path to the directory rec. model parameters
         :param args: parameters
         """
-        self._random = np.random
 
         self._params_list = [
-            ("_seed", "random_seed", "seed", 42, None, None)
+            ("_seed", "random_seed", "seed", 42, int, None)
         ]
         self.autoset_params()
 
@@ -36,17 +35,23 @@ class Random(RecMixin, BaseRecommenderModel):
         return f"Random_{self.get_params_shortcut()}"
 
     def train(self):
-        recs = self.get_recommendations(self.evaluator.get_needed_recommendations())
-        result_dict = self.evaluator.eval(recs)
-        self._results.append(result_dict)
+        self.evaluate()
 
-        if self._save_recs:
-            store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}.tsv")
+    def get_recommendations(self, top_k: int = 100):
+        predictions_top_k_val = {}
+        predictions_top_k_test = {}
 
-    def get_recommendations(self, top_k):
+        recs_val, recs_test = self.process_protocol(top_k)
+
+        predictions_top_k_val.update(recs_val)
+        predictions_top_k_test.update(recs_test)
+
+        return predictions_top_k_val, predictions_top_k_test
+
+    def get_single_recommendation(self, mask, top_k, *args):
         r_int = np.random.randint
         n_items = self._num_items
-        items = self._data.items
+        # items = self._data.items
         ratings = self._data.train_dict
 
         r = {}
@@ -55,10 +60,16 @@ class Random(RecMixin, BaseRecommenderModel):
             ui = set(i_s.keys())
             lui = len(ui)
             local_k = min(top_k, n_items - lui)
+
+            local_items = np.arange(n_items)[mask[self._data.public_users[u]]]
+            n_local_items = len(local_items)
+
             for index in range(local_k):
-                j = items[r_int(n_items)]
+                j = self._data.private_items[local_items[r_int(n_local_items)]]
+                # j = items[r_int(n_items)]
                 while j in ui:
-                    j = items[r_int(n_items)]
+                    j = self._data.private_items[local_items[r_int(n_local_items)]]
+                    # j = items[r_int(n_items)]
                 l.append((j, 1))
             r[u] = l
         return r

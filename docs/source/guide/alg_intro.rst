@@ -59,7 +59,7 @@ The majority of the recommendation models uses a Mixin:
 
 .. autosummary::
 
-    knowledge_aware.kaHFM.ka_hfm.KaHFM
+    knowledge_aware.kaHFM.kahfm.KaHFM
     knowledge_aware.kaHFM_batch.kahfm_batch.KaHFMBatch
     knowledge_aware.kahfm_embeddings.kahfm_embeddings.KaHFMEmbeddings
 
@@ -105,10 +105,10 @@ The majority of the recommendation models uses a Mixin:
 
 .. autosummary::
 
-    NN.item_knn.item_knn.ItemKNN
-    NN.user_knn.user_knn.UserKNN
-    NN.attribute_item_knn.attribute_item_knn.AttributeItemKNN
-    NN.attribute_user_knn.attribute_user_knn.AttributeUserKNN
+    knn.item_knn.item_knn.ItemKNN
+    knn.user_knn.user_knn.UserKNN
+    knn.attribute_item_knn.attribute_item_knn.AttributeItemKNN
+    knn.attribute_user_knn.attribute_user_knn.AttributeUserKNN
 
 * **Unpersonalized Recommenders**
 
@@ -125,5 +125,5 @@ The majority of the recommendation models uses a Mixin:
     visual_recommenders.DeepStyle.DeepStyle.DeepStyle
     visual_recommenders.DVBPR.DVBPR.DVBPR
     visual_recommenders.VBPR.VBPR.VBPR
-    visual_recommenders.VNPR.visual_neural_personalized_ranking.VNPR
-    visual_recommenders.elliot.recommender.adversarial.AMR.AMR.AMR
+    visual_recommenders.VNPR.VNPR.VNPR
+    adversarial.AMR.AMR.AMR

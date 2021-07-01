@@ -83,6 +83,10 @@ loggers:
     level: FATAL
     handlers:
       - queue_listener
+  'EarlyStopping':
+    level: FATAL
+    handlers:
+      - queue_listener
   __main__:
     level: FATAL
     handlers:

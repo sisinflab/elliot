@@ -2,18 +2,26 @@
 Module description:
 
 """
+import inspect
 import logging as pylog
+import os
+
+import numpy as np
+import random
+
 from elliot.evaluation.evaluator import Evaluator
 from elliot.utils.folder import build_model_folder
 
-__version__ = '0.1'
+__version__ = '0.3.0'
 __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
 from abc import ABC
 from abc import abstractmethod
 from functools import wraps
+from types import SimpleNamespace
 from elliot.utils import logging
+from elliot.recommender.early_stopping import EarlyStopping
 
 
 class BaseRecommenderModel(ABC):
@@ -29,6 +37,8 @@ class BaseRecommenderModel(ABC):
         self._data = data
         self._config = config
         self._params = params
+
+        self._negative_sampling = hasattr(data.config, "negative_sampling")
 
         self._restore = getattr(self._params.meta, "restore", False)
 
@@ -51,18 +61,34 @@ class BaseRecommenderModel(ABC):
         self._save_recs = getattr(self._params.meta, "save_recs", False)
         self._verbose = getattr(self._params.meta, "verbose", None)
         self._validation_rate = getattr(self._params.meta, "validation_rate", 1)
-        self._compute_auc = getattr(self._params.meta, "compute_auc", False)
-        self._epochs = getattr(self._params, "epochs", 2)
+        self._optimize_internal_loss = getattr(self._params.meta, "optimize_internal_loss", False)
+        self._epochs = int(getattr(self._params, "epochs", 2))
+        self._seed = getattr(self._params, "seed", 42)
+        self._early_stopping = EarlyStopping(SimpleNamespace(**getattr(self._params, "early_stopping", {})),
+                                             self._validation_metric, self._validation_k, _cutoff_k,
+                                             data.config.evaluation.simple_metrics)
         self._iteration = 0
         if self._epochs < self._validation_rate:
             raise Exception(f"The first validation epoch ({self._validation_rate}) "
                             f"is later than the overall number of epochs ({self._epochs}).")
         self._batch_size = getattr(self._params, "batch_size", -1)
+
+
+        self.best_metric_value = 0
+
+        self._losses = []
         self._results = []
         self._params_list = []
 
+    def get_base_params_shortcut(self):
+        return "_".join([str(k) + "=" + str(v).replace(".", "$") for k, v in
+                         dict({"seed": self._seed,
+                               "e": self._epochs,
+                               "bs": self._batch_size}).items()
+                         ])
+
     def get_params_shortcut(self):
-        return "_".join([str(p[2])+":"+ str(p[5](getattr(self, p[0])) if p[5] else getattr(self, p[0])) for p in self._params_list])
+        return "_".join([str(p[2])+"="+ str(p[5](getattr(self, p[0])) if p[5] else getattr(self, p[0])).replace(".", "$") for p in self._params_list])
 
     def autoset_params(self):
         """
@@ -117,8 +143,13 @@ def init_charger(init):
     @wraps(init)
     def new_init(self, *args, **kwargs):
         BaseRecommenderModel.__init__(self, *args, **kwargs)
-        self.logger = logging.get_logger(self.__class__.__name__, pylog.CRITICAL if self._config.config_test else
-                                         pylog.DEBUG)
+        package_name = inspect.getmodule(self).__package__
+        rec_name = f"external.{self.__class__.__name__}" if "external" in package_name else self.__class__.__name__
+        self.logger = logging.get_logger_model(rec_name, pylog.CRITICAL if self._config.config_test else pylog.DEBUG)
+        np.random.seed(self._seed)
+        random.seed(self._seed)
+        self._nprandom = np.random
+        self._random = random
         self._num_items = self._data.num_items
         self._num_users = self._data.num_users
 
@@ -127,6 +158,6 @@ def init_charger(init):
         self.evaluator = Evaluator(self._data, self._params)
         self._params.name = self.name
         build_model_folder(self._config.path_output_rec_weight, self.name)
-        self._saving_filepath = f'{self._config.path_output_rec_weight}{self.name}/best-weights-{self.name}'
+        self._saving_filepath = os.path.abspath(os.sep.join([self._config.path_output_rec_weight, self.name, f"best-weights-{self.name}"]))
 
     return new_init

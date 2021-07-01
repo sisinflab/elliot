@@ -3,7 +3,7 @@ Module description:
 
 """
 
-__version__ = '0.1'
+__version__ = '0.3.0'
 __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
@@ -266,6 +266,8 @@ class ItemCategoryDataObject:
         else:
             self.val_dict = self.build_dict(data_tuple[1], self.users)
             self.test_dict = self.build_dict(data_tuple[2], self.users)
+
+        self.allunrated_mask = np.where((self.sp_i_train.toarray() == 0), True, False)
 
     def dataframe_to_dict(self, data):
         users = list(data['userId'].unique())

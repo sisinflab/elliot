@@ -11,17 +11,16 @@ The first key component of the config file is the ``data_config`` section.
     experiment:
       data_config:
         strategy: dataset|fixed|hierarchy
-        dataloader: KnowledgeChainsLoader|DataSetLoader
         dataset_path: this/is/the/path.tsv
         root_folder: this/is/the/path
         train_path: this/is/the/path.tsv
         validation_path: this/is/the/path.tsv
         test_path: this/is/the/path.tsv
         side_information:
-            feature_data: this/is/the/path.tsv
-            map: this/is/the/path.tsv
-            features: this/is/the/path.tsv
-            properties: this/is/the/path.conf
+            - dataloader: ChainedKG|ItemAttributes|VisualAttribute
+              map: this/is/the/path.tsv
+              features: this/is/the/path.tsv
+              properties: this/is/the/path.conf
 
 In this section, we can define which input files and how they should be loaded.
 
@@ -98,23 +97,27 @@ An example can be:
         side_information:
             feature_data: this/is/the/path/to/features.npy
 
-For further details regarding the Data Loaders, please refer to the :ref:`section<Data Loaders>`.
-
+For further details regarding the Data Loaders, please refer to the :ref:`section<Loaders>`.
 
 Data Prefiltering
 """""""""""""""""""""""
 
 Elliot provides several prefiltering strategies.
-To enable Prefiltering operations, we can insert the corresponding block into our config file:
+To enable Prefiltering operations, we can insert the corresponding block into our config file.
+Moreover it is possible to specify multiple prefiltering steps by set multiple strategy into prefiltering section:
 
 .. code:: yaml
 
     experiment:
       prefiltering:
-        strategy: global_threshold|user_average|user_k_core|item_k_core|iterative_k_core|n_rounds_k_core|cold_users
-        threshold: 3|average
-        core: 5
-        rounds: 2
+        - strategy: global_threshold|user_average|user_k_core|item_k_core|iterative_k_core|n_rounds_k_core|cold_users
+          threshold: 3|average
+          core: 5
+          rounds: 2
+        - strategy: global_threshold|user_average|user_k_core|item_k_core|iterative_k_core|n_rounds_k_core|cold_users
+          threshold: 3|average
+          core: 5
+          rounds: 2
 
 In detail, Elliot provides eight main prefiltering approaches: ``global_threshold``,
 ``user_average``, ``user_k_core``, ``item_k_core``, ``iterative_k_core``, ``n_rounds_k_core``, ``cold_users``.
@@ -322,6 +325,22 @@ It takes the parameter ``folds`` with an **int** value, that defines the overall
         test_splitting:
             strategy: random_cross_validation
             folds: 5
+
+Negative Sampling
+""""""""""""""""""""""""""""
+Elliot let us to set up a set of negative items for each user, these items are useful to provide a negative sampling
+evaluation. It is possible to provide a file with these items or give to Elliot the possibility to generate a specific
+number of negative items for each user.
+
+.. code:: yaml
+
+    experiment:
+        negative_sampling:
+            strategy: fixed|random
+            files: [ path/to/file ]
+            num_items: 5
+
+For further details regarding the file format and other feature about Negative Sampling, please refer to the :ref:`section<Negative Sampling>`.
 
 Dataset Name Configuration
 """"""""""""""""""""""""""""

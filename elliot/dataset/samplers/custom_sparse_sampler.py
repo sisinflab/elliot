@@ -3,17 +3,16 @@ Module description:
 
 """
 
-__version__ = '0.1'
+__version__ = '0.3.0'
 __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
 import numpy as np
-np.random.seed(42)
-import tensorflow as tf
 
 
 class Sampler:
     def __init__(self, indexed_ratings, sp_i_train):
+        np.random.seed(42)
         self._indexed_ratings = indexed_ratings
         self._sp_i_train = sp_i_train
         self._users = list(self._indexed_ratings.keys())

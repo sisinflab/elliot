@@ -15,10 +15,18 @@ class PreFilter:
 
     @staticmethod
     def filter(d: pd.DataFrame, ns: SimpleNamespace) -> pd.DataFrame:
-
         if not hasattr(ns, "prefiltering"):
             return d
         ns = ns.prefiltering
+        dataframe = d.copy()
+
+        for strategy in ns:
+            dataframe = PreFilter.single_filter(dataframe, strategy)
+
+        return dataframe
+
+    @staticmethod
+    def single_filter(d: pd.DataFrame, ns: SimpleNamespace) -> pd.DataFrame:
 
         strategy = getattr(ns, "strategy", None)
         data = d.copy()

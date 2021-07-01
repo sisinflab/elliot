@@ -3,7 +3,7 @@ Module description:
 
 """
 
-__version__ = '0.1'
+__version__ = '0.3.0'
 __author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malitesta@poliba.it'
 
@@ -12,8 +12,6 @@ import numpy as np
 import tensorflow as tf
 from tensorflow import keras, Variable
 
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-tf.random.set_seed(0)
 
 
 class AMF_model(keras.Model):
@@ -26,10 +24,11 @@ class AMF_model(keras.Model):
                  l_w=0, l_b=0, eps=0, l_adv=0,
                  num_users=100,
                  num_items=100,
+                 random_seed=42,
                  name="AMF",
                  **kwargs):
         super().__init__(name=name, **kwargs)
-        tf.random.set_seed(42)
+        tf.random.set_seed(random_seed)
 
         self._factors = factors
         self._learning_rate = learning_rate

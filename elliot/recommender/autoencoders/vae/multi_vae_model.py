@@ -3,7 +3,7 @@ Module description:
 
 """
 
-__version__ = '0.1'
+__version__ = '0.3.0'
 __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
@@ -14,7 +14,6 @@ from tensorflow import keras
 from tensorflow.keras import layers
 import numpy as np
 
-# logging.disable(logging.WARNING)
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 
@@ -94,10 +93,11 @@ class VariationalAutoEncoder(keras.Model):
                  learning_rate=0.001,
                  dropout_rate=0,
                  regularization_lambda=0.01,
+                 random_seed=42,
                  name="VariationalAutoEncoder",
                  **kwargs):
         super().__init__(name=name, **kwargs)
-        tf.random.set_seed(42)
+        tf.random.set_seed(random_seed)
         self.original_dim = original_dim
         self.encoder = Encoder(latent_dim=latent_dim,
                                intermediate_dim=intermediate_dim,
@@ -157,65 +157,3 @@ class VariationalAutoEncoder(keras.Model):
     @tf.function
     def get_top_k(self, preds, train_mask, k=100):
         return tf.nn.top_k(tf.where(train_mask, preds, -np.inf), k=k, sorted=True)
-
-
-# class DenoisingAutoEncoder(keras.Model):
-#     """Combines the encoder and decoder into an end-to-end model for training."""
-#
-#     def __init__(
-#         self,
-#         original_dim,
-#         intermediate_dim=600,
-#         latent_dim=200,
-#         learning_rate=0.001,
-#         dropout_rate=0,
-#         regularization_lambda=0.01,
-#         name="DenoisingAutoEncoder",
-#         **kwargs
-#     ):
-#         super().__init__(name=name, **kwargs)
-#         tf.random.set_seed(42)
-#         self.original_dim = original_dim
-#         self.encoder = Encoder(latent_dim=latent_dim,
-#                                intermediate_dim=intermediate_dim,
-#                                dropout_rate=dropout_rate,
-#                                regularization_lambda=regularization_lambda)
-#         self.decoder = Decoder(original_dim,
-#                                intermediate_dim=intermediate_dim,
-#                                regularization_lambda=regularization_lambda)
-#         self.optimizer = tf.optimizers.Adam(learning_rate)
-#
-#     def call(self, inputs, training=None):
-#         z_mean = self.encoder(inputs, training=training)
-#         reconstructed = self.decoder(z_mean)
-#         return reconstructed
-#
-#     @tf.function
-#     def train_step(self, batch):
-#         with tf.GradientTape() as tape:
-#
-#             # Clean Inference
-#             logits = self.call(inputs=batch, training=True)
-#             log_softmax_var = tf.nn.log_softmax(logits)
-#
-#             # per-user average negative log-likelihood
-#             loss = -tf.reduce_mean(tf.reduce_sum(
-#                 log_softmax_var * batch, axis=1))
-#
-#         grads = tape.gradient(loss, self.trainable_weights)
-#         self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
-#
-#         return loss
-#
-#     @tf.function
-#     def predict(self, inputs, training=False):
-#         """
-#         Get full predictions on the whole users/items matrix.
-#
-#         Returns:
-#             The matrix of predicted values.
-#         """
-#
-#         logits = self.call(inputs=inputs, training=True)
-#         log_softmax_var = tf.nn.log_softmax(logits)
-#         return log_softmax_var

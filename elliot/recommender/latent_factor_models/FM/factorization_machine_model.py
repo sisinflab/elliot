@@ -3,19 +3,19 @@ Module description:
 
 """
 
-__version__ = '0.1'
+__version__ = '0.3.0'
 __author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta, Antonio Ferrara'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it,' \
             'daniele.malitesta@poliba.it, antonio.ferrara@poliba.it'
 
 import os
+from typing import Union, Text
+
 import numpy as np
 import tensorflow as tf
 from tensorflow import keras
-from typing import Optional, Union, Text
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-tf.random.set_seed(0)
 
 
 class FactorizationMachineModel(keras.Model):
@@ -26,10 +26,11 @@ class FactorizationMachineModel(keras.Model):
                  factors,
                  lambda_weights,
                  learning_rate=0.01,
+                 random_seed=42,
                  name="FM",
                  **kwargs):
         super().__init__(name=name, **kwargs)
-        tf.random.set_seed(42)
+        tf.random.set_seed(random_seed)
         self.num_users = num_users
         self.num_items = num_items
         self.num_features = num_features
@@ -81,7 +82,7 @@ class FactorizationMachineModel(keras.Model):
         output = self.call(inputs=inputs, training=training)
         return output
 
-    @tf.function
+    # @tf.function
     def get_recs(self, inputs, training=False, **kwargs):
         """
         Get full predictions on the whole users/items matrix.
@@ -91,7 +92,7 @@ class FactorizationMachineModel(keras.Model):
         """
         if self.num_features:
             output = tf.map_fn(lambda row: self.call(inputs=row, training=training),
-                           tf.convert_to_tensor(inputs))
+                               tf.convert_to_tensor(inputs))
         else:
             output = self.call(inputs=inputs, training=training)
 
@@ -150,9 +151,9 @@ class Embedding(tf.keras.layers.Layer):
             field_dims,
             factors,
             kernel_initializer: Union[
-              Text, tf.keras.initializers.Initializer] = "truncated_normal",
+                Text, tf.keras.initializers.Initializer] = "truncated_normal",
             kernel_regularizer: Union[Text, None,
-                                    tf.keras.regularizers.Regularizer] = None,
+                                      tf.keras.regularizers.Regularizer] = None,
             **kwargs):
 
         super().__init__(**kwargs)
@@ -174,18 +175,9 @@ class Embedding(tf.keras.layers.Layer):
 
     @tf.function
     def call(self, x0: tf.Tensor, training=None) -> tf.Tensor:
-        return tf.map_fn(lambda row: (
-                                             tf.reduce_sum(
-                                                 tf.matmul(
-                                                     self._embedding.weights[0][row>0],
-                                                        tf.transpose(self._embedding.weights[0][row>0]))
-                                                 , axis=(-2,-1))
-                                      -
-                                      tf.reduce_sum(
-                                          self._embedding.weights[0][row>0] ** 2,
-                                          axis=(-2,-1))
-                                      ) * 0.5,
-                  x0)
+        return tf.map_fn(lambda row: (tf.reduce_sum(
+            tf.matmul(self._embedding.weights[0][row>0], tf.transpose(self._embedding.weights[0][row > 0])),
+            axis=(-2, -1)) - tf.reduce_sum( self._embedding.weights[0][row>0] ** 2, axis=(-2,-1))) * 0.5, x0)
 
     @tf.function
     def get_config(self):
@@ -210,9 +202,9 @@ class FactorizationMachineLayer(tf.keras.layers.Layer):
             field_dims,
             factors,
             kernel_initializer: Union[
-              Text, tf.keras.initializers.Initializer] = "truncated_normal",
+                Text, tf.keras.initializers.Initializer] = "truncated_normal",
             kernel_regularizer: Union[Text, None,
-                                    tf.keras.regularizers.Regularizer] = None,
+                                      tf.keras.regularizers.Regularizer] = None,
             **kwargs):
 
         super().__init__(**kwargs)
@@ -254,9 +246,9 @@ class MatrixFactorizationLayer(tf.keras.layers.Layer):
             num_items,
             factors,
             kernel_initializer: Union[
-              Text, tf.keras.initializers.Initializer] = "truncated_normal",
+                Text, tf.keras.initializers.Initializer] = "truncated_normal",
             kernel_regularizer: Union[Text, None,
-                                    tf.keras.regularizers.Regularizer] = None,
+                                      tf.keras.regularizers.Regularizer] = None,
             **kwargs):
 
         super().__init__(**kwargs)

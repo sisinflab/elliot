@@ -3,9 +3,11 @@ Module description:
 
 """
 
-__version__ = '0.1'
+__version__ = '0.3.0'
 __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
+
+import pickle
 
 import numpy as np
 from scipy import sparse as sp
@@ -60,9 +62,10 @@ class WRMFModel(object):
     def predict(self, user, item):
         return self.pred_mat[self._data.public_users[user], self._data.public_items[item]]
 
-    def get_user_recs(self, user, k=100):
-        user_items = self._data.train_dict[user].keys()
-        predictions = {i: self.predict(user, i) for i in self._data.items if i not in user_items}
+    def get_user_recs(self, user, mask, k=100):
+        user_mask = mask[self._data.public_users[user]]
+        predictions = {i: self.predict(user, i) for i in self._data.items if user_mask[self._data.public_items[i]]}
+
         indices, values = zip(*predictions.items())
         indices = np.array(indices)
         values = np.array(values)
@@ -86,3 +89,11 @@ class WRMFModel(object):
         self.X = saving_dict['X']
         self.Y = saving_dict['Y']
         self.C = saving_dict['C']
+
+    def load_weights(self, path):
+        with open(path, "rb") as f:
+            self.set_model_state(pickle.load(f))
+
+    def save_weights(self, path):
+        with open(path, "wb") as f:
+            pickle.dump(self.get_model_state(), f)

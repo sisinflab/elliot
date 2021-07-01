@@ -3,7 +3,7 @@ Module description:
 
 """
 
-__version__ = '0.1'
+__version__ = '0.3.0'
 __author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malitesta@poliba.it'
 
@@ -12,17 +12,18 @@ import numpy as np
 from tensorflow import keras
 
 
-class VBPR_model(keras.Model):
+class VBPRModel(keras.Model):
     def __init__(self, factors=200, factors_d=20,
                  learning_rate=0.001,
                  l_w=0, l_b=0, l_e=0,
-                 emb_image=None,
+                 num_image_feature=2048,
                  num_users=100,
                  num_items=100,
+                 random_seed=42,
                  name="VBPRMF",
                  **kwargs):
         super().__init__(name=name, **kwargs)
-        tf.random.set_seed(42)
+        tf.random.set_seed(random_seed)
 
         self._factors = factors
         self._factors_d = factors_d
@@ -30,8 +31,7 @@ class VBPR_model(keras.Model):
         self.l_w = l_w
         self.l_b = l_b
         self.l_e = l_e
-        self.emb_image = emb_image
-        self.num_image_feature = self.emb_image.shape[1]
+        self.num_image_feature = num_image_feature
         self._num_items = num_items
         self._num_users = num_users
 
@@ -46,8 +46,6 @@ class VBPR_model(keras.Model):
         self.Tu = tf.Variable(
             self.initializer(shape=[self._num_users, self._factors_d]),
             name='Tu', dtype=tf.float32)
-        self.F = tf.Variable(
-            self.emb_image, dtype=tf.float32, trainable=False)
         self.E = tf.Variable(
             self.initializer(shape=[self.num_image_feature, self._factors_d]),
             name='E', dtype=tf.float32)
@@ -56,12 +54,11 @@ class VBPR_model(keras.Model):
 
     @tf.function
     def call(self, inputs, training=None):
-        user, item = inputs
+        user, item, feature_i = inputs
         beta_i = tf.squeeze(tf.nn.embedding_lookup(self.Bi, item))
         gamma_u = tf.squeeze(tf.nn.embedding_lookup(self.Gu, user))
         theta_u = tf.squeeze(tf.nn.embedding_lookup(self.Tu, user))
         gamma_i = tf.squeeze(tf.nn.embedding_lookup(self.Gi, item))
-        feature_i = tf.squeeze(tf.nn.embedding_lookup(self.F, item))
 
         xui = beta_i + tf.reduce_sum((gamma_u * gamma_i), axis=1) + \
               tf.reduce_sum((theta_u * tf.matmul(feature_i, self.E)), axis=1) + \
@@ -71,11 +68,11 @@ class VBPR_model(keras.Model):
 
     @tf.function
     def train_step(self, batch):
-        user, pos, neg = batch
+        user, pos, feature_pos, neg, feature_neg = batch
         with tf.GradientTape() as t:
             xu_pos, gamma_u, gamma_pos, _, theta_u, beta_pos = \
-                self(inputs=(user, pos), training=True)
-            xu_neg, _, gamma_neg, _, _, beta_neg = self(inputs=(user, neg), training=True)
+                self(inputs=(user, pos, feature_pos), training=True)
+            xu_neg, _, gamma_neg, _, _, beta_neg = self(inputs=(user, neg, feature_neg), training=True)
 
             result = tf.clip_by_value(xu_pos - xu_neg, -80.0, 1e8)
             loss = tf.reduce_sum(tf.nn.softplus(-result))
@@ -102,6 +99,13 @@ class VBPR_model(keras.Model):
         return self.Bi + tf.matmul(self.Gu[start:stop], self.Gi, transpose_b=True) \
                + tf.matmul(self.Tu[start:stop], tf.matmul(self.F, self.E), transpose_b=True) \
                + tf.squeeze(tf.matmul(self.F, self.Bp))
+
+    @tf.function
+    def predict_item_batch(self, start, stop, start_item, stop_item, feat):
+        return self.Bi[start_item:(stop_item + 1)] + tf.matmul(self.Gu[start:stop], self.Gi[start_item:(stop_item + 1)],
+                                                               transpose_b=True) \
+               + tf.matmul(self.Tu[start:stop], tf.matmul(feat, self.E), transpose_b=True) \
+               + tf.squeeze(tf.matmul(feat, self.Bp))
 
     def get_config(self):
         raise NotImplementedError

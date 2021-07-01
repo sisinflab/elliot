@@ -11,6 +11,8 @@ i.e., all the users and items have at least𝑘recorded interaction. Since reach
 Elliot allows specifying the maximum number of iterations (Iter-n-rounds). Finally, the Cold-Users
 filtering feature allows retaining cold-users only.
 
+Moreover it is possible to specify multiple prefiltering steps by set multiple strategy into ``prefiltering`` section.
+
 Elliot provides several prefiltering strategies.
 To enable Prefiltering operations, we can insert the corresponding block into our config file:
 
@@ -18,10 +20,14 @@ To enable Prefiltering operations, we can insert the corresponding block into ou
 
     experiment:
       prefiltering:
-        strategy: global_threshold|user_average|user_k_core|item_k_core|iterative_k_core|n_rounds_k_core|cold_users
-        threshold: 3|average
-        core: 5
-        rounds: 2
+        - strategy: global_threshold|user_average|user_k_core|item_k_core|iterative_k_core|n_rounds_k_core|cold_users
+          threshold: 3|average
+          core: 5
+          rounds: 2
+        - strategy: global_threshold|user_average|user_k_core|item_k_core|iterative_k_core|n_rounds_k_core|cold_users
+          threshold: 3|average
+          core: 5
+          rounds: 2
 
 In detail, Elliot provides eight main prefiltering approaches: ``global_threshold``,
 ``user_average``, ``user_k_core``, ``item_k_core``, ``iterative_k_core``, ``n_rounds_k_core``, ``cold_users``.

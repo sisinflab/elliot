@@ -3,7 +3,7 @@ Module description:
 
 """
 
-__version__ = '0.1'
+__version__ = '0.3.0'
 __author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malitesta@poliba.it'
 
@@ -13,9 +13,6 @@ import tensorflow as tf
 from tensorflow import keras
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-tf.random.set_seed(0)
-
-tf.random.set_seed(0)
 
 
 class FISM_model(keras.Model):
@@ -24,21 +21,24 @@ class FISM_model(keras.Model):
                  data,
                  factors,
                  lr,
-                 l_w,
-                 l_b,
                  alpha,
+                 beta,
+                 lambda_,
+                 gamma,
                  num_users,
                  num_items,
+                 random_seed,
                  name="FISM",
                  **kwargs):
         super().__init__(name=name, **kwargs)
-        tf.random.set_seed(42)
+        tf.random.set_seed(random_seed)
 
         self._data = data
         self._factors = factors
         self._lr = lr
-        self._l_w = l_w
-        self._l_b = l_b
+        self._beta = beta
+        self._lambda = lambda_
+        self._gamma = gamma
         self._alpha = alpha
         self._num_users = num_users
         self._num_items = num_items
@@ -60,11 +60,8 @@ class FISM_model(keras.Model):
     @tf.function
     def call(self, inputs, training=None):
         user, item = inputs
-        # user_inter = self._history_item_matrix[user]
         user_inter = tf.nn.embedding_lookup(self._history_item_matrix, user)
-        # item_num = self._history_lens[user]
         item_num = tf.nn.embedding_lookup(self._history_lens, user)
-        # batch_mask_mat = self._mask_history_matrix[user]
         batch_mask_mat = tf.nn.embedding_lookup(self._mask_history_matrix, user)
 
         user_history = tf.squeeze(tf.nn.embedding_lookup(self.Gi, user_inter))  # batch_size x max_len x embedding_size
@@ -84,7 +81,7 @@ class FISM_model(keras.Model):
         with tf.GradientTape() as tape:
             # Clean Inference
             output, user_bias, item_bias, source, target = self(inputs=(user, pos), training=True)
-            reg_loss = self._l_b * tf.nn.l2_loss(user_bias) + self._l_b * tf.nn.l2_loss(item_bias) + tf.reduce_sum(
+            reg_loss = self._lambda * tf.nn.l2_loss(user_bias) + self._gamma * tf.nn.l2_loss(item_bias) + self._beta * tf.reduce_sum(
                 [tf.nn.l2_loss(source), tf.nn.l2_loss(target)])
             reg_loss = tf.cast(reg_loss, tf.float64)
             loss = self.loss(output, label) + reg_loss

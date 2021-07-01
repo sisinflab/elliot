@@ -3,18 +3,16 @@ Module description:
 
 """
 
-__version__ = '0.1'
+__version__ = '0.3.0'
 __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
-import random
-
 import numpy as np
-np.random.seed(42)
 
 
 class Sampler:
     def __init__(self, indexed_ratings, sparse_i_ratings, neg_ratio):
+        np.random.seed(42)
         self._sparse_i_ratings = sparse_i_ratings
         self._neg_ratio = neg_ratio
         self._indexed_ratings = indexed_ratings

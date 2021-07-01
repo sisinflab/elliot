@@ -3,7 +3,7 @@ Module description:
 
 """
 
-__version__ = '0.1'
+__version__ = '0.3.0'
 __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
@@ -18,9 +18,6 @@ from elliot.recommender.autoencoders.dae.multi_dae_model import DenoisingAutoEnc
 from elliot.recommender.recommender_utils_mixin import RecMixin
 from elliot.utils.write import store_recommendation
 from elliot.recommender.base_recommender_model import init_charger
-
-np.random.seed(42)
-random.seed(0)
 
 
 class MultiDAE(RecMixin, BaseRecommenderModel):
@@ -56,8 +53,6 @@ class MultiDAE(RecMixin, BaseRecommenderModel):
     def __init__(self, data, config, params, *args, **kwargs):
         """
         """
-        self._random = np.random
-        self._random_p = random
 
         self._ratings = self._data.train_dict
         self._sampler = sp.Sampler(self._data.sp_i_train)
@@ -73,7 +68,7 @@ class MultiDAE(RecMixin, BaseRecommenderModel):
             ("_latent_dim", "latent_dim", "latent_dim", 200, None, None),
             ("_lambda", "reg_lambda", "reg_lambda", 0.01, None, None),
             ("_learning_rate", "lr", "lr", 0.001, None, None),
-            ("_dropout_rate", "dropout_pkeep", "dropout_pkeep", 1, None, None),
+            ("_dropout_rate", "dropout_pkeep", "dropout_pkeep", 1, None, None)
         ]
         self.autoset_params()
 
@@ -84,22 +79,20 @@ class MultiDAE(RecMixin, BaseRecommenderModel):
                                            self._latent_dim,
                                            self._learning_rate,
                                            self._dropout_rate,
-                                           self._lambda)
+                                           self._lambda,
+                                           self._seed)
 
     @property
     def name(self):
         return "MultiDAE" \
-               + "_e:" + str(self._epochs) \
-               + "_bs:" + str(self._batch_size) \
+               + f"_{self.get_base_params_shortcut()}" \
                + f"_{self.get_params_shortcut()}"
 
     def train(self):
         if self._restore:
             return self.restore_weights()
 
-        best_metric_value = 0
-
-        for it in range(self._epochs):
+        for it in self.iterate(self._epochs):
             loss = 0
             steps = 0
             with tqdm(total=int(self._num_users // self._batch_size), disable=not self._verbose) as t:
@@ -109,17 +102,4 @@ class MultiDAE(RecMixin, BaseRecommenderModel):
                     t.set_postfix({'loss': f'{loss.numpy()/steps:.5f}'})
                     t.update()
 
-            if not (it + 1) % self._validation_rate:
-                recs = self.get_recommendations(self.evaluator.get_needed_recommendations())
-                result_dict = self.evaluator.eval(recs)
-                self._results.append(result_dict)
-
-                self.logger.info(f'Epoch {(it + 1)}/{self._epochs} loss {loss/steps:.5f}')
-
-                if self._results[-1][self._validation_k]["val_results"][self._validation_metric] > best_metric_value:
-                    print("******************************************")
-                    best_metric_value = self._results[-1][self._validation_k]["val_results"][self._validation_metric]
-                    if self._save_weights:
-                        self._model.save_weights(self._saving_filepath)
-                    if self._save_recs:
-                        store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}-it:{it + 1}.tsv")
+            self.evaluate(it, loss/(it + 1))

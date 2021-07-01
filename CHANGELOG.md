@@ -2,6 +2,32 @@
 
 All notable changes to this project will be documented in this file
 
+## [v0.3.0] - 2020-06-30
+### Changed
+- early stopping strategies
+- offline recommendation files evaluation (ProxyRecommender, RecommendationFolder) 
+- negative sampling evaluation
+- improved Microsoft Windows compatibility  
+- binarization of explicit dataset
+- automatic loading of implicit datasets 
+- multiple prefiltering
+- managing side information with modular loaders
+- alignment of side information with training data
+- improved Documentation: Model creation, Side Information loading, Early Stopping, Negative Sampling 
+- added nDCG as formulated in Rendle's 2020 KDD paper
+- visual loader with tensorflow pipeline 
+- added and fixing visual recsys method:
+  - DVBPR
+  - VBPR
+  - DeepStyle
+  - ACF
+  - VNPR
+- added new recommender method
+  - MF (Rendle's 2020 RecSys reproducibility paper)
+  - EASER
+  - RP3beta
+  - iALS
+
 ## [v0.2.1] - 2020-03-27
 ### Changed
 

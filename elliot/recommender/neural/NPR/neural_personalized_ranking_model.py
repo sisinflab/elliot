@@ -3,7 +3,7 @@ Module description:
 
 """
 
-__version__ = '0.1'
+__version__ = '0.3.0'
 __author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta, Felice Antonio Merra'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malitesta@poliba.it, felice.merra@poliba.it'
 
@@ -14,7 +14,6 @@ import tensorflow as tf
 from tensorflow import keras
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-tf.random.set_seed(0)
 
 
 class NPRModel(keras.Model):
@@ -22,10 +21,11 @@ class NPRModel(keras.Model):
                  num_users,
                  num_items,
                  embed_mf_size, l_w, mlp_hidden_size, dropout, learning_rate=0.01,
+                 random_seed=42,
                  name="NPR",
                  **kwargs):
         super().__init__(name=name, **kwargs)
-        tf.random.set_seed(42)
+        tf.random.set_seed(random_seed)
         self.num_users = num_users
         self.num_items = num_items
         self.embed_mf_size = embed_mf_size

@@ -3,7 +3,7 @@ Module description:
 
 """
 
-__version__ = '0.1'
+__version__ = '0.3.0'
 __author__ = 'Felice Antonio Merra, Vito Walter Anelli, Claudio Pomo'
 __email__ = 'felice.merra@poliba.it, vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
@@ -17,7 +17,6 @@ from elliot.recommender.gan.IRGAN.irgan_model import IRGAN_model
 from elliot.recommender.recommender_utils_mixin import RecMixin
 from elliot.utils.write import store_recommendation
 
-np.random.seed(42)
 
 
 class IRGAN(RecMixin, BaseRecommenderModel):
@@ -105,21 +104,20 @@ class IRGAN(RecMixin, BaseRecommenderModel):
                                   self._d_pretrain_epochs,
                                   self._g_epochs,
                                   self._d_epochs,
-                                  self._sample_lambda)
+                                  self._sample_lambda,
+                                  self._seed)
 
     @property
     def name(self):
         return "IRGAN" \
-               + "_e:" + str(self._epochs) \
-               + "_bs:" + str(self._batch_size) \
+               + f"_{self.get_base_params_shortcut()}" \
                + f"_{self.get_params_shortcut()}"
 
     def train(self):
         if self._restore:
             return self.restore_weights()
 
-        best_metric_value = 0
-        for it in range(self._epochs):
+        for it in self.iterate(self._epochs):
             dis_loss, gen_loss = 0, 0
             with tqdm(total=1, disable=not self._verbose) as t:
                 update_dis_loss, update_gen_loss = self._model.train_step()
@@ -129,29 +127,15 @@ class IRGAN(RecMixin, BaseRecommenderModel):
                     {'Dis loss': f'{dis_loss.numpy():.5f}', 'Gen loss': f'{gen_loss.numpy():.5f}'})
                 t.update()
 
-            if not (it + 1) % self._validation_rate:
-                recs = self.get_recommendations(self.evaluator.get_needed_recommendations())
-                result_dict = self.evaluator.eval(recs)
-                self._results.append(result_dict)
-
-                print(f'Epoch {(it + 1)}/{self._epochs} Dis loss: {dis_loss.numpy():.5f}, Gen loss: {gen_loss.numpy():.5f}')
-
-                if self._results[-1][self._validation_k]["val_results"][self._validation_metric] > best_metric_value:
-                    print("******************************************")
-                    best_metric_value = self._results[-1][self._validation_k]["val_results"][self._validation_metric]
-                    if self._save_weights:
-                        self._model.save_weights(self._saving_filepath)
-                    if self._save_recs:
-                        store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}-it:{it + 1}.tsv")
+            self.evaluate(it, dis_loss.numpy()/(it + 1))
 
     def get_recommendations(self, k: int = 100):
-        predictions_top_k = {}
-        for index, offset in enumerate(range(0, self._num_users, self._params.batch_size)):
-            offset_stop = min(offset + self._params.batch_size, self._num_users)
+        predictions_top_k_test = {}
+        predictions_top_k_val = {}
+        for index, offset in enumerate(range(0, self._num_users, self._batch_size)):
+            offset_stop = min(offset + self._batch_size, self._num_users)
             predictions = self._model.predict(offset, offset_stop)
-            mask = self.get_train_mask(offset, offset_stop)
-            v, i = self._model.get_top_k(predictions, mask, k=k)
-            items_ratings_pair = [list(zip(map(self._data.private_items.get, u_list[0]), u_list[1]))
-                                  for u_list in list(zip(i.numpy(), v.numpy()))]
-            predictions_top_k.update(dict(zip(range(offset, offset_stop), items_ratings_pair)))
-        return predictions_top_k
+            recs_val, recs_test = self.process_protocol(k, predictions, offset, offset_stop)
+            predictions_top_k_val.update(recs_val)
+            predictions_top_k_test.update(recs_test)
+        return predictions_top_k_val, predictions_top_k_test

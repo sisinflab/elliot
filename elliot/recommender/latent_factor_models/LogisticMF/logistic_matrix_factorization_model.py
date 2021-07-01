@@ -3,7 +3,7 @@ Module description:
 
 """
 
-__version__ = '0.1'
+__version__ = '0.3.0'
 __author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it,daniele.malitesta@poliba.it'
 
@@ -13,7 +13,6 @@ import tensorflow as tf
 from tensorflow import keras
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-tf.random.set_seed(0)
 
 
 class LogisticMatrixFactorizationModel(keras.Model):
@@ -24,10 +23,11 @@ class LogisticMatrixFactorizationModel(keras.Model):
                  lambda_weights,
                  alpha,
                  learning_rate=0.01,
+                 random_seed=42,
                  name="LMF",
                  **kwargs):
         super().__init__(name=name, **kwargs)
-        tf.random.set_seed(42)
+        tf.random.set_seed(random_seed)
         self._num_users = num_users
         self._num_items = num_items
         self._factors = factors

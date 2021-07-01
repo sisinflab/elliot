@@ -4,10 +4,10 @@ elliot.recommender.knowledge\_aware.kaHFM package
 Submodules
 ----------
 
-elliot.recommender.knowledge\_aware.kaHFM.ka\_hfm module
+elliot.recommender.knowledge\_aware.kaHFM.ka\hfm module
 --------------------------------------------------------
 
-.. automodule:: elliot.recommender.knowledge_aware.kaHFM.ka_hfm
+.. automodule:: elliot.recommender.knowledge_aware.kaHFM.kahfm
    :members:
    :undoc-members:
    :show-inheritance:

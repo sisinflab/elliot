@@ -3,7 +3,7 @@ Module description:
 
 """
 
-__version__ = '0.1'
+__version__ = '0.3.0'
 __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
@@ -24,3 +24,5 @@ from .Slim import Slim
 from .CML import CML
 from .FISM import FISM
 from .SVDpp import SVDpp
+from .iALS import iALS
+from .MF2020 import MF2020

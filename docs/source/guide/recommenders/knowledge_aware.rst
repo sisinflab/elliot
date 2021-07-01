@@ -9,14 +9,14 @@ Summary
 
 .. autosummary::
 
-    kaHFM.ka_hfm.KaHFM
+    kaHFM.kahfm.KaHFM
     kaHFM_batch.kahfm_batch.KaHFMBatch
     kahfm_embeddings.kahfm_embeddings.KaHFMEmbeddings
 
 KaHFM
 ~~~~~~~~~~~~~~~~
 
-.. module:: elliot.recommender.knowledge_aware.kaHFM.ka_hfm
+.. module:: elliot.recommender.knowledge_aware.kaHFM.kahfm
 .. autoclass:: KaHFM
     :show-inheritance:
 

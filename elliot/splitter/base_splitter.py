@@ -61,13 +61,15 @@ Nested Hold-Out
 
 
 class Splitter:
-    def __init__(self, data: pd.DataFrame, splitting_ns: SimpleNamespace):
+    def __init__(self, data: pd.DataFrame, splitting_ns: SimpleNamespace, random_seed=42):
+        self.random_seed = random_seed
         self.data = data
         self.splitting_ns = splitting_ns
         self.save_on_disk = False
         self.save_folder = None
 
     def process_splitting(self):
+        np.random.seed(self.random_seed)
         data = self.data
         splitting_ns = self.splitting_ns
 
@@ -76,10 +78,10 @@ class Splitter:
                 self.save_on_disk = True
                 self.save_folder = splitting_ns.save_folder
 
-                if os.path.exists(os.path.dirname(self.save_folder)):
-                    shutil.rmtree(os.path.dirname(self.save_folder), ignore_errors=True)
+                if os.path.exists(self.save_folder):
+                    shutil.rmtree(self.save_folder, ignore_errors=True)
 
-                os.makedirs(os.path.dirname(self.save_folder))
+                os.makedirs(self.save_folder)
             else:
                 raise Exception("Train or Test paths are missing")
 
@@ -109,25 +111,25 @@ class Splitter:
 
     def store_splitting(self, tuple_list):
         for i, (train_val, test) in enumerate(tuple_list):
-            actual_test_folder = create_folder_by_index(self.save_folder, i)
-            test.to_csv(f"{actual_test_folder}test.tsv", sep='\t', index=False)
+            actual_test_folder = create_folder_by_index(self.save_folder, str(i))
+            test.to_csv(os.path.abspath(os.sep.join([actual_test_folder, "test.tsv"])), sep='\t', index=False, header=False)
             if isinstance(train_val, list):
                 for j, (train, val) in enumerate(train_val):
-                   actual_val_folder = create_folder_by_index(actual_test_folder, j)
-                   val.to_csv(f"{actual_val_folder}val.tsv", sep='\t', index=False)
-                   train.to_csv(f"{actual_val_folder}train.tsv", sep='\t', index=False)
+                    actual_val_folder = create_folder_by_index(actual_test_folder, str(j))
+                    val.to_csv(os.path.abspath(os.sep.join([actual_val_folder, "val.tsv"])), sep='\t', index=False, header=False)
+                    train.to_csv(os.path.abspath(os.sep.join([actual_val_folder, "train.tsv"])), sep='\t', index=False, header=False)
             else:
-                train_val.to_csv(f"{actual_test_folder}train.tsv", sep='\t', index=False)
+                train_val.to_csv(os.path.abspath(os.sep.join([actual_test_folder, "train.tsv"])), sep='\t', index=False, header=False)
 
-    def read_folder(self, folder_path):
-        for root, dirs, files in os.walk(folder_path):
-            if not dirs:
-                # leggi i due file
-
-                pass
-            else:
-                pass
-            pass
+    # def read_folder(self, folder_path):
+    #     for root, dirs, files in os.walk(folder_path):
+    #         if not dirs:
+    #             # leggi i due file
+    #
+    #             pass
+    #         else:
+    #             pass
+    #         pass
 
     def handle_hierarchy(self, data: pd.DataFrame, valtest_splitting_ns: SimpleNamespace) -> t.List[
         t.Tuple[pd.DataFrame, pd.DataFrame]]:
@@ -153,7 +155,7 @@ class Splitter:
                 if hasattr(valtest_splitting_ns, "test_ratio"):
                     tuple_list = self.splitting_temporal_holdout(data, float(valtest_splitting_ns.test_ratio))
                 elif hasattr(valtest_splitting_ns, "leave_n_out"):
-                    tuple_list = self.splitting_temporal_holdout(data, int(valtest_splitting_ns.leave_n_out))
+                    tuple_list = self.splitting_temporal_leavenout(data, int(valtest_splitting_ns.leave_n_out))
                 else:
                     raise Exception(f"Option missing for {valtest_splitting_ns.strategy} strategy")
             elif valtest_splitting_ns.strategy == "random_subsampling":

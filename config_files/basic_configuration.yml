@@ -1,9 +1,10 @@
 experiment:
+  version: 0.2.1
   dataset: cat_dbpedia_movielens_1m
   data_config:
     strategy: dataset
     dataloader: KnowledgeChainsLoader
-    dataset_path: ../data/cat_dbpedia_movielens_1m/dataset.tsv
+    dataset_path: ../data/{0}/dataset.tsv
     side_information:
         map: ../data/cat_dbpedia_movielens_1m/map.tsv
         features: ../data/cat_dbpedia_movielens_1m/features.tsv
@@ -11,12 +12,7 @@ experiment:
 #  prefiltering:
 #    strategy: user_average # Not applied in the paper experiments
   splitting:
-    save_on_disk: True
-    save_folder: ../data/cat_dbpedia_movielens_1m/splitting/
     test_splitting:
-        strategy: temporal_hold_out
-        test_ratio: 0.2
-    validation_splitting:
         strategy: temporal_hold_out
         test_ratio: 0.2
   top_k: 50

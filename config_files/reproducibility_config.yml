@@ -1,0 +1,141 @@
+experiment:
+  dataset: movielens_1m
+  data_config:
+    strategy: dataset
+    dataset_path: ../data/{0}/dataset.tsv
+  prefiltering:
+    - strategy: global_threshold
+      threshold: 4
+    - strategy: iterative_k_core
+      core: 10
+  binarize: True
+  splitting:
+    save_on_disk: True
+    save_folder: ../data/movielens_1m/splitting/
+    test_splitting:
+#      strategy: temporal_hold_out
+      test_ratio: 0.2
+      strategy: random_subsampling
+      folds: 5
+  top_k: 50
+  evaluation:
+    cutoffs: [10, 20, 50]
+    simple_metrics: [nDCG, Recall, HR, Precision, MAP, MRR]
+  gpu: 1
+  external_models_path: ../external/models/__init__.py
+  models:
+#    Random:
+#      meta:
+#        save_recs: True
+#    external.MostPop:
+#      meta:
+#        verbose: True
+#        save_recs: True
+#    MF2020: # from original paper
+#      meta:
+#        hyper_max_evals: 20
+#        hyper_opt_alg: tpe
+#        verbose: True
+#        save_recs: True
+#      epochs: 50 # 256 original paper but 50 comes from NeuMF paper
+#      factors: [8, 16, 32, 64, 128, 256]
+#      lr: [0.001, 0.003, 0.01]
+#      reg: [0.001, 0.003, 0.01]
+#      m: [4,6,8]
+#    EASER: # from TOIS
+#      meta:
+#        verbose: True
+#        save_recs: True
+#        hyper_max_evals: 20
+#        hyper_opt_alg: tpe
+#      l2_norm: [uniform, 10, 10e7]
+#    RP3beta: #from TOIS
+#      meta:
+#        hyper_max_evals: 20
+#        hyper_opt_alg: tpe
+#        verbose: True
+#        save_recs: True
+#      neighborhood: [uniform, 5, 1000]
+#      alpha: [uniform, 0, 2]
+#      beta: [uniform, 0, 2]
+#      normalize_similarity: [True, False]
+#    iALS: #from TOIS
+#      meta:
+#        hyper_max_evals: 20
+#        hyper_opt_alg: tpe
+#        verbose: True
+#        save_recs: True
+#        validation_rate: 20
+#      epochs: [uniform, 1, 500]
+#      scaling: [linear, log]
+#      factors: [uniform, 1, 200]
+#      alpha: [uniform, 10e-3, 50]
+#      epsilon: [uniform, 10e-3, 10]
+#      reg: [uniform, 10e-3, 10e-2]
+    NeuMF: #from the original paper + Rendle
+      meta:
+        hyper_max_evals: 50
+        hyper_opt_alg: tpe
+        verbose: True
+        save_recs: True
+        validation_rate: 1
+      mf_factors:  [8, 16, 32, 64, 128, 256]
+      dropout: 0
+      is_mf_train: True
+      is_mlp_train: True
+      batch_size: [64, 128, 256]
+      epochs: 50
+      lr: [0.0001, 0.0005, 0.001, 0.005]
+      m: [4,6,8]
+#    ItemKNN: #from TOIS
+#      meta:
+#        save_recs: True
+#        verbose: True
+#        hyper_max_evals: 20
+#        hyper_opt_alg: tpe
+#      neighbors: [uniform, 5, 1000]
+#      similarity: [cosine, jaccard, dice, pearson, euclidean]
+#    UserKNN: #from TOIS
+#      meta:
+#        hyper_max_evals: 20
+#        hyper_opt_alg: tpe
+#        save_recs: True
+#        verbose: True
+#      neighbors: [ uniform, 5, 1000 ]
+#      similarity: [cosine, jaccard, dice, mahalanobis, euclidean]
+#    MultiVAE: # from original paper
+#      meta:
+#        hyper_max_evals: 50
+#        hyper_opt_alg: tpe
+#        save_recs: True
+#        verbose: True
+#      lr: [loguniform, -11.512925464970229, 0] # exploration taken from TOIS
+#      epochs: 200
+#      batch_size: [64, 128, 256 ]
+#      intermediate_dim: 600
+#      latent_dim: 200
+#      dropout_pkeep: 0.5
+#      reg_lambda: [loguniform, -11.512925464970229, 0] # exploration taken from TOIS
+#    BPRMF:
+#      meta:
+#        hyper_max_evals: 20
+#        hyper_opt_alg: tpe
+#        verbose: True
+#        save_recs: True
+#      lr: [0.001, 0.003, 0.01]
+#      batch_size: [ 128, 256, 512 ]
+#      epochs: 50
+#      bias_regularization: 0
+#      user_regularization: [0.001, 0.003, 0.01]
+#      positive_item_regularization: [0.001, 0.003, 0.01]
+#      negative_item_regularization: [0.0001, 0.0003, 0.001]
+#      factors: [8, 16, 32, 64, 128, 256]
+#    Slim: #from TOIS
+#      meta:
+#        hyper_max_evals: 20
+#        hyper_opt_alg: tpe
+#        verbose: True
+#        save_recs: True
+#      l1_ratio: [loguniform, -11.512925464970229, 0]
+#      alpha: [uniform, 10e-3, 1]
+#      neighborhood: [uniform, 5, 1000]

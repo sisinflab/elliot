@@ -3,7 +3,7 @@ Module description:
 
 """
 
-__version__ = '0.1'
+__version__ = '0.3.0'
 __author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malitesta@poliba.it'
 
@@ -12,12 +12,12 @@ from PIL import Image
 
 import numpy as np
 import random
-np.random.seed(42)
-random.seed(42)
 
 
 class Sampler:
     def __init__(self, indexed_ratings, item_indices, images_path, output_image_size, epochs):
+        np.random.seed(42)
+        random.seed(42)
         self._indexed_ratings = indexed_ratings
         self._item_indices = item_indices
         self._users = list(self._indexed_ratings.keys())

@@ -13,7 +13,7 @@ from elliot.utils.folder import build_log_folder
 class TimeFilter(logging.Filter):
 
     def filter(self, record: logging.LogRecord) -> bool:
-        record.time_filter = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S.%f")
+        record.time_filter = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
         return True
 
 
@@ -21,7 +21,7 @@ def init(path_config, folder_log, log_level=logging.WARNING):
     # Pull in Logging Config
     path = os.path.join(path_config)
     build_log_folder(folder_log)
-    folder_log = f'{folder_log}elliot.log'
+    folder_log = os.path.abspath(os.sep.join([folder_log, "elliot.log"]))
     pattern = re.compile('.*?\${(\w+)}.*?')
     loader = yaml.SafeLoader
     loader.add_implicit_resolver('!CUSTOM', pattern, None)
@@ -74,11 +74,21 @@ def get_logger(name, log_level=logging.DEBUG):
     return logger
 
 
+def get_logger_model(name, log_level=logging.DEBUG):
+    logger = logging.root.manager.loggerDict[name]
+    logger_es = logging.root.manager.loggerDict["EarlyStopping"]
+    logger_es.addFilter(TimeFilter())
+    logger_es.addHandler(logger.handlers[0])
+    logger_es.setLevel(log_level)
+    logger.setLevel(log_level)
+    return logger
+
+
 def prepare_logger(name, path, log_level=logging.DEBUG):
     logger = logging.getLogger(name)
     logger.addFilter(TimeFilter())
     logger.setLevel(log_level)
-    logfilepath = f'''{path}/{name}-{datetime.datetime.now().strftime('%b-%d-%Y_%H-%M-%S')}.log'''
+    logfilepath = os.path.abspath(os.sep.join([path, f"{name}-{datetime.datetime.now().strftime('%b-%d-%Y_%H-%M-%S')}.log"]))
     fh = logging.FileHandler(logfilepath)
     sh = logging.StreamHandler(sys.stdout)
     fh.setLevel(log_level)

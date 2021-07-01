@@ -3,7 +3,7 @@ Module description:
 
 """
 
-__version__ = '0.1'
+__version__ = '0.3.0'
 __author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malitesta@poliba.it'
 
@@ -18,8 +18,6 @@ from elliot.utils.write import store_recommendation
 
 from elliot.recommender.base_recommender_model import BaseRecommenderModel
 from elliot.recommender.base_recommender_model import init_charger
-
-np.random.seed(42)
 
 
 class LogisticMatrixFactorization(RecMixin, BaseRecommenderModel):
@@ -52,7 +50,6 @@ class LogisticMatrixFactorization(RecMixin, BaseRecommenderModel):
 
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
-        self._random = np.random
 
         self._params_list = [
             ("_learning_rate", "lr", "lr", 0.001, None, None),
@@ -71,14 +68,18 @@ class LogisticMatrixFactorization(RecMixin, BaseRecommenderModel):
 
         self._sampler = pws.Sampler(self._data.i_train_dict)
 
-        self._model = LogisticMatrixFactorizationModel(self._num_users, self._num_items, self._factors,
-                                                       self._l_w, self._alpha, self._learning_rate)
+        self._model = LogisticMatrixFactorizationModel(self._num_users,
+                                                       self._num_items,
+                                                       self._factors,
+                                                       self._l_w,
+                                                       self._alpha,
+                                                       self._learning_rate,
+                                                       self._seed)
 
     @property
     def name(self):
         return "LMF"\
-               + "_e:" + str(self._epochs) \
-               + "_bs:" + str(self._batch_size) \
+               + f"_{self.get_base_params_shortcut()}" \
                + f"_{self.get_params_shortcut()}"
 
     def predict(self, u: int, i: int):
@@ -88,9 +89,7 @@ class LogisticMatrixFactorization(RecMixin, BaseRecommenderModel):
         if self._restore:
             return self.restore_weights()
 
-        best_metric_value = 0
-        for it in range(self._epochs):
-
+        for it in self.iterate(self._epochs):
             loss = 0
             steps = 0
             with tqdm(total=int(self._data.transactions * 2 // self._batch_size), disable=not self._verbose) as t:
@@ -110,48 +109,17 @@ class LogisticMatrixFactorization(RecMixin, BaseRecommenderModel):
                     t.set_postfix({'loss': f'{loss.numpy() / steps:.5f}'})
                     t.update()
 
-            if not (it + 1) % self._validation_rate:
-                recs = self.get_recommendations(self.evaluator.get_needed_recommendations())
-                result_dict = self.evaluator.eval(recs)
-                self._results.append(result_dict)
-
-                print(f'Epoch {(it + 1)}/{self._epochs} loss {loss/steps:.5f}')
-
-                if self._results[-1][self._validation_k]["val_results"][self._validation_metric] > best_metric_value:
-                    print("******************************************")
-                    best_metric_value = self._results[-1][self._validation_k]["val_results"][self._validation_metric]
-                    if self._save_weights:
-                        self._model.save_weights(self._saving_filepath)
-                    if self._save_recs:
-                        store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}-it:{it + 1}.tsv")
+            self.evaluate(it, loss.numpy()/(it + 1))
 
     def get_recommendations(self, k: int = 100):
-        predictions_top_k = {}
+        predictions_top_k_test = {}
+        predictions_top_k_val = {}
         for index, offset in enumerate(range(0, self._num_users, self._batch_size)):
             offset_stop = min(offset + self._batch_size, self._num_users)
             predictions = self._model.predict_batch(offset, offset_stop)
-            v, i = self._model.get_top_k(predictions, self.get_train_mask(offset, offset_stop), k=k)
-            items_ratings_pair = [list(zip(map(self._data.private_items.get, u_list[0]), u_list[1]))
-                                  for u_list in list(zip(i.numpy(), v.numpy()))]
-            predictions_top_k.update(dict(zip(range(offset, offset_stop), items_ratings_pair)))
-        return predictions_top_k
+            recs_val, recs_test = self.process_protocol(k, predictions, offset, offset_stop)
+            predictions_top_k_val.update(recs_val)
+            predictions_top_k_test.update(recs_test)
+        return predictions_top_k_val, predictions_top_k_test
 
-    def restore_weights(self):
-        try:
-            with open(self._saving_filepath, "rb") as f:
-                self._model.set_model_state(pickle.load(f))
-            print(f"Model correctly Restored")
 
-            recs = self.get_recommendations(self.evaluator.get_needed_recommendations())
-            result_dict = self.evaluator.eval(recs)
-            self._results.append(result_dict)
-
-            print("******************************************")
-            if self._save_recs:
-                store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}.tsv")
-            return True
-
-        except Exception as ex:
-            print(f"Error in model restoring operation! {ex}")
-
-        return False

@@ -2,12 +2,11 @@ experiment:
   dataset: movielens_1m
   data_config:
     strategy: dataset
-    dataset_path: ../data/movielens_1m/dataset.tsv
+    dataset_path: ../data/{0}/dataset.tsv
   prefiltering:
     strategy: iterative_k_core
     core: 10
   splitting:
-    save_folder: ../data/movielens_1m/splitting/
     test_splitting:
         strategy: random_subsampling
         folds: 1
@@ -17,28 +16,14 @@ experiment:
         folds: 5
   top_k: 50
   evaluation:
-    simple_metrics: [nDCG, ACLT, APLT, ARP, PopREO]
+    simple_metrics: [nDCG, ACLT, ARP]
     complex_metrics:
     - metric: UserMADrating
       clustering_name: Happiness
       clustering_file: ../data/movielens_1m/u_happy.tsv
-    - metric: ItemMADrating
-      clustering_name: ItemPopularity
-      clustering_file: ../data/movielens_1m/i_pop.tsv
-    - metric: REO
-      clustering_name: ItemPopularity
-      clustering_file: ../data/movielens_1m/i_pop.tsv
-    - metric: RSP
-      clustering_name: ItemPopularity
-      clustering_file: ../data/movielens_1m/i_pop.tsv
-    - metric: BiasDisparityBD
-      user_clustering_name: Happiness
-      user_clustering_file: ../data/movielens_1m/u_happy.tsv
-      item_clustering_name: ItemPopularity
-      item_clustering_file: ../data/movielens_1m/i_pop.tsv
     relevance_threshold: 1
     wilcoxon_test: True
-  gpu: 1
+  gpu: 0
   models:
     NeuMF:
       meta:

@@ -5,7 +5,7 @@ Proceedings of the 2005 SIAM International Conference on Data Mining. Society fo
 """
 
 
-__version__ = '0.1'
+__version__ = '0.3.0'
 __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
@@ -17,8 +17,6 @@ from elliot.recommender.algebric.slope_one.slope_one_model import SlopeOneModel
 from elliot.recommender.base_recommender_model import BaseRecommenderModel, init_charger
 from elliot.recommender.recommender_utils_mixin import RecMixin
 from elliot.utils.write import store_recommendation
-
-np.random.seed(42)
 
 
 class SlopeOne(RecMixin, BaseRecommenderModel):
@@ -49,8 +47,19 @@ class SlopeOne(RecMixin, BaseRecommenderModel):
 
         self._model = SlopeOneModel(self._data)
 
-    def get_recommendations(self, k: int = 100):
-        return {u: self._model.get_user_recs(u, k) for u in self._ratings.keys()}
+    def get_recommendations(self, k: int = 10):
+        predictions_top_k_val = {}
+        predictions_top_k_test = {}
+
+        recs_val, recs_test = self.process_protocol(k)
+
+        predictions_top_k_val.update(recs_val)
+        predictions_top_k_test.update(recs_test)
+
+        return predictions_top_k_val, predictions_top_k_test
+
+    def get_single_recommendation(self, mask, k, *args):
+        return {u: self._model.get_user_recs(u, mask, k) for u in self._data.train_dict.keys()}
 
     @property
     def name(self):
@@ -62,22 +71,7 @@ class SlopeOne(RecMixin, BaseRecommenderModel):
 
         self._model.initialize()
 
-        print(f"Transactions: {self._data.transactions}")
-        best_metric_value = 0
-
-        print("Computing recommendations..")
-        recs = self.get_recommendations(self.evaluator.get_needed_recommendations())
-        result_dict = self.evaluator.eval(recs)
-        self._results.append(result_dict)
-        print(f'Finished')
-
-        if self._results[-1][self._validation_k]["val_results"][self._validation_metric] > best_metric_value:
-            print("******************************************")
-            if self._save_weights:
-                with open(self._saving_filepath, "wb") as f:
-                    pickle.dump(self._model.get_model_state(), f)
-            if self._save_recs:
-                store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}.tsv")
+        self.evaluate()
 
     def restore_weights(self):
         try:

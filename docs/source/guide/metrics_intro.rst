@@ -26,7 +26,8 @@ All the metrics inherit from a common abstract class:
     accuracy.map.map.MAP
     accuracy.mar.mar.MAR
     accuracy.mrr.mrr.MRR
-    accuracy.ndcg.ndcg.NDCG
+    accuracy.ndcg.ndcg.nDCG
+    accuracy.ndcg.ndcg_rendle2020.nDCGRendle2020
 
 * **Bias**
 

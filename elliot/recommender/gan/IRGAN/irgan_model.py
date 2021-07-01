@@ -3,7 +3,7 @@ Module description:
 
 """
 
-__version__ = '0.1'
+__version__ = '0.3.0'
 __author__ = 'Felice Antonio Merra, Vito Walter Anelli, Claudio Pomo'
 __email__ = 'felice.merra@poliba.it, vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
@@ -14,7 +14,6 @@ from tensorflow import keras
 from elliot.dataset.samplers import pointwise_pos_neg_sampler as pws
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-tf.random.set_seed(0)
 
 
 class Generator(keras.Model):
@@ -29,7 +28,6 @@ class Generator(keras.Model):
                  name="IRGAN-GEN",
                  **kwargs):
         super().__init__(name=name, **kwargs)
-        tf.random.set_seed(42)
 
         self._factors = factors
         self._learning_rate = learning_rate
@@ -115,7 +113,6 @@ class Discriminator(keras.Model):
                  name="IRGAN-DIS",
                  **kwargs):
         super().__init__(name=name, **kwargs)
-        tf.random.set_seed(42)
 
         self._factors = factors
         self._learning_rate = learning_rate
@@ -183,10 +180,11 @@ class IRGAN_model(keras.Model):
                  g_epochs=5,
                  d_epochs=1,
                  sample_lambda=0.2,
+                 random_seed=42,
                  name="IRGAN",
                  **kwargs):
         super().__init__(name=name, **kwargs)
-        tf.random.set_seed(42)
+        tf.random.set_seed(random_seed)
 
         self._predict_model = predict_model
         self._data = data

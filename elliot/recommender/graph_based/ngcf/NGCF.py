@@ -3,7 +3,7 @@ Module description:
 
 """
 
-__version__ = '0.1'
+__version__ = '0.3.0'
 __author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malitesta@poliba.it'
 
@@ -20,9 +20,6 @@ from elliot.recommender.base_recommender_model import init_charger
 from elliot.recommender.graph_based.ngcf.NGCF_model import NGCFModel
 from elliot.recommender.recommender_utils_mixin import RecMixin
 from elliot.utils.write import store_recommendation
-
-np.random.seed(42)
-random.seed(0)
 
 
 class NGCF(RecMixin, BaseRecommenderModel):
@@ -63,8 +60,6 @@ class NGCF(RecMixin, BaseRecommenderModel):
     """
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
-        self._random = np.random
-        self._random_p = random
 
         self._ratings = self._data.train_dict
         self._sampler = cs.Sampler(self._data.i_train_dict)
@@ -83,7 +78,7 @@ class NGCF(RecMixin, BaseRecommenderModel):
              lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
             ("_message_dropout", "message_dropout", "message_dropout", "(0.1,)", lambda x: list(make_tuple(x)),
              lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
-            ("_n_fold", "n_fold", "n_fold", 5, None, None),
+            ("_n_fold", "n_fold", "n_fold", 5, None, None)
         ]
         self.autoset_params()
 
@@ -103,7 +98,8 @@ class NGCF(RecMixin, BaseRecommenderModel):
             message_dropout=self._message_dropout,
             n_fold=self._n_fold,
             adjacency=self._adjacency,
-            laplacian=self._laplacian
+            laplacian=self._laplacian,
+            random_seed=self._seed
         )
 
     def _create_adj_mat(self):
@@ -134,16 +130,14 @@ class NGCF(RecMixin, BaseRecommenderModel):
     @property
     def name(self):
         return "NGCF" \
-               + "_e:" + str(self._epochs) \
-               + "_bs:" + str(self._batch_size) \
+               + f"_{self.get_base_params_shortcut()}" \
                + f"_{self.get_params_shortcut()}"
 
     def train(self):
         if self._restore:
             return self.restore_weights()
 
-        best_metric_value = 0
-        for it in range(self._epochs):
+        for it in self.iterate(self._epochs):
             loss = 0
             steps = 0
             with tqdm(total=int(self._data.transactions // self._batch_size), disable=not self._verbose) as t:
@@ -153,29 +147,16 @@ class NGCF(RecMixin, BaseRecommenderModel):
                     t.set_postfix({'loss': f'{loss.numpy() / steps:.5f}'})
                     t.update()
 
-            if not (it + 1) % self._validation_rate:
-                recs = self.get_recommendations(self.evaluator.get_needed_recommendations())
-                result_dict = self.evaluator.eval(recs)
-                self._results.append(result_dict)
-
-                print(f'Epoch {(it + 1)}/{self._epochs} loss {loss / steps:.5f}')
-
-                if self._results[-1][self._validation_k]["val_results"][self._validation_metric] > best_metric_value:
-                    print("******************************************")
-                    best_metric_value = self._results[-1][self._validation_k]["val_results"][self._validation_metric]
-                    if self._save_weights:
-                        self._model.save_weights(self._saving_filepath)
-                    if self._save_recs:
-                        store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}-it:{it + 1}.tsv")
+            self.evaluate(it, loss.numpy()/(it + 1))
 
     def get_recommendations(self, k: int = 100):
-        predictions_top_k = {}
-        for index, offset in enumerate(range(0, self._num_users, self._params.batch_size)):
-            offset_stop = min(offset+self._params.batch_size, self._num_users)
+        predictions_top_k_test = {}
+        predictions_top_k_val = {}
+        for index, offset in enumerate(range(0, self._num_users, self._batch_size)):
+            offset_stop = min(offset + self._batch_size, self._num_users)
             predictions = self._model.predict(offset, offset_stop)
-            v, i = self._model.get_top_k(predictions, self.get_train_mask(offset, offset_stop), k=k)
-            items_ratings_pair = [list(zip(map(self._data.private_items.get, u_list[0]), u_list[1]))
-                                  for u_list in list(zip(i.numpy(), v.numpy()))]
-            predictions_top_k.update(dict(zip(range(offset, offset_stop), items_ratings_pair)))
-        return predictions_top_k
+            recs_val, recs_test = self.process_protocol(k, predictions, offset, offset_stop)
+            predictions_top_k_val.update(recs_val)
+            predictions_top_k_test.update(recs_test)
+        return predictions_top_k_val, predictions_top_k_test
 

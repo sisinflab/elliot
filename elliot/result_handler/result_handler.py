@@ -3,9 +3,11 @@ Module description:
 
 """
 
-__version__ = '0.1'
+__version__ = '0.3.0'
 __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
+
+import os
 
 import pandas as pd
 from datetime import datetime
@@ -32,9 +34,10 @@ class ResultHandler:
     def add_oneshot_recommender(self, **kwargs):
         new_ks = set(kwargs["test_results"].keys())
         [self.ks.append(k) for k in new_ks if k not in self.ks]
-        self.oneshot_recommenders[kwargs["name"].split("_")[0]] = [kwargs]
+        # self.oneshot_recommenders[kwargs["name"].split("_")[0]] = [kwargs]
+        self.oneshot_recommenders[kwargs["name"]] = [kwargs]
 
-    def save_best_results(self, output='../results/'):
+    def save_best_results(self, output=''):
         global_results = dict(self.oneshot_recommenders)
         for k in self.ks:
             results = {}
@@ -43,8 +46,8 @@ class ResultHandler:
                     results.update({result['params']['name']: result[_eval_results][k]})
             info = pd.DataFrame.from_dict(results, orient='index')
             info.insert(0, 'model', info.index)
-            info.to_csv(
-                f'{output}rec_cutoff_{k}_relthreshold_{self.rel_threshold}_{datetime.now().strftime("%Y_%m_%d_%H_%M_%S")}.tsv',
+            info.to_csv(os.path.abspath(os.sep.join([output,
+                f'rec_cutoff_{k}_relthreshold_{self.rel_threshold}_{datetime.now().strftime("%Y_%m_%d_%H_%M_%S")}.tsv'])),
                 sep='\t', index=False)
 
     def save_best_results_as_triplets(self, output='../results/'):
@@ -57,13 +60,13 @@ class ResultHandler:
             info = pd.DataFrame.from_dict(results, orient='index')
             info.insert(0, 'model', info.index)
             triplets = info.set_index("model").stack().reset_index()
-            triplets.to_csv(
-                f'{output}triplets_rec_cutoff_{k}_relthreshold_{self.rel_threshold}_{datetime.now().strftime("%Y_%m_%d_%H_%M_%S")}.tsv',
+            triplets.to_csv(os.path.abspath(os.sep.join([output,
+                f'triplets_rec_cutoff_{k}_relthreshold_{self.rel_threshold}_{datetime.now().strftime("%Y_%m_%d_%H_%M_%S")}.tsv'])),
                 sep='\t', index=False, header=["model", "metric", "value"])
 
-    def save_best_models(self, output='../results/', default_metric = "nDCG"):
+    def save_best_models(self, output='../results/', default_metric = "nDCG", default_k = [10]):
         global_results = dict(self.oneshot_recommenders)
-        k = self.ks[0]
+        k = default_k[0]
         models = [{"default_validation_metric": default_metric,
                    "default_validation_cutoff": k,
                    "rel_threshold": self.rel_threshold}]
@@ -72,8 +75,8 @@ class ResultHandler:
                 models.append({"meta": model["params"]["meta"].__dict__, "recommender": rec,
                                "configuration": {key: value for key, value in model["params"].items() if
                                                  key != 'meta'}})
-        with open(
-                f'{output}bestmodelparams_cutoff_{k}_relthreshold_{self.rel_threshold}_{datetime.now().strftime("%Y_%m_%d_%H_%M_%S")}.json',
+        with open(os.path.abspath(os.sep.join([output,
+                f'bestmodelparams_cutoff_{k}_relthreshold_{self.rel_threshold}_{datetime.now().strftime("%Y_%m_%d_%H_%M_%S")}.json'])),
                 mode='w') as f:
             json.dump(models, f, indent=4)
 
@@ -108,8 +111,8 @@ class ResultHandler:
                                             metric_name,
                                             p_value))
 
-            with open(
-                    f'{output}stat_{stat_test.value[1]}_cutoff_{k}_relthreshold_{self.rel_threshold}_{datetime.now().strftime("%Y_%m_%d_%H_%M_%S")}.tsv',
+            with open(os.path.abspath(os.sep.join([output,
+                    f'stat_{stat_test.value[1]}_cutoff_{k}_relthreshold_{self.rel_threshold}_{datetime.now().strftime("%Y_%m_%d_%H_%M_%S")}.tsv'])),
                     "w") as f:
                 for tup in results:
                     f.write(f"{tup[0]}\t{tup[1]}\t{tup[2]}\t{tup[3]}\n")
@@ -134,8 +137,8 @@ class HyperParameterStudy:
                     results.update({result['params']['name']: result[_eval_results][k]})
                 info = pd.DataFrame.from_dict(results, orient='index')
                 info.insert(0, 'model', info.index)
-                info.to_csv(
-                    f'{output}rec_{rec}_cutoff_{k}_relthreshold_{self.rel_threshold}_{datetime.now().strftime("%Y_%m_%d_%H_%M_%S")}.tsv',
+                info.to_csv(os.path.abspath(os.sep.join([output,
+                    f'rec_{rec}_cutoff_{k}_relthreshold_{self.rel_threshold}_{datetime.now().strftime("%Y_%m_%d_%H_%M_%S")}.tsv'])),
                     sep='\t', index=False)
 
     def save_trials_as_triplets(self, output='../results/'):
@@ -147,6 +150,6 @@ class HyperParameterStudy:
                 info = pd.DataFrame.from_dict(results, orient='index')
                 info.insert(0, 'model', info.index)
                 triplets = info.set_index("model").stack().reset_index()
-                triplets.to_csv(
-                    f'{output}triplets_rec_{rec}_cutoff_{k}_relthreshold_{self.rel_threshold}_{datetime.now().strftime("%Y_%m_%d_%H_%M_%S")}.tsv',
+                triplets.to_csv(os.path.abspath(os.sep.join([output,
+                    f'triplets_rec_{rec}_cutoff_{k}_relthreshold_{self.rel_threshold}_{datetime.now().strftime("%Y_%m_%d_%H_%M_%S")}.tsv'])),
                     sep='\t', index=False, header=["model", "metric", "value"])

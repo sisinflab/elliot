@@ -3,12 +3,12 @@ Module description:
 
 """
 
-__version__ = '0.1'
+__version__ = '0.3.0'
 __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
 import numpy as np
-np.random.seed(42)
+
 
 class Sampler:
     def __init__(self,
@@ -16,9 +16,8 @@ class Sampler:
                  users,
                  items
                  ):
+        np.random.seed(42)
         self._ratings = ratings
-        # self._random = random
-        # self._sample_negative_items_empirically: bool = sample_negative_items_empirically
         self._users = users
         self._items = items
 

@@ -4,6 +4,7 @@
 Lemire, Daniel, and Anna Maclachlan. "Slope one predictors for online rating-based collaborative filtering."
 Proceedings of the 2005 SIAM International Conference on Data Mining. Society for Industrial and Applied Mathematics
 """
+import pickle
 
 import numpy as np
 
@@ -45,16 +46,18 @@ class SlopeOneModel:
             pred += sum(self.dev[item, j] for j in Ri) / len(Ri)
         return pred
 
-    def get_user_recs(self, u, k):
+    def get_user_recs(self, u, mask, k=100):
         uidx = self._data.public_users[u]
-        user_items = self._data.train_dict[u].keys()
-        indexed_user_items = [self._data.public_items[i] for i in user_items]
-        predictions = {self._data.private_items[i]: self.predict(uidx, i) for i in range(self._num_items) if i not in indexed_user_items}
+        user_mask = mask[uidx]
+        # user_items = self._data.train_dict[u].keys()
+        # indexed_user_items = [self._data.public_items[i] for i in user_items]
+        predictions = {self._data.private_items[iidx]: self.predict(uidx, iidx) for iidx in range(self._num_items) if user_mask[iidx]}
 
         indices, values = zip(*predictions.items())
         indices = np.array(indices)
         values = np.array(values)
-        partially_ordered_preds_indices = np.argpartition(values, -k)[-k:]
+        local_k = min(k, len(values))
+        partially_ordered_preds_indices = np.argpartition(values, -local_k)[-local_k:]
         real_values = values[partially_ordered_preds_indices]
         real_indices = indices[partially_ordered_preds_indices]
         local_top_k = real_values.argsort()[::-1]
@@ -71,3 +74,11 @@ class SlopeOneModel:
         self.freq = saving_dict['freq']
         self.dev = saving_dict['dev']
         self.user_mean = saving_dict['user_mean']
+
+    def load_weights(self, path):
+        with open(path, "rb") as f:
+            self.set_model_state(pickle.load(f))
+
+    def save_weights(self, path):
+        with open(path, "wb") as f:
+            pickle.dump(self.get_model_state(), f)

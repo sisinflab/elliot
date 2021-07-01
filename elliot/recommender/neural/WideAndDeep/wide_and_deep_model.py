@@ -3,7 +3,7 @@ Module description:
 
 """
 
-__version__ = '0.1'
+__version__ = '0.3.0'
 __author__ = 'Felice Antonio Merra, Vito Walter Anelli, Claudio Pomo'
 __email__ = 'felice.merra@poliba.it, vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
@@ -14,14 +14,15 @@ import tensorflow as tf
 from tensorflow import keras
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-tf.random.set_seed(0)
 
 
 class WideAndDeepModel(tf.keras.Model):
     def __init__(self, data, num_users, num_items, embedding_size, mlp_hidden_size, dropout_prob, lr, l_w, l_b,
+                 random_seed=42,
                  name="WideAndDeepModel",
                  **kwargs):
         super().__init__(name=name, **kwargs)
+        tf.random.set_seed(random_seed)
 
         self._data = data
         self._num_users = num_users

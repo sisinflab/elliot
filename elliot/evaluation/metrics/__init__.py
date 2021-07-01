@@ -8,11 +8,11 @@ See the implementation of Precision metric for creating new per-user metrics.
 See the implementation of Item Coverage for creating new cross-user metrics.
 """
 
-__version__ = '0.1'
+__version__ = '0.3.0'
 __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
-from elliot.evaluation.metrics.accuracy.ndcg import NDCG
+from elliot.evaluation.metrics.accuracy.ndcg import nDCG, nDCGRendle2020
 from elliot.evaluation.metrics.accuracy.precision import Precision
 from elliot.evaluation.metrics.accuracy.recall import Recall
 from elliot.evaluation.metrics.accuracy.hit_rate import HR
@@ -46,7 +46,8 @@ from elliot.evaluation.metrics.fairness.reo import REO
 from elliot.evaluation.metrics.statistical_array_metric import StatisticalMetric
 
 _metric_dictionary = {
-    "nDCG": NDCG,
+    "nDCG": nDCG,
+    "nDCGRendle2020": nDCGRendle2020,
     "Precision": Precision,
     "Recall": Recall,
     "HR": HR,
