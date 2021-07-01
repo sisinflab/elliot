@@ -22,7 +22,7 @@ class AbstractLoader(ABC):
     def create_namespace(self) -> SimpleNamespace:
         raise NotImplementedError
 
-    if float(".".join([str(sys.version_info[0]),str(sys.version_info[1])])) < 3.8:
+    if float(".".join([str(sys.version_info[0]), str(sys.version_info[1])])) < 3.8:
         _version_warning = "WARNING: Your Python version is lower than 3.8. Consequently, Custom class objects created in Side Information Namespace will be created swallowly!!!!"
         print(_version_warning, file=sys.stderr)
 

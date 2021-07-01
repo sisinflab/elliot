@@ -3,7 +3,7 @@ Module description:
 
 """
 
-__version__ = '0.1'
+__version__ = '0.3.0'
 __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
@@ -27,6 +27,7 @@ regexp = re.compile(r'[\D][\w-]+\.[\w-]+')
 
 _experiment = 'experiment'
 
+_version = 'version'
 _data_config = "data_config"
 _splitting = "splitting"
 _evaluation = "evaluation"
@@ -118,13 +119,16 @@ class NameSpaceModel:
             .format(self.config[_experiment][_dataset]))
 
         self.config[_experiment][_dataloader] = self.config[_experiment].get(_dataloader, "DataSetLoader")
+        self.config[_experiment][_version] = self.config[_experiment].get(_version, __version__)
+
 
         manage_directories(self.config[_experiment][_recs], self.config[_experiment][_weights],
                            self.config[_experiment][_performance])
 
         for p in [_data_config, _weights, _recs, _dataset, _top_k, _performance, _logger_config,
                   _log_folder, _dataloader, _splitting, _prefiltering, _evaluation, _external_models_path,
-                  _print_triplets, _config_test, _negative_sampling, _binarize, _random_seed, _align_side_with_train]:
+                  _print_triplets, _config_test, _negative_sampling, _binarize, _random_seed, _align_side_with_train,
+                  _version]:
             if p == _data_config:
                 side_information = self.config[_experiment][p].get("side_information", None)
 

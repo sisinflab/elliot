@@ -1,9 +1,9 @@
 Negative Sampling
 ======================
 
-Some evaluation strategy needed a bunk of items for each user to rank as negative items alongside with the positive ones.
-Elliot provide two different strategies to cover this feature. The first one is named *fixed* because needed of a file
-containing the negative items for each user. File containing these negative items must be has tab-separated-value format
+Some evaluation strategies needed a collection of items for each user to rank as negative items alongside positive ones.
+Elliot provides two different strategies to cover this feature. The first one is named *fixed* because needed for a file
+containing the negative items for each user. The file containing these negative items must have tab-separated-value
 with this pattern for each line
 
 ``(user_id, item_test_id)   neg_item1   neg_item2 ....``

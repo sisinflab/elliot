@@ -12,7 +12,7 @@ import random
 from elliot.evaluation.evaluator import Evaluator
 from elliot.utils.folder import build_model_folder
 
-__version__ = '0.1'
+__version__ = '0.3.0'
 __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 

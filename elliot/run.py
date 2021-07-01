@@ -3,7 +3,7 @@ Module description:
 
 """
 
-__version__ = '0.1'
+__version__ = '0.3.0'
 __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
@@ -22,6 +22,19 @@ from elliot.utils import logging as logging_project
 _rstate = np.random.RandomState(42)
 here = path.abspath(path.dirname(__file__))
 
+print(u'''
+__/\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\___/\\\\\\\\\\\\______/\\\\\\\\\\\\_________________________________________        
+ _\\/\\\\\\///////////___\\////\\\\\\_____\\////\\\\\\_________________________________________       
+  _\\/\\\\\\_________________\\/\\\\\\________\\/\\\\\\______/\\\\\\_____________________/\\\\\\______      
+   _\\/\\\\\\\\\\\\\\\\\\\\\\_________\\/\\\\\\________\\/\\\\\\_____\\///_______/\\\\\\\\\\______/\\\\\\\\\\\\\\\\\\\\\\_     
+    _\\/\\\\\\///////__________\\/\\\\\\________\\/\\\\\\______/\\\\\\____/\\\\\\///\\\\\\___\\////\\\\\\////__    
+     _\\/\\\\\\_________________\\/\\\\\\________\\/\\\\\\_____\\/\\\\\\___/\\\\\\__\\//\\\\\\_____\\/\\\\\\______   
+      _\\/\\\\\\_________________\\/\\\\\\________\\/\\\\\\_____\\/\\\\\\__\\//\\\\\\__/\\\\\\______\\/\\\\\\_/\\\\__  
+       _\\/\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\___/\\\\\\\\\\\\\\\\\\___/\\\\\\\\\\\\\\\\\\__\\/\\\\\\___\\///\\\\\\\\\\/_______\\//\\\\\\\\\\___ 
+        _\\///////////////___\\/////////___\\/////////___\\///______\\/////__________\\/////____''')
+
+
+print(f'Version Number: {__version__}')
 
 def run_experiment(config_path: str = ''):
     builder = NameSpaceBuilder(config_path, here, path.abspath(path.dirname(config_path)))
@@ -29,6 +42,13 @@ def run_experiment(config_path: str = ''):
     config_test(builder, base)
     logging_project.init(base.base_namespace.path_logger_config, base.base_namespace.path_log_folder)
     logger = logging_project.get_logger("__main__")
+
+    if base.base_namespace.version != __version__:
+        logger.error(f'Your config file use a different version of Elliot! '
+                     f'Be careful because some feature could be deprecated! Download latest version at this link '
+                     f'https://github.com/sisinflab/elliot/releases')
+        raise Exception('Version mismatch!')
+
     logger.info("Start experiment")
     base.base_namespace.evaluation.relevance_threshold = getattr(base.base_namespace.evaluation, "relevance_threshold", 0)
     res_handler = ResultHandler(rel_threshold=base.base_namespace.evaluation.relevance_threshold)
@@ -54,7 +74,7 @@ def run_experiment(config_path: str = ''):
 
             model_placeholder = ho.ModelCoordinator(data_test, base.base_namespace, model_base, model_class, test_fold_index)
             if isinstance(model_base, tuple):
-                logger.info(f"Tuning begun for {model_class.__name__}\n")
+                logger.info(f"Tuning begun for {model_class.__name__}\\n")
                 trials = Trials()
                 best = fmin(model_placeholder.objective,
                             space=model_base[1],
@@ -77,7 +97,7 @@ def run_experiment(config_path: str = ''):
                 test_trials.append(trials)
                 logger.info(f"Tuning ended for {model_class.__name__}")
             else:
-                logger.info(f"Training begun for {model_class.__name__}\n")
+                logger.info(f"Training begun for {model_class.__name__}\\n")
                 single = model_placeholder.single()
 
                 ############################################
@@ -90,9 +110,9 @@ def run_experiment(config_path: str = ''):
                 test_results.append(single)
                 logger.info(f"Training ended for {model_class.__name__}")
 
-            logger.info(f"Loss:\t{best_model_loss}")
-            logger.info(f"Best Model params:\t{best_model_params}")
-            logger.info(f"Best Model results:\t{best_model_results}")
+            logger.info(f"Loss:\\t{best_model_loss}")
+            logger.info(f"Best Model params:\\t{best_model_params}")
+            logger.info(f"Best Model results:\\t{best_model_results}")
 
         # Migliore sui test, aggiunta a performance totali
         min_val = np.argmin([i["loss"] for i in test_results])
@@ -186,6 +206,7 @@ def config_test(builder, base):
                 hyper_handler.add_trials(test_trials[min_val])
         logger.info("End config test without issues")
     base.base_namespace.config_test = False
+
 
 if __name__ == '__main__':
     run_experiment("./config/config.yml")

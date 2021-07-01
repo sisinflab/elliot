@@ -4,7 +4,7 @@ Module description:
 """
 
 
-__version__ = '0.1'
+__version__ = '0.3.0'
 __author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta, Antonio Ferrara'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it,' \
             'daniele.malitesta@poliba.it, antonio.ferrara@poliba.it'

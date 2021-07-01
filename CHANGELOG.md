@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file
 
+## [v0.3.0] - 2020-06-30
+### Changed
+- negative sampling evaluation
+- binarization of explicit dataset
+- incremental splitting
+- managing side information with modular loaders
+- adding and fixing visual recsys method:
+  - DVBPR
+  - VBPR
+  - DeepStyle
+  - ACF
+  - VNPR
+- early stopping strategies
+- adding new recommender method
+
 ## [v0.2.1] - 2020-03-27
 ### Changed
 
