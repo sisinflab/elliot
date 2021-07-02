@@ -26,6 +26,7 @@ class AMF(RecMixin, BaseRecommenderModel):
 
     The model support two adversarial perturbations methods:
         FGSM-based presented by X. He et al in `paper <https://arxiv.org/abs/1808.03908>`
+
         MSAP presented by Anelli et al. in `paper <https://journals.flvc.org/FLAIRS/article/view/128443>`
 
     Args:
