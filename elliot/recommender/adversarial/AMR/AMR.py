@@ -28,6 +28,7 @@ class AMR(RecMixin, BaseRecommenderModel):
 
     The model support two adversarial perturbations methods:
         FGSM-based presented by X. He et al in `paper <https://arxiv.org/pdf/1809.07062.pdf>`
+
         MSAP presented by Anelli et al. in `paper <https://journals.flvc.org/FLAIRS/article/view/128443>`
 
     Args:
