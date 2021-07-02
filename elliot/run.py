@@ -33,8 +33,8 @@ __/\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\___/\\\\\\\\\\\\______/\\\\\\\\\\\\____________
        _\\/\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\___/\\\\\\\\\\\\\\\\\\___/\\\\\\\\\\\\\\\\\\__\\/\\\\\\___\\///\\\\\\\\\\/_______\\//\\\\\\\\\\___ 
         _\\///////////////___\\/////////___\\/////////___\\///______\\/////__________\\/////____''')
 
-
 print(f'Version Number: {__version__}')
+
 
 def run_experiment(config_path: str = ''):
     builder = NameSpaceBuilder(config_path, here, path.abspath(path.dirname(config_path)))
@@ -48,10 +48,12 @@ def run_experiment(config_path: str = ''):
                      f'In different versions of Elliot the results may slightly change due to progressive improvement! '
                      f'Some feature could be deprecated! Download latest version at this link '
                      f'https://github.com/sisinflab/elliot/releases')
-        raise Exception('Version mismatch! In different versions of Elliot the results may slightly change due to progressive improvement!')
+        raise Exception(
+            'Version mismatch! In different versions of Elliot the results may slightly change due to progressive improvement!')
 
     logger.info("Start experiment")
-    base.base_namespace.evaluation.relevance_threshold = getattr(base.base_namespace.evaluation, "relevance_threshold", 0)
+    base.base_namespace.evaluation.relevance_threshold = getattr(base.base_namespace.evaluation, "relevance_threshold",
+                                                                 0)
     res_handler = ResultHandler(rel_threshold=base.base_namespace.evaluation.relevance_threshold)
     hyper_handler = HyperParameterStudy(rel_threshold=base.base_namespace.evaluation.relevance_threshold)
     dataloader_class = getattr(importlib.import_module("elliot.dataset"), base.base_namespace.data_config.dataloader)
@@ -72,18 +74,18 @@ def run_experiment(config_path: str = ''):
             else:
                 model_class = getattr(importlib.import_module("elliot.recommender"), key)
 
-
-            model_placeholder = ho.ModelCoordinator(data_test, base.base_namespace, model_base, model_class, test_fold_index)
+            model_placeholder = ho.ModelCoordinator(data_test, base.base_namespace, model_base, model_class,
+                                                    test_fold_index)
             if isinstance(model_base, tuple):
                 logger.info(f"Tuning begun for {model_class.__name__}\\n")
                 trials = Trials()
-                best = fmin(model_placeholder.objective,
-                            space=model_base[1],
-                            algo=model_base[3],
-                            trials=trials,
-                            verbose=False,
-                            rstate=_rstate,
-                            max_evals=model_base[2])
+                fmin(model_placeholder.objective,
+                     space=model_base[1],
+                     algo=model_base[3],
+                     trials=trials,
+                     verbose=False,
+                     rstate=_rstate,
+                     max_evals=model_base[2])
 
                 # argmin relativo alla combinazione migliore di iperparametri
                 min_val = np.argmin([i["result"]["loss"] for i in trials._trials])
@@ -128,15 +130,20 @@ def run_experiment(config_path: str = ''):
     res_handler.save_best_results(output=base.base_namespace.path_output_rec_performance)
     cutoff_k = getattr(base.base_namespace.evaluation, "cutoffs", [base.base_namespace.top_k])
     cutoff_k = cutoff_k if isinstance(cutoff_k, list) else [cutoff_k]
-    first_metric = base.base_namespace.evaluation.simple_metrics[0] if base.base_namespace.evaluation.simple_metrics else ""
-    res_handler.save_best_models(output=base.base_namespace.path_output_rec_performance, default_metric=first_metric, default_k=cutoff_k)
-    if hasattr(base.base_namespace, "print_results_as_triplets") and base.base_namespace.print_results_as_triplets == True:
+    first_metric = base.base_namespace.evaluation.simple_metrics[
+        0] if base.base_namespace.evaluation.simple_metrics else ""
+    res_handler.save_best_models(output=base.base_namespace.path_output_rec_performance, default_metric=first_metric,
+                                 default_k=cutoff_k)
+    if hasattr(base.base_namespace,
+               "print_results_as_triplets") and base.base_namespace.print_results_as_triplets == True:
         res_handler.save_best_results_as_triplets(output=base.base_namespace.path_output_rec_performance)
         hyper_handler.save_trials_as_triplets(output=base.base_namespace.path_output_rec_performance)
     if hasattr(base.base_namespace.evaluation, "paired_ttest") and base.base_namespace.evaluation.paired_ttest:
-        res_handler.save_best_statistical_results(stat_test=StatTest.PairedTTest, output=base.base_namespace.path_output_rec_performance)
+        res_handler.save_best_statistical_results(stat_test=StatTest.PairedTTest,
+                                                  output=base.base_namespace.path_output_rec_performance)
     if hasattr(base.base_namespace.evaluation, "wilcoxon_test") and base.base_namespace.evaluation.wilcoxon_test:
-        res_handler.save_best_statistical_results(stat_test=StatTest.WilcoxonTest, output=base.base_namespace.path_output_rec_performance)
+        res_handler.save_best_statistical_results(stat_test=StatTest.WilcoxonTest,
+                                                  output=base.base_namespace.path_output_rec_performance)
 
     logger.info("End experiment")
 
@@ -158,10 +165,12 @@ def config_test(builder, base):
         logging_project.init(base.base_namespace.path_logger_config, base.base_namespace.path_log_folder)
         logger = logging_project.get_logger("__main__")
         logger.info("Start config test")
-        base.base_namespace.evaluation.relevance_threshold = getattr(base.base_namespace.evaluation, "relevance_threshold", 0)
+        base.base_namespace.evaluation.relevance_threshold = getattr(base.base_namespace.evaluation,
+                                                                     "relevance_threshold", 0)
         res_handler = ResultHandler(rel_threshold=base.base_namespace.evaluation.relevance_threshold)
         hyper_handler = HyperParameterStudy(rel_threshold=base.base_namespace.evaluation.relevance_threshold)
-        dataloader_class = getattr(importlib.import_module("elliot.dataset"), base.base_namespace.data_config.dataloader)
+        dataloader_class = getattr(importlib.import_module("elliot.dataset"),
+                                   base.base_namespace.data_config.dataloader)
         dataloader = dataloader_class(config=base.base_namespace)
         data_test_list = dataloader.generate_dataobjects_mock()
         for key, model_base in builder.models():
@@ -170,7 +179,8 @@ def config_test(builder, base):
             for data_test in data_test_list:
                 if key.startswith("external."):
                     spec = importlib.util.spec_from_file_location("external",
-                                                                  path.relpath(base.base_namespace.external_models_path))
+                                                                  path.relpath(
+                                                                      base.base_namespace.external_models_path))
                     external = importlib.util.module_from_spec(spec)
                     sys.modules[spec.name] = external
                     spec.loader.exec_module(external)
@@ -184,11 +194,11 @@ def config_test(builder, base):
                 if isinstance(model_base, tuple):
                     trials = Trials()
                     fmin(model_placeholder.objective,
-                                space=model_base_mock[1],
-                                algo=model_base_mock[3],
-                                trials=trials,
-                                rstate=_rstate,
-                                max_evals=model_base_mock[2])
+                         space=model_base_mock[1],
+                         algo=model_base_mock[3],
+                         trials=trials,
+                         rstate=_rstate,
+                         max_evals=model_base_mock[2])
 
                     min_val = np.argmin([i["result"]["loss"] for i in trials._trials])
 
@@ -211,4 +221,3 @@ def config_test(builder, base):
 
 if __name__ == '__main__':
     run_experiment("./config/config.yml")
-
