@@ -13,8 +13,6 @@ from tensorflow import keras, Variable
 
 
 class AMR_model(keras.Model):
-    _Delta_Gu: Variable
-    _Delta_Gi: Variable
 
     def __init__(self, factors=200, factors_d=20,
                  learning_rate=0.001,

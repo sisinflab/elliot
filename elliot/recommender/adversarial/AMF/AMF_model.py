@@ -15,8 +15,6 @@ from tensorflow import keras, Variable
 
 
 class AMF_model(keras.Model):
-    _Delta_Gu: Variable
-    _Delta_Gi: Variable
 
     def __init__(self,
                  factors=200,
