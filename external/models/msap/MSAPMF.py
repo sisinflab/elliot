@@ -110,6 +110,8 @@ class MSAPMF(RecMixin, BaseRecommenderModel):
                                 self._l_b,
                                 self._eps,
                                 self._l_adv,
+                                   self._eps_iter,
+                                   self._nb_iter,
                                 self._num_users,
                                 self._num_items,
                                 self._seed)
