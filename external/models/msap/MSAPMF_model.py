@@ -19,10 +19,10 @@ class MSAPMF_model(keras.Model):
                  factors=200,
                  learning_rate=0.001,
                  l_w=0, l_b=0, eps=0.05, l_adv=0,
-                 num_users=100,
-                 num_items=100,
                  eps_iter=0.0005,
                  nb_iter=20,
+                 num_users=100,
+                 num_items=100,
                  random_seed=42,
                  name="MSAPMF",
                  **kwargs):
