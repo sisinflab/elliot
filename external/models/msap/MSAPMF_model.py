@@ -13,17 +13,18 @@ import tensorflow as tf
 from tensorflow import keras, Variable
 
 
-
-class AMF_model(keras.Model):
+class MSAPMF_model(keras.Model):
 
     def __init__(self,
                  factors=200,
                  learning_rate=0.001,
-                 l_w=0, l_b=0, eps=0, l_adv=0,
+                 l_w=0, l_b=0, eps=0.05, l_adv=0,
+                 eps_iter=0.0005,
+                 nb_iter=20,
                  num_users=100,
                  num_items=100,
                  random_seed=42,
-                 name="AMF",
+                 name="MSAPMF",
                  **kwargs):
         super().__init__(name=name, **kwargs)
         tf.random.set_seed(random_seed)
@@ -34,6 +35,8 @@ class AMF_model(keras.Model):
         self._l_b = l_b
         self._l_adv = l_adv
         self._eps = eps
+        self._eps_iter = eps_iter
+        self._nb_iter = nb_iter
         self._num_items = num_items
         self._num_users = num_users
 
@@ -49,7 +52,7 @@ class AMF_model(keras.Model):
                                      trainable=False)
 
         self._optimizer = tf.optimizers.Adam(self._learning_rate)
-        #self.saver_ckpt = tf.train.Checkpoint(optimizer=self._optimizer, model=self)
+        # self.saver_ckpt = tf.train.Checkpoint(optimizer=self._optimizer, model=self)
 
     # @tf.function
     def call(self, inputs, adversarial=False, training=None):
@@ -88,7 +91,7 @@ class AMF_model(keras.Model):
 
             if user_adv_train:
                 # Build the Adversarial Perturbation on the Current Model Parameters
-                self.build_perturbation(batch)
+                self.build_msap_perturbation(batch, self._eps_iter, self._nb_iter)
 
                 # Clean Inference
                 adv_xu_pos, _, _, _ = self(inputs=(user, pos), adversarial=True, training=True)
@@ -162,7 +165,7 @@ class AMF_model(keras.Model):
 
     def build_msap_perturbation(self, batch, eps_iter, nb_iter):
         """
-        Evaluate Adversarial Perturbation with MSAP
+        Adversarial Perturbation with MSAP
         https://journals.flvc.org/FLAIRS/article/view/128443
         """
         self._Delta_Gu = self._Delta_Gu * 0.0

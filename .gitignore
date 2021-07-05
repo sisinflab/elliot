@@ -13,6 +13,7 @@
 [Ss]cripts
 pyvenv.cfg
 .venv
+/venv/
 pip-selfcheck.json
 
 .idea
@@ -47,6 +48,7 @@ docs/source/_static
 docs/source/_templates
 
 
+!/data/README.md
 !/data/cat_dbpedia_movielens_1m/features.tsv
 !/data/cat_dbpedia_movielens_1m/map.tsv
 !/data/cat_dbpedia_movielens_1m/properties.conf
@@ -55,3 +57,4 @@ docs/source/_templates
 !/data/cat_dbpedia_movielens_1m_v030/features.tsv
 !/data/cat_dbpedia_movielens_1m_v030/map.tsv
 !/data/cat_dbpedia_movielens_1m_v030/properties.conf
+

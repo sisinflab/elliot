@@ -1,0 +1,126 @@
+experiment:
+  data_config:
+    strategy: fixed
+    train_path: ../data/{0}/trainingset.tsv
+    validation_path: ../data/{0}/validationset.tsv
+    test_path: ../data/{0}/testset.tsv
+    side_information:
+      - dataloader: VisualAttribute
+        visual_features: ../data/{0}/original/cnn_features_resnet50_avg_pool/
+        visual_pca_features: ../data/{0}/original/cnn_features_resnet50_avg_pool_pca128/
+        visual_feat_map_features: ../data/{0}/original/cnn_features_resnet50_conv5_block3_out/
+        images_src_folder: ../data/{0}/original/images/
+        output_image_size: (224,224)
+  dataset: amazon_boys_girls
+  top_k: 100
+  evaluation:
+    cutoffs: [20, 50, 100]
+    simple_metrics: [HR, nDCG, Precision, F1, MAP, ItemCoverage, nDCGRendle2020, Gini, SEntropy, EFD, EPC]
+    relevance_threshold: 1
+    paired_ttest: True
+  gpu: -1
+  models:
+    VBPR:
+      meta:
+        hyper_opt_alg: grid
+        validation_rate: 10
+        verbose: True
+        save_weights: True
+        save_recs: True
+        validation_metric: HR@100
+        restore: False
+      lr: [ 0.0001, 0.001, 0.01 ]
+      epochs: 100 # As in NeuMF Code
+      factors: 128
+      factors_d: 20
+      batch_size: 128
+      batch_eval: 512
+      l_w: [ 0.00001, 0.001 ]
+      l_b: 0
+    AMR:
+      meta:
+        hyper_opt_alg: grid
+        validation_rate: 10
+        verbose: True
+        save_weights: True
+        save_recs: True
+        validation_metric: HR@100
+        eval_perturbations: False
+        restore: False
+      lr: [ 0.0001, 0.001, 0.01 ]
+      epochs: 100 # As in NeuMF Code
+      factors: 128
+      factors_d: 20
+      batch_size: 128
+      batch_eval: 1024
+      l_w: [ 0.00001, 0.001 ]
+      l_b: 0
+      l_adv: 1
+      eps: 0.5
+      adversarial_epochs: 50
+      eps_iter: 0.0625 # 2.5 * ε-test / num_steps (Iterative Perturbations)
+      nb_iter: 20  #Number of Iterative Perturbations (MSAP, Flairs '21)
+    DVBPR:
+      meta:
+        hyper_opt_alg: grid
+        validation_rate: 1
+        verbose: True
+        save_weights: True
+        save_recs: True
+        validation_metric: HR@100
+        restore: False
+      lr: [ 0.0001, 0.001, 0.01 ]
+      epochs: 20
+      factors: 128
+      batch_size: 128
+      batch_eval: 512
+      lambda_1: 0.001
+      lambda_2: 1.0
+    ACF:
+      meta:
+        hyper_opt_alg: grid
+        validation_rate: 10
+        verbose: True
+        save_weights: True
+        save_recs: True
+        validation_metric: HR@100
+        restore: False
+      lr: [ 0.0001, 0.001, 0.01 ]
+      epochs: 100 # As in NeuMF Code
+      factors: 128
+      batch_size: 1
+      l_w: [ 0.00001, 0.001]
+      layers_component: (64, 1)
+      layers_item: (64, 1)
+    DeepStyle:
+      meta:
+        hyper_opt_alg: grid
+        validation_rate: 10
+        verbose: True
+        save_weights: True
+        save_recs: True
+        validation_metric: HR@100
+        restore: False
+      lr: [0.0001, 0.001, 0.01]
+      epochs: 100 # As in NeuMF Code
+      factors: 128
+      batch_size: 128
+      batch_eval: 512
+      l_w: [0.00001, 0.001]
+    VNPR:
+      meta:
+        hyper_opt_alg: grid
+        validation_rate: 10
+        verbose: True
+        save_weights: True
+        save_recs: True
+        validation_metric: HR@100
+        restore: False
+      lr: [0.0001, 0.001, 0.01]
+      epochs: 100 # As in NeuMF Code
+      mf_factors: 128
+      batch_size: 128
+      batch_eval: 512
+      mlp_hidden_size: (128, 64, 1)
+      prob_keep_dropout: 0.5
+      l_w: [0.00001, 0.001]

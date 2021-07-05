@@ -13,31 +13,23 @@ experiment:
     simple_metrics: [HR, nDCG, EFD, ACLT, APLT]
     paired_ttest: True
     wilcoxon_test: True
-  gpu: 1
+  gpu: 0
   models:
     AMF:
       meta:
         save_recs: False
         hyper_max_evals: 5
         hyper_opt_alg: tpe
-      epochs: 10
+        eval_perturbations: True
+        validation_rate: 1
+      epochs: 2
       batch_size: 256
-      factors: [quniform, 50, 100, 1]
-      lr: [loguniform, -2, -1]
+      factors: 10 # [quniform, 50, 100, 1]
+      lr: 0.001 # [loguniform, -2, -1]
       l_w: 0.0001
       l_b: 0.0001
-      eps: [uniform, 0.1, 0.5] # Magnitude of the Perturbation
+      eps: 0.5 # [uniform, 0.1, 0.5] # Magnitude of the Perturbation
       l_adv: 1 # Adversarial Regularization Parameters
-      adversarial_epochs: [quniform, 4, 8, 1] # Number of final epochs to be run [APR starts from (epochs - adversarial_epochs) epoch]
-    NeuMF:
-      meta:
-        validation_rate: 1
-      mf_factors: 20
-      mlp_factors: 10
-      mlp_hidden_size: (5,2)
-      dropout: 0.2
-      is_mf_train: True
-      is_mlp_train: True
-      batch_size: 256
-      epochs: 10
-      lr: 0.001
+      adversarial_epochs: 1 # [quniform, 4, 8, 1] # Number of final epochs to be run [APR starts from (epochs - adversarial_epochs) epoch]
+      eps_iter: 0.0625 # 2.5 * ε-test / num_steps (Iterative Perturbations)
+      nb_iter: 20  #Number of Iterative Perturbations (MSAP, Flairs '21)
