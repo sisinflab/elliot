@@ -5,7 +5,7 @@ Mnih, Andriy, and Russ R. Salakhutdinov. "Probabilistic matrix factorization." A
 
 """
 
-__version__ = '0.3.0'
+__version__ = '0.3.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 

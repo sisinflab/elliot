@@ -8,7 +8,7 @@ See the implementation of Precision metric for creating new per-user metrics.
 See the implementation of Item Coverage for creating new cross-user metrics.
 """
 
-__version__ = '0.3.0'
+__version__ = '0.3.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 

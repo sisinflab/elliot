@@ -3,7 +3,7 @@ This is the implementation of the global AUC metric.
 It proceeds from a system-wise computation.
 """
 
-__version__ = '0.3.0'
+__version__ = '0.3.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
