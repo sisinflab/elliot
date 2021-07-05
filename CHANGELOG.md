@@ -2,7 +2,15 @@
 
 All notable changes to this project will be documented in this file
 
-## [v0.3.0] - 2020-06-30
+## [v0.3.1] - 2021-07-05
+### Changed
+- fix AMF: insert of perturbation evaluation, insert multi-step adversarial perturbations
+- fix AMR:  insert of perturbation evaluation, insert multi-step adversarial perturbations, improved the data pipeline
+- start experiments with command line parameters (```python start_experiments.py --conf name_config_file```)
+- released configuration files for DEMO paper (Under review at RecSys 2021)
+- readme file in ```/data/``` directory with links to datasets
+
+## [v0.3.0] - 2021-06-30
 ### Changed
 - early stopping strategies
 - offline recommendation files evaluation (ProxyRecommender, RecommendationFolder) 
@@ -28,14 +36,14 @@ All notable changes to this project will be documented in this file
   - RP3beta
   - iALS
 
-## [v0.2.1] - 2020-03-27
+## [v0.2.1] - 2021-03-27
 ### Changed
 
 - `requirements.txt` for Pillow vulnerabilities, change version to >=8.1.1
 - Adversarial features for ECIR tutorial "__AL4Rec__"
 - Hands-on example for ECIR Tutorial "__AL4Rec__"
 
-## [v0.2.0] - 2020-03-12
+## [v0.2.0] - 2021-03-12
 ### Added
 
 - new dataloader ItemCategoryLoader
@@ -56,5 +64,5 @@ All notable changes to this project will be documented in this file
 - default validation k setup
 
 
-## [v0.1.0] - 2020-03-05
+## [v0.1.0] - 2021-03-05
 First Release
