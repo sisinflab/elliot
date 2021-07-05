@@ -105,14 +105,16 @@ class MSAPMF(RecMixin, BaseRecommenderModel):
         self._results_perturbation = {}
 
         self._model = MSAPMF_model(self._factors,
-                                self._learning_rate,
-                                self._l_w,
-                                self._l_b,
-                                self._eps,
-                                self._l_adv,
-                                self._num_users,
-                                self._num_items,
-                                self._seed)
+                                   self._learning_rate,
+                                   self._l_w,
+                                   self._l_b,
+                                   self._eps,
+                                   self._l_adv,
+                                   self._eps_iter,
+                                   self._nb_iter,
+                                   self._num_users,
+                                   self._num_items,
+                                   self._seed)
 
     @property
     def name(self):
@@ -143,7 +145,8 @@ class MSAPMF(RecMixin, BaseRecommenderModel):
     def evaluate_perturbations(self, it=None):
         if (it is None) or (not (it + 1) % self._validation_rate):
 
-            for full_batch in self._sampler.step(self._data.transactions, self._data.transactions):  # self._data.transactions
+            for full_batch in self._sampler.step(self._data.transactions,
+                                                 self._data.transactions):  # self._data.transactions
                 self._model.build_msap_perturbation(full_batch, self._eps_iter, self._nb_iter)
                 adversarial_iterative_recs = self.get_recommendations(self.evaluator.get_needed_recommendations(),
                                                                       adversarial=True)

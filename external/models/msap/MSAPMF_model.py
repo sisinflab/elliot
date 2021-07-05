@@ -18,7 +18,9 @@ class MSAPMF_model(keras.Model):
     def __init__(self,
                  factors=200,
                  learning_rate=0.001,
-                 l_w=0, l_b=0, eps=0, l_adv=0,
+                 l_w=0, l_b=0, eps=0.05, l_adv=0,
+                 eps_iter=0.0005,
+                 nb_iter=20,
                  num_users=100,
                  num_items=100,
                  random_seed=42,
@@ -33,6 +35,8 @@ class MSAPMF_model(keras.Model):
         self._l_b = l_b
         self._l_adv = l_adv
         self._eps = eps
+        self._eps_iter = eps_iter
+        self._nb_iter = nb_iter
         self._num_items = num_items
         self._num_users = num_users
 
@@ -87,7 +91,7 @@ class MSAPMF_model(keras.Model):
 
             if user_adv_train:
                 # Build the Adversarial Perturbation on the Current Model Parameters
-                self.build_msap_perturbation(batch)
+                self.build_msap_perturbation(batch, self._eps_iter, self._nb_iter)
 
                 # Clean Inference
                 adv_xu_pos, _, _, _ = self(inputs=(user, pos), adversarial=True, training=True)
