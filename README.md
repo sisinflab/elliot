@@ -8,6 +8,8 @@
 
 [Paper]: https://arxiv.org/abs/2103.02590
 
+### A NEW VERSION OF [ELLIOT(v0.3.1) IS OUT](https://github.com/sisinflab/elliot/releases/)
+
 Elliot is a comprehensive recommendation framework that analyzes the recommendation problem from the researcher's perspective.
 It conducts a whole experiment, from dataset loading to results gathering.
 The core idea is to feed the system with a simple and straightforward configuration file that drives the framework 
