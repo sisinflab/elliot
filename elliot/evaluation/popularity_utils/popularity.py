@@ -4,7 +4,7 @@ This module provides a popularity class based on number of users who have experi
 the dataset are counted once)
 """
 
-__version__ = '0.3.0'
+__version__ = '0.3.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo, Alejandro Bellogín'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, alejandro.bellogin@uam.es'
 

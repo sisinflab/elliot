@@ -3,7 +3,7 @@ This is the implementation of the Average Recommendation Popularity metric.
 It proceeds from a user-wise computation, and average the values over the users.
 """
 
-__version__ = '0.3.0'
+__version__ = '0.3.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
