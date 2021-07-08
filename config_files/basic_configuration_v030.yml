@@ -1,5 +1,5 @@
 experiment:
-  version: 0.3.0
+  version: 0.3.1
   dataset: cat_dbpedia_movielens_1m
   data_config:
     strategy: dataset
