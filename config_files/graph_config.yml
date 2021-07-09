@@ -1,0 +1,46 @@
+experiment:
+  data_config:
+    strategy: fixed
+    train_path: ../data/{0}/trainingset.tsv
+    validation_path: ../data/{0}/validationset.tsv
+    test_path: ../data/{0}/testset.tsv
+  dataset: amazon_baby
+  top_k: 100
+  evaluation:
+    simple_metrics: [HR, nDCG, Precision]
+    relevance_threshold: 1
+  gpu: -1
+  external_models_path: ../external/models/__init__.py
+  models:
+#    external.NGCF:
+#      meta:
+#        validation_rate: 1
+#        verbose: True
+#        save_weights: False
+#        save_recs: True
+#        validation_metric: HR@100
+#        restore: False
+#      lr: 0.0005
+#      epochs: 10
+#      factors: 64
+#      batch_size: 256
+#      l_w: 0.1
+#      weight_size: (64,)
+#      node_dropout: ()
+#      message_dropout: (0.1,)
+    NGCF:
+      meta:
+        validation_rate: 1
+        verbose: True
+        save_weights: False
+        save_recs: True
+        validation_metric: HR@100
+        restore: False
+      lr: 0.0005
+      epochs: 10
+      factors: 64
+      batch_size: 256
+      l_w: 0.1
+      weight_size: (64,)
+      node_dropout: ()
+      message_dropout: (0.1,)
