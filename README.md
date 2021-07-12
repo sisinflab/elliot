@@ -134,17 +134,22 @@ If you find Elliot useful for your research or development, please cite the foll
 
 ```
 
-@InProceedings{ABFMMPDD21,
-  author = {Vito Walter Anelli and Alejandro Bellogin and Antonio Ferrara and 
-            Daniele Malitesta and Felice Antonio Merra and Claudio Pomo and 
-            Francesco M. Donini and Tommaso {Di Noia}},
-  title = "Elliot: a Comprehensive and RigorousFramework for Reproducible 
-           Recommender Systems Evaluation",
-  booktitle = "SIGIR '21: Proceedings of the 44rd International ACM SIGIR 
-               Conference on Research and Development in Information Retrieval",
-  year = "2021",
-  url = "http://sisinflab.poliba.it/publications/2021/ABFMMPDD21"
-} 
+@inproceedings{10.1145/3404835.3463245,
+author = {Anelli, Vito Walter and Bellogin, Alejandro and Ferrara, Antonio and Malitesta, Daniele and Merra, Felice Antonio and Pomo, Claudio and Donini, Francesco Maria and Di Noia, Tommaso},
+title = {Elliot: A Comprehensive and Rigorous Framework for Reproducible Recommender Systems Evaluation},
+year = {2021},
+isbn = {9781450380379},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+url = {https://doi.org/10.1145/3404835.3463245},
+doi = {10.1145/3404835.3463245}
+booktitle = {Proceedings of the 44th International ACM SIGIR Conference on Research and Development in Information Retrieval},
+pages = {2405–2414},
+numpages = {10},
+keywords = {recommender systems, bias, fairness, reproducibility, evaluation},
+location = {Virtual Event, Canada},
+series = {SIGIR '21}
+}
 
 ```
 
