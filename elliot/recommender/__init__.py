@@ -20,7 +20,7 @@ from .knn import ItemKNN, UserKNN, AttributeItemKNN, AttributeUserKNN
 from .neural import DeepFM, DMF, NeuMF, NFM, GMF, NAIS, UserAutoRec, ItemAutoRec, ConvNeuMF, WideAndDeep, ConvMF, NPR
 from .content_based import VSM
 from .algebric import SlopeOne
-from .adversarial import AMF, AMR
+from .adversarial import AMF, MSAPMF, AMR
 from .gan import IRGAN, CFGAN
 from .generic import ProxyRecommender
 

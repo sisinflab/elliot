@@ -52,9 +52,16 @@ class AdversarialMF(RecMixin, BaseRecommenderModel):
         self._params_list = [
             ("_factors", "factors", "factors", 10, None, None),
             ("_learning_rate", "lr", "lr", 0.001, None, None),
-            ("_l_w", "reg", "reg", 0.1, None, None)
+            ("_l_w", "reg", "reg", 0.1, None, None),
+            ("_eps", "eps", "eps", 0.1, None, None),
+            ("_l_adv", "l_adv", "l_adv", 0.001, None, None),
+            ("_adversarial_epochs", "adversarial_epochs", "adv_epochs", self._epochs // 2, int, None)
         ]
         self.autoset_params()
+
+        if self._adversarial_epochs > self._epochs:
+            raise Exception(f"The total epoch ({self._epochs}) "
+                            f"is smaller than the adversarial epochs ({self._adversarial_epochs}).")
 
         if self._batch_size < 1:
             self._batch_size = self._data.transactions
@@ -66,11 +73,13 @@ class AdversarialMF(RecMixin, BaseRecommenderModel):
         self._sampler = pws.Sampler(self._data.i_train_dict)
 
         self._model = AdversarialMatrixFactorizationModel(self._num_users,
-                                               self._num_items,
-                                               self._factors,
-                                               self._l_w,
-                                               self._learning_rate,
-                                               self._seed)
+                                                          self._num_items,
+                                                          self._factors,
+                                                          self._l_w,
+                                                          self._learning_rate,
+                                                          self._l_adv,
+                                                          self._eps,
+                                                          self._seed)
 
     @property
     def name(self):
@@ -86,16 +95,17 @@ class AdversarialMF(RecMixin, BaseRecommenderModel):
             return self.restore_weights()
 
         for it in self.iterate(self._epochs):
+            user_adv_train = (self._epochs - it) <= self._adversarial_epochs
             loss = 0
             steps = 0
             with tqdm(total=int(self._data.transactions // self._batch_size), disable=not self._verbose) as t:
                 for batch in self._sampler.step(self._data.transactions, self._batch_size):
                     steps += 1
-                    loss += self._model.train_step(batch)
-                    t.set_postfix({'loss': f'{loss.numpy() / steps:.5f}'})
+                    loss += self._model.train_step(batch, user_adv_train)
+                    t.set_postfix({'(APR)-loss' if user_adv_train else '(BPR)-loss': f'{loss.numpy() / steps:.5f}'})
                     t.update()
 
-            self.evaluate(it, loss.numpy()/(it + 1))
+            self.evaluate(it, loss.numpy() / (it + 1))
 
     def get_recommendations(self, k: int = 100):
         predictions_top_k_test = {}
