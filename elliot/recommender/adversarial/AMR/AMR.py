@@ -190,7 +190,7 @@ class AMR(RecMixin, BaseRecommenderModel):
                 _, pos, _, _, _ = batch
                 delta_temp = self._model.build_msap_perturbation(batch, self._eps_iter, self._nb_iter, delta_features[pos])
                 delta_features[pos] = delta_temp.numpy()
-                break
+
             adversarial_iterative_recs = self.get_recommendations(self.evaluator.get_needed_recommendations(), delta_features)
 
             self._model.init_delta_f()
@@ -198,7 +198,6 @@ class AMR(RecMixin, BaseRecommenderModel):
             for batch in self._next_batch:
                 self._model.build_perturbation(batch, delta_features[pos])
                 delta_features[pos] = delta_temp.numpy()
-                break
 
             adversarial_single_recs = self.get_recommendations(self.evaluator.get_needed_recommendations(), delta_features)
             clean_result_dict = self._results[-1]
