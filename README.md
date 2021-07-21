@@ -6,7 +6,7 @@
 
 [Docs]: https://elliot.readthedocs.io/en/latest/
 
-[Paper]: https://arxiv.org/abs/2103.02590
+[Paper]: https://doi.org/10.1145/3404835.3463245
 
 ### A NEW VERSION OF [ELLIOT(v0.3.1) IS OUT](https://github.com/sisinflab/elliot/releases/)
 
