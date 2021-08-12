@@ -1,0 +1,42 @@
+experiment:
+  dataset: movielens_small
+  data_config:
+    strategy: dataset
+    dataset_path: ../data/{0}/dataset.tsv
+    side_information:
+      - dataloader: ItemAttributes
+        attribute_file: ../data/{0}/item_features.tsv
+  splitting:
+    save_on_disk: True
+    save_folder: ../data/{0}/splitting/
+    test_splitting:
+      strategy: temporal_hold_out
+      test_ratio: 0.2
+  top_k: 10
+  evaluation:
+    cutoffs: 10
+    simple_metrics: [nDCG, Recall, HR, Precision, MAP, MRR]
+  gpu: -1
+  external_models_path: ../external/models/__init__.py
+  models:
+    Random:
+      meta:
+        save_recs: True
+    MostPop:
+      meta:
+        save_recs: True
+    AttributeItemKNN:
+      meta:
+        save_recs: True
+        save_weights: True
+        verbose: True
+      neighbors: [15, 30, 60, 100]
+      similarity: [cosine, correlation]
+    VSM:
+      meta:
+        save_recs: True
+        save_weights: True
+        verbose: True
+      similarity: [cosine, correlation]
+      user_profile: [tfidf, binary]
+      item_profile: [tfidf, binary]
