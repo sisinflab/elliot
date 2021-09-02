@@ -6,12 +6,12 @@ from torch_geometric.utils import degree
 
 
 class NGCFLayer(MessagePassing, ABC):
-    def __init__(self, in_channels, out_channels, dropout):
-        super(NGCFLayer, self).__init__(aggr='add')  # "Add" aggregation (Step 5).
+    def __init__(self, in_channels, out_channels, message_dropout):
+        super(NGCFLayer, self).__init__(aggr='add')
         self.lin1 = torch.nn.Linear(in_channels, out_channels)
         self.lin2 = torch.nn.Linear(in_channels, out_channels)
         self.leaky_relu = torch.nn.LeakyReLU()
-        self.dropout = torch.nn.Dropout(dropout)
+        self.dropout = torch.nn.Dropout(message_dropout)
 
     def forward(self, x, edge_index):
         row, col = edge_index

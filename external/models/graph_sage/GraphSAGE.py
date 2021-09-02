@@ -16,14 +16,14 @@ from elliot.dataset.samplers import custom_sampler as cs
 from elliot.recommender import BaseRecommenderModel
 from elliot.recommender.base_recommender_model import init_charger
 from elliot.recommender.recommender_utils_mixin import RecMixin
-from .NGCFModel import NGCFModel
+from .GraphSAGEModel import GraphSAGEModel
 
 
-class NGCF(RecMixin, BaseRecommenderModel):
+class GraphSAGE(RecMixin, BaseRecommenderModel):
     r"""
-    Neural Graph Collaborative Filtering
+    Inductive Representation Learning on Large Graphs
 
-    For further details, please refer to the `paper <https://dl.acm.org/doi/10.1145/3331184.3331267>`_
+    For further details, please refer to the `paper <https://proceedings.neurips.cc/paper/2017/hash/5dd9db5e033da9c6fb5ba83c7a7ebea9-Abstract.html>`_
 
     Args:
         lr: Learning rate
@@ -32,26 +32,21 @@ class NGCF(RecMixin, BaseRecommenderModel):
         batch_size: Batch size
         l_w: Regularization coefficient
         weight_size: Tuple with number of units for each embedding propagation layer
-        node_dropout: Tuple with dropout rate for each node
-        message_dropout: Tuple with dropout rate for each embedding propagation layer
 
     To include the recommendation model, add it to the config file adopting the following pattern:
 
     .. code:: yaml
 
       models:
-        NGCF:
+        GraphSAGE:
           meta:
             save_recs: True
           lr: 0.0005
           epochs: 50
           batch_size: 512
           factors: 64
-          batch_size: 256
           l_w: 0.1
           weight_size: (64,)
-          node_dropout: ()
-          message_dropout: (0.1,)
     """
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
@@ -67,10 +62,6 @@ class NGCF(RecMixin, BaseRecommenderModel):
             ("_factors", "factors", "factors", 64, None, None),
             ("_l_w", "l_w", "l_w", 0.01, None, None),
             ("_weight_size", "weight_size", "weight_size", "(64,)", lambda x: list(make_tuple(x)),
-             lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
-            ("_node_dropout", "node_dropout", "node_dropout", "()", lambda x: list(make_tuple(x)),
-             lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
-            ("_message_dropout", "message_dropout", "message_dropout", "()", lambda x: list(make_tuple(x)),
              lambda x: self._batch_remove(str(x), " []").replace(",", "-"))
         ]
         self.autoset_params()
@@ -80,7 +71,7 @@ class NGCF(RecMixin, BaseRecommenderModel):
         row, col = data.sp_i_train.nonzero()
         self.edge_index = np.array([row, col])
 
-        self._model = NGCFModel(
+        self._model = GraphSAGEModel(
             num_users=self._num_users,
             num_items=self._num_items,
             learning_rate=self._learning_rate,
@@ -88,15 +79,13 @@ class NGCF(RecMixin, BaseRecommenderModel):
             l_w=self._l_w,
             weight_size=self._weight_size,
             n_layers=self._n_layers,
-            node_dropout=self._node_dropout,
-            message_dropout=self._message_dropout,
             edge_index=self.edge_index,
             random_seed=self._seed
         )
 
     @property
     def name(self):
-        return "NGCF" \
+        return "GraphSAGE" \
                + f"_{self.get_base_params_shortcut()}" \
                + f"_{self.get_params_shortcut()}"
 

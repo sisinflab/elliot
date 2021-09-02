@@ -16,14 +16,14 @@ from elliot.dataset.samplers import custom_sampler as cs
 from elliot.recommender import BaseRecommenderModel
 from elliot.recommender.base_recommender_model import init_charger
 from elliot.recommender.recommender_utils_mixin import RecMixin
-from .NGCFModel import NGCFModel
+from .GATModel import GATModel
 
 
-class NGCF(RecMixin, BaseRecommenderModel):
+class GAT(RecMixin, BaseRecommenderModel):
     r"""
-    Neural Graph Collaborative Filtering
+    Graph Attention Networks
 
-    For further details, please refer to the `paper <https://dl.acm.org/doi/10.1145/3331184.3331267>`_
+    For further details, please refer to the `paper <https://openreview.net/forum?id=rJXMpikCZ>`_
 
     Args:
         lr: Learning rate
@@ -32,7 +32,6 @@ class NGCF(RecMixin, BaseRecommenderModel):
         batch_size: Batch size
         l_w: Regularization coefficient
         weight_size: Tuple with number of units for each embedding propagation layer
-        node_dropout: Tuple with dropout rate for each node
         message_dropout: Tuple with dropout rate for each embedding propagation layer
 
     To include the recommendation model, add it to the config file adopting the following pattern:
@@ -40,17 +39,15 @@ class NGCF(RecMixin, BaseRecommenderModel):
     .. code:: yaml
 
       models:
-        NGCF:
+        GAT:
           meta:
             save_recs: True
           lr: 0.0005
           epochs: 50
           batch_size: 512
           factors: 64
-          batch_size: 256
           l_w: 0.1
           weight_size: (64,)
-          node_dropout: ()
           message_dropout: (0.1,)
     """
     @init_charger
@@ -68,8 +65,6 @@ class NGCF(RecMixin, BaseRecommenderModel):
             ("_l_w", "l_w", "l_w", 0.01, None, None),
             ("_weight_size", "weight_size", "weight_size", "(64,)", lambda x: list(make_tuple(x)),
              lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
-            ("_node_dropout", "node_dropout", "node_dropout", "()", lambda x: list(make_tuple(x)),
-             lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
             ("_message_dropout", "message_dropout", "message_dropout", "()", lambda x: list(make_tuple(x)),
              lambda x: self._batch_remove(str(x), " []").replace(",", "-"))
         ]
@@ -80,7 +75,7 @@ class NGCF(RecMixin, BaseRecommenderModel):
         row, col = data.sp_i_train.nonzero()
         self.edge_index = np.array([row, col])
 
-        self._model = NGCFModel(
+        self._model = GATModel(
             num_users=self._num_users,
             num_items=self._num_items,
             learning_rate=self._learning_rate,
@@ -88,7 +83,6 @@ class NGCF(RecMixin, BaseRecommenderModel):
             l_w=self._l_w,
             weight_size=self._weight_size,
             n_layers=self._n_layers,
-            node_dropout=self._node_dropout,
             message_dropout=self._message_dropout,
             edge_index=self.edge_index,
             random_seed=self._seed
@@ -96,7 +90,7 @@ class NGCF(RecMixin, BaseRecommenderModel):
 
     @property
     def name(self):
-        return "NGCF" \
+        return "GAT" \
                + f"_{self.get_base_params_shortcut()}" \
                + f"_{self.get_params_shortcut()}"
 

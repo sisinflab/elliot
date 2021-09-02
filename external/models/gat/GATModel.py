@@ -8,15 +8,14 @@ __author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta, Felice Antoni
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malitesta@poliba.it, felice.merra@poliba.it'
 
 from abc import ABC
+from torch_geometric.nn import GATConv
 
-from .NGCFLayer import NGCFLayer
-from .NodeDropout import NodeDropout
 import torch
 import torch_geometric
 import numpy as np
 
 
-class NGCFModel(torch.nn.Module, ABC):
+class GATModel(torch.nn.Module, ABC):
     def __init__(self,
                  num_users,
                  num_items,
@@ -25,11 +24,10 @@ class NGCFModel(torch.nn.Module, ABC):
                  l_w,
                  weight_size,
                  n_layers,
-                 node_dropout,
                  message_dropout,
                  edge_index,
                  random_seed,
-                 name="NGFC",
+                 name="GAT",
                  **kwargs
                  ):
         super().__init__()
@@ -42,7 +40,6 @@ class NGCFModel(torch.nn.Module, ABC):
         self.l_w = l_w
         self.weight_size = weight_size
         self.n_layers = n_layers
-        self.node_dropout = node_dropout if node_dropout else [0.0] * self.n_layers
         self.message_dropout = message_dropout if message_dropout else [0.0] * self.n_layers
         self.weight_size_list = [self.embed_k] + self.weight_size
         self.edge_index = torch.tensor(edge_index, dtype=torch.int64)
@@ -55,11 +52,11 @@ class NGCFModel(torch.nn.Module, ABC):
         propagation_network_list = []
 
         for layer in range(self.n_layers):
-            propagation_network_list.append((NodeDropout(self.node_dropout[layer], self.num_users, self.num_items),
-                                             'edge_index -> edge_index'))
-            propagation_network_list.append((NGCFLayer(self.weight_size_list[layer],
-                                                       self.weight_size_list[layer + 1],
-                                                       self.message_dropout[layer]), 'x, edge_index -> x'))
+            propagation_network_list.append((GATConv(in_channels=self.weight_size_list[layer],
+                                                     out_channels=self.weight_size_list[layer + 1],
+                                                     dropout=self.message_dropout[layer],
+                                                     add_self_loops=False,
+                                                     bias=False), 'x, edge_index -> x'))
 
         self.propagation_network = torch_geometric.nn.Sequential('x, edge_index', propagation_network_list)
         self.softplus = torch.nn.Softplus()
@@ -74,13 +71,10 @@ class NGCFModel(torch.nn.Module, ABC):
         ego_embeddings = torch.cat((gu_0, gi_0), 0)
         all_embeddings = [ego_embeddings]
 
-        for layer in range(0, self.n_layers, 2):
-            dropout_edge_index = list(
-                self.propagation_network.children()
-            )[0][layer](self.edge_index)
+        for layer in range(0, self.n_layers):
             all_embeddings += [list(
                 self.propagation_network.children()
-            )[0][layer + 1](all_embeddings[layer], dropout_edge_index)]
+            )[0][layer](all_embeddings[layer], self.edge_index)]
 
         all_embeddings = torch.cat(all_embeddings, 1)
         gu, gi = torch.split(all_embeddings, [self.num_users, self.num_items], 0)

@@ -7,8 +7,6 @@ __version__ = '0.3.0'
 __author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta, Felice Antonio Merra'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malitesta@poliba.it, felice.merra@poliba.it'
 
-from ast import literal_eval as make_tuple
-
 from tqdm import tqdm
 import numpy as np
 
@@ -16,14 +14,14 @@ from elliot.dataset.samplers import custom_sampler as cs
 from elliot.recommender import BaseRecommenderModel
 from elliot.recommender.base_recommender_model import init_charger
 from elliot.recommender.recommender_utils_mixin import RecMixin
-from .NGCFModel import NGCFModel
+from .LightGCNModel import LightGCNModel
 
 
-class NGCF(RecMixin, BaseRecommenderModel):
+class LightGCN(RecMixin, BaseRecommenderModel):
     r"""
-    Neural Graph Collaborative Filtering
+    LightGCN: Simplifying and Powering Graph Convolution Network for Recommendation
 
-    For further details, please refer to the `paper <https://dl.acm.org/doi/10.1145/3331184.3331267>`_
+    For further details, please refer to the `paper <https://dl.acm.org/doi/10.1145/3397271.3401063>`_
 
     Args:
         lr: Learning rate
@@ -31,16 +29,14 @@ class NGCF(RecMixin, BaseRecommenderModel):
         factors: Number of latent factors
         batch_size: Batch size
         l_w: Regularization coefficient
-        weight_size: Tuple with number of units for each embedding propagation layer
-        node_dropout: Tuple with dropout rate for each node
-        message_dropout: Tuple with dropout rate for each embedding propagation layer
+        n_layers: Number of stacked propagation layers
 
     To include the recommendation model, add it to the config file adopting the following pattern:
 
     .. code:: yaml
 
       models:
-        NGCF:
+        LightGCN:
           meta:
             save_recs: True
           lr: 0.0005
@@ -49,9 +45,7 @@ class NGCF(RecMixin, BaseRecommenderModel):
           factors: 64
           batch_size: 256
           l_w: 0.1
-          weight_size: (64,)
-          node_dropout: ()
-          message_dropout: (0.1,)
+          n_layers: 2
     """
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
@@ -66,37 +60,27 @@ class NGCF(RecMixin, BaseRecommenderModel):
             ("_learning_rate", "lr", "lr", 0.0005, None, None),
             ("_factors", "factors", "factors", 64, None, None),
             ("_l_w", "l_w", "l_w", 0.01, None, None),
-            ("_weight_size", "weight_size", "weight_size", "(64,)", lambda x: list(make_tuple(x)),
-             lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
-            ("_node_dropout", "node_dropout", "node_dropout", "()", lambda x: list(make_tuple(x)),
-             lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
-            ("_message_dropout", "message_dropout", "message_dropout", "()", lambda x: list(make_tuple(x)),
-             lambda x: self._batch_remove(str(x), " []").replace(",", "-"))
+            ("_n_layers", "n_layers", "n_layers", 1, None, None)
         ]
         self.autoset_params()
-
-        self._n_layers = len(self._weight_size)
 
         row, col = data.sp_i_train.nonzero()
         self.edge_index = np.array([row, col])
 
-        self._model = NGCFModel(
+        self._model = LightGCNModel(
             num_users=self._num_users,
             num_items=self._num_items,
             learning_rate=self._learning_rate,
             embed_k=self._factors,
             l_w=self._l_w,
-            weight_size=self._weight_size,
             n_layers=self._n_layers,
-            node_dropout=self._node_dropout,
-            message_dropout=self._message_dropout,
             edge_index=self.edge_index,
             random_seed=self._seed
         )
 
     @property
     def name(self):
-        return "NGCF" \
+        return "LightGCN" \
                + f"_{self.get_base_params_shortcut()}" \
                + f"_{self.get_params_shortcut()}"
 

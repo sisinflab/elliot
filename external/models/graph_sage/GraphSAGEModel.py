@@ -9,14 +9,13 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malite
 
 from abc import ABC
 
-from .NGCFLayer import NGCFLayer
-from .NodeDropout import NodeDropout
+from .GraphSAGELayer import GraphSAGELayer
 import torch
 import torch_geometric
 import numpy as np
 
 
-class NGCFModel(torch.nn.Module, ABC):
+class GraphSAGEModel(torch.nn.Module, ABC):
     def __init__(self,
                  num_users,
                  num_items,
@@ -25,11 +24,9 @@ class NGCFModel(torch.nn.Module, ABC):
                  l_w,
                  weight_size,
                  n_layers,
-                 node_dropout,
-                 message_dropout,
                  edge_index,
                  random_seed,
-                 name="NGFC",
+                 name="GraphSAGE",
                  **kwargs
                  ):
         super().__init__()
@@ -42,24 +39,19 @@ class NGCFModel(torch.nn.Module, ABC):
         self.l_w = l_w
         self.weight_size = weight_size
         self.n_layers = n_layers
-        self.node_dropout = node_dropout if node_dropout else [0.0] * self.n_layers
-        self.message_dropout = message_dropout if message_dropout else [0.0] * self.n_layers
         self.weight_size_list = [self.embed_k] + self.weight_size
         self.edge_index = torch.tensor(edge_index, dtype=torch.int64)
 
         self.Gu = torch.nn.Parameter(
-            torch.nn.init.zeros_(torch.empty((self.num_users, sum(self.weight_size_list)))))
+            torch.nn.init.zeros_(torch.empty((self.num_users, self.embed_k))))
         self.Gi = torch.nn.Parameter(
-            torch.nn.init.zeros_(torch.empty((self.num_items, sum(self.weight_size_list)))))
+            torch.nn.init.zeros_(torch.empty((self.num_items, self.embed_k))))
 
         propagation_network_list = []
 
         for layer in range(self.n_layers):
-            propagation_network_list.append((NodeDropout(self.node_dropout[layer], self.num_users, self.num_items),
-                                             'edge_index -> edge_index'))
-            propagation_network_list.append((NGCFLayer(self.weight_size_list[layer],
-                                                       self.weight_size_list[layer + 1],
-                                                       self.message_dropout[layer]), 'x, edge_index -> x'))
+            propagation_network_list.append((GraphSAGELayer(self.weight_size_list[layer],
+                                                            self.weight_size_list[layer + 1]), 'x, edge_index -> x'))
 
         self.propagation_network = torch_geometric.nn.Sequential('x, edge_index', propagation_network_list)
         self.softplus = torch.nn.Softplus()
@@ -68,22 +60,18 @@ class NGCFModel(torch.nn.Module, ABC):
 
     def _propagate_embeddings(self):
         # Extract gu_0 and gi_0 to begin embedding updating for L layers
-        gu_0 = self.Gu[:, :self.embed_k]
-        gi_0 = self.Gi[:, :self.embed_k]
+        gu_0 = self.Gu
+        gi_0 = self.Gi
 
-        ego_embeddings = torch.cat((gu_0, gi_0), 0)
-        all_embeddings = [ego_embeddings]
+        current_embeddings = torch.cat((gu_0, gi_0), 0)
 
-        for layer in range(0, self.n_layers, 2):
-            dropout_edge_index = list(
+        for layer in range(0, self.n_layers):
+            current_embeddings = list(
                 self.propagation_network.children()
-            )[0][layer](self.edge_index)
-            all_embeddings += [list(
-                self.propagation_network.children()
-            )[0][layer + 1](all_embeddings[layer], dropout_edge_index)]
+            )[0][layer](current_embeddings, self.edge_index)
+            current_embeddings /= torch.unsqueeze(torch.norm(current_embeddings, 2, dim=1), dim=1)
 
-        all_embeddings = torch.cat(all_embeddings, 1)
-        gu, gi = torch.split(all_embeddings, [self.num_users, self.num_items], 0)
+        gu, gi = torch.split(current_embeddings, [self.num_users, self.num_items], 0)
         self.Gu = torch.nn.Parameter(gu)
         self.Gi = torch.nn.Parameter(gi)
 

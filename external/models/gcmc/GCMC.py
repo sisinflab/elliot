@@ -12,18 +12,18 @@ from ast import literal_eval as make_tuple
 from tqdm import tqdm
 import numpy as np
 
-from elliot.dataset.samplers import custom_sampler as cs
+from elliot.dataset.samplers import pointwise_pos_neg_sampler as ppns
 from elliot.recommender import BaseRecommenderModel
 from elliot.recommender.base_recommender_model import init_charger
 from elliot.recommender.recommender_utils_mixin import RecMixin
-from .NGCFModel import NGCFModel
+from .GCMCModel import GCMCModel
 
 
-class NGCF(RecMixin, BaseRecommenderModel):
+class GCMC(RecMixin, BaseRecommenderModel):
     r"""
-    Neural Graph Collaborative Filtering
+    Graph Convolutional Matrix Completion
 
-    For further details, please refer to the `paper <https://dl.acm.org/doi/10.1145/3331184.3331267>`_
+    For further details, please refer to the `paper <https://arxiv.org/abs/1706.02263>`_
 
     Args:
         lr: Learning rate
@@ -31,32 +31,33 @@ class NGCF(RecMixin, BaseRecommenderModel):
         factors: Number of latent factors
         batch_size: Batch size
         l_w: Regularization coefficient
-        weight_size: Tuple with number of units for each embedding propagation layer
+        convolutional_layer_size: Tuple with number of units for each convolutional layer
+        dense_layer_size: Tuple with number of units for each dense layer
         node_dropout: Tuple with dropout rate for each node
-        message_dropout: Tuple with dropout rate for each embedding propagation layer
+        dense_layer_dropout: Tuple with hidden layer dropout rate for each dense propagation layer
 
     To include the recommendation model, add it to the config file adopting the following pattern:
 
     .. code:: yaml
 
       models:
-        NGCF:
+        GCMC:
           meta:
             save_recs: True
           lr: 0.0005
           epochs: 50
           batch_size: 512
           factors: 64
-          batch_size: 256
           l_w: 0.1
-          weight_size: (64,)
+          convolutional_layer_size: (64,)
+          dense_layer_size: (64,)
           node_dropout: ()
-          message_dropout: (0.1,)
+          dense_layer_dropout: (0.1,)
     """
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
 
-        self._sampler = cs.Sampler(self._data.i_train_dict)
+        self._sampler = ppns.Sampler(self._data.i_train_dict)
         if self._batch_size < 1:
             self._batch_size = self._num_users
 
@@ -66,37 +67,42 @@ class NGCF(RecMixin, BaseRecommenderModel):
             ("_learning_rate", "lr", "lr", 0.0005, None, None),
             ("_factors", "factors", "factors", 64, None, None),
             ("_l_w", "l_w", "l_w", 0.01, None, None),
-            ("_weight_size", "weight_size", "weight_size", "(64,)", lambda x: list(make_tuple(x)),
+            ("_convolutional_layer_size", "convolutional_layer_size", "convolutional_layer_size", "(64,)", lambda x: list(make_tuple(x)),
+             lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
+            ("_dense_layer_size", "dense_layer_size", "dense_layer_size", "(64,)", lambda x: list(make_tuple(x)),
              lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
             ("_node_dropout", "node_dropout", "node_dropout", "()", lambda x: list(make_tuple(x)),
              lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
-            ("_message_dropout", "message_dropout", "message_dropout", "()", lambda x: list(make_tuple(x)),
+            ("_dense_layer_dropout", "dense_layer_dropout", "dense_layer_dropout", "()", lambda x: list(make_tuple(x)),
              lambda x: self._batch_remove(str(x), " []").replace(",", "-"))
         ]
         self.autoset_params()
 
-        self._n_layers = len(self._weight_size)
+        self._n_convolutional_layers = len(self._convolutional_layer_size)
+        self._n_dense_layers = len(self._dense_layer_size)
 
         row, col = data.sp_i_train.nonzero()
         self.edge_index = np.array([row, col])
 
-        self._model = NGCFModel(
+        self._model = GCMCModel(
             num_users=self._num_users,
             num_items=self._num_items,
             learning_rate=self._learning_rate,
             embed_k=self._factors,
             l_w=self._l_w,
-            weight_size=self._weight_size,
-            n_layers=self._n_layers,
+            convolutional_layer_size=self._convolutional_layer_size,
+            dense_layer_size=self._dense_layer_size,
+            n_convolutional_layers=self._n_convolutional_layers,
+            n_dense_layers=self._n_dense_layers,
             node_dropout=self._node_dropout,
-            message_dropout=self._message_dropout,
+            dense_layer_dropout=self._dense_layer_dropout,
             edge_index=self.edge_index,
             random_seed=self._seed
         )
 
     @property
     def name(self):
-        return "NGCF" \
+        return "GCMC" \
                + f"_{self.get_base_params_shortcut()}" \
                + f"_{self.get_params_shortcut()}"
 

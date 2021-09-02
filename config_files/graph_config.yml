@@ -17,30 +17,72 @@ experiment:
 #        validation_rate: 1
 #        verbose: True
 #        save_weights: False
-#        save_recs: True
-#        validation_metric: HR@100
+#        save_recs: False
+#        validation_metric: nDCG
 #        restore: False
 #      lr: 0.0005
 #      epochs: 10
 #      factors: 64
 #      batch_size: 256
 #      l_w: 0.1
+#      weight_size: (128,64,)
+#    external.LightGCN:
+#      meta:
+#        validation_rate: 1
+#        verbose: True
+#        save_weights: False
+#        save_recs: False
+#        validation_metric: nDCG
+#        restore: False
+#      lr: 0.0005
+#      epochs: 10
+#      factors: 64
+#      batch_size: 256
+#      l_w: 0.1
+#      weight_size: (64,64,)
+#    external.GraphSAGE:
+#      meta:
+#        validation_rate: 1
+#        verbose: True
+#        save_weights: False
+#        save_recs: False
+#        validation_metric: nDCG
+#        restore: False
+#      lr: 0.0005
+#      epochs: 50
+#      batch_size: 512
+#      factors: 64
+#      l_w: 0.1
 #      weight_size: (64,)
-#      node_dropout: ()
+#    external.GAT:
+#      meta:
+#        validation_rate: 1
+#        verbose: True
+#        save_weights: False
+#        save_recs: False
+#        validation_metric: nDCG
+#        restore: False
+#      lr: 0.0005
+#      epochs: 50
+#      batch_size: 512
+#      factors: 64
+#      l_w: 0.1
+#      weight_size: (64,)
 #      message_dropout: (0.1,)
-    NGCF:
+    external.GCMC:
       meta:
         validation_rate: 1
         verbose: True
         save_weights: False
-        save_recs: True
-        validation_metric: HR@100
+        save_recs: False
+        validation_metric: nDCG
         restore: False
       lr: 0.0005
-      epochs: 10
-      factors: 64
-      batch_size: 256
+      epochs: 50
+      batch_size: 512
+      factors: 256
       l_w: 0.1
-      weight_size: (64,)
+      convolutional_layer_size: (128,64,)
+      dense_layer_size: (32,16,)
       node_dropout: ()
-      message_dropout: (0.1,)
+      dense_layer_dropout: (0.1,)
