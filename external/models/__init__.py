@@ -6,3 +6,4 @@ from .lightgcn import LightGCN
 from .graph_sage import GraphSAGE
 from .gat import GAT
 from .gcmc import GCMC
+from .disen_gcn import DisenGCN

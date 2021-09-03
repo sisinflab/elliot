@@ -69,7 +69,24 @@ experiment:
 #      l_w: 0.1
 #      weight_size: (64,)
 #      message_dropout: (0.1,)
-    external.GCMC:
+#    external.GCMC:
+#      meta:
+#        validation_rate: 1
+#        verbose: True
+#        save_weights: False
+#        save_recs: False
+#        validation_metric: nDCG
+#        restore: False
+#      lr: 0.0005
+#      epochs: 50
+#      batch_size: 512
+#      factors: 256
+#      l_w: 0.1
+#      convolutional_layer_size: (128,64,)
+#      dense_layer_size: (32,16,)
+#      node_dropout: ()
+#      dense_layer_dropout: (0.1,)
+    external.DisenGCN:
       meta:
         validation_rate: 1
         verbose: True
@@ -80,9 +97,9 @@ experiment:
       lr: 0.0005
       epochs: 50
       batch_size: 512
-      factors: 256
+      factors: 64
       l_w: 0.1
-      convolutional_layer_size: (128,64,)
-      dense_layer_size: (32,16,)
-      node_dropout: ()
-      dense_layer_dropout: (0.1,)
+      weight_size: (64,)
+      message_dropout: (0.1,)
+      disen_k: 10
+      temperature: 10

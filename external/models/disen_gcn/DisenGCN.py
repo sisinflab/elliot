@@ -12,18 +12,18 @@ from ast import literal_eval as make_tuple
 from tqdm import tqdm
 import numpy as np
 
-from elliot.dataset.samplers import pointwise_pos_neg_ratio_ratings_sampler as ppnrrs
+from elliot.dataset.samplers import custom_sampler as cs
 from elliot.recommender import BaseRecommenderModel
 from elliot.recommender.base_recommender_model import init_charger
 from elliot.recommender.recommender_utils_mixin import RecMixin
-from .GCMCModel import GCMCModel
+from .DisenGCNModel import DisenGCNModel
 
 
-class GCMC(RecMixin, BaseRecommenderModel):
+class DisenGCN(RecMixin, BaseRecommenderModel):
     r"""
-    Graph Convolutional Matrix Completion
+    Disentangled Graph Convolutional Networks
 
-    For further details, please refer to the `paper <https://arxiv.org/abs/1706.02263>`_
+    For further details, please refer to the `paper <http://proceedings.mlr.press/v97/ma19a.html>`_
 
     Args:
         lr: Learning rate
@@ -31,17 +31,17 @@ class GCMC(RecMixin, BaseRecommenderModel):
         factors: Number of latent factors
         batch_size: Batch size
         l_w: Regularization coefficient
-        convolutional_layer_size: Tuple with number of units for each convolutional layer
-        dense_layer_size: Tuple with number of units for each dense layer
-        node_dropout: Tuple with dropout rate for each node
-        dense_layer_dropout: Tuple with hidden layer dropout rate for each dense propagation layer
+        weight_size: Tuple with number of units for each embedding propagation layer
+        message_dropout: Tuple with dropout rate for each embedding propagation layer
+        disen_k: Factor for disentanglement
+        temperature: Temperature value for softmax
 
     To include the recommendation model, add it to the config file adopting the following pattern:
 
     .. code:: yaml
 
       models:
-        GCMC:
+        DisenGCN:
           meta:
             save_recs: True
           lr: 0.0005
@@ -49,15 +49,15 @@ class GCMC(RecMixin, BaseRecommenderModel):
           batch_size: 512
           factors: 64
           l_w: 0.1
-          convolutional_layer_size: (64,)
-          dense_layer_size: (64,)
-          node_dropout: ()
-          dense_layer_dropout: (0.1,)
+          weight_size: (64,)
+          message_dropout: (0.1,)
+          disen_k: 10
+          temperature: 10
     """
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
 
-        self._sampler = ppnrrs.Sampler(self._data.i_train_dict, self._data.sp_i_train_ratings, 0)
+        self._sampler = cs.Sampler(self._data.i_train_dict)
         if self._batch_size < 1:
             self._batch_size = self._num_users
 
@@ -67,42 +67,38 @@ class GCMC(RecMixin, BaseRecommenderModel):
             ("_learning_rate", "lr", "lr", 0.0005, None, None),
             ("_factors", "factors", "factors", 64, None, None),
             ("_l_w", "l_w", "l_w", 0.01, None, None),
-            ("_convolutional_layer_size", "convolutional_layer_size", "convolutional_layer_size", "(64,)", lambda x: list(make_tuple(x)),
+            ("_weight_size", "weight_size", "weight_size", "(64,)", lambda x: list(make_tuple(x)),
              lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
-            ("_dense_layer_size", "dense_layer_size", "dense_layer_size", "(64,)", lambda x: list(make_tuple(x)),
+            ("_message_dropout", "message_dropout", "message_dropout", "()", lambda x: list(make_tuple(x)),
              lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
-            ("_node_dropout", "node_dropout", "node_dropout", "()", lambda x: list(make_tuple(x)),
-             lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
-            ("_dense_layer_dropout", "dense_layer_dropout", "dense_layer_dropout", "()", lambda x: list(make_tuple(x)),
-             lambda x: self._batch_remove(str(x), " []").replace(",", "-"))
+            ("_disen_k", "disen_k", "disen_k", 10, None, None),
+            ("_temperature", "temperature", "temperature", 10, None, None)
         ]
         self.autoset_params()
 
-        self._n_convolutional_layers = len(self._convolutional_layer_size)
-        self._n_dense_layers = len(self._dense_layer_size)
+        self._n_layers = len(self._weight_size)
 
         row, col = data.sp_i_train.nonzero()
         self.edge_index = np.array([row, col])
 
-        self._model = GCMCModel(
+        self._model = DisenGCNModel(
             num_users=self._num_users,
             num_items=self._num_items,
             learning_rate=self._learning_rate,
             embed_k=self._factors,
             l_w=self._l_w,
-            convolutional_layer_size=self._convolutional_layer_size,
-            dense_layer_size=self._dense_layer_size,
-            n_convolutional_layers=self._n_convolutional_layers,
-            n_dense_layers=self._n_dense_layers,
-            node_dropout=self._node_dropout,
-            dense_layer_dropout=self._dense_layer_dropout,
+            weight_size=self._weight_size,
+            n_layers=self._n_layers,
+            disen_k=self._disen_k,
+            temperature=self._temperature,
+            message_dropout=self._message_dropout,
             edge_index=self.edge_index,
             random_seed=self._seed
         )
 
     @property
     def name(self):
-        return "GCMC" \
+        return "DisenGCN" \
                + f"_{self.get_base_params_shortcut()}" \
                + f"_{self.get_params_shortcut()}"
 

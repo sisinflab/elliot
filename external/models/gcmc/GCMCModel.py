@@ -81,6 +81,7 @@ class GCMCModel(torch.nn.Module, ABC):
             dense_network_list.append(('relu_' + str(layer), torch.nn.ReLU()))
         self.dense_network = torch.nn.Sequential(OrderedDict(dense_network_list))
 
+        self.sigmoid = torch.nn.Sigmoid()
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
 
     def _propagate_embeddings(self):
@@ -114,7 +115,7 @@ class GCMCModel(torch.nn.Module, ABC):
         zeta_u = torch.squeeze(Zu[user])
         zeta_i = torch.squeeze(Zi[item])
 
-        xui = torch.sigmoid_(torch.matmul(torch.transpose(zeta_u, 0, 1), torch.matmul(self.Q, zeta_i)))
+        xui = torch.matmul(zeta_u, torch.matmul(self.Q, torch.transpose(zeta_i, 0, 1)))
 
         return xui, zeta_u, zeta_i
 
@@ -122,15 +123,16 @@ class GCMCModel(torch.nn.Module, ABC):
         return torch.matmul(self.Gu[start:stop], torch.transpose(self.Gi, 0, 1))
 
     def train_step(self, batch):
-        user, item = batch
+        user, item, _ = batch
         xui, zeta_u, zeta_i = self.forward(inputs=(user, item))
 
-        difference = torch.clamp(xu_pos - xu_neg, -80.0, 1e8)
-        loss = torch.sum(self.softplus(-difference))
-        reg_loss = self.l_w * (torch.norm(gamma_u, 2) +
-                               torch.norm(gamma_pos, 2) +
-                               torch.norm(gamma_neg, 2) +
-                               torch.stack([torch.norm(value, 2) for value in self.propagation_network.parameters()],
+        log_likelihood = torch.log(self.sigmoid(xui))
+        loss = - torch.sum(log_likelihood)
+        reg_loss = self.l_w * (torch.norm(zeta_u, 2) +
+                               torch.norm(zeta_i, 2) +
+                               torch.stack([torch.norm(value, 2) for value in self.convolutional_network.parameters()],
+                                           dim=0).sum(dim=0) +
+                               torch.stack([torch.norm(value, 2) for value in self.dense_network.parameters()],
                                            dim=0).sum(dim=0)) * 2
         loss += reg_loss
 
