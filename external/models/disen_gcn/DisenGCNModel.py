@@ -76,42 +76,25 @@ class DisenGCNModel(torch.nn.Module, ABC):
 
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
 
-    def _propagate_embeddings(self):
-        # Extract gu_0 and gi_0 to begin embedding updating for L layers
-        gu_0 = self.Gu[:, :self.embed_k]
-        gi_0 = self.Gi[:, :self.embed_k]
-
-        ego_embeddings = torch.cat((gu_0, gi_0), 0)
-        all_embeddings = [ego_embeddings]
-
-        for layer in range(0, self.n_layers, 2):
-            dropout_edge_index = list(
-                self.propagation_network.children()
-            )[0][layer](self.edge_index)
-            all_embeddings += [list(
-                self.propagation_network.children()
-            )[0][layer + 1](all_embeddings[layer], dropout_edge_index)]
-
-        all_embeddings = torch.cat(all_embeddings, 1)
-        gu, gi = torch.split(all_embeddings, [self.num_users, self.num_items], 0)
-        self.Gu = torch.nn.Parameter(gu)
-        self.Gi = torch.nn.Parameter(gi)
-
     def forward(self, inputs, **kwargs):
+        zeta_u = self.projection_network(self.Gu)
+        zeta_i = self.projection_network(self.Gi)
+
+        all_zeta = torch.cat((zeta_u, zeta_i), 0)
+        all_zeta = self.disentangle_network(all_zeta, self.edge_index)
+        zeta_u, zeta_i = torch.split(all_zeta, [self.num_users, self.num_items], 0)
+
         user, item = inputs
-        gamma_u = torch.squeeze(self.Gu[user])
-        gamma_i = torch.squeeze(self.Gi[item])
 
-        xui = torch.sum(gamma_u * gamma_i, 1)
+        xui = torch.sum(torch.squeeze(zeta_u[user]) * torch.squeeze(zeta_i[item]), 1)
 
-        return xui, gamma_u, gamma_i
+        return xui, zeta_u, zeta_i
 
     def predict(self, start, stop, **kwargs):
         return torch.matmul(self.Gu[start:stop], torch.transpose(self.Gi, 0, 1))
 
     def train_step(self, batch):
         user, pos, neg = batch
-        self._propagate_embeddings()
         xu_pos, gamma_u, gamma_pos = self.forward(inputs=(user, pos))
         xu_neg, _, gamma_neg = self.forward(inputs=(user, neg))
 

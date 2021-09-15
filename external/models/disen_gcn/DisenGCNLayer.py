@@ -11,7 +11,8 @@ class DisenGCNLayer(MessagePassing, ABC):
         self.dropout = torch.nn.Dropout(message_dropout)
 
     def forward(self, x, edge_index):
-        return self.dropout(x + self.propagate(edge_index, x=x))
+        c = self.dropout(x + self.propagate(edge_index, x=x))
+        return c / torch.unsqueeze(torch.unsqueeze(torch.norm(c, 2, dim=[0, 2]), 0), 2)
 
     def message(self, x_i, x_j):
         p = torch.softmax(torch.matmul(x_i, x_j) / self.temperature, dim=0)
