@@ -90,13 +90,13 @@ class GCMCModel(torch.nn.Module, ABC):
         for layer in range(0, self.n_convolutional_layers * 3, 3):
             dropout_edge_index = list(
                 self.convolutional_network.children()
-            )[0][layer](self.edge_index)
+            )[layer](self.edge_index)
             current_embeddings = list(
                 self.convolutional_network.children()
-            )[0][layer + 1](current_embeddings, dropout_edge_index)
+            )[layer + 1](current_embeddings, dropout_edge_index)
             current_embeddings = list(
                 self.convolutional_network.children()
-            )[0][layer + 2](current_embeddings)
+            )[layer + 2](current_embeddings)
 
         for layer in range(0, self.n_dense_layers * 2, 2):
             current_embeddings = list(

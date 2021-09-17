@@ -74,7 +74,7 @@ class GATModel(torch.nn.Module, ABC):
         for layer in range(0, self.n_layers):
             all_embeddings += [list(
                 self.propagation_network.children()
-            )[0][layer](all_embeddings[layer], self.edge_index)]
+            )[layer](all_embeddings[layer], self.edge_index)]
 
         all_embeddings = torch.cat(all_embeddings, 1)
         gu, gi = torch.split(all_embeddings, [self.num_users, self.num_items], 0)

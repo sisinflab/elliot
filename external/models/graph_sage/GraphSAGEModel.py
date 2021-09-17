@@ -68,7 +68,7 @@ class GraphSAGEModel(torch.nn.Module, ABC):
         for layer in range(0, self.n_layers):
             current_embeddings = list(
                 self.propagation_network.children()
-            )[0][layer](current_embeddings, self.edge_index)
+            )[layer](current_embeddings, self.edge_index)
             current_embeddings /= torch.unsqueeze(torch.norm(current_embeddings, 2, dim=1), dim=1)
 
         gu, gi = torch.split(current_embeddings, [self.num_users, self.num_items], 0)
