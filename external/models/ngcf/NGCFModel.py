@@ -125,6 +125,5 @@ class NGCFModel(torch.nn.Module, ABC):
 
         return loss.detach().cpu().numpy()
 
-    @staticmethod
-    def get_top_k(preds, train_mask, k=100):
-        return torch.topk(torch.where(torch.tensor(train_mask), preds, torch.tensor(-np.inf)), k=k, sorted=True)
+    def get_top_k(self, preds, train_mask, k=100):
+        return torch.topk(torch.where(torch.tensor(train_mask.to(self.device)), preds.to(self.device), torch.tensor(-np.inf)), k=k, sorted=True)
