@@ -77,10 +77,10 @@ class NGCFModel(torch.nn.Module, ABC):
         for layer in range(0, self.n_layers, 2):
             dropout_edge_index = list(
                 self.propagation_network.children()
-            )[0][layer](self.edge_index)
+            )[layer](self.edge_index)
             all_embeddings += [list(
                 self.propagation_network.children()
-            )[0][layer + 1](all_embeddings[layer], dropout_edge_index)]
+            )[layer + 1](all_embeddings[layer], dropout_edge_index)]
 
         all_embeddings = torch.cat(all_embeddings, 1)
         gu, gi = torch.split(all_embeddings, [self.num_users, self.num_items], 0)
