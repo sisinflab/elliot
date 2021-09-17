@@ -73,8 +73,8 @@ class NGCFModel(torch.nn.Module, ABC):
 
     def _propagate_embeddings(self):
         # Extract gu_0 and gi_0 to begin embedding updating for L layers
-        gu_0 = self.Gu[:, :self.embed_k]
-        gi_0 = self.Gi[:, :self.embed_k]
+        gu_0 = self.Gu[:, :self.embed_k].to(self.device)
+        gi_0 = self.Gi[:, :self.embed_k].to(self.device)
 
         ego_embeddings = torch.cat((gu_0, gi_0), 0)
         all_embeddings = [ego_embeddings]
@@ -89,20 +89,20 @@ class NGCFModel(torch.nn.Module, ABC):
 
         all_embeddings = torch.cat(all_embeddings, 1)
         gu, gi = torch.split(all_embeddings, [self.num_users, self.num_items], 0)
-        self.Gu = torch.nn.Parameter(gu)
-        self.Gi = torch.nn.Parameter(gi)
+        self.Gu = torch.nn.Parameter(gu).to(self.device)
+        self.Gi = torch.nn.Parameter(gi).to(self.device)
 
     def forward(self, inputs, **kwargs):
         user, item = inputs
-        gamma_u = torch.squeeze(self.Gu[user])
-        gamma_i = torch.squeeze(self.Gi[item])
+        gamma_u = torch.squeeze(self.Gu[user]).to(self.device)
+        gamma_i = torch.squeeze(self.Gi[item]).to(self.device)
 
         xui = torch.sum(gamma_u * gamma_i, 1)
 
         return xui, gamma_u, gamma_i
 
     def predict(self, start, stop, **kwargs):
-        return torch.matmul(self.Gu[start:stop], torch.transpose(self.Gi, 0, 1))
+        return torch.matmul(self.Gu[start:stop].to(self.device), torch.transpose(self.Gi.to(self.device), 0, 1))
 
     def train_step(self, batch):
         user, pos, neg = batch
