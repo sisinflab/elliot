@@ -14,7 +14,7 @@ experiment:
   evaluation:
     simple_metrics: [HR, nDCG, Precision]
     relevance_threshold: 1
-  gpu: -1
+  gpu: 0
   external_models_path: ../external/models/__init__.py
   models:
     external.NGCF:
