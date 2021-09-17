@@ -35,6 +35,8 @@ class NGCFModel(torch.nn.Module, ABC):
         super().__init__()
         torch.manual_seed(random_seed)
 
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
         self.num_users = num_users
         self.num_items = num_items
         self.embed_k = embed_k
@@ -49,8 +51,10 @@ class NGCFModel(torch.nn.Module, ABC):
 
         self.Gu = torch.nn.Parameter(
             torch.nn.init.zeros_(torch.empty((self.num_users, sum(self.weight_size_list)))))
+        self.Gu.to(self.device)
         self.Gi = torch.nn.Parameter(
             torch.nn.init.zeros_(torch.empty((self.num_items, sum(self.weight_size_list)))))
+        self.Gi.to(self.device)
 
         propagation_network_list = []
 
@@ -62,6 +66,7 @@ class NGCFModel(torch.nn.Module, ABC):
                                                        self.message_dropout[layer]), 'x, edge_index -> x'))
 
         self.propagation_network = torch_geometric.nn.Sequential('x, edge_index', propagation_network_list)
+        self.propagation_network.to(self.device)
         self.softplus = torch.nn.Softplus()
 
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
@@ -77,10 +82,10 @@ class NGCFModel(torch.nn.Module, ABC):
         for layer in range(0, self.n_layers, 2):
             dropout_edge_index = list(
                 self.propagation_network.children()
-            )[layer](self.edge_index)
+            )[layer](self.edge_index.to(self.device))
             all_embeddings += [list(
                 self.propagation_network.children()
-            )[layer + 1](all_embeddings[layer], dropout_edge_index)]
+            )[layer + 1](all_embeddings[layer].to(self.device), dropout_edge_index.to(self.device))]
 
         all_embeddings = torch.cat(all_embeddings, 1)
         gu, gi = torch.split(all_embeddings, [self.num_users, self.num_items], 0)
