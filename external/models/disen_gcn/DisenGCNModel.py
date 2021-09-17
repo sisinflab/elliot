@@ -83,27 +83,40 @@ class DisenGCNModel(torch.nn.Module, ABC):
         all_zeta = torch.cat((zeta_u, zeta_i), 0)
         all_zeta = self.disentangle_network(all_zeta, self.edge_index)
         zeta_u, zeta_i = torch.split(all_zeta, [self.num_users, self.num_items], 0)
+        c_u = zeta_u.reshape(zeta_u.shape[0], zeta_u.shape[1] * zeta_u.shape[2])
+        c_i = zeta_i.reshape(zeta_i.shape[0], zeta_i.shape[1] * zeta_i.shape[2])
 
         user, item = inputs
 
-        xui = torch.sum(torch.squeeze(zeta_u[user]) * torch.squeeze(zeta_i[item]), 1)
+        xui = torch.sum(torch.squeeze(c_u[user]) * torch.squeeze(c_i[item]), 1)
 
         return xui, zeta_u, zeta_i
 
     def predict(self, start, stop, **kwargs):
-        return torch.matmul(self.Gu[start:stop], torch.transpose(self.Gi, 0, 1))
+        zeta_u = self.projection_network(self.Gu)
+        zeta_i = self.projection_network(self.Gi)
+
+        all_zeta = torch.cat((zeta_u, zeta_i), 0)
+        self.disentangle_network.eval()
+        all_zeta = self.disentangle_network(all_zeta, self.edge_index)
+        self.disentangle_network.train()
+        zeta_u, zeta_i = torch.split(all_zeta, [self.num_users, self.num_items], 0)
+        c_u = zeta_u.reshape(zeta_u.shape[0], zeta_u.shape[1] * zeta_u.shape[2])
+        c_i = zeta_i.reshape(zeta_i.shape[0], zeta_i.shape[1] * zeta_i.shape[2])
+
+        return torch.matmul(c_u[start:stop], torch.transpose(c_i, 0, 1))
 
     def train_step(self, batch):
         user, pos, neg = batch
-        xu_pos, gamma_u, gamma_pos = self.forward(inputs=(user, pos))
-        xu_neg, _, gamma_neg = self.forward(inputs=(user, neg))
+        xu_pos, zeta_u, zeta_i_pos = self.forward(inputs=(user, pos))
+        xu_neg, _, zeta_i_neg = self.forward(inputs=(user, neg))
 
         difference = torch.clamp(xu_pos - xu_neg, -80.0, 1e8)
         loss = torch.sum(self.softplus(-difference))
-        reg_loss = self.l_w * (torch.norm(gamma_u, 2) +
-                               torch.norm(gamma_pos, 2) +
-                               torch.norm(gamma_neg, 2) +
-                               torch.stack([torch.norm(value, 2) for value in self.propagation_network.parameters()],
+        reg_loss = self.l_w * (torch.norm(zeta_u, 2) +
+                               torch.norm(zeta_i_pos, 2) +
+                               torch.norm(zeta_i_neg, 2) +
+                               torch.stack([torch.norm(value, 2) for value in self.projection_network.parameters()],
                                            dim=0).sum(dim=0)) * 2
         loss += reg_loss
 
