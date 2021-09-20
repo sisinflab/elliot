@@ -33,6 +33,8 @@ class GATModel(torch.nn.Module, ABC):
         super().__init__()
         torch.manual_seed(random_seed)
 
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
         self.num_users = num_users
         self.num_items = num_items
         self.embed_k = embed_k
@@ -46,8 +48,10 @@ class GATModel(torch.nn.Module, ABC):
 
         self.Gu = torch.nn.Parameter(
             torch.nn.init.zeros_(torch.empty((self.num_users, sum(self.weight_size_list)))))
+        self.Gu.to(self.device)
         self.Gi = torch.nn.Parameter(
             torch.nn.init.zeros_(torch.empty((self.num_items, sum(self.weight_size_list)))))
+        self.Gi.to(self.device)
 
         propagation_network_list = []
 
@@ -59,6 +63,7 @@ class GATModel(torch.nn.Module, ABC):
                                                      bias=False), 'x, edge_index -> x'))
 
         self.propagation_network = torch_geometric.nn.Sequential('x, edge_index', propagation_network_list)
+        self.propagation_network.to(self.device)
         self.softplus = torch.nn.Softplus()
 
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
