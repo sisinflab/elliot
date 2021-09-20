@@ -61,7 +61,7 @@ class LightGCNModel(torch.nn.Module, ABC):
 
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
 
-    def _propagate_embeddings(self):
+    def propagate_embeddings(self):
         ego_embeddings = torch.cat((self.Gu.to(self.device), self.Gi.to(self.device)), 0)
         all_embeddings = [ego_embeddings]
 
@@ -75,7 +75,7 @@ class LightGCNModel(torch.nn.Module, ABC):
         return gu, gi
 
     def forward(self, inputs, **kwargs):
-        gu, gi = self._propagate_embeddings()
+        gu, gi = self.propagate_embeddings()
         user, item = inputs
         gamma_u = torch.squeeze(gu[user]).to(self.device)
         gamma_i = torch.squeeze(gi[item]).to(self.device)
@@ -84,9 +84,8 @@ class LightGCNModel(torch.nn.Module, ABC):
 
         return xui
 
-    def predict(self, start, stop, **kwargs):
-        gu, gi = self._propagate_embeddings()
-        return torch.matmul(gu[start:stop].to(self.device), torch.transpose(gi.to(self.device), 0, 1))
+    def predict(self, gu, gi, **kwargs):
+        return torch.matmul(gu.to(self.device), torch.transpose(gi.to(self.device), 0, 1))
 
     def train_step(self, batch):
         user, pos, neg = batch
