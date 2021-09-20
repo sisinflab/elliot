@@ -73,7 +73,6 @@ class GraphSAGEModel(torch.nn.Module, ABC):
             current_embeddings /= torch.unsqueeze(torch.norm(current_embeddings, 2, dim=1), dim=1)
 
         gu, gi = torch.split(current_embeddings, [self.num_users, self.num_items], 0)
-
         return gu, gi
 
     def forward(self, inputs, **kwargs):
