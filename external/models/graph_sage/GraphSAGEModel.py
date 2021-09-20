@@ -32,6 +32,8 @@ class GraphSAGEModel(torch.nn.Module, ABC):
         super().__init__()
         torch.manual_seed(random_seed)
 
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
         self.num_users = num_users
         self.num_items = num_items
         self.embed_k = embed_k
@@ -44,8 +46,10 @@ class GraphSAGEModel(torch.nn.Module, ABC):
 
         self.Gu = torch.nn.Parameter(
             torch.nn.init.zeros_(torch.empty((self.num_users, self.embed_k))))
+        self.Gu.to(self.device)
         self.Gi = torch.nn.Parameter(
             torch.nn.init.zeros_(torch.empty((self.num_items, self.embed_k))))
+        self.Gi.to(self.device)
 
         propagation_network_list = []
 
@@ -54,50 +58,45 @@ class GraphSAGEModel(torch.nn.Module, ABC):
                                                             self.weight_size_list[layer + 1]), 'x, edge_index -> x'))
 
         self.propagation_network = torch_geometric.nn.Sequential('x, edge_index', propagation_network_list)
+        self.propagation_network.to(self.device)
         self.softplus = torch.nn.Softplus()
 
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
 
-    def _propagate_embeddings(self):
-        # Extract gu_0 and gi_0 to begin embedding updating for L layers
-        gu_0 = self.Gu
-        gi_0 = self.Gi
-
-        current_embeddings = torch.cat((gu_0, gi_0), 0)
+    def propagate_embeddings(self):
+        current_embeddings = torch.cat((self.Gu.to(self.device), self.Gi.to(self.device)), 0)
 
         for layer in range(0, self.n_layers):
             current_embeddings = list(
                 self.propagation_network.children()
-            )[layer](current_embeddings, self.edge_index)
+            )[layer](current_embeddings.to(self.device), self.edge_index.to(self.device))
             current_embeddings /= torch.unsqueeze(torch.norm(current_embeddings, 2, dim=1), dim=1)
 
         gu, gi = torch.split(current_embeddings, [self.num_users, self.num_items], 0)
-        self.Gu = torch.nn.Parameter(gu)
-        self.Gi = torch.nn.Parameter(gi)
+        return gu, gi
 
     def forward(self, inputs, **kwargs):
-        user, item = inputs
-        gamma_u = torch.squeeze(self.Gu[user])
-        gamma_i = torch.squeeze(self.Gi[item])
+        gu, gi = inputs
+        gamma_u = torch.squeeze(gu).to(self.device)
+        gamma_i = torch.squeeze(gi).to(self.device)
 
         xui = torch.sum(gamma_u * gamma_i, 1)
 
-        return xui, gamma_u, gamma_i
+        return xui
 
-    def predict(self, start, stop, **kwargs):
-        return torch.matmul(self.Gu[start:stop], torch.transpose(self.Gi, 0, 1))
+    def predict(self, gu, gi, **kwargs):
+        return torch.matmul(gu.to(self.device), torch.transpose(gi.to(self.device), 0, 1))
 
     def train_step(self, batch):
+        gu, gi = self.propagate_embeddings()
         user, pos, neg = batch
-        self._propagate_embeddings()
-        xu_pos, gamma_u, gamma_pos = self.forward(inputs=(user, pos))
-        xu_neg, _, gamma_neg = self.forward(inputs=(user, neg))
+        xu_pos = self.forward(inputs=(gu[user], gi[pos]))
+        xu_neg = self.forward(inputs=(gu[user], gi[pos]))
 
         difference = torch.clamp(xu_pos - xu_neg, -80.0, 1e8)
         loss = torch.sum(self.softplus(-difference))
-        reg_loss = self.l_w * (torch.norm(gamma_u, 2) +
-                               torch.norm(gamma_pos, 2) +
-                               torch.norm(gamma_neg, 2) +
+        reg_loss = self.l_w * (torch.norm(self.Gu, 2) +
+                               torch.norm(self.Gi, 2) +
                                torch.stack([torch.norm(value, 2) for value in self.propagation_network.parameters()],
                                            dim=0).sum(dim=0)) * 2
         loss += reg_loss
@@ -108,6 +107,6 @@ class GraphSAGEModel(torch.nn.Module, ABC):
 
         return loss.detach().cpu().numpy()
 
-    @staticmethod
-    def get_top_k(preds, train_mask, k=100):
-        return torch.topk(torch.where(torch.tensor(train_mask), preds, torch.tensor(-np.inf)), k=k, sorted=True)
+    def get_top_k(self, preds, train_mask, k=100):
+        return torch.topk(torch.where(torch.tensor(train_mask).to(self.device), preds.to(self.device), torch.tensor(-np.inf).to(self.device)), k=k, sorted=True)
+
