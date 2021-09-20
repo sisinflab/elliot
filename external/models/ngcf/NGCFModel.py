@@ -50,10 +50,10 @@ class NGCFModel(torch.nn.Module, ABC):
         self.edge_index = torch.tensor(edge_index, dtype=torch.int64)
 
         self.Gu = torch.nn.Parameter(
-            torch.nn.init.zeros_(torch.empty((self.num_users, sum(self.weight_size_list)))))
+            torch.nn.init.zeros_(torch.empty((self.num_users, self.embed_k))))
         self.Gu.to(self.device)
         self.Gi = torch.nn.Parameter(
-            torch.nn.init.zeros_(torch.empty((self.num_items, sum(self.weight_size_list)))))
+            torch.nn.init.zeros_(torch.empty((self.num_items, self.embed_k))))
         self.Gi.to(self.device)
 
         propagation_network_list = []
@@ -72,11 +72,7 @@ class NGCFModel(torch.nn.Module, ABC):
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
 
     def _propagate_embeddings(self):
-        # Extract gu_0 and gi_0 to begin embedding updating for L layers
-        gu_0 = self.Gu[:, :self.embed_k].to(self.device)
-        gi_0 = self.Gi[:, :self.embed_k].to(self.device)
-
-        ego_embeddings = torch.cat((gu_0, gi_0), 0)
+        ego_embeddings = torch.cat((self.Gu.to(self.device), self.Gi.to(self.device)), 0)
         all_embeddings = [ego_embeddings]
 
         for layer in range(0, self.n_layers, 2):
@@ -89,32 +85,31 @@ class NGCFModel(torch.nn.Module, ABC):
 
         all_embeddings = torch.cat(all_embeddings, 1)
         gu, gi = torch.split(all_embeddings, [self.num_users, self.num_items], 0)
-        self.Gu = torch.nn.Parameter(gu).to(self.device)
-        self.Gi = torch.nn.Parameter(gi).to(self.device)
+        return gu, gi
 
     def forward(self, inputs, **kwargs):
+        gu, gi = self._propagate_embeddings()
         user, item = inputs
-        gamma_u = torch.squeeze(self.Gu[user]).to(self.device)
-        gamma_i = torch.squeeze(self.Gi[item]).to(self.device)
+        gamma_u = torch.squeeze(gu[user]).to(self.device)
+        gamma_i = torch.squeeze(gi[item]).to(self.device)
 
         xui = torch.sum(gamma_u * gamma_i, 1)
 
-        return xui, gamma_u, gamma_i
+        return xui
 
     def predict(self, start, stop, **kwargs):
-        return torch.matmul(self.Gu[start:stop].to(self.device), torch.transpose(self.Gi.to(self.device), 0, 1))
+        gu, gi = self._propagate_embeddings()
+        return torch.matmul(gu[start:stop].to(self.device), torch.transpose(gi.to(self.device), 0, 1))
 
     def train_step(self, batch):
         user, pos, neg = batch
-        self._propagate_embeddings()
-        xu_pos, gamma_u, gamma_pos = self.forward(inputs=(user, pos))
-        xu_neg, _, gamma_neg = self.forward(inputs=(user, neg))
+        xu_pos = self.forward(inputs=(user, pos))
+        xu_neg = self.forward(inputs=(user, neg))
 
         difference = torch.clamp(xu_pos - xu_neg, -80.0, 1e8)
         loss = torch.sum(self.softplus(-difference))
-        reg_loss = self.l_w * (torch.norm(gamma_u, 2) +
-                               torch.norm(gamma_pos, 2) +
-                               torch.norm(gamma_neg, 2) +
+        reg_loss = self.l_w * (torch.norm(self.Gu, 2) +
+                               torch.norm(self.Gi, 2) +
                                torch.stack([torch.norm(value, 2) for value in self.propagation_network.parameters()],
                                            dim=0).sum(dim=0)) * 2
         loss += reg_loss
