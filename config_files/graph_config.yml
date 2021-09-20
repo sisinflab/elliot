@@ -55,10 +55,10 @@ experiment:
         restore: False
       lr: 0.0005
       epochs: 50
-      batch_size: 512
+      batch_size: 1024
       factors: 64
       l_w: 0.1
-      weight_size: (64,)
+      weight_size: (64,32,32)
 #    external.GAT:
 #      meta:
 #        validation_rate: 1
