@@ -74,14 +74,16 @@ class NGCFModel(torch.nn.Module, ABC):
     def propagate_embeddings(self):
         ego_embeddings = torch.cat((self.Gu.to(self.device), self.Gi.to(self.device)), 0)
         all_embeddings = [ego_embeddings]
+        embedding_idx = 0
 
-        for layer in range(0, self.n_layers, 2):
+        for layer in range(0, self.n_layers * 2, 2):
             dropout_edge_index = list(
                 self.propagation_network.children()
             )[layer](self.edge_index.to(self.device))
             all_embeddings += [list(
                 self.propagation_network.children()
-            )[layer + 1](all_embeddings[layer].to(self.device), dropout_edge_index.to(self.device))]
+            )[layer + 1](all_embeddings[embedding_idx].to(self.device), dropout_edge_index.to(self.device))]
+            embedding_idx += 1
 
         all_embeddings = torch.cat(all_embeddings, 1)
         gu, gi = torch.split(all_embeddings, [self.num_users, self.num_items], 0)
