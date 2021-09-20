@@ -28,9 +28,9 @@ experiment:
       lr: 0.0005
       epochs: 10
       factors: 64
-      batch_size: 64
+      batch_size: 1024
       l_w: 0.1
-      weight_size: (128,64,32,)
+      weight_size: (128,)
 #    external.LightGCN:
 #      meta:
 #        validation_rate: 1
