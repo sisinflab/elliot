@@ -28,7 +28,7 @@ experiment:
       lr: 0.0005
       epochs: 10
       factors: 64
-      batch_size: 512
+      batch_size: 256
       l_w: 0.1
       weight_size: (128,64,32,)
 #    external.LightGCN:
