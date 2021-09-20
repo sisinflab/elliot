@@ -3,7 +3,7 @@ from .msap import MSAPMF
 from .AdversarialMF import AdversarialMF
 from .ngcf import NGCF
 from .lightgcn import LightGCN
-from .graph_sage import GraphSAGE
+from .pinsage import PinSage
 from .gat import GAT
 from .gcmc import GCMC
 from .disen_gcn import DisenGCN

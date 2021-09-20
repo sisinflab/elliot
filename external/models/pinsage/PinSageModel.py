@@ -9,24 +9,29 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malite
 
 from abc import ABC
 
-from .GraphSAGELayer import GraphSAGELayer
+from .PinSageLayer import PinSageLayer
 import torch
 import torch_geometric
 import numpy as np
+from collections import OrderedDict
 
 
-class GraphSAGEModel(torch.nn.Module, ABC):
+class PinSageModel(torch.nn.Module, ABC):
     def __init__(self,
                  num_users,
                  num_items,
                  learning_rate,
                  embed_k,
                  l_w,
-                 weight_size,
+                 message_weight_size,
+                 convolution_weight_size,
+                 out_weight_size,
+                 t_top_nodes,
                  n_layers,
+                 delta,
                  edge_index,
                  random_seed,
-                 name="GraphSAGE",
+                 name="PinSage",
                  **kwargs
                  ):
         super().__init__()
@@ -39,9 +44,15 @@ class GraphSAGEModel(torch.nn.Module, ABC):
         self.embed_k = embed_k
         self.learning_rate = learning_rate
         self.l_w = l_w
-        self.weight_size = weight_size
+        self.message_weight_size = message_weight_size
+        self.convolution_weight_size = convolution_weight_size
+        self.out_weight_size = out_weight_size
+        self.t_top_nodes = t_top_nodes
         self.n_layers = n_layers
-        self.weight_size_list = [self.embed_k] + self.weight_size
+        self.delta = delta
+        self.message_weight_size_list = [self.embed_k] + self.message_weight_size
+        self.convolution_weight_size_list = list(self.convolution_weight_size)
+        self.out_weight_size_list = list(self.out_weight_size)
         self.edge_index = torch.tensor(edge_index, dtype=torch.int64)
 
         self.Gu = torch.nn.Parameter(
@@ -51,15 +62,29 @@ class GraphSAGEModel(torch.nn.Module, ABC):
             torch.nn.init.zeros_(torch.empty((self.num_items, self.embed_k))))
         self.Gi.to(self.device)
 
-        propagation_network_list = []
+        propagation_network_list = [(PinSageLayer(self.message_weight_size_list[0],
+                                                  self.message_weight_size_list[1],
+                                                  self.convolution_weight_size_list[0]), 'x, edge_index -> x')]
 
-        for layer in range(self.n_layers):
-            propagation_network_list.append((GraphSAGELayer(self.weight_size_list[layer],
-                                                            self.weight_size_list[layer + 1]), 'x, edge_index -> x'))
+        for layer in range(1, self.n_layers):
+            propagation_network_list.append((PinSageLayer(self.convolution_weight_size_list[layer - 1],
+                                                          self.message_weight_size_list[layer + 1],
+                                                          self.convolution_weight_size_list[layer]), 'x, edge_index -> x'))
 
         self.propagation_network = torch_geometric.nn.Sequential('x, edge_index', propagation_network_list)
+
+        out_network_list = [('out_0', torch.nn.Linear(in_features=self.convolution_weight_size_list[-1],
+                                                      out_features=self.out_weight_size_list[0]))]
+        out_network_list += [('relu_0', torch.nn.ReLU())]
+        out_network_list += [('out_1', torch.nn.Linear(in_features=self.out_weight_size_list[0],
+                                                       out_features=self.out_weight_size_list[1], bias=False))]
+
+        self.out_network = torch.nn.Sequential(OrderedDict(out_network_list))
+
         self.propagation_network.to(self.device)
-        self.softplus = torch.nn.Softplus()
+        self.out_network.to(self.device)
+
+        self.loss = torch.nn.MarginRankingLoss()
 
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
 
@@ -69,7 +94,9 @@ class GraphSAGEModel(torch.nn.Module, ABC):
         for layer in range(0, self.n_layers):
             current_embeddings = list(
                 self.propagation_network.children()
-            )[layer](current_embeddings.to(self.device), self.edge_index.to(self.device))
+            )[0][layer](current_embeddings.to(self.device), self.edge_index.to(self.device))
+
+        current_embeddings = self.out_network(current_embeddings.to(self.device))
 
         gu, gi = torch.split(current_embeddings, [self.num_users, self.num_items], 0)
         return gu, gi
@@ -92,8 +119,7 @@ class GraphSAGEModel(torch.nn.Module, ABC):
         xu_pos = self.forward(inputs=(gu[user], gi[pos]))
         xu_neg = self.forward(inputs=(gu[user], gi[neg]))
 
-        difference = torch.clamp(xu_pos - xu_neg, -80.0, 1e8)
-        loss = torch.sum(self.softplus(-difference))
+        loss = self.loss(xu_pos, xu_neg, torch.ones_like(xu_pos))
         reg_loss = self.l_w * (torch.norm(self.Gu, 2) +
                                torch.norm(self.Gi, 2) +
                                torch.stack([torch.norm(value, 2) for value in self.propagation_network.parameters()],

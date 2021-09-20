@@ -16,14 +16,14 @@ from elliot.dataset.samplers import custom_sampler as cs
 from elliot.recommender import BaseRecommenderModel
 from elliot.recommender.base_recommender_model import init_charger
 from elliot.recommender.recommender_utils_mixin import RecMixin
-from .GraphSAGEModel import GraphSAGEModel
+from .PinSageModel import PinSageModel
 
 
-class GraphSAGE(RecMixin, BaseRecommenderModel):
+class PinSage(RecMixin, BaseRecommenderModel):
     r"""
-    Inductive Representation Learning on Large Graphs
+    Graph Convolutional Neural Networks for Web-Scale Recommender Systems
 
-    For further details, please refer to the `paper <https://proceedings.neurips.cc/paper/2017/hash/5dd9db5e033da9c6fb5ba83c7a7ebea9-Abstract.html>`_
+    For further details, please refer to the `paper <https://dl.acm.org/doi/10.1145/3219819.3219890>`_
 
     Args:
         lr: Learning rate
@@ -31,14 +31,17 @@ class GraphSAGE(RecMixin, BaseRecommenderModel):
         factors: Number of latent factors
         batch_size: Batch size
         l_w: Regularization coefficient
-        weight_size: Tuple with number of units for each embedding propagation layer
+        message_weight_size: Tuple with number of units for each message layer
+        convolution_weight_size: Tuple with number of units for each convolution layer
+        out_weight_size: Single tuple with number of units for the two output layers
+        t_top_nodes: Number of nodes to consider from neighborhood according to L1-norm random walks
 
     To include the recommendation model, add it to the config file adopting the following pattern:
 
     .. code:: yaml
 
       models:
-        GraphSAGE:
+        PinSage:
           meta:
             save_recs: True
           lr: 0.0005
@@ -46,8 +49,12 @@ class GraphSAGE(RecMixin, BaseRecommenderModel):
           batch_size: 512
           factors: 64
           l_w: 0.1
-          weight_size: (64,)
+          message_weight_size: (64,32,32)
+          convolution_weight_size: (64,32,32)
+          out_weight_size: (64,32)
+          t_top_nodes: 10
     """
+
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
 
@@ -61,31 +68,44 @@ class GraphSAGE(RecMixin, BaseRecommenderModel):
             ("_learning_rate", "lr", "lr", 0.0005, None, None),
             ("_factors", "factors", "factors", 64, None, None),
             ("_l_w", "l_w", "l_w", 0.01, None, None),
-            ("_weight_size", "weight_size", "weight_size", "(64,)", lambda x: list(make_tuple(x)),
-             lambda x: self._batch_remove(str(x), " []").replace(",", "-"))
+            ("_message_weight_size", "message_weight_size", "message_weight_size", "(64,)",
+             lambda x: list(make_tuple(x)),
+             lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
+            ("_convolution_weight_size", "convolution_weight_size", "convolution_weight_size", "(64,)",
+             lambda x: list(make_tuple(x)),
+             lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
+            ("_out_weight_size", "out_weight_size", "out_weight_size", "(64,)",
+             lambda x: list(make_tuple(x)),
+             lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
+            ("_t_top_nodes", "t_top_nodes", "t_top_nodes", 10, None, None),
+            ("_delta", "delta", "delta", 0.5, None, None),
         ]
         self.autoset_params()
 
-        self._n_layers = len(self._weight_size)
+        self._n_layers = len(self._message_weight_size)
 
         row, col = data.sp_i_train.nonzero()
         self.edge_index = np.array([row, col])
 
-        self._model = GraphSAGEModel(
+        self._model = PinSageModel(
             num_users=self._num_users,
             num_items=self._num_items,
             learning_rate=self._learning_rate,
             embed_k=self._factors,
             l_w=self._l_w,
-            weight_size=self._weight_size,
+            message_weight_size=self._message_weight_size,
+            convolution_weight_size=self._convolution_weight_size,
+            out_weight_size=self._out_weight_size,
+            t_top_nodes=self._t_top_nodes,
             n_layers=self._n_layers,
+            delta=self._delta,
             edge_index=self.edge_index,
             random_seed=self._seed
         )
 
     @property
     def name(self):
-        return "GraphSAGE" \
+        return "PinSage" \
                + f"_{self.get_base_params_shortcut()}" \
                + f"_{self.get_params_shortcut()}"
 

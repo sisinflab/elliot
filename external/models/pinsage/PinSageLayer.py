@@ -2,14 +2,13 @@ from abc import ABC
 
 import torch
 from torch_geometric.nn import MessagePassing
-from torch_geometric.utils import add_self_loops
 
 
-class GraphSAGELayer(MessagePassing, ABC):
-    def __init__(self, in_channels, out_channels):
-        super(GraphSAGELayer, self).__init__(aggr="mean")
-        self.lin1 = torch.nn.Linear(in_channels, out_channels)
-        self.lin2 = torch.nn.Linear(in_channels + out_channels, out_channels)
+class PinSageLayer(MessagePassing, ABC):
+    def __init__(self, message_in_channels, message_out_channels, convolution_out_channels):
+        super(PinSageLayer, self).__init__(aggr="mean")
+        self.lin1 = torch.nn.Linear(message_in_channels, message_out_channels)
+        self.lin2 = torch.nn.Linear(message_in_channels + message_out_channels, convolution_out_channels)
         self.relu = torch.nn.ReLU()
 
     def forward(self, x, edge_index):
