@@ -75,10 +75,9 @@ class LightGCNModel(torch.nn.Module, ABC):
         return gu, gi
 
     def forward(self, inputs, **kwargs):
-        gu, gi = self.propagate_embeddings()
-        user, item = inputs
-        gamma_u = torch.squeeze(gu[user]).to(self.device)
-        gamma_i = torch.squeeze(gi[item]).to(self.device)
+        gu, gi = inputs
+        gamma_u = torch.squeeze(gu).to(self.device)
+        gamma_i = torch.squeeze(gi).to(self.device)
 
         xui = torch.sum(gamma_u * gamma_i, 1)
 
@@ -88,9 +87,10 @@ class LightGCNModel(torch.nn.Module, ABC):
         return torch.matmul(gu.to(self.device), torch.transpose(gi.to(self.device), 0, 1))
 
     def train_step(self, batch):
+        gu, gi = self.propagate_embeddings()
         user, pos, neg = batch
-        xu_pos = self.forward(inputs=(user, pos))
-        xu_neg = self.forward(inputs=(user, neg))
+        xu_pos = self.forward(inputs=(gu[user], gi[pos]))
+        xu_neg = self.forward(inputs=(gu[user], gi[pos]))
 
         difference = torch.clamp(xu_pos - xu_neg, -80.0, 1e8)
         loss = torch.sum(self.softplus(-difference))
