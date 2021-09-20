@@ -91,7 +91,7 @@ class GraphSAGEModel(torch.nn.Module, ABC):
         gu, gi = self.propagate_embeddings()
         user, pos, neg = batch
         xu_pos = self.forward(inputs=(gu[user], gi[pos]))
-        xu_neg = self.forward(inputs=(gu[user], gi[pos]))
+        xu_neg = self.forward(inputs=(gu[user], gi[neg]))
 
         difference = torch.clamp(xu_pos - xu_neg, -80.0, 1e8)
         loss = torch.sum(self.softplus(-difference))
