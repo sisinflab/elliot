@@ -42,7 +42,7 @@ experiment:
       lr: 0.001
       epochs: 10
       factors: 64
-      batch_size: 256
+      batch_size: 1024
       l_w: 0.0001
       n_layers: 3
 #    external.GraphSAGE:
