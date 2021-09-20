@@ -72,7 +72,7 @@ class LightGCNModel(torch.nn.Module, ABC):
         for layer in range(0, self.n_layers):
             all_embeddings += [list(
                 self.propagation_network.children()
-            )[layer](all_embeddings[layer].to(self.device), self.edge_index).to(self.device)]
+            )[layer](all_embeddings[layer].to(self.device), self.edge_index.to(self.device))]
 
         all_embeddings = sum([all_embeddings[k] * self.alpha[k] for k in range(len(all_embeddings))])
         gu, gi = torch.split(all_embeddings, [self.num_users, self.num_items], 0)
