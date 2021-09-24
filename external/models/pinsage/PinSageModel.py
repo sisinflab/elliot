@@ -9,6 +9,8 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malite
 
 from abc import ABC
 
+import networkx as nx
+
 from .PinSageLayer import PinSageLayer
 import torch
 import torch_geometric
@@ -30,6 +32,7 @@ class PinSageModel(torch.nn.Module, ABC):
                  n_layers,
                  delta,
                  edge_index,
+                 graph,
                  random_seed,
                  name="PinSage",
                  **kwargs
@@ -54,6 +57,7 @@ class PinSageModel(torch.nn.Module, ABC):
         self.convolution_weight_size_list = list(self.convolution_weight_size)
         self.out_weight_size_list = list(self.out_weight_size)
         self.edge_index = torch.tensor(edge_index, dtype=torch.int64)
+        self.graph = graph
 
         self.Gu = torch.nn.Parameter(
             torch.nn.init.zeros_(torch.empty((self.num_users, self.embed_k))))
@@ -61,6 +65,8 @@ class PinSageModel(torch.nn.Module, ABC):
         self.Gi = torch.nn.Parameter(
             torch.nn.init.zeros_(torch.empty((self.num_items, self.embed_k))))
         self.Gi.to(self.device)
+
+        # self._get_personalized_page_rank()
 
         propagation_network_list = [(PinSageLayer(self.message_weight_size_list[0],
                                                   self.message_weight_size_list[1],
@@ -87,6 +93,15 @@ class PinSageModel(torch.nn.Module, ABC):
         self.loss = torch.nn.MarginRankingLoss()
 
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
+
+    def _get_personalized_page_rank(self):
+
+        def pagerank(node):
+            return nx.pagerank(self.graph, personalization={node: 1})
+
+        results = []
+        for n in list(self.graph.nodes):
+            results.append(pagerank(n))
 
     def propagate_embeddings(self):
         current_embeddings = torch.cat((self.Gu.to(self.device), self.Gi.to(self.device)), 0)

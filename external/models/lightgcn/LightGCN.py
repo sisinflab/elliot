@@ -65,6 +65,7 @@ class LightGCN(RecMixin, BaseRecommenderModel):
         self.autoset_params()
 
         row, col = data.sp_i_train.nonzero()
+        col = [c + self._num_users for c in col]
         self.edge_index = np.array([row, col])
 
         self._model = LightGCNModel(

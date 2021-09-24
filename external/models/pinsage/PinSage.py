@@ -11,6 +11,7 @@ from ast import literal_eval as make_tuple
 
 from tqdm import tqdm
 import numpy as np
+import networkx as nx
 
 from elliot.dataset.samplers import custom_sampler as cs
 from elliot.recommender import BaseRecommenderModel
@@ -83,9 +84,15 @@ class PinSage(RecMixin, BaseRecommenderModel):
         self.autoset_params()
 
         self._n_layers = len(self._message_weight_size)
-
         row, col = data.sp_i_train.nonzero()
+        col = [c + self._num_users for c in col]
         self.edge_index = np.array([row, col])
+
+        # Build graph with networkx for personalized page rank
+        G = nx.Graph()
+        G.add_nodes_from(row, bipartite=0)
+        G.add_nodes_from(col, bipartite=1)
+        G.add_edges_from(list(zip(col, row)))
 
         self._model = PinSageModel(
             num_users=self._num_users,
@@ -100,6 +107,7 @@ class PinSage(RecMixin, BaseRecommenderModel):
             n_layers=self._n_layers,
             delta=self._delta,
             edge_index=self.edge_index,
+            graph=G,
             random_seed=self._seed
         )
 

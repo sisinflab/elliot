@@ -59,7 +59,10 @@ class NGCFModel(torch.nn.Module, ABC):
         propagation_network_list = []
 
         for layer in range(self.n_layers):
-            propagation_network_list.append((NodeDropout(self.node_dropout[layer], self.num_users, self.num_items),
+            propagation_network_list.append((NodeDropout(self.node_dropout[layer],
+                                                         self.num_users,
+                                                         self.num_items,
+                                                         random_seed),
                                              'edge_index -> edge_index'))
             propagation_network_list.append((NGCFLayer(self.weight_size_list[layer],
                                                        self.weight_size_list[layer + 1],
@@ -79,10 +82,10 @@ class NGCFModel(torch.nn.Module, ABC):
         for layer in range(0, self.n_layers * 2, 2):
             dropout_edge_index = list(
                 self.propagation_network.children()
-            )[layer](self.edge_index.to(self.device))
+            )[0][layer](self.edge_index.to(self.device))
             all_embeddings += [list(
                 self.propagation_network.children()
-            )[layer + 1](all_embeddings[embedding_idx].to(self.device), dropout_edge_index.to(self.device))]
+            )[0][layer + 1](all_embeddings[embedding_idx].to(self.device), dropout_edge_index.to(self.device))]
             embedding_idx += 1
 
         all_embeddings = torch.cat(all_embeddings, 1)
