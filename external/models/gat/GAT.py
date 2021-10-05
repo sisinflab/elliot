@@ -32,6 +32,7 @@ class GAT(RecMixin, BaseRecommenderModel):
         batch_size: Batch size
         l_w: Regularization coefficient
         weight_size: Tuple with number of units for each embedding propagation layer
+        heads: Tuple with numbers for multi-head-attentions
         message_dropout: Tuple with dropout rate for each embedding propagation layer
 
     To include the recommendation model, add it to the config file adopting the following pattern:
@@ -48,6 +49,7 @@ class GAT(RecMixin, BaseRecommenderModel):
           factors: 64
           l_w: 0.1
           weight_size: (64,)
+          heads: (8,)
           message_dropout: (0.1,)
     """
     @init_charger
@@ -64,6 +66,8 @@ class GAT(RecMixin, BaseRecommenderModel):
             ("_factors", "factors", "factors", 64, None, None),
             ("_l_w", "l_w", "l_w", 0.01, None, None),
             ("_weight_size", "weight_size", "weight_size", "(64,)", lambda x: list(make_tuple(x)),
+             lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
+            ("_heads", "heads", "heads", "(1,)", lambda x: list(make_tuple(x)),
              lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
             ("_message_dropout", "message_dropout", "message_dropout", "()", lambda x: list(make_tuple(x)),
              lambda x: self._batch_remove(str(x), " []").replace(",", "-"))
@@ -83,6 +87,7 @@ class GAT(RecMixin, BaseRecommenderModel):
             l_w=self._l_w,
             weight_size=self._weight_size,
             n_layers=self._n_layers,
+            heads=self._heads,
             message_dropout=self._message_dropout,
             edge_index=self.edge_index,
             random_seed=self._seed
@@ -113,9 +118,10 @@ class GAT(RecMixin, BaseRecommenderModel):
     def get_recommendations(self, k: int = 100):
         predictions_top_k_test = {}
         predictions_top_k_val = {}
+        gu, gi = self._model.propagate_embeddings()
         for index, offset in enumerate(range(0, self._num_users, self._batch_size)):
             offset_stop = min(offset + self._batch_size, self._num_users)
-            predictions = self._model.predict(offset, offset_stop)
+            predictions = self._model.predict(gu[offset: offset_stop], gi)
             recs_val, recs_test = self.process_protocol(k, predictions, offset, offset_stop)
             predictions_top_k_val.update(recs_val)
             predictions_top_k_test.update(recs_test)

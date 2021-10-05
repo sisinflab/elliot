@@ -24,6 +24,7 @@ class GATModel(torch.nn.Module, ABC):
                  l_w,
                  weight_size,
                  n_layers,
+                 heads,
                  message_dropout,
                  edge_index,
                  random_seed,
@@ -42,25 +43,36 @@ class GATModel(torch.nn.Module, ABC):
         self.l_w = l_w
         self.weight_size = weight_size
         self.n_layers = n_layers
+        self.heads = heads
         self.message_dropout = message_dropout if message_dropout else [0.0] * self.n_layers
         self.weight_size_list = [self.embed_k] + self.weight_size
         self.edge_index = torch.tensor(edge_index, dtype=torch.int64)
 
         self.Gu = torch.nn.Parameter(
-            torch.nn.init.zeros_(torch.empty((self.num_users, sum(self.weight_size_list)))))
+            torch.nn.init.zeros_(torch.empty((self.num_users, self.embed_k))))
         self.Gu.to(self.device)
         self.Gi = torch.nn.Parameter(
-            torch.nn.init.zeros_(torch.empty((self.num_items, sum(self.weight_size_list)))))
+            torch.nn.init.zeros_(torch.empty((self.num_items, self.embed_k))))
         self.Gi.to(self.device)
 
         propagation_network_list = []
 
-        for layer in range(self.n_layers):
+        for layer in range(self.n_layers - 1):
             propagation_network_list.append((GATConv(in_channels=self.weight_size_list[layer],
                                                      out_channels=self.weight_size_list[layer + 1],
+                                                     heads=self.heads[layer],
                                                      dropout=self.message_dropout[layer],
                                                      add_self_loops=False,
-                                                     bias=False), 'x, edge_index -> x'))
+                                                     concat=True), 'x, edge_index -> x'))
+            propagation_network_list.append(torch.nn.ELU())
+
+        propagation_network_list.append((GATConv(in_channels=self.weight_size_list[self.n_layers - 1],
+                                                 out_channels=self.weight_size_list[self.n_layers],
+                                                 heads=self.heads[self.n_layers - 1],
+                                                 dropout=self.message_dropout[self.n_layers - 1],
+                                                 add_self_loops=False,
+                                                 concat=False), 'x, edge_index -> x'))
+        propagation_network_list.append(torch.nn.Identity())
 
         self.propagation_network = torch_geometric.nn.Sequential('x, edge_index', propagation_network_list)
         self.propagation_network.to(self.device)
@@ -68,47 +80,42 @@ class GATModel(torch.nn.Module, ABC):
 
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
 
-    def _propagate_embeddings(self):
-        # Extract gu_0 and gi_0 to begin embedding updating for L layers
-        gu_0 = self.Gu[:, :self.embed_k]
-        gi_0 = self.Gi[:, :self.embed_k]
-
-        ego_embeddings = torch.cat((gu_0, gi_0), 0)
-        all_embeddings = [ego_embeddings]
+    def propagate_embeddings(self):
+        current_embeddings = torch.cat((self.Gu.to(self.device), self.Gi.to(self.device)), 0)
 
         for layer in range(0, self.n_layers):
-            all_embeddings += [list(
+            current_embeddings = list(
                 self.propagation_network.children()
-            )[layer](all_embeddings[layer], self.edge_index)]
+            )[0][layer](current_embeddings.to(self.device), self.edge_index.to(self.device))
+            current_embeddings = list(
+                self.propagation_network.children()
+            )[0][layer + 1](current_embeddings.to(self.device))
 
-        all_embeddings = torch.cat(all_embeddings, 1)
-        gu, gi = torch.split(all_embeddings, [self.num_users, self.num_items], 0)
-        self.Gu = torch.nn.Parameter(gu)
-        self.Gi = torch.nn.Parameter(gi)
+        gu, gi = torch.split(current_embeddings, [self.num_users, self.num_items], 0)
+        return gu, gi
 
     def forward(self, inputs, **kwargs):
-        user, item = inputs
-        gamma_u = torch.squeeze(self.Gu[user])
-        gamma_i = torch.squeeze(self.Gi[item])
+        gu, gi = inputs
+        gamma_u = gu.to(self.device)
+        gamma_i = gi.to(self.device)
 
         xui = torch.sum(gamma_u * gamma_i, 1)
 
-        return xui, gamma_u, gamma_i
+        return xui
 
-    def predict(self, start, stop, **kwargs):
-        return torch.matmul(self.Gu[start:stop], torch.transpose(self.Gi, 0, 1))
+    def predict(self, gu, gi, **kwargs):
+        return torch.matmul(gu.to(self.device), torch.transpose(gi.to(self.device), 0, 1))
 
     def train_step(self, batch):
+        gu, gi = self.propagate_embeddings()
         user, pos, neg = batch
-        self._propagate_embeddings()
-        xu_pos, gamma_u, gamma_pos = self.forward(inputs=(user, pos))
-        xu_neg, _, gamma_neg = self.forward(inputs=(user, neg))
+        xu_pos = self.forward(inputs=(gu[user], gi[pos]))
+        xu_neg = self.forward(inputs=(gu[user], gi[neg]))
 
         difference = torch.clamp(xu_pos - xu_neg, -80.0, 1e8)
         loss = torch.sum(self.softplus(-difference))
-        reg_loss = self.l_w * (torch.norm(gamma_u, 2) +
-                               torch.norm(gamma_pos, 2) +
-                               torch.norm(gamma_neg, 2) +
+        reg_loss = self.l_w * (torch.norm(self.Gu, 2) +
+                               torch.norm(self.Gi, 2) +
                                torch.stack([torch.norm(value, 2) for value in self.propagation_network.parameters()],
                                            dim=0).sum(dim=0)) * 2
         loss += reg_loss
@@ -119,6 +126,6 @@ class GATModel(torch.nn.Module, ABC):
 
         return loss.detach().cpu().numpy()
 
-    @staticmethod
-    def get_top_k(preds, train_mask, k=100):
-        return torch.topk(torch.where(torch.tensor(train_mask), preds, torch.tensor(-np.inf)), k=k, sorted=True)
+    def get_top_k(self, preds, train_mask, k=100):
+        return torch.topk(torch.where(torch.tensor(train_mask).to(self.device), preds.to(self.device),
+                                      torch.tensor(-np.inf).to(self.device)), k=k, sorted=True)

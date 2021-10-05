@@ -75,7 +75,8 @@ class PinSageModel(torch.nn.Module, ABC):
         for layer in range(1, self.n_layers):
             propagation_network_list.append((PinSageLayer(self.convolution_weight_size_list[layer - 1],
                                                           self.message_weight_size_list[layer + 1],
-                                                          self.convolution_weight_size_list[layer]), 'x, edge_index -> x'))
+                                                          self.convolution_weight_size_list[layer]),
+                                             'x, edge_index -> x'))
 
         self.propagation_network = torch_geometric.nn.Sequential('x, edge_index', propagation_network_list)
 
@@ -148,5 +149,5 @@ class PinSageModel(torch.nn.Module, ABC):
         return loss.detach().cpu().numpy()
 
     def get_top_k(self, preds, train_mask, k=100):
-        return torch.topk(torch.where(torch.tensor(train_mask).to(self.device), preds.to(self.device), torch.tensor(-np.inf).to(self.device)), k=k, sorted=True)
-
+        return torch.topk(torch.where(torch.tensor(train_mask).to(self.device), preds.to(self.device),
+                                      torch.tensor(-np.inf).to(self.device)), k=k, sorted=True)
