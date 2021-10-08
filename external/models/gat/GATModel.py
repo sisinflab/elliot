@@ -64,7 +64,7 @@ class GATModel(torch.nn.Module, ABC):
                                                      dropout=self.message_dropout[layer],
                                                      add_self_loops=False,
                                                      concat=True), 'x, edge_index -> x'))
-            propagation_network_list.append(torch.nn.ELU())
+            propagation_network_list.append((torch.nn.ELU(), 'x -> x'))
 
         propagation_network_list.append((GATConv(in_channels=self.weight_size_list[self.n_layers - 1],
                                                  out_channels=self.weight_size_list[self.n_layers],
@@ -72,7 +72,7 @@ class GATModel(torch.nn.Module, ABC):
                                                  dropout=self.message_dropout[self.n_layers - 1],
                                                  add_self_loops=False,
                                                  concat=False), 'x, edge_index -> x'))
-        propagation_network_list.append(torch.nn.Identity())
+        propagation_network_list.append((torch.nn.Identity(), 'x -> x'))
 
         self.propagation_network = torch_geometric.nn.Sequential('x, edge_index', propagation_network_list)
         self.propagation_network.to(self.device)
@@ -80,24 +80,37 @@ class GATModel(torch.nn.Module, ABC):
 
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
 
-    def propagate_embeddings(self):
+    def propagate_embeddings(self, evaluate=False):
         current_embeddings = torch.cat((self.Gu.to(self.device), self.Gi.to(self.device)), 0)
 
-        for layer in range(0, self.n_layers):
-            current_embeddings = list(
-                self.propagation_network.children()
-            )[0][layer](current_embeddings.to(self.device), self.edge_index.to(self.device))
-            current_embeddings = list(
-                self.propagation_network.children()
-            )[0][layer + 1](current_embeddings.to(self.device))
+        for layer in range(0, self.n_layers * 2, 2):
+            if evaluate:
+                self.propagation_network.eval()
+                with torch.no_grad():
+                    current_embeddings = list(
+                        self.propagation_network.children()
+                    )[0][layer](current_embeddings.to(self.device), self.edge_index.to(self.device))
+                    current_embeddings = list(
+                        self.propagation_network.children()
+                    )[0][layer + 1](current_embeddings.to(self.device))
+            else:
+                current_embeddings = list(
+                    self.propagation_network.children()
+                )[0][layer](current_embeddings.to(self.device), self.edge_index.to(self.device))
+                current_embeddings = list(
+                    self.propagation_network.children()
+                )[0][layer + 1](current_embeddings.to(self.device))
+
+        if evaluate:
+            self.propagation_network.train()
 
         gu, gi = torch.split(current_embeddings, [self.num_users, self.num_items], 0)
         return gu, gi
 
     def forward(self, inputs, **kwargs):
         gu, gi = inputs
-        gamma_u = gu.to(self.device)
-        gamma_i = gi.to(self.device)
+        gamma_u = torch.squeeze(gu).to(self.device)
+        gamma_i = torch.squeeze(gi).to(self.device)
 
         xui = torch.sum(gamma_u * gamma_i, 1)
 

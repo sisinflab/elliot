@@ -32,6 +32,7 @@ experiment:
 #      l_w: 0.1
 #      weight_size: (64,32,32)
 #      node_dropout: (0.1,0,0)
+#      message_dropout: (0.1,0,0)
 #    external.LightGCN:
 #      meta:
 #        validation_rate: 1
@@ -64,23 +65,23 @@ experiment:
 #      out_weight_size: (64,32)
 #      t_top_nodes: 10
 #      delta: 0.5
-    external.GAT:
-      meta:
-        validation_rate: 1
-        verbose: True
-        save_weights: False
-        save_recs: False
-        validation_metric: nDCG
-        restore: False
-      lr: 0.0005
-      epochs: 50
-      batch_size: 1024
-      factors: 64
-      l_w: 0.1
-      weight_size: (64,)
-      heads: (4,)
-      message_dropout: (0.1,)
-#    external.GCMC:
+#    external.GAT:
+#      meta:
+#        validation_rate: 1
+#        verbose: True
+#        save_weights: False
+#        save_recs: False
+#        validation_metric: nDCG
+#        restore: False
+#      lr: 0.0005
+#      epochs: 50
+#      batch_size: 1024
+#      factors: 64
+#      l_w: 0.1
+#      weight_size: (64,)
+#      heads: (4,)
+#      message_dropout: (0.1,)
+#    external.GCMC: # Must run on RAM, otherwise out-of-memory error
 #      meta:
 #        validation_rate: 1
 #        verbose: True
@@ -93,24 +94,24 @@ experiment:
 #      batch_size: 512
 #      factors: 256
 #      l_w: 0.1
-#      convolutional_layer_size: (128,64,)
-#      dense_layer_size: (32,16,)
+#      convolutional_layer_size: (128,64)
+#      dense_layer_size: (32,16)
 #      node_dropout: ()
-#      dense_layer_dropout: (0.1,)
-#    external.DisenGCN:
-#      meta:
-#        validation_rate: 1
-#        verbose: True
-#        save_weights: False
-#        save_recs: False
-#        validation_metric: nDCG
-#        restore: False
-#      lr: 0.0005
-#      epochs: 50
-#      batch_size: 512
-#      factors: 64
-#      l_w: 0.1
-#      weight_size: (64,)
-#      message_dropout: (0.1,)
-#      disen_k: 10
-#      temperature: 10
+#      dense_layer_dropout: (0.1,0)
+    external.DisenGCN:
+      meta:
+        validation_rate: 1
+        verbose: True
+        save_weights: False
+        save_recs: False
+        validation_metric: nDCG
+        restore: False
+      lr: 0.0005
+      epochs: 50
+      batch_size: 512
+      factors: 64
+      l_w: 0.1
+      weight_size: (64,32,16)
+      message_dropout: (0.1,0,0)
+      disen_k: (10,5,2)
+      temperature: 10

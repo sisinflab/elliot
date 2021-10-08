@@ -120,7 +120,7 @@ class NGCF(RecMixin, BaseRecommenderModel):
     def get_recommendations(self, k: int = 100):
         predictions_top_k_test = {}
         predictions_top_k_val = {}
-        gu, gi = self._model.propagate_embeddings()
+        gu, gi = self._model.propagate_embeddings(evaluate=True)
         for index, offset in enumerate(range(0, self._num_users, self._batch_size)):
             offset_stop = min(offset + self._batch_size, self._num_users)
             predictions = self._model.predict(gu[offset: offset_stop], gi)

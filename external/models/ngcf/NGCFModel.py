@@ -74,19 +74,30 @@ class NGCFModel(torch.nn.Module, ABC):
 
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
 
-    def propagate_embeddings(self):
+    def propagate_embeddings(self, evaluate=False):
         ego_embeddings = torch.cat((self.Gu.to(self.device), self.Gi.to(self.device)), 0)
         all_embeddings = [ego_embeddings]
         embedding_idx = 0
 
         for layer in range(0, self.n_layers * 2, 2):
-            dropout_edge_index = list(
-                self.propagation_network.children()
-            )[0][layer](self.edge_index.to(self.device))
-            all_embeddings += [list(
-                self.propagation_network.children()
-            )[0][layer + 1](all_embeddings[embedding_idx].to(self.device), dropout_edge_index.to(self.device))]
+            if not evaluate:
+                dropout_edge_index = list(
+                    self.propagation_network.children()
+                )[0][layer](self.edge_index.to(self.device))
+                all_embeddings += [list(
+                    self.propagation_network.children()
+                )[0][layer + 1](all_embeddings[embedding_idx].to(self.device), dropout_edge_index.to(self.device))]
+            else:
+                self.propagation_network.eval()
+                with torch.no_grad():
+                    all_embeddings += [list(
+                        self.propagation_network.children()
+                    )[0][layer + 1](all_embeddings[embedding_idx].to(self.device), self.edge_index.to(self.device))]
+
             embedding_idx += 1
+
+        if evaluate:
+            self.propagation_network.train()
 
         all_embeddings = torch.cat(all_embeddings, 1)
         gu, gi = torch.split(all_embeddings, [self.num_users, self.num_items], 0)
@@ -125,4 +136,5 @@ class NGCFModel(torch.nn.Module, ABC):
         return loss.detach().cpu().numpy()
 
     def get_top_k(self, preds, train_mask, k=100):
-        return torch.topk(torch.where(torch.tensor(train_mask).to(self.device), preds.to(self.device), torch.tensor(-np.inf).to(self.device)), k=k, sorted=True)
+        return torch.topk(torch.where(torch.tensor(train_mask).to(self.device), preds.to(self.device),
+                                      torch.tensor(-np.inf).to(self.device)), k=k, sorted=True)

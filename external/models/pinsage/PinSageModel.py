@@ -104,15 +104,29 @@ class PinSageModel(torch.nn.Module, ABC):
         for n in list(self.graph.nodes):
             results.append(pagerank(n))
 
-    def propagate_embeddings(self):
+    def propagate_embeddings(self, evaluate=False):
         current_embeddings = torch.cat((self.Gu.to(self.device), self.Gi.to(self.device)), 0)
 
         for layer in range(0, self.n_layers):
-            current_embeddings = list(
-                self.propagation_network.children()
-            )[0][layer](current_embeddings.to(self.device), self.edge_index.to(self.device))
+            if evaluate:
+                self.propagation_network.eval()
+                with torch.no_grad():
+                    current_embeddings = list(
+                        self.propagation_network.children()
+                    )[0][layer](current_embeddings.to(self.device), self.edge_index.to(self.device))
+            else:
+                current_embeddings = list(
+                    self.propagation_network.children()
+                )[0][layer](current_embeddings.to(self.device), self.edge_index.to(self.device))
 
-        current_embeddings = self.out_network(current_embeddings.to(self.device))
+        if evaluate:
+            self.out_network.eval()
+            with torch.no_grad():
+                current_embeddings = self.out_network(current_embeddings.to(self.device))
+            self.propagation_network.train()
+            self.out_network.train()
+        else:
+            current_embeddings = self.out_network(current_embeddings.to(self.device))
 
         gu, gi = torch.split(current_embeddings, [self.num_users, self.num_items], 0)
         return gu, gi

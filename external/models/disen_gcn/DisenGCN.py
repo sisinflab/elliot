@@ -33,7 +33,7 @@ class DisenGCN(RecMixin, BaseRecommenderModel):
         l_w: Regularization coefficient
         weight_size: Tuple with number of units for each embedding propagation layer
         message_dropout: Tuple with dropout rate for each embedding propagation layer
-        disen_k: Factor for disentanglement
+        disen_k: Tuple with factor for disentanglement for each embedding propagation layer
         temperature: Temperature value for softmax
 
     To include the recommendation model, add it to the config file adopting the following pattern:
@@ -51,7 +51,7 @@ class DisenGCN(RecMixin, BaseRecommenderModel):
           l_w: 0.1
           weight_size: (64,)
           message_dropout: (0.1,)
-          disen_k: 10
+          disen_k: (10,)
           temperature: 10
     """
     @init_charger
@@ -71,7 +71,8 @@ class DisenGCN(RecMixin, BaseRecommenderModel):
              lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
             ("_message_dropout", "message_dropout", "message_dropout", "()", lambda x: list(make_tuple(x)),
              lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
-            ("_disen_k", "disen_k", "disen_k", 10, None, None),
+            ("_disen_k", "disen_k", "disen_k", "()", lambda x: list(make_tuple(x)),
+             lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
             ("_temperature", "temperature", "temperature", 10, None, None)
         ]
         self.autoset_params()

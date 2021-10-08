@@ -61,14 +61,24 @@ class LightGCNModel(torch.nn.Module, ABC):
 
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
 
-    def propagate_embeddings(self):
+    def propagate_embeddings(self, evaluate=False):
         ego_embeddings = torch.cat((self.Gu.to(self.device), self.Gi.to(self.device)), 0)
         all_embeddings = [ego_embeddings]
 
         for layer in range(0, self.n_layers):
-            all_embeddings += [list(
-                self.propagation_network.children()
-            )[0][layer](all_embeddings[layer].to(self.device), self.edge_index.to(self.device))]
+            if evaluate:
+                self.propagation_network.eval()
+                with torch.no_grad():
+                    all_embeddings += [list(
+                        self.propagation_network.children()
+                    )[0][layer](all_embeddings[layer].to(self.device), self.edge_index.to(self.device))]
+            else:
+                all_embeddings += [list(
+                    self.propagation_network.children()
+                )[0][layer](all_embeddings[layer].to(self.device), self.edge_index.to(self.device))]
+
+        if evaluate:
+            self.propagation_network.train()
 
         all_embeddings = sum([all_embeddings[k] * self.alpha[k] for k in range(len(all_embeddings))])
         gu, gi = torch.split(all_embeddings, [self.num_users, self.num_items], 0)

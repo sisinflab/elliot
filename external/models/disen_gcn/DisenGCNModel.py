@@ -56,22 +56,19 @@ class DisenGCNModel(torch.nn.Module, ABC):
         self.Gi = torch.nn.Parameter(
             torch.nn.init.zeros_(torch.empty((self.num_items, self.embed_k))))
 
-        projection_network_list = []
-
+        disengcn_network_list = []
         for layer in range(self.n_layers):
-            projection_network_list.append(('feat_proj_' + str(layer), (FeatureProjection(
+            projection_layer = torch.nn.Sequential(OrderedDict([('feat_proj_' + str(layer), (FeatureProjection(
                 self.weight_size_list[layer],
                 self.weight_size_list[layer + 1],
-                disen_k))))
+                self.disen_k[layer])))]))
+            disentangle_layer = torch_geometric.nn.Sequential('x, edge_index', [
+                (DisenGCNLayer(self.message_dropout[layer], self.temperature),
+                 'x, edge_index -> x')])
+            disengcn_network_list.append(('disen_gcn_' + str(layer), torch.nn.Sequential(projection_layer,
+                                                                                         disentangle_layer)))
 
-        self.projection_network = torch.nn.Sequential(OrderedDict(projection_network_list))
-
-        disentangle_network_list = []
-        for layer in range(self.n_layers):
-            disentangle_network_list.append((DisenGCNLayer(self.message_dropout[layer], self.temperature),
-                                             'x, edge_index -> x'))
-
-        self.disentangle_network = torch_geometric.nn.Sequential('x, edge_index', disentangle_network_list)
+        self.disengcn_network = torch.nn.Sequential(OrderedDict(disengcn_network_list))
         self.softplus = torch.nn.Softplus()
 
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)

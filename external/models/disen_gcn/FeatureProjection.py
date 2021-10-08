@@ -1,7 +1,9 @@
+from abc import ABC
+
 import torch
 
 
-class FeatureProjection(torch.nn.Module):
+class FeatureProjection(torch.nn.Module, ABC):
     def __init__(self, in_channels, out_channels, disen_k):
         super(FeatureProjection, self).__init__()
         self.W = torch.nn.Parameter(
