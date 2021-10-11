@@ -74,10 +74,12 @@ class DisenGCNModel(torch.nn.Module, ABC):
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
 
     def forward(self, inputs, **kwargs):
-        zeta_u = self.projection_network(self.Gu)
-        zeta_i = self.projection_network(self.Gi)
+        users, items = inputs
+        for layer in range(self.n_layers):
+            zeta_u = list(self.disengcn_network.children())[layer][0]()
+            zeta_i = list(self.disengcn_network.children())[layer][0]()
+            all_zeta = torch.cat((zeta_u, zeta_i), 0)
 
-        all_zeta = torch.cat((zeta_u, zeta_i), 0)
         all_zeta = self.disentangle_network(all_zeta, self.edge_index)
         zeta_u, zeta_i = torch.split(all_zeta, [self.num_users, self.num_items], 0)
         c_u = zeta_u.reshape(zeta_u.shape[0], zeta_u.shape[1] * zeta_u.shape[2])
