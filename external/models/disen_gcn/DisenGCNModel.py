@@ -29,6 +29,7 @@ class DisenGCNModel(torch.nn.Module, ABC):
                  n_layers,
                  disen_k,
                  temperature,
+                 routing_iterations,
                  message_dropout,
                  edge_index,
                  random_seed,
@@ -37,6 +38,8 @@ class DisenGCNModel(torch.nn.Module, ABC):
                  ):
         super().__init__()
         torch.manual_seed(random_seed)
+
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
         self.num_users = num_users
         self.num_items = num_items
@@ -47,14 +50,17 @@ class DisenGCNModel(torch.nn.Module, ABC):
         self.n_layers = n_layers
         self.disen_k = disen_k
         self.temperature = temperature
+        self.routing_iterations = routing_iterations
         self.message_dropout = message_dropout if message_dropout else [0.0] * self.n_layers
         self.weight_size_list = [self.embed_k] + self.weight_size
         self.edge_index = torch.tensor(edge_index, dtype=torch.int64)
 
         self.Gu = torch.nn.Parameter(
             torch.nn.init.zeros_(torch.empty((self.num_users, self.embed_k))))
+        self.Gu.to(self.device)
         self.Gi = torch.nn.Parameter(
             torch.nn.init.zeros_(torch.empty((self.num_items, self.embed_k))))
+        self.Gi.to(self.device)
 
         disengcn_network_list = []
         for layer in range(self.n_layers):
@@ -63,31 +69,36 @@ class DisenGCNModel(torch.nn.Module, ABC):
                 self.weight_size_list[layer + 1],
                 self.disen_k[layer])))]))
             disentangle_layer = torch_geometric.nn.Sequential('x, edge_index', [
-                (DisenGCNLayer(self.message_dropout[layer], self.temperature),
-                 'x, edge_index -> x')])
+                (DisenGCNLayer(self.temperature), 'x, edge_index -> x')])
             disengcn_network_list.append(('disen_gcn_' + str(layer), torch.nn.Sequential(projection_layer,
                                                                                          disentangle_layer)))
 
         self.disengcn_network = torch.nn.Sequential(OrderedDict(disengcn_network_list))
+        self.disengcn_network.to(self.device)
         self.softplus = torch.nn.Softplus()
 
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
 
     def forward(self, inputs, **kwargs):
-        users, items = inputs
+        user, item, neigh_user, neigh_item = inputs
+        current_edge_index_u = torch.tensor([[0] * len(neigh_user), list(range(1, len(neigh_user) + 1))])
+        current_edge_index_i = torch.tensor([[0] * len(neigh_item), list(range(1, len(neigh_item) + 1))])
+        users_embeddings = self.Gu[[user] + neigh_item]
+        items_embeddings = self.Gi[[item] + neigh_user]
+        input_embeddings_zeta_u = torch.cat((torch.unsqueeze(users_embeddings[0], 0), items_embeddings[1:]), 0)
+        input_embeddings_zeta_i = torch.cat((torch.unsqueeze(items_embeddings[0], 0), users_embeddings[1:]), 0)
         for layer in range(self.n_layers):
-            zeta_u = list(self.disengcn_network.children())[layer][0]()
-            zeta_i = list(self.disengcn_network.children())[layer][0]()
-            all_zeta = torch.cat((zeta_u, zeta_i), 0)
+            zeta_u = list(self.disengcn_network.children())[layer][0](input_embeddings_zeta_u.to(self.device))
+            zeta_i = list(self.disengcn_network.children())[layer][0](input_embeddings_zeta_i.to(self.device))
+            for t in range(self.routing_iterations):
+                c_u = list(self.disengcn_network.children())[layer][1](zeta_u.to(self.device), current_edge_index_u)[0]
+                c_i = list(self.disengcn_network.children())[layer][1](zeta_i.to(self.device), current_edge_index_i)[0]
+                zeta_u[0] = c_u
+                zeta_i[0] = c_i
+            input_embeddings_zeta_u = zeta_u.reshape(zeta_u.shape[0], zeta_u.shape[1] * zeta_u.shape[2])
+            input_embeddings_zeta_i = zeta_i.reshape(zeta_i.shape[0], zeta_i.shape[1] * zeta_i.shape[2])
 
-        all_zeta = self.disentangle_network(all_zeta, self.edge_index)
-        zeta_u, zeta_i = torch.split(all_zeta, [self.num_users, self.num_items], 0)
-        c_u = zeta_u.reshape(zeta_u.shape[0], zeta_u.shape[1] * zeta_u.shape[2])
-        c_i = zeta_i.reshape(zeta_i.shape[0], zeta_i.shape[1] * zeta_i.shape[2])
-
-        user, item = inputs
-
-        xui = torch.sum(torch.squeeze(c_u[user]) * torch.squeeze(c_i[item]), 1)
+        xui = torch.sum(torch.squeeze(input_embeddings_zeta_u[user]) * torch.squeeze(input_embeddings_zeta_u[item]), 1)
 
         return xui, zeta_u, zeta_i
 
@@ -106,9 +117,9 @@ class DisenGCNModel(torch.nn.Module, ABC):
         return torch.matmul(c_u[start:stop], torch.transpose(c_i, 0, 1))
 
     def train_step(self, batch):
-        user, pos, neg = batch
-        xu_pos, zeta_u, zeta_i_pos = self.forward(inputs=(user, pos))
-        xu_neg, _, zeta_i_neg = self.forward(inputs=(user, neg))
+        user, pos, neg, neigh_user, neigh_pos_items, neigh_neg_items = batch
+        xu_pos, zeta_u, zeta_i_pos = self.forward(inputs=(user, pos, neigh_user, neigh_pos_items))
+        xu_neg, _, zeta_i_neg = self.forward(inputs=(user, neg, neigh_user, neigh_neg_items))
 
         difference = torch.clamp(xu_pos - xu_neg, -80.0, 1e8)
         loss = torch.sum(self.softplus(-difference))

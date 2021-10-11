@@ -12,11 +12,11 @@ from ast import literal_eval as make_tuple
 from tqdm import tqdm
 import numpy as np
 
-from elliot.dataset.samplers import custom_sampler as cs
 from elliot.recommender import BaseRecommenderModel
 from elliot.recommender.base_recommender_model import init_charger
 from elliot.recommender.recommender_utils_mixin import RecMixin
 from .DisenGCNModel import DisenGCNModel
+from .pairwise_sampler_disengcn import Sampler
 
 
 class DisenGCN(RecMixin, BaseRecommenderModel):
@@ -35,6 +35,7 @@ class DisenGCN(RecMixin, BaseRecommenderModel):
         message_dropout: Tuple with dropout rate for each embedding propagation layer
         disen_k: Tuple with factor for disentanglement for each embedding propagation layer
         temperature: Temperature value for softmax
+        routing_iterations: Number of routing iterations
 
     To include the recommendation model, add it to the config file adopting the following pattern:
 
@@ -53,11 +54,16 @@ class DisenGCN(RecMixin, BaseRecommenderModel):
           message_dropout: (0.1,)
           disen_k: (10,)
           temperature: 10
+          routing_iterations: 5
     """
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
 
-        self._sampler = cs.Sampler(self._data.i_train_dict)
+        iu_dict = data.build_items_neighbour()
+
+        self._sampler = Sampler(self._data.i_train_dict,
+                                iu_dict,
+                                self._epochs)
         if self._batch_size < 1:
             self._batch_size = self._num_users
 
@@ -73,7 +79,8 @@ class DisenGCN(RecMixin, BaseRecommenderModel):
              lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
             ("_disen_k", "disen_k", "disen_k", "()", lambda x: list(make_tuple(x)),
              lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
-            ("_temperature", "temperature", "temperature", 10, None, None)
+            ("_temperature", "temperature", "temperature", 10, None, None),
+            ("_routing_iterations", "routing_iterations", "routing_iterations", 5, None, None)
         ]
         self.autoset_params()
 
@@ -93,6 +100,7 @@ class DisenGCN(RecMixin, BaseRecommenderModel):
             n_layers=self._n_layers,
             disen_k=self._disen_k,
             temperature=self._temperature,
+            routing_iterations=self._routing_iterations,
             message_dropout=self._message_dropout,
             edge_index=self.edge_index,
             random_seed=self._seed
