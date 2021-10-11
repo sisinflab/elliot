@@ -72,6 +72,7 @@ class DisenGCNModel(torch.nn.Module, ABC):
                 (DisenGCNLayer(self.temperature), 'x, edge_index -> x')])
             disengcn_network_list.append(('disen_gcn_' + str(layer), torch.nn.Sequential(projection_layer,
                                                                                          disentangle_layer)))
+            disengcn_network_list.append(('dropout_' + str(layer), torch.nn.Dropout(self.message_dropout[layer])))
 
         self.disengcn_network = torch.nn.Sequential(OrderedDict(disengcn_network_list))
         self.disengcn_network.to(self.device)
@@ -85,22 +86,26 @@ class DisenGCNModel(torch.nn.Module, ABC):
         current_edge_index_i = torch.tensor([[0] * len(neigh_item), list(range(1, len(neigh_item) + 1))])
         users_embeddings = self.Gu[[user] + neigh_item]
         items_embeddings = self.Gi[[item] + neigh_user]
-        input_embeddings_zeta_u = torch.cat((torch.unsqueeze(users_embeddings[0], 0), items_embeddings[1:]), 0)
-        input_embeddings_zeta_i = torch.cat((torch.unsqueeze(items_embeddings[0], 0), users_embeddings[1:]), 0)
-        for layer in range(self.n_layers):
-            zeta_u = list(self.disengcn_network.children())[layer][0](input_embeddings_zeta_u.to(self.device))
-            zeta_i = list(self.disengcn_network.children())[layer][0](input_embeddings_zeta_i.to(self.device))
+        embeddings_zeta_u = torch.cat((torch.unsqueeze(users_embeddings[0], 0), items_embeddings[1:]), 0)
+        embeddings_zeta_i = torch.cat((torch.unsqueeze(items_embeddings[0], 0), users_embeddings[1:]), 0)
+        for layer in range(0, self.n_layers * 2, 2):
+            zeta_u = list(self.disengcn_network.children())[layer][0](embeddings_zeta_u.to(self.device))
+            zeta_i = list(self.disengcn_network.children())[layer][0](embeddings_zeta_i.to(self.device))
             for t in range(self.routing_iterations):
-                c_u = list(self.disengcn_network.children())[layer][1](zeta_u.to(self.device), current_edge_index_u)[0]
-                c_i = list(self.disengcn_network.children())[layer][1](zeta_i.to(self.device), current_edge_index_i)[0]
+                c_u = list(self.disengcn_network.children())[layer][1](zeta_u.to(self.device),
+                                                                       current_edge_index_u.to(self.device))[0]
+                c_i = list(self.disengcn_network.children())[layer][1](zeta_i.to(self.device),
+                                                                       current_edge_index_i.to(self.device))[0]
                 zeta_u[0] = c_u
                 zeta_i[0] = c_i
-            input_embeddings_zeta_u = zeta_u.reshape(zeta_u.shape[0], zeta_u.shape[1] * zeta_u.shape[2])
-            input_embeddings_zeta_i = zeta_i.reshape(zeta_i.shape[0], zeta_i.shape[1] * zeta_i.shape[2])
+            embeddings_zeta_u = zeta_u.reshape(zeta_u.shape[0], zeta_u.shape[1] * zeta_u.shape[2])
+            embeddings_zeta_i = zeta_i.reshape(zeta_i.shape[0], zeta_i.shape[1] * zeta_i.shape[2])
+            embeddings_zeta_u = list(self.disengcn_network.children())[layer + 1](embeddings_zeta_u.to(self.device))
+            embeddings_zeta_i = list(self.disengcn_network.children())[layer + 1](embeddings_zeta_i.to(self.device))
 
-        xui = torch.sum(torch.squeeze(input_embeddings_zeta_u[user]) * torch.squeeze(input_embeddings_zeta_u[item]), 1)
+        xui = torch.sum(torch.unsqueeze(embeddings_zeta_u[0], 0) * torch.unsqueeze(embeddings_zeta_i[0], 0), 1)
 
-        return xui, zeta_u, zeta_i
+        return xui, embeddings_zeta_u[0], embeddings_zeta_i[0]
 
     def predict(self, start, stop, **kwargs):
         zeta_u = self.projection_network(self.Gu)
@@ -126,7 +131,7 @@ class DisenGCNModel(torch.nn.Module, ABC):
         reg_loss = self.l_w * (torch.norm(zeta_u, 2) +
                                torch.norm(zeta_i_pos, 2) +
                                torch.norm(zeta_i_neg, 2) +
-                               torch.stack([torch.norm(value, 2) for value in self.projection_network.parameters()],
+                               torch.stack([torch.norm(value, 2) for value in self.disengcn_network.parameters()],
                                            dim=0).sum(dim=0)) * 2
         loss += reg_loss
 

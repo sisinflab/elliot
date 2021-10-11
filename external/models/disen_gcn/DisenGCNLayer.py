@@ -14,5 +14,5 @@ class DisenGCNLayer(MessagePassing, ABC):
         return c / torch.unsqueeze(torch.unsqueeze(torch.norm(c, 2, dim=[0, 2]), 0), 2)
 
     def message(self, x_i, x_j):
-        p = torch.softmax(torch.sum(torch.multiply(x_i, x_j), dim=2) / self.temperature, dim=1)
+        p = torch.softmax(torch.sum(x_i * x_j, dim=2) / self.temperature, dim=1)
         return torch.unsqueeze(p, 2) * x_j

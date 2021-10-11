@@ -113,6 +113,6 @@ experiment:
       l_w: 0.1
       weight_size: (64,32,16)
       message_dropout: (0.1,0,0)
-      disen_k: (10,5,2)
+      disen_k: (16,8,4)
       temperature: 10
       routing_iterations: 5
