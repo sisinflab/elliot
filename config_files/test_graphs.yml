@@ -15,7 +15,6 @@ experiment:
   evaluation:
     cutoffs: [5, 10, 20, 50]
     simple_metrics: [HR, nDCG, Precision, Recall, EFD, EPC, ItemCoverage, Gini, PopREO, PopRSP, ARP]
-    relevance_threshold: 1
   gpu: 0
   external_models_path: ../external/models/__init__.py
   models:
