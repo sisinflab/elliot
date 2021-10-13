@@ -6,7 +6,7 @@ experiment:
   splitting:
     validation_splitting:
       strategy: temporal_hold_out
-      leave_n_out: 0.1
+      test_ratio: 0.1
     test_splitting:
       strategy: temporal_hold_out
       test_ratio: 0.2
