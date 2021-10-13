@@ -2,13 +2,14 @@ experiment:
   data_config:
     strategy: dataset
     dataset_path: ../data/{0}/dataset.tsv
+  binarize: True
   splitting:
     validation_splitting:
-      strategy: random_subsampling
-      leave_n_out: 1
+      strategy: temporal_hold_out
+      leave_n_out: 0.1
     test_splitting:
-      strategy: random_subsampling
-      leave_n_out: 1
+      strategy: temporal_hold_out
+      test_ratio: 0.2
   dataset: movielens_1m
   top_k: 20
   evaluation:
@@ -18,6 +19,26 @@ experiment:
   gpu: 0
   external_models_path: ../external/models/__init__.py
   models:
+    Random:
+      meta:
+        save_recs: False
+    MostPop:
+      meta:
+        verbose: True
+        save_recs: False
+    MultiVAE:
+      meta:
+        hyper_max_evals: 20
+        hyper_opt_alg: tpe
+        save_recs: False
+        verbose: True
+      lr: [loguniform, -11.512925464970229, 0]
+      epochs: 200
+      batch_size: [ 128, 256, 512 ]
+      intermediate_dim: 600
+      latent_dim: 200
+      dropout_pkeep: 0.5
+      reg_lambda: [loguniform, -11.512925464970229, 0]
     external.NGCF:
       meta:
         validation_rate: 50
