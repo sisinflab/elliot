@@ -57,10 +57,10 @@ class LightGCN(RecMixin, BaseRecommenderModel):
         ######################################
 
         self._params_list = [
-            ("_learning_rate", "lr", "lr", 0.0005, None, None),
-            ("_factors", "factors", "factors", 64, None, None),
-            ("_l_w", "l_w", "l_w", 0.01, None, None),
-            ("_n_layers", "n_layers", "n_layers", 1, None, None)
+            ("_learning_rate", "lr", "lr", 0.0005, float, None),
+            ("_factors", "factors", "factors", 64, int, None),
+            ("_l_w", "l_w", "l_w", 0.01, float, None),
+            ("_n_layers", "n_layers", "n_layers", 1, int, None)
         ]
         self.autoset_params()
 

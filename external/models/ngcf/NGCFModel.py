@@ -83,16 +83,16 @@ class NGCFModel(torch.nn.Module, ABC):
             if not evaluate:
                 dropout_edge_index = list(
                     self.propagation_network.children()
-                )[0][layer](self.edge_index.to(self.device))
+                )[layer](self.edge_index.to(self.device))
                 all_embeddings += [list(
                     self.propagation_network.children()
-                )[0][layer + 1](all_embeddings[embedding_idx].to(self.device), dropout_edge_index.to(self.device))]
+                )[layer + 1](all_embeddings[embedding_idx].to(self.device), dropout_edge_index.to(self.device))]
             else:
                 self.propagation_network.eval()
                 with torch.no_grad():
                     all_embeddings += [list(
                         self.propagation_network.children()
-                    )[0][layer + 1](all_embeddings[embedding_idx].to(self.device), self.edge_index.to(self.device))]
+                    )[layer + 1](all_embeddings[embedding_idx].to(self.device), self.edge_index.to(self.device))]
 
             embedding_idx += 1
 
