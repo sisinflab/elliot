@@ -19,8 +19,8 @@ with zipfile.ZipFile(io.BytesIO(response.content)) as zip_ref:
 
 print("Printing ratings.tsv to data/movielens_1m/ ..")
 
-os.makedirs("data/movielens_1m", exist_ok=True)
-with open("data/movielens_1m/dataset.tsv", "w") as f:
+os.makedirs("data/cat_dbpedia_movielens_1m_v030", exist_ok=True)
+with open("data/cat_dbpedia_movielens_1m_v030/dataset.tsv", "w") as f:
     f.writelines(ml_1m_ratings)
 
 print("Done! We are now starting the Elliot's experiment")
