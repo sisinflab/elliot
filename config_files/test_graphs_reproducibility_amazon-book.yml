@@ -12,6 +12,13 @@ experiment:
   gpu: 0
   external_models_path: ../external/models/__init__.py
   models:
+    Random:
+      meta:
+        save_recs: False
+    MostPop:
+      meta:
+        verbose: True
+        save_recs: False
     external.NGCF:
       meta:
         validation_rate: 1
@@ -20,11 +27,11 @@ experiment:
         save_recs: True
         validation_metric: Recall
         restore: False
-      lr: [ 0.0001, 0.0005, 0.001, 0.005 ]
+      lr: [0.0001, 0.0005, 0.001, 0.005]
       epochs: 400
       factors: 64
       batch_size: 1024
-      l_w: [ 10e-5, 10e-4, 10e-3, 10e-2, 10e-1, 1, 10, 10e+2 ]
+      l_w: [10e-5, 10e-4, 10e-3, 10e-2, 10e-1, 1, 10, 10e+2]
       weight_size: (64,64,64)
       node_dropout: (0,0,0)
       message_dropout: (0.1,0.1,0.1)
@@ -33,13 +40,6 @@ experiment:
         monitor: Recall@20
         mode: auto
         verbose: True
-    Random:
-      meta:
-        save_recs: False
-    MostPop:
-      meta:
-        verbose: True
-        save_recs: False
     external.LightGCN:
       meta:
         validation_rate: 1
