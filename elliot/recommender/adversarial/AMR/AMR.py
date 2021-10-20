@@ -13,6 +13,8 @@ import pandas as pd
 import os
 from tqdm import tqdm
 
+import time
+
 from elliot.recommender.adversarial.AMR import pairwise_pipeline_sampler_vbpr as ppsv
 from elliot.recommender import BaseRecommenderModel
 from elliot.recommender.adversarial.AMR.AMR_model import AMR_model
@@ -164,6 +166,7 @@ class AMR(RecMixin, BaseRecommenderModel):
         it = 0
         user_adv_train = (self._epochs - it) <= self._adversarial_epochs
         with tqdm(total=int(self._data.transactions // self._batch_size), disable=not self._verbose) as t:
+            start_epoch = time.time()
             for batch in self._next_batch:
                 steps += 1
                 loss += self._model.train_step(batch, user_adv_train)
@@ -171,6 +174,9 @@ class AMR(RecMixin, BaseRecommenderModel):
                 t.update()
 
                 if steps == self._data.transactions // self._batch_size:
+                    end_epoch = time.time()
+                    print('\r')
+                    self.logger.info(f"Epoch Time: {end_epoch - start_epoch}")
                     t.reset()
                     self.evaluate(it, loss.numpy() / steps)
                     it += 1
@@ -180,6 +186,7 @@ class AMR(RecMixin, BaseRecommenderModel):
 
                     if getattr(self._params.meta, "eval_perturbations", False):
                         self.evaluate_perturbations(it)
+                    start_epoch = time.time()
 
     def evaluate_perturbations(self, it=None):
         if (it is None) or (not (it + 1) % self._validation_rate):

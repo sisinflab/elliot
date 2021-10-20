@@ -11,6 +11,8 @@ import numpy as np
 import tensorflow as tf
 from tqdm import tqdm
 
+import time
+
 from elliot.recommender.visual_recommenders.DVBPR import pairwise_pipeline_sampler_dvbpr as ppsd
 from elliot.recommender import BaseRecommenderModel
 from elliot.recommender.base_recommender_model import init_charger
@@ -102,6 +104,7 @@ class DVBPR(RecMixin, BaseRecommenderModel):
         steps = 0
         it = 0
         with tqdm(total=int(self._data.transactions // self._batch_size), disable=not self._verbose) as t:
+            start_epoch = time.time()
             for batch in self._next_batch:
                 steps += 1
                 loss += self._model.train_step(batch)
@@ -109,11 +112,15 @@ class DVBPR(RecMixin, BaseRecommenderModel):
                 t.update()
 
                 if steps == self._data.transactions // self._batch_size:
+                    end_epoch = time.time()
+                    print('\r')
+                    self.logger.info(f"Epoch Time: {end_epoch - start_epoch}")
                     t.reset()
                     self.evaluate(it, loss.numpy() / steps)
                     it += 1
                     steps = 0
                     loss = 0
+                    start_epoch = time.time()
 
     def get_recommendations(self, k: int = 100):
         predictions_top_k_test = {}
