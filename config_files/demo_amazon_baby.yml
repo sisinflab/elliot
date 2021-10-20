@@ -18,8 +18,7 @@ experiment:
     simple_metrics: [HR, nDCG, Precision, F1, MAP, ItemCoverage, nDCGRendle2020, Gini, SEntropy, EFD, EPC]
     relevance_threshold: 1
     paired_ttest: True
-
-  gpu: 0
+  gpu: -1
   models:
     VBPR:
       meta:
