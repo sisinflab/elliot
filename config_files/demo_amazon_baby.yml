@@ -18,7 +18,7 @@ experiment:
     simple_metrics: [HR, nDCG, Precision, F1, MAP, ItemCoverage, nDCGRendle2020, Gini, SEntropy, EFD, EPC]
     relevance_threshold: 1
     paired_ttest: True
-  gpu: 0
+  gpu: -1
   models:
     VBPR:
       meta:
@@ -53,22 +53,22 @@ experiment:
 #      batch_eval: 1024
 #      lambda_1: 0.001
 #      lambda_2: 1.0
-    ACF:
-      meta:
-        hyper_opt_alg: grid
-        validation_rate: 10
-        verbose: True
-        save_weights: True
-        save_recs: True
-        validation_metric: HR@100
-        restore: False
-      lr: [ 0.0001, 0.001, 0.01 ]
-      epochs: 100 # As in NeuMF Code
-      factors: 128
-      batch_size: 1
-      l_w: [ 0.00001, 0.001]
-      layers_component: (64, 1)
-      layers_item: (64, 1)
+#    ACF:
+#      meta:
+#        hyper_opt_alg: grid
+#        validation_rate: 10
+#        verbose: True
+#        save_weights: True
+#        save_recs: True
+#        validation_metric: HR@100
+#        restore: False
+#      lr: [ 0.0001, 0.001, 0.01 ]
+#      epochs: 100 # As in NeuMF Code
+#      factors: 128
+#      batch_size: 1
+#      l_w: [ 0.00001, 0.001]
+#      layers_component: (64, 1)
+#      layers_item: (64, 1)
 #    DeepStyle:
 #      meta:
 #        hyper_opt_alg: grid
