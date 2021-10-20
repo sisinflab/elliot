@@ -20,39 +20,39 @@ experiment:
     paired_ttest: True
   gpu: -1
   models:
-    VBPR:
-      meta:
-        hyper_opt_alg: grid
-        validation_rate: 10
-        verbose: True
-        save_weights: True
-        save_recs: True
-        validation_metric: HR@100
-        restore: False
-      lr: [ 0.0001, 0.001, 0.01 ]
-      epochs: 100 # As in NeuMF Code
-      factors: 128
-      factors_d: 20
-      batch_size: 128
-      batch_eval: 4096
-      l_w: [ 0.00001, 0.001 ]
-      l_b: 0
-#    DVBPR:
+#    VBPR:
 #      meta:
 #        hyper_opt_alg: grid
-#        validation_rate: 1
+#        validation_rate: 10
 #        verbose: True
 #        save_weights: True
 #        save_recs: True
 #        validation_metric: HR@100
 #        restore: False
 #      lr: [ 0.0001, 0.001, 0.01 ]
-#      epochs: 20
+#      epochs: 100 # As in NeuMF Code
 #      factors: 128
+#      factors_d: 20
 #      batch_size: 128
-#      batch_eval: 1024
-#      lambda_1: 0.001
-#      lambda_2: 1.0
+#      batch_eval: 4096
+#      l_w: [ 0.00001, 0.001 ]
+#      l_b: 0
+    DVBPR:
+      meta:
+        hyper_opt_alg: grid
+        validation_rate: 1
+        verbose: True
+        save_weights: True
+        save_recs: True
+        validation_metric: HR@100
+        restore: False
+      lr: [ 0.0001, 0.001, 0.01 ]
+      epochs: 20
+      factors: 128
+      batch_size: 128
+      batch_eval: 1024
+      lambda_1: 0.001
+      lambda_2: 1.0
 #    ACF:
 #      meta:
 #        hyper_opt_alg: grid
