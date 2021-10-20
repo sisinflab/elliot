@@ -7,8 +7,6 @@ __version__ = '0.3.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta, Felice Antonio Merra'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malitesta@poliba.it, felice.merra@poliba.it'
 
-import time
-
 from tqdm import tqdm
 
 import tensorflow as tf
@@ -115,7 +113,6 @@ class VBPR(RecMixin, BaseRecommenderModel):
         steps = 0
         it = 0
         with tqdm(total=int(self._data.transactions // self._batch_size), disable=not self._verbose) as t:
-            start_epoch = time.time()
             for batch in self._next_batch:
                 steps += 1
                 loss += self._model.train_step(batch)
@@ -123,8 +120,6 @@ class VBPR(RecMixin, BaseRecommenderModel):
                 t.update()
 
                 if steps == self._data.transactions // self._batch_size:
-                    end_epoch = time.time()
-                    print(end_epoch - start_epoch)
                     t.reset()
                     self.evaluate(it, loss.numpy() / steps)
                     it += 1
