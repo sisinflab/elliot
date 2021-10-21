@@ -9,7 +9,7 @@ experiment:
   evaluation:
     cutoffs: [5, 10, 20]
 #      simple_metrics: [HR, nDCG, Precision, Recall, EFD, EPC, ItemCoverage, Gini, PopREO, PopRSP, ARP]
-      simple_metrics: [ Recall ]
+    simple_metrics: [ Recall ]
   gpu: 0
   external_models_path: ../external/models/__init__.py
   models:
