@@ -82,7 +82,7 @@ class MMGCNModel(torch.nn.Module, ABC):
                                                     self.combination), 'x, edge_index -> x')]
             for layer in range(1, self.n_layers):
                 propagation_network_list.append((MMGCNLayer(self.embed_k,
-                                                            propagation_network_list[-1][0].lin1.out_features,
+                                                            propagation_network_list[-1][0].lin3.out_features,
                                                             self.embed_k_multimod[m_id],
                                                             self.aggregation,
                                                             self.combination), 'x, edge_index -> x'))
