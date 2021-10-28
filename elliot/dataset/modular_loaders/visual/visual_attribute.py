@@ -78,9 +78,15 @@ class VisualAttribute(AbstractLoader):
             self.item_mapping = {item: val for val, item in enumerate(items)}
         return items
 
-    def get_all_features(self):
-        files = os.listdir(self.visual_feature_folder_path)
-        all_features = np.empty((len(files), self.visual_features_shape))
-        for f in files:
-            all_features[int(f.split('.')[0])] = np.load(self.visual_feature_folder_path + '/' + f)
-        return all_features
+    def get_all_features(self, evaluate=False):
+        if evaluate:
+            files = os.listdir(self.visual_feature_folder_path)
+            all_features = np.empty((len(files), self.visual_features_shape))
+            for f in files:
+                all_features[int(f.split('.')[0])] = np.load(self.visual_feature_folder_path + '/' + f)
+            return all_features
+        else:
+            all_features = np.empty((len(self.items), self.visual_features_shape))
+            for i, file in enumerate(list(self.items)):
+                all_features[i] = np.load(self.visual_feature_folder_path + '/' + str(file) + '.npy')
+            return all_features

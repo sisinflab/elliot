@@ -19,13 +19,15 @@ class MMGCNLayer(MessagePassing, ABC):
             raise NotImplementedError('This aggregation function has not been implemented yet!')
         self.leaky_relu = torch.nn.LeakyReLU()
 
-    def forward(self, u_m, i_m, u_id, edge_index):
-        u_hat_m = self.leaky_relu(self.lin2(u_m)) + u_id
-        h_m = self.propagate(edge_index, x=self.lin1(i_m))
-
+    def forward(self, x_m, x_id, edge_index):
+        h_m = self.propagate(edge_index, x=x_m)
+        x_hat_m = self.leaky_relu(self.lin2(x_m)) + x_id
         if self.combination == 'co':
-            return self.leaky_relu(self.lin3(torch.cat(h_m, u_hat_m), dim=1))
+            return self.leaky_relu(self.lin3(torch.cat((h_m, x_hat_m), dim=1)))
         elif self.combination == 'ele':
-            return self.leaky_relu(self.lin3(h_m) + u_hat_m)
+            return self.leaky_relu(self.lin3(h_m) + x_hat_m)
         else:
             raise NotImplementedError('This aggregation function has not been implemented yet!')
+
+    def message(self, x_j):
+        return self.lin1(x_j)

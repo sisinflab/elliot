@@ -28,11 +28,11 @@ class MMGCN(RecMixin, BaseRecommenderModel):
     Args:
         lr: Learning rate
         epochs: Number of epochs
+        num_layers: Number of propagation layers
         factors: Number of latent factors
         factors_multimod: Tuple with number of units for each modality
         batch_size: Batch size
         l_w: Regularization coefficient
-        weight_size: Tuple with number of units for each embedding propagation layer
         modalities: Tuple of modalities
         aggregation: Type of aggregation
         combination: Type of combination
@@ -47,11 +47,11 @@ class MMGCN(RecMixin, BaseRecommenderModel):
             save_recs: True
           lr: 0.0005
           epochs: 50
+          num_layers: 2
           factors: 64
           factors_multimod: (64,64)
           batch_size: 256
           l_w: 0.1
-          weight_size: (64,)
           modalities: (visual,textual)
           aggregation: mean
           combination: co
@@ -70,8 +70,7 @@ class MMGCN(RecMixin, BaseRecommenderModel):
             ("_learning_rate", "lr", "lr", 0.0005, float, None),
             ("_factors", "factors", "factors", 64, int, None),
             ("_l_w", "l_w", "l_w", 0.01, float, None),
-            ("_weight_size", "weight_size", "weight_size", "(64,)", lambda x: list(make_tuple(x)),
-             lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
+            ("_num_layers", "num_layers", "num_layers", 2, int, None),
             ("_factors_multimod", "factors_multimod", "factors_multimod", "(64,64)", lambda x: list(make_tuple(x)),
              lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
             ("_modalities", "modalities", "modalites", "('visual','textual')", lambda x: list(make_tuple(x)),
@@ -82,8 +81,6 @@ class MMGCN(RecMixin, BaseRecommenderModel):
              lambda x: self._batch_remove(str(x), " []").replace(",", "-"))
         ]
         self.autoset_params()
-
-        self._n_layers = len(self._weight_size)
 
         for m_id, m in enumerate(self._modalities):
             self.__setattr__(f'''_side_{m}''',
@@ -100,13 +97,12 @@ class MMGCN(RecMixin, BaseRecommenderModel):
             embed_k=self._factors,
             embed_k_multimod=self._factors_multimod,
             l_w=self._l_w,
-            weight_size=self._weight_size,
+            num_layers=self._num_layers,
             modalities=self._modalities,
             aggregation=self._aggregation,
             combination=self._combination,
             multimodal_features=[self.__getattribute__(f'''_side_{m}''').object.get_all_features() for m in
                                  self._modalities],
-            n_layers=self._n_layers,
             edge_index=self.edge_index,
             random_seed=self._seed
         )

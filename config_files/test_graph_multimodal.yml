@@ -24,10 +24,10 @@ experiment:
       lr: 0.0005
       epochs: 50
       batch_size: 512
+      num_layers: 2
       factors: 64
       factors_multimod: (64,64)
       l_w: 0.1
-      weight_size: (64,)
       modalities: ('visual','textual')
       aggregation: mean
       combination: co
