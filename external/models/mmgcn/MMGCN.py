@@ -71,8 +71,7 @@ class MMGCN(RecMixin, BaseRecommenderModel):
             ("_factors", "factors", "factors", 64, int, None),
             ("_l_w", "l_w", "l_w", 0.01, float, None),
             ("_num_layers", "num_layers", "num_layers", 2, int, None),
-            ("_factors_multimod", "factors_multimod", "factors_multimod", "(64,64)", lambda x: list(make_tuple(x)),
-             lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
+            ("_factors_multimod", "factors_multimod", "factors_multimod", 64, int, None),
             ("_modalities", "modalities", "modalites", "('visual','textual')", lambda x: list(make_tuple(x)),
              lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
             ("_aggregation", "aggregation", "aggregation", 'mean', str, None),
@@ -132,10 +131,10 @@ class MMGCN(RecMixin, BaseRecommenderModel):
     def get_recommendations(self, k: int = 100):
         predictions_top_k_test = {}
         predictions_top_k_val = {}
-        gu, gi = self._model.propagate_embeddings(evaluate=True)
+        gum, gim = self._model.propagate_embeddings(evaluate=True)
         for index, offset in enumerate(range(0, self._num_users, self._batch_size)):
             offset_stop = min(offset + self._batch_size, self._num_users)
-            predictions = self._model.predict(gu[offset: offset_stop], gi)
+            predictions = self._model.predict(gum[offset: offset_stop], gim)
             recs_val, recs_test = self.process_protocol(k, predictions, offset, offset_stop)
             predictions_top_k_val.update(recs_val)
             predictions_top_k_test.update(recs_test)

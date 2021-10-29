@@ -77,13 +77,13 @@ class MMGCNModel(torch.nn.Module, ABC):
         for m_id, m in enumerate(self.modalities):
             propagation_network_list = [(MMGCNLayer(self.embed_k,
                                                     self.multimodal_features_shapes[m_id],
-                                                    self.embed_k_multimod[m_id],
+                                                    self.embed_k_multimod,
                                                     self.aggregation,
                                                     self.combination), 'x, edge_index -> x')]
             for layer in range(1, self.n_layers):
                 propagation_network_list.append((MMGCNLayer(self.embed_k,
                                                             propagation_network_list[-1][0].lin3.out_features,
-                                                            self.embed_k_multimod[m_id],
+                                                            self.embed_k_multimod,
                                                             self.aggregation,
                                                             self.combination), 'x, edge_index -> x'))
 
@@ -95,8 +95,9 @@ class MMGCNModel(torch.nn.Module, ABC):
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
 
     def propagate_embeddings(self, evaluate=False):
-        x_id = torch.cat((self.Gu.to(self.device), self.Gi.to(self.device)), 0)
         x_all_m = dict()
+        gum = torch.empty((len(self.modalities), self.num_users, self.embed_k_multimod))
+        gim = torch.empty((len(self.modalities), self.num_items, self.embed_k_multimod))
 
         for m_id, m in enumerate(self.modalities):
             x_all_m[m] = torch.cat((self.Gum[m].to(self.device), self.Gim[m].to(self.device)), 0)
@@ -106,44 +107,54 @@ class MMGCNModel(torch.nn.Module, ABC):
                 if not evaluate:
                     x_all_m[m] = list(
                         self.propagation_network_multimodal[m].children()
-                    )[layer](x_all_m[m].to(self.device), x_id.to(self.device), self.edge_index.to(self.device))
+                    )[layer](x_all_m[m].to(self.device),
+                             torch.cat((self.Gu.to(self.device), self.Gi.to(self.device)), 0).to(self.device),
+                             self.edge_index.to(self.device))
                 else:
                     self.propagation_network_multimodal[m].eval()
                     with torch.no_grad():
                         x_all_m[m] = list(
                             self.propagation_network_multimodal[m].children()
-                        )[layer](x_all_m[m].to(self.device), x_id.to(self.device), self.edge_index.to(self.device))
+                        )[layer](x_all_m[m].to(self.device),
+                                 torch.cat((self.Gu.to(self.device), self.Gi.to(self.device)), 0).to(self.device),
+                                 self.edge_index.to(self.device))
                 if evaluate:
                     self.propagation_network_multimodal[m].train()
 
-        all_embeddings = torch.cat(all_embeddings, 1)
-        gu, gi = torch.split(all_embeddings, [self.num_users, self.num_items], 0)
-        return gu, gi
+            gum[m_id], gim[m_id] = torch.split(x_all_m[m], [self.num_users, self.num_items], 0)
+        return torch.sum(gum, dim=0), torch.sum(gim, dim=0)
 
     def forward(self, inputs, **kwargs):
-        gu, gi = inputs
-        gamma_u = torch.squeeze(gu).to(self.device)
-        gamma_i = torch.squeeze(gi).to(self.device)
+        gum, gim = inputs
+        gamma_u_m = torch.squeeze(gum).to(self.device)
+        gamma_i_m = torch.squeeze(gim).to(self.device)
 
-        xui = torch.sum(gamma_u * gamma_i, 1)
+        xui = torch.sum(gamma_u_m * gamma_i_m, 1)
 
         return xui
 
-    def predict(self, gu, gi, **kwargs):
-        return torch.matmul(gu.to(self.device), torch.transpose(gi.to(self.device), 0, 1))
+    def predict(self, gum, gim, **kwargs):
+        return torch.matmul(gum.to(self.device), torch.transpose(gim.to(self.device), 0, 1))
 
     def train_step(self, batch):
-        gu, gi = self.propagate_embeddings()
+        gum, gim = self.propagate_embeddings()
         user, pos, neg = batch
-        xu_pos = self.forward(inputs=(gu[user], gi[pos]))
-        xu_neg = self.forward(inputs=(gu[user], gi[neg]))
+        xu_pos = self.forward(inputs=(gum[user], gim[pos]))
+        xu_neg = self.forward(inputs=(gum[user], gim[neg]))
 
         difference = torch.clamp(xu_pos - xu_neg, -80.0, 1e8)
         loss = torch.sum(self.softplus(-difference))
+
+        multimodal_networks_parameters = list()
+        for _, values in self.propagation_network_multimodal.items():
+            for v in values.parameters():
+                multimodal_networks_parameters.append(torch.norm(v, 2))
+
         reg_loss = self.l_w * (torch.norm(self.Gu, 2) +
                                torch.norm(self.Gi, 2) +
-                               torch.stack([torch.norm(value, 2) for value in self.propagation_network.parameters()],
-                                           dim=0).sum(dim=0)) * 2
+                               torch.stack([torch.norm(value, 2) for _, value in self.Gum.items()], dim=0).sum(dim=0) +
+                               torch.stack([torch.norm(value, 2) for _, value in self.Gim.items()], dim=0).sum(dim=0) +
+                               torch.stack(multimodal_networks_parameters, dim=0).sum(dim=0)) * 2
         loss += reg_loss
 
         self.optimizer.zero_grad()

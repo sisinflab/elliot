@@ -19,6 +19,8 @@ experiment:
   models:
     external.MMGCN:
       meta:
+        validation_rate: 1
+        verbose: True
         save_recs: False
         save_weights: False
       lr: 0.0005
@@ -26,7 +28,7 @@ experiment:
       batch_size: 512
       num_layers: 2
       factors: 64
-      factors_multimod: (64,64)
+      factors_multimod: 64
       l_w: 0.1
       modalities: ('visual','textual')
       aggregation: mean
