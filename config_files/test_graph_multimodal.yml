@@ -8,7 +8,7 @@ experiment:
       - dataloader: VisualAttribute
         visual_features: ../data/{0}/original/cnn_features_resnet50_avg_pool/
       - dataloader: TextualAttribute
-        textual_features: ../data/{0}/original/cnn_features_resnet50_avg_pool/
+        textual_features: ../data/{0}/original/text_features_all-mpnet-base-v2/
   dataset: amazon_baby
   top_k: 50
   evaluation:
