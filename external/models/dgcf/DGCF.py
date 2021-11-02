@@ -1,0 +1,124 @@
+"""
+Module description:
+
+"""
+
+__version__ = '0.3.0'
+__author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta, Felice Antonio Merra'
+__email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malitesta@poliba.it, felice.merra@poliba.it'
+
+from tqdm import tqdm
+import numpy as np
+
+from elliot.recommender import BaseRecommenderModel
+from elliot.recommender.base_recommender_model import init_charger
+from elliot.recommender.recommender_utils_mixin import RecMixin
+from .DGCFModel import DGCFModel
+
+
+class DGCF(RecMixin, BaseRecommenderModel):
+    r"""
+    Disentangled Graph Collaborative Filtering
+
+    For further details, please refer to the `paper <https://dl.acm.org/doi/abs/10.1145/3397271.3401137>`_
+
+    Args:
+        lr: Learning rate
+        epochs: Number of epochs
+        factors: Number of latent factors
+        batch_size: Batch size
+        l_w: Regularization coefficient
+        n_layers: Number of propagation embedding layers
+        disen_k: Tuple with factor for disentanglement for each embedding propagation layer
+        routing_iterations: Number of routing iterations
+
+    To include the recommendation model, add it to the config file adopting the following pattern:
+
+    .. code:: yaml
+
+      models:
+        DGCF:
+          meta:
+            save_recs: True
+          lr: 0.0005
+          epochs: 50
+          batch_size: 512
+          factors: 64
+          l_w: 0.1
+          n_layers: 3
+          disen_k: 16
+          routing_iterations: 2
+    """
+    @init_charger
+    def __init__(self, data, config, params, *args, **kwargs):
+
+        if self._batch_size < 1:
+            self._batch_size = self._num_users
+
+        ######################################
+
+        self._params_list = [
+            ("_learning_rate", "lr", "lr", 0.0005, None, None),
+            ("_factors", "factors", "factors", 64, None, None),
+            ("_l_w", "l_w", "l_w", 0.01, None, None),
+            ("_n_layers", "n_layers", "n_layers", 3, None, None),
+            ("_disen_k", "disen_k", "disen_k", 16, None, None),
+            ("_routing_iterations", "routing_iterations", "routing_iterations", 5, None, None)
+        ]
+        self.autoset_params()
+
+        row, col = data.sp_i_train.nonzero()
+        col = [c + self._num_users for c in col]
+        self.edge_index = np.array([row, col])
+
+        self._model = DGCFModel(
+            num_users=self._num_users,
+            num_items=self._num_items,
+            learning_rate=self._learning_rate,
+            embed_k=self._factors,
+            l_w=self._l_w,
+            n_layers=self._n_layers,
+            disen_k=self._disen_k,
+            routing_iterations=self._routing_iterations,
+            edge_index=self.edge_index,
+            random_seed=self._seed
+        )
+
+    @property
+    def name(self):
+        return "DGCF" \
+               + f"_{self.get_base_params_shortcut()}" \
+               + f"_{self.get_params_shortcut()}"
+
+    def train(self):
+        if self._restore:
+            return self.restore_weights()
+
+        for it in self.iterate(self._epochs):
+            loss = 0
+            steps = 0
+            with tqdm(total=int(self._data.transactions // self._batch_size), disable=not self._verbose) as t:
+                for batch in self._sampler.step(self._data.transactions, self._batch_size):
+                    steps += 1
+                    loss += self._model.train_step(batch)
+                    t.set_postfix({'loss': f'{loss / steps:.5f}'})
+                    t.update()
+
+            self.evaluate(it, loss / (it + 1))
+
+    def get_recommendations(self, k: int = 100):
+        predictions_top_k_test = {}
+        predictions_top_k_val = {}
+        for index, offset in enumerate(range(0, self._num_users, self._batch_size)):
+            offset_stop = min(offset + self._batch_size, self._num_users)
+            predictions = self._model.predict(offset, offset_stop)
+            recs_val, recs_test = self.process_protocol(k, predictions, offset, offset_stop)
+            predictions_top_k_val.update(recs_val)
+            predictions_top_k_test.update(recs_test)
+        return predictions_top_k_val, predictions_top_k_test
+
+    def get_single_recommendation(self, mask, k, predictions, offset, offset_stop):
+        v, i = self._model.get_top_k(predictions, mask[offset: offset_stop], k=k)
+        items_ratings_pair = [list(zip(map(self._data.private_items.get, u_list[0]), u_list[1]))
+                              for u_list in list(zip(i.detach().cpu().numpy(), v.detach().cpu().numpy()))]
+        return dict(zip(map(self._data.private_users.get, range(offset, offset_stop)), items_ratings_pair))
