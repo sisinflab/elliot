@@ -5,8 +5,8 @@ experiment:
     validation_path: ../data/{0}/validationset.tsv
     test_path: ../data/{0}/testset.tsv
     side_information:
-      - dataloader: VisualAttribute
-        visual_features: ../data/{0}/original/cnn_features_resnet50_avg_pool/
+#      - dataloader: VisualAttribute
+#        visual_features: ../data/{0}/original/cnn_features_resnet50_avg_pool/
       - dataloader: TextualAttribute
         textual_features: ../data/{0}/original/text_features_all-mpnet-base-v2/
   dataset: amazon_baby
@@ -17,7 +17,23 @@ experiment:
   gpu: 0
   external_models_path: ../external/models/__init__.py
   models:
-    external.MMGCN:
+#    external.MMGCN:
+#      meta:
+#        validation_rate: 1
+#        verbose: True
+#        save_recs: False
+#        save_weights: False
+#      lr: 0.0005
+#      epochs: 50
+#      batch_size: 512
+#      num_layers: 2
+#      factors: 64
+#      factors_multimod: 64
+#      l_w: 0.1
+#      modalities: ('visual','textual')
+#      aggregation: mean
+#      combination: co
+    external.EGCF:
       meta:
         validation_rate: 1
         verbose: True
@@ -26,10 +42,6 @@ experiment:
       lr: 0.0005
       epochs: 50
       batch_size: 512
-      num_layers: 2
       factors: 64
-      factors_multimod: 64
       l_w: 0.1
-      modalities: ('visual','textual')
-      aggregation: mean
-      combination: co
+      n_layers: 3

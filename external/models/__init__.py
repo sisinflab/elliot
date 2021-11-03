@@ -8,4 +8,5 @@ from .gat import GAT
 from .gcmc import GCMC
 from .disen_gcn import DisenGCN
 from .mmgcn import MMGCN
-
+from .dgcf import DGCF
+from .egcf import EGCF
