@@ -9,6 +9,9 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malite
 
 from abc import ABC
 
+from torch_geometric.nn import GATConv
+from collections import OrderedDict
+
 import torch
 import torch_geometric
 import numpy as np
@@ -20,10 +23,16 @@ class EGCFModel(torch.nn.Module, ABC):
                  num_items,
                  learning_rate,
                  embed_k,
+                 embed_n_e_k,
+                 weight_size_nodes,
+                 weight_size_edges,
+                 weight_size_nodes_edges,
                  l_w,
                  n_layers,
                  edge_features,
                  edge_index,
+                 node_edge_index,
+                 edge_edge_index,
                  random_seed,
                  name="EGCF",
                  **kwargs
@@ -36,50 +45,127 @@ class EGCFModel(torch.nn.Module, ABC):
         self.num_users = num_users
         self.num_items = num_items
         self.embed_k = embed_k
+        self.embed_n_e_k = embed_n_e_k
+        self.weight_size_nodes_list = weight_size_nodes
+        self.weight_size_edges_list = weight_size_edges
+        self.weight_size_nodes_edges_list = weight_size_nodes_edges
         self.learning_rate = learning_rate
         self.l_w = l_w
         self.n_layers = n_layers
         self.edge_index = torch.tensor(edge_index, dtype=torch.int64)
+        self.node_edge_index = torch.tensor(node_edge_index, dtype=torch.int64)
+        self.edge_edge_index = torch.tensor(edge_edge_index, dtype=torch.int64)
 
         self.Gu = torch.nn.Parameter(
-            torch.nn.init.zeros_(torch.empty((self.num_users, self.embed_k))))
+            torch.nn.init.xavier_normal_(torch.empty((self.num_users, self.embed_k))))
         self.Gu.to(self.device)
         self.Gi = torch.nn.Parameter(
-            torch.nn.init.zeros_(torch.empty((self.num_items, self.embed_k))))
+            torch.nn.init.xavier_normal_(torch.empty((self.num_items, self.embed_k))))
         self.Gi.to(self.device)
         self.Ge = torch.nn.Parameter(
             torch.tensor(edge_features, dtype=torch.float32)
         )
 
-        propagation_network_list = []
+        propagation_network_nn_list = [(GATConv(in_channels=self.embed_k,
+                                                out_channels=self.weight_size_nodes_list[0],
+                                                add_self_loops=False), 'x, edge_index -> x')]
+        propagation_network_ee_list = [(GATConv(in_channels=self.Ge.shape[1],
+                                                out_channels=self.weight_size_edges_list[0],
+                                                add_self_loops=False), 'x, edge_index -> x')]
+        propagation_network_ne_list = [(GATConv(in_channels=self.embed_n_e_k,
+                                                out_channels=self.weight_size_nodes_edges_list[0],
+                                                add_self_loops=False), 'x, edge_index -> x')]
 
-        for layer in range(self.n_layers):
-            propagation_network_list.append((EGCFLayer(), 'x, edge_index -> x'))
+        for layer in range(1, self.n_layers):
+            propagation_network_nn_list.append(
+                (GATConv(in_channels=self.weight_size_nodes_list[layer - 1] + self.weight_size_edges_list[layer - 1],
+                         out_channels=self.weight_size_nodes_list[layer],
+                         add_self_loops=False), 'x, edge_index -> x'))
+            propagation_network_ee_list.append(
+                (GATConv(in_channels=self.weight_size_edges_list[layer - 1] + self.weight_size_edges_list[layer - 1],
+                         out_channels=self.weight_size_edges_list[layer],
+                         add_self_loops=False), 'x, edge_index -> x'))
+            propagation_network_ne_list.append(
+                (GATConv(in_channels=self.weight_size_nodes_list[layer - 1] + self.weight_size_edges_list[layer - 1],
+                         out_channels=self.weight_size_nodes_edges_list[layer],
+                         add_self_loops=False), 'x, edge_index -> x'))
 
-        self.propagation_network = torch_geometric.nn.Sequential('x, edge_index', propagation_network_list)
-        self.propagation_network.to(self.device)
+        self.propagation_network_nn = torch_geometric.nn.Sequential('x, edge_index', propagation_network_nn_list)
+        self.propagation_network_nn.to(self.device)
+        self.propagation_network_ee = torch_geometric.nn.Sequential('x, edge_index', propagation_network_ee_list)
+        self.propagation_network_ee.to(self.device)
+        self.propagation_network_ne = torch_geometric.nn.Sequential('x, edge_index', propagation_network_ne_list)
+        self.propagation_network_ne.to(self.device)
+        self.projection_layer_nodes = torch.nn.Sequential(
+            OrderedDict([('feat_proj_nodes', torch.nn.Linear(in_features=self.embed_k,
+                                                             out_features=self.embed_n_e_k)),
+                         ('relu', torch.nn.ReLU())]))
+        self.projection_layer_nodes.to(self.device)
+        self.projection_layer_edges = torch.nn.Sequential(
+            OrderedDict([('feat_proj_edges', torch.nn.Linear(in_features=self.Ge.shape[1],
+                                                             out_features=self.embed_n_e_k)),
+                         ('relu', torch.nn.ReLU())]))
+        self.projection_layer_edges.to(self.device)
+
         self.softplus = torch.nn.Softplus()
 
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
 
     def propagate_embeddings(self, evaluate=False):
-        node_embeddings = torch.cat((self.Gu.to(self.device), self.Gi.to(self.device)), 0)
+        node_node_embeddings = torch.cat((self.Gu.to(self.device), self.Gi.to(self.device)), 0)
+        edge_edge_embeddings = self.Ge
+
+        # we project node and edge embeddings into the same latent space for the node-edge propagation network
+        node_node_embeddings_projected = self.projection_layer_nodes(node_node_embeddings.to(self.device))
+        edge_edge_embeddings_projected = self.projection_layer_edges(edge_edge_embeddings.to(self.device))
+        node_edge_embeddings = torch.cat((node_node_embeddings_projected.to(self.device),
+                                          edge_edge_embeddings_projected.to(self.device)), 0)
+
         for layer in range(self.n_layers):
             if not evaluate:
-                node_embeddings = list(
-                    self.propagation_network.children()
-                )[layer + 1](node_embeddings.to(self.device), self.Ge, self.edge_index.to(self.device))
+                # first, we propagate node-node embeddings
+                node_node_embeddings = list(
+                    self.propagation_network_nn.children()
+                )[layer](node_node_embeddings.to(self.device), self.edge_index.to(self.device))
+                # then, we propagate edge-edge embedding
+                edge_edge_embeddings = list(
+                    self.propagation_network_ee.children()
+                )[layer](edge_edge_embeddings, self.edge_edge_index.to(self.device))
+                # finally, we propagate node-edge embeddings
+                node_edge_embeddings = list(
+                    self.propagation_network_ne.children()
+                )[layer](node_edge_embeddings.to(self.device), self.node_edge_index.to(self.device))
             else:
-                self.propagation_network.eval()
+                self.propagation_network_nn.eval()
+                self.propagation_network_ee.eval()
+                self.propagation_network_ne.eval()
                 with torch.no_grad():
-                    node_embeddings = list(
-                        self.propagation_network.children()
-                    )[layer + 1](node_embeddings.to(self.device), self.Ge, self.edge_index.to(self.device))
-
+                    # first, we propagate node-node embeddings
+                    node_node_embeddings = list(
+                        self.propagation_network_nn.children()
+                    )[layer](node_node_embeddings.to(self.device), self.edge_index.to(self.device))
+                    # then, we propagate edge-edge embedding
+                    edge_edge_embeddings = list(
+                        self.propagation_network_ee.children()
+                    )[layer](edge_edge_embeddings, self.edge_edge_index.to(self.device))
+                    # finally, we propagate node-edge embeddings
+                    node_edge_embeddings = list(
+                        self.propagation_network_ne.children()
+                    )[layer](node_edge_embeddings.to(self.device), self.node_edge_index.to(self.device))
+            node_edge_node_embeddings, node_edge_edge_embeddings = \
+                torch.split(node_edge_embeddings, [self.num_users + self.num_items,
+                                                   node_edge_embeddings.shape[0] - (self.num_users + self.num_items)],
+                            0)
+            node_node_embeddings = torch.cat((node_node_embeddings, node_edge_node_embeddings), dim=1)
+            edge_edge_embeddings = torch.cat((edge_edge_embeddings, node_edge_edge_embeddings), dim=1)
+            node_edge_embeddings = torch.cat((node_node_embeddings.to(self.device),
+                                              edge_edge_embeddings.to(self.device)), 0)
         if evaluate:
-            self.propagation_network.train()
+            self.propagation_network_nn.train()
+            self.propagation_network_ee.train()
+            self.propagation_network_ne.train()
 
-        gu, gi = torch.split(node_embeddings, [self.num_users, self.num_items], 0)
+        gu, gi = torch.split(node_node_embeddings, [self.num_users, self.num_items], 0)
         return gu, gi
 
     def forward(self, inputs, **kwargs):
@@ -96,6 +182,7 @@ class EGCFModel(torch.nn.Module, ABC):
 
     def train_step(self, batch):
         gu, gi = self.propagate_embeddings()
+
         user, pos, neg = batch
         xu_pos = self.forward(inputs=(gu[user], gi[pos]))
         xu_neg = self.forward(inputs=(gu[user], gi[neg]))
@@ -104,7 +191,16 @@ class EGCFModel(torch.nn.Module, ABC):
         loss = torch.sum(self.softplus(-difference))
         reg_loss = self.l_w * (torch.norm(self.Gu, 2) +
                                torch.norm(self.Gi, 2) +
-                               torch.stack([torch.norm(value, 2) for value in self.propagation_network.parameters()],
+                               torch.norm(self.Ge, 2) +
+                               torch.stack([torch.norm(value, 2) for value in self.propagation_network_nn.parameters()],
+                                           dim=0).sum(dim=0) +
+                               torch.stack([torch.norm(value, 2) for value in self.propagation_network_ee.parameters()],
+                                           dim=0).sum(dim=0) +
+                               torch.stack([torch.norm(value, 2) for value in self.propagation_network_ne.parameters()],
+                                           dim=0).sum(dim=0) +
+                               torch.stack([torch.norm(value, 2) for value in self.projection_layer_nodes.parameters()],
+                                           dim=0).sum(dim=0) +
+                               torch.stack([torch.norm(value, 2) for value in self.projection_layer_edges.parameters()],
                                            dim=0).sum(dim=0)) * 2
         loss += reg_loss
 

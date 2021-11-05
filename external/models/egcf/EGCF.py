@@ -10,6 +10,8 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malite
 from tqdm import tqdm
 import numpy as np
 
+from ast import literal_eval as make_tuple
+
 from elliot.dataset.samplers import custom_sampler as cs
 
 from elliot.recommender import BaseRecommenderModel
@@ -26,9 +28,12 @@ class EGCF(RecMixin, BaseRecommenderModel):
         lr: Learning rate
         epochs: Number of epochs
         factors: Number of latent factors
+        node_edge_factors: Number of shared latent factors for nodes and edges
+        weight_size_nodes: Tuple with number of units for each node embedding propagation layer
+        weight_size_edges: Tuple with number of units for each edge embedding propagation layer
+        weight_size_nodes_edges: Tuple with number of units for each node-edge embedding propagation layer
         batch_size: Batch size
         l_w: Regularization coefficient
-        n_layers: Number of propagation embedding layers
 
     To include the recommendation model, add it to the config file adopting the following pattern:
 
@@ -42,9 +47,13 @@ class EGCF(RecMixin, BaseRecommenderModel):
           epochs: 50
           batch_size: 512
           factors: 64
+          node_edge_factors: 128
+          weight_size_nodes: (64,)
+          weight_size_edges: (64,)
+          weight_size_nodes_edges: (64,)
           l_w: 0.1
-          n_layers: 3
     """
+
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
         self._sampler = cs.Sampler(self._data.i_train_dict)
@@ -57,6 +66,14 @@ class EGCF(RecMixin, BaseRecommenderModel):
         self._params_list = [
             ("_learning_rate", "lr", "lr", 0.0005, None, None),
             ("_factors", "factors", "factors", 64, None, None),
+            ("_node_edge_factors", "node_edge_factors", "node_edge_factors", 128, None, None),
+            ("_weight_size_nodes", "weight_size_nodes", "weight_size_nodes", "(64,)", lambda x: list(make_tuple(x)),
+             lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
+            ("_weight_size_edges", "weight_size_edges", "weight_size_edges", "(64,)", lambda x: list(make_tuple(x)),
+             lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
+            ("_weight_size_nodes_edges", "weight_size_nodes_edges", "weight_size_nodes_edges", "(64,)",
+             lambda x: list(make_tuple(x)),
+             lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
             ("_l_w", "l_w", "l_w", 0.01, None, None),
             ("_n_layers", "n_layers", "n_layers", 3, None, None),
             ("_loader", "loader", "loader", 'TextualAttributes', str, None)
@@ -77,15 +94,38 @@ class EGCF(RecMixin, BaseRecommenderModel):
 
         self.node_edge_index = np.array(list_nodes_edges).transpose()
 
+        list_edges_edges = []
+
+        for e in set(self.node_edge_index[1]):
+            nodes_connected_to_e = self.node_edge_index[0, np.argwhere(self.node_edge_index[1] == e)][:, 0].tolist()
+            edges_connected_to_e = self.node_edge_index[
+                                       1, np.argwhere(self.node_edge_index[0] == nodes_connected_to_e[0])].tolist() + \
+                                   self.node_edge_index[
+                                       1, np.argwhere(self.node_edge_index[0] == nodes_connected_to_e[1])].tolist()
+            edges_connected_to_e = [ee[0] for ee in edges_connected_to_e if ee[0] != e]
+            for ee in edges_connected_to_e:
+                list_edges_edges.append([e, ee])
+
+        self.edge_edge_index = np.array(list_edges_edges).transpose()
+        self.edge_edge_index -= np.min(self.edge_edge_index)
+
+        self._n_layers = len(self._weight_size_nodes)
+
         self._model = EGCFModel(
             num_users=self._num_users,
             num_items=self._num_items,
             learning_rate=self._learning_rate,
             embed_k=self._factors,
+            embed_n_e_k=self._node_edge_factors,
             l_w=self._l_w,
+            weight_size_nodes=self._weight_size_nodes,
+            weight_size_edges=self._weight_size_edges,
+            weight_size_nodes_edges=self._weight_size_nodes_edges,
             n_layers=self._n_layers,
             edge_features=self._side_edge_textual.object.get_all_features(evaluate=True),
             edge_index=self.edge_index,
+            node_edge_index=self.node_edge_index,
+            edge_edge_index=self.edge_edge_index,
             random_seed=self._seed
         )
 
@@ -114,9 +154,10 @@ class EGCF(RecMixin, BaseRecommenderModel):
     def get_recommendations(self, k: int = 100):
         predictions_top_k_test = {}
         predictions_top_k_val = {}
+        gu, gi = self._model.propagate_embeddings(evaluate=True)
         for index, offset in enumerate(range(0, self._num_users, self._batch_size)):
             offset_stop = min(offset + self._batch_size, self._num_users)
-            predictions = self._model.predict(offset, offset_stop)
+            predictions = self._model.predict(gu[offset: offset_stop], gi)
             recs_val, recs_test = self.process_protocol(k, predictions, offset, offset_stop)
             predictions_top_k_val.update(recs_val)
             predictions_top_k_test.update(recs_test)

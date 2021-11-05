@@ -43,5 +43,8 @@ experiment:
       epochs: 50
       batch_size: 512
       factors: 64
+      node_edge_factors: 128
+      weight_size_nodes: (64,64)
+      weight_size_edges: (64,64)
+      weight_size_nodes_edges: (64,64)
       l_w: 0.1
-      n_layers: 3
