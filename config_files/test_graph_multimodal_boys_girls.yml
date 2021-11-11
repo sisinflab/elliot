@@ -1,4 +1,5 @@
 experiment:
+  backend: [tensorflow, pytorch]
   data_config:
     strategy: fixed
     train_path: ../data/{0}/trainingset.tsv

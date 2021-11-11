@@ -68,6 +68,7 @@ def run_experiment(config_path: str = ''):
                 spec = importlib.util.spec_from_file_location("external",
                                                               path.relpath(base.base_namespace.external_models_path))
                 external = importlib.util.module_from_spec(spec)
+                external.backend = base.base_namespace.backend
                 sys.modules[spec.name] = external
                 spec.loader.exec_module(external)
                 model_class = getattr(importlib.import_module("external"), key.split(".", 1)[1])
