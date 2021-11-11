@@ -12,7 +12,7 @@ experiment:
   evaluation:
     cutoffs: [10, 20, 50]
     simple_metrics: [HR, nDCG, Precision, Recall]
-  gpu: 1
+  gpu: 2
   external_models_path: ../external/models/__init__.py
   models:
     external.NGCF:
