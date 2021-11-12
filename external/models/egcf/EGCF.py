@@ -75,7 +75,6 @@ class EGCF(RecMixin, BaseRecommenderModel):
              lambda x: list(make_tuple(x)),
              lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
             ("_l_w", "l_w", "l_w", 0.01, None, None),
-            ("_n_layers", "n_layers", "n_layers", 3, None, None),
             ("_loader", "loader", "loader", 'TextualAttributes', str, None)
         ]
         self.autoset_params()
