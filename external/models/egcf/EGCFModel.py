@@ -130,7 +130,7 @@ class EGCFModel(torch.nn.Module, ABC):
                 # then, we propagate edge-edge embedding
                 edge_edge_embeddings = list(
                     self.propagation_network_ee.children()
-                )[layer](edge_edge_embeddings, self.edge_edge_index.to(self.device))
+                )[layer](edge_edge_embeddings.to(self.device), self.edge_edge_index.to(self.device))
                 # finally, we propagate node-edge embeddings
                 node_edge_embeddings = list(
                     self.propagation_network_ne.children()
@@ -147,7 +147,7 @@ class EGCFModel(torch.nn.Module, ABC):
                     # then, we propagate edge-edge embedding
                     edge_edge_embeddings = list(
                         self.propagation_network_ee.children()
-                    )[layer](edge_edge_embeddings, self.edge_edge_index.to(self.device))
+                    )[layer](edge_edge_embeddings.to(self.device), self.edge_edge_index.to(self.device))
                     # finally, we propagate node-edge embeddings
                     node_edge_embeddings = list(
                         self.propagation_network_ne.children()
