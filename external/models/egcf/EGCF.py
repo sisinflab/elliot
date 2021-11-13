@@ -64,9 +64,9 @@ class EGCF(RecMixin, BaseRecommenderModel):
         ######################################
 
         self._params_list = [
-            ("_learning_rate", "lr", "lr", 0.0005, None, None),
-            ("_factors", "factors", "factors", 64, None, None),
-            ("_node_edge_factors", "node_edge_factors", "node_edge_factors", 128, None, None),
+            ("_learning_rate", "lr", "lr", 0.0005, float, None),
+            ("_factors", "factors", "factors", 64, int, None),
+            ("_node_edge_factors", "node_edge_factors", "node_edge_factors", 128, int, None),
             ("_weight_size_nodes", "weight_size_nodes", "weight_size_nodes", "(64,)", lambda x: list(make_tuple(x)),
              lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
             ("_weight_size_edges", "weight_size_edges", "weight_size_edges", "(64,)", lambda x: list(make_tuple(x)),
@@ -74,7 +74,7 @@ class EGCF(RecMixin, BaseRecommenderModel):
             ("_weight_size_nodes_edges", "weight_size_nodes_edges", "weight_size_nodes_edges", "(64,)",
              lambda x: list(make_tuple(x)),
              lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
-            ("_l_w", "l_w", "l_w", 0.01, None, None),
+            ("_l_w", "l_w", "l_w", 0.01, float, None),
             ("_loader", "loader", "loader", 'TextualAttributes', str, None)
         ]
         self.autoset_params()
