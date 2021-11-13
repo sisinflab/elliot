@@ -64,7 +64,7 @@ experiment:
         save_recs: True
         validation_metric: Recall
         restore: False
-      lr: 0.005
+      lr: [0.0001, 0.005]
       epochs: 400
       batch_size: 512
       factors: 64
@@ -72,7 +72,7 @@ experiment:
       weight_size_nodes: (64,64)
       weight_size_edges: (64,64)
       weight_size_nodes_edges: (64,64)
-      l_w: 10e-5
+      l_w: [10e-5, 10e-3, 10e-1, 10]
       early_stopping:
         patience: 50
         monitor: Recall@20
