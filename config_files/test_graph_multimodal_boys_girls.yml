@@ -69,9 +69,9 @@ experiment:
       batch_size: 512
       factors: 64
       node_edge_factors: 64
-      weight_size_nodes: (64,64)
-      weight_size_edges: (64,64)
-      weight_size_nodes_edges: (64,64)
+      weight_size_nodes: (64,64,64)
+      weight_size_edges: (64,64,64)
+      weight_size_nodes_edges: (64,64,64)
       l_w: [10e-5, 10e-3, 10e-1, 10]
       early_stopping:
         patience: 50
