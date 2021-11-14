@@ -10,6 +10,7 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malite
 from abc import ABC
 
 from torch_geometric.nn import GATConv
+from torch_geometric.nn import GCNConv
 from collections import OrderedDict
 
 import torch
@@ -66,29 +67,29 @@ class EGCFModel(torch.nn.Module, ABC):
             torch.tensor(edge_features, dtype=torch.float32)
         )
 
-        propagation_network_nn_list = [(GATConv(in_channels=self.embed_k,
+        propagation_network_nn_list = [(GCNConv(in_channels=self.embed_k,
                                                 out_channels=self.weight_size_nodes_list[0],
-                                                add_self_loops=False), 'x, edge_index -> x')]
-        propagation_network_ee_list = [(GATConv(in_channels=self.Ge.shape[1],
+                                                add_self_loops=True), 'x, edge_index -> x')]
+        propagation_network_ee_list = [(GCNConv(in_channels=self.Ge.shape[1],
                                                 out_channels=self.weight_size_edges_list[0],
-                                                add_self_loops=False), 'x, edge_index -> x')]
-        propagation_network_ne_list = [(GATConv(in_channels=self.embed_n_e_k,
+                                                add_self_loops=True), 'x, edge_index -> x')]
+        propagation_network_ne_list = [(GCNConv(in_channels=self.embed_n_e_k,
                                                 out_channels=self.weight_size_nodes_edges_list[0],
-                                                add_self_loops=False), 'x, edge_index -> x')]
+                                                add_self_loops=True), 'x, edge_index -> x')]
 
         for layer in range(1, self.n_layers):
             propagation_network_nn_list.append(
-                (GATConv(in_channels=self.weight_size_nodes_list[layer - 1] + self.weight_size_edges_list[layer - 1],
+                (GCNConv(in_channels=self.weight_size_nodes_list[layer - 1] + self.weight_size_edges_list[layer - 1],
                          out_channels=self.weight_size_nodes_list[layer],
-                         add_self_loops=False), 'x, edge_index -> x'))
+                         add_self_loops=True), 'x, edge_index -> x'))
             propagation_network_ee_list.append(
-                (GATConv(in_channels=self.weight_size_edges_list[layer - 1] + self.weight_size_edges_list[layer - 1],
+                (GCNConv(in_channels=self.weight_size_edges_list[layer - 1] + self.weight_size_edges_list[layer - 1],
                          out_channels=self.weight_size_edges_list[layer],
-                         add_self_loops=False), 'x, edge_index -> x'))
+                         add_self_loops=True), 'x, edge_index -> x'))
             propagation_network_ne_list.append(
-                (GATConv(in_channels=self.weight_size_nodes_list[layer - 1] + self.weight_size_edges_list[layer - 1],
+                (GCNConv(in_channels=self.weight_size_nodes_list[layer - 1] + self.weight_size_edges_list[layer - 1],
                          out_channels=self.weight_size_nodes_edges_list[layer],
-                         add_self_loops=False), 'x, edge_index -> x'))
+                         add_self_loops=True), 'x, edge_index -> x'))
 
         self.propagation_network_nn = torch_geometric.nn.Sequential('x, edge_index', propagation_network_nn_list)
         self.propagation_network_nn.to(self.device)
