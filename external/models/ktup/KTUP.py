@@ -51,62 +51,65 @@ class KTUP(RecMixin, BaseRecommenderModel):
             ("_norm_lambda", "norm_lambda", "nl", 1, None, None),
             ("_kg_lambda", "kg_lambda", "kgl", 1, None, None),
             ("_use_st_gumbel", "use_st_gumbel", "gum", False, None, None),
+            ("_loader", "loader", "load", "KGRec", None, None)
         ]
         self.autoset_params()
-
-        feature_names_path = self._config.data_config.side_information.features
-        feature_names: t.Dict[int, t.List[str, str]] = self.load_feature_names(feature_names_path)
-
-        self._relations = list({r for r, _ in feature_names.values()})
-        self._private_relations = {p: u for p, u in enumerate(self._relations)}
-        self._public_relations = {v: k for k, v in self._private_relations.items()}
-
-        self._entities = list({o for _, o in feature_names.values()})
-        self._private_entities = {p: u for p, u in enumerate(self._entities)}
-        self._public_entities = {v: k for k, v in self._private_entities.items()}
-
         self._step_to_switch = self._joint_ratio * 10
+        self._side = getattr(self._data.side_information, self._loader, None)
 
-        mapping = self.load_mapping("/media/cheggynho/WalterBackup03/KARS_pomo/kvae/code/data/categorical_dbpedia_ml1m/mapping.tsv")
-
-
-        item2entity = {}
-        entity2item = {}
-        for p, item in enumerate(set(mapping.keys()) - set(self._entities), len(set(self._entities))):
-            self._private_entities[p] = item
-            self._public_entities[item] = p
-            item2entity[mapping[item]] = p
-            entity2item[p] = mapping[item]
-
-        self._tfidf_obj = TFIDF(self._data.side_information_data.feature_map)
-        self._tfidf = self._tfidf_obj.tfidf()
-        self._user_profiles = self._tfidf_obj.get_profiles(self._ratings)
-
-        self._user_factors = \
-            np.zeros(shape=(len(self._data.users), len(self._data.features)))
-        self._item_factors = \
-            np.zeros(shape=(len(self._data.items), len(self._data.features)))
-
-        for i, f_dict in self._tfidf.items():
-            if i in self._data.items:
-                for f, v in f_dict.items():
-                    self._item_factors[self._data.public_items[i]][self._data.public_features[f]] = v
-
-        for u, f_dict in self._user_profiles.items():
-            for f, v in f_dict.items():
-                self._user_factors[self._data.public_users[u]][self._data.public_features[f]] = v
+        # feature_names_path = self._config.data_config.side_information.features
+        # feature_names: t.Dict[int, t.List[str, str]] = self.load_feature_names(feature_names_path)
+        #
+        # self._relations = list({r for r, _ in feature_names.values()})
+        # self._private_relations = {p: u for p, u in enumerate(self._relations)}
+        # self._public_relations = {v: k for k, v in self._private_relations.items()}
+        #
+        # self._entities = list({o for _, o in feature_names.values()})
+        # self._private_entities = {p: u for p, u in enumerate(self._entities)}
+        # self._public_entities = {v: k for k, v in self._private_entities.items()}
+        #
+        # self._step_to_switch = self._joint_ratio * 10
+        #
+        # mapping = self._config.data_config.side_information.mapping
+        #
+        #
+        # item2entity = {}
+        # entity2item = {}
+        # for p, item in enumerate(set(mapping.keys()) - set(self._entities), len(set(self._entities))):
+        #     self._private_entities[p] = item
+        #     self._public_entities[item] = p
+        #     item2entity[mapping[item]] = p
+        #     entity2item[p] = mapping[item]
+        #
+        # self._tfidf_obj = TFIDF(self._data.side_information_data.feature_map)
+        # self._tfidf = self._tfidf_obj.tfidf()
+        # self._user_profiles = self._tfidf_obj.get_profiles(self._ratings)
+        #
+        # self._user_factors = \
+        #     np.zeros(shape=(len(self._data.users), len(self._data.features)))
+        # self._item_factors = \
+        #     np.zeros(shape=(len(self._data.items), len(self._data.features)))
+        #
+        # for i, f_dict in self._tfidf.items():
+        #     if i in self._data.items:
+        #         for f, v in f_dict.items():
+        #             self._item_factors[self._data.public_items[i]][self._data.public_features[f]] = v
+        #
+        # for u, f_dict in self._user_profiles.items():
+        #     for f, v in f_dict.items():
+        #         self._user_factors[self._data.public_users[u]][self._data.public_features[f]] = v
 
         self._iteration = 0
         # self.evaluator = Evaluator(self._data, self._params)
         if self._batch_size < 1:
-            self._batch_size = self._num_users
+            self._batch_size = self._data.num_users
 
         ######################################
 
-        self._dropout_rate = 1. - self._dropout_rate
+        # self._dropout_rate = 1. - self._dropout_rate
         #
-        self._model = jtup(self._L1, self._embedding_size, self._num_users, self._num_items, self._entity_total,
-                           self._relation_total, self._i_map, self._kg_map)
+        self._model = jtup(self._L1, self._embedding_size, self._data.num_users, self._data.num_items, len(self._side.entity_set),
+                           len(self._side.predicate_set), self._side.public_items_entitiesidx, self._side.public_items_entitiesidx)
 
 
 
@@ -134,7 +137,7 @@ class KTUP(RecMixin, BaseRecommenderModel):
                 else:
                     for batch in self._sampler.step(self._data.transactions, self._batch_size):
                         steps += 1
-                        loss += self._model.train_step_kg(batch, is_rec=False, kg_lambda=self.__kg_lambda)
+                        loss += self._model.train_step_kg(batch, is_rec=False, kg_lambda=self._kg_lambda)
                 t.set_postfix({'loss': f'{loss.numpy() / steps:.5f}'})
                 t.update()
 
@@ -155,12 +158,12 @@ class KTUP(RecMixin, BaseRecommenderModel):
 
     def get_recommendations(self, k: int = 100):
         predictions_top_k = {}
-        for index, offset in enumerate(range(0, self._num_users, self._batch_size)):
-            offset_stop = min(offset + self._batch_size, self._num_users)
+        for index, offset in enumerate(range(0, self._data.num_users, self._batch_size)):
+            offset_stop = min(offset + self._batch_size, self._data.num_users)
             predictions = self._model.get_recs(
                 (
-                    np.repeat(np.array(list(range(offset, offset_stop)))[:, None], repeats=self._num_items, axis=1),
-                    np.array([self._i_items_set for _ in range(offset, offset_stop)])
+                    np.repeat(np.array(list(range(offset, offset_stop)))[:, None], repeats=self._data.num_items, axis=1),
+                    np.array([self._data.items for _ in range(offset, offset_stop)])
                  )
             )
             v, i = self._model.get_top_k(predictions, self.get_train_mask(offset, offset_stop), k=k)

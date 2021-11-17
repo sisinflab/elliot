@@ -53,7 +53,7 @@ class jtup(keras.Model):
                                                      embeddings_initializer=initializer,
                                                      trainable=True, dtype=tf.float32)
         self.user_embeddings(0)
-        self.user_embeddings.weights[0] = tf.math.l2_normalize(self.item_embedding.weights[0])
+        self.user_embeddings.weights[0] = tf.math.l2_normalize(self.user_embeddings.weights[0])
 
         self.item_embeddings = keras.layers.Embedding(input_dim=self.item_total, output_dim=self.embedding_size,
                                                       embeddings_initializer=initializer,
@@ -75,8 +75,8 @@ class jtup(keras.Model):
 
         # transh
 
-        ent_embeddings_w = tf.Variable(initial_value=initializer(self.ent_total, self.embedding_size))
-        ent_embeddings_w = tf.concat([tf.math.l2_normalize(ent_embeddings_w[:-1, :]), tf.zeros([1, 5])], 0)
+        ent_embeddings_w = tf.Variable(initial_value=initializer(shape=(self.ent_total, self.embedding_size)))
+        ent_embeddings_w = tf.concat([tf.math.l2_normalize(ent_embeddings_w[:-1, :]), tf.zeros([1, self.embedding_size])], 0)
 
         self.ent_embeddings = keras.layers.Embedding(input_dim=self.ent_total, output_dim=self.embedding_size,
                                                            weights=[ent_embeddings_w],
@@ -108,7 +108,7 @@ class jtup(keras.Model):
         # self.decoder = Decoder(output_dim,
         #                        intermediate_dim=intermediate_dim,
         #                        regularization_lambda=regularization_lambda)
-        # self.optimizer = tf.optimizers.Adam(learning_rate)
+        self.optimizer = tf.optimizers.Adam(0.01)
         # tf.Graph().finalize()
 
     def get_config(self):
@@ -119,11 +119,12 @@ class jtup(keras.Model):
 
     def paddingItems(self, i_ids, pad_index):
         padded_e_ids = []
-        for i_id in i_ids:
-            new_index = self.i_map[i_id]
-            ent_id = self.new_map[new_index][0]
-            padded_e_ids.append(ent_id if ent_id != -1 else pad_index)
-        return padded_e_ids
+        for i_id in i_ids.obj:
+            # new_index = self.i_map[i_id]
+            # ent_id = self.new_map[new_index][0]
+            ent_id = self.new_map[i_id[0]]
+            padded_e_ids.append([ent_id] if ent_id != -1 else [pad_index])
+        return np.array(padded_e_ids)
 
     # @tf.function
     def call(self, inputs, training=None, **kwargs):
@@ -166,15 +167,15 @@ class jtup(keras.Model):
     def getPreferences(self, u_e, i_e):
         # use item and user embedding to compute preference distribution
         # pre_probs: batch * rel, or batch * item * rel
-        pre_probs = tf.matmul(u_e + i_e, tf.transpose(self.pref_embeddings.weight + self.rel_embeddings.weight)) / 2
+        pre_probs = tf.matmul(u_e + i_e, tf.transpose(self.pref_embeddings.weights[0] + self.rel_embeddings.weights[0])) / 2
 
-        r_e = tf.matmul(pre_probs, self.pref_embeddings.weight + self.rel_embeddings.weight) / 2
-        norm = tf.matmul(pre_probs, self.pref_norm_embeddings.weight + self.norm_embeddings.weight) / 2
+        r_e = tf.matmul(pre_probs, self.pref_embeddings.weights[0] + self.rel_embeddings.weights[0]) / 2
+        norm = tf.matmul(pre_probs, self.pref_norm_embeddings.weights[0] + self.norm_embeddings.weights[0]) / 2
 
         return pre_probs, r_e, norm
 
     def projection_trans_h(self, original, norm):
-        return original - tf.reduce_sum(original * norm, dim=len(original.size()) - 1, keepdim=True) * norm
+        return original - tf.reduce_sum(original * norm, axis=len(original.shape.as_list()) - 1, keepdims=True) * norm
 
     # @tf.function
     def train_step_rec(self, batch, **kwargs):
@@ -186,11 +187,14 @@ class jtup(keras.Model):
             neg_score = self.call(inputs=(user, neg), training=True, **kwargs)
 
             losses = self.bprLoss(pos_score, neg_score)
-            losses += self.orthogonalLoss(self.pref_embeddings.weight, self.pref_norm_embeddings.weight)
+            losses += self.orthogonalLoss(self.pref_embeddings.weights[0], self.pref_norm_embeddings.weights[0])
 
-        gradients, variables = zip(*self.optimizer.compute_gradients(losses))
-        gradients, _ = tf.clip_by_global_norm(gradients, 1) # fix clipping value
-        self.optimizer.apply_gradients(zip(tape.gradient(gradients, self.trainable_weights), self.trainable_weights))
+        # gradients, variables = zip(*self.optimizer.compute_gradients(losses))
+        # gradients, _ = tf.clip_by_global_norm(gradients, 1) # fix clipping value
+        # self.optimizer.apply_gradients(zip(tape.gradient(gradients, self.trainable_weights), self.trainable_weights))
+        grads = tape.gradient(losses, self.trainable_weights)
+        grads, _ = tf.clip_by_global_norm(grads, 1) # fix clipping value
+        self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
 
         return losses
 
@@ -211,9 +215,12 @@ class jtup(keras.Model):
             losses += self.normLoss(ent_embeddings) + self.normLoss(rel_embeddings)
             losses = kwargs['kg_lambda'] * losses
 
-        gradients, variables = zip(*self.optimizer.compute_gradients(losses))
-        gradients, _ = tf.clip_by_global_norm(gradients, 1) # fix clipping value
-        self.optimizer.apply_gradients(zip(tape.gradient(gradients, self.trainable_weights), self.trainable_weights))
+        # gradients, variables = zip(*self.optimizer.compute_gradients(losses))
+        # gradients, _ = tf.clip_by_global_norm(gradients, 1) # fix clipping value
+        # self.optimizer.apply_gradients(zip(tape.gradient(gradients, self.trainable_weights), self.trainable_weights))
+        grads = tape.gradient(losses, self.trainable_weights)
+        grads, _ = tf.clip_by_global_norm(grads, 1) # fix clipping value
+        self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
 
         return losses
 
@@ -228,15 +235,15 @@ class jtup(keras.Model):
 
     def bprLoss(self, pos, neg, target=1.0):
         loss = - tf.math.log_sigmoid(target * (pos - neg))
-        return loss.mean()
+        return tf.reduce_mean(loss)
 
     def orthogonalLoss(self, rel_embeddings, norm_embeddings):
         return tf.reduce_sum(
-            tf.reduce_sum(norm_embeddings * rel_embeddings, dim=1, keepdim=True) ** 2 /
-            tf.reduce_sum(rel_embeddings ** 2, dim=1, keepdim=True))
+            tf.reduce_sum(norm_embeddings * rel_embeddings, axis=1, keepdims=True) ** 2 /
+            tf.reduce_sum(rel_embeddings ** 2, axis=1, keepdims=True))
 
     def normLoss(self, embeddings, dim=1):
-        norm = tf.reduce_sum(embeddings ** 2, dim=dim, keepdim=True)
+        norm = tf.reduce_sum(embeddings ** 2, axis=dim, keepdims=True)
         return tf.reduce_sum(tf.reduce_max(norm - (tf.Variable(tf.Tensor([1.0]))), (tf.Variable(tf.Tensor([0.0])))))
 
     def marginLoss(self, pos, neg, margin):
