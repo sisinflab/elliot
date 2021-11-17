@@ -1,4 +1,5 @@
 experiment:
+  backend: tensorflow
   data_config:
     strategy: dataset
     dataset_path: ../data/{0}/ratings.dat
