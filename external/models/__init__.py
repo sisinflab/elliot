@@ -11,6 +11,7 @@ def import_model_by_backend(tensorflow_cmd, pytorch_cmd):
 from .most_popular import MostPop
 from .msap import MSAPMF
 from .AdversarialMF import AdversarialMF
+from .ktup import KTUP
 
 import sys
 for _backend in sys.modules["external"].backend:
@@ -26,4 +27,3 @@ for _backend in sys.modules["external"].backend:
         from .mmgcn import MMGCN
         from .dgcf import DGCF
         from .egcf import EGCF
-
