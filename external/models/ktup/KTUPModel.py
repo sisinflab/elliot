@@ -117,12 +117,14 @@ class jtup(keras.Model):
     def convert_function(self, row):
         return tf.math.reduce_mean(self.item_embedding.weights[0][row > 0], axis=0)
 
-    def paddingItems(self, i_ids, pad_index):
+    def paddingItems(self, i_ids):
+        # i_ids, pad_index = input
         padded_e_ids = []
-        for i_id in i_ids.obj:
+        pad_index = self.ent_total-1
+        for i_id in i_ids:
             # new_index = self.i_map[i_id]
             # ent_id = self.new_map[new_index][0]
-            ent_id = self.new_map[i_id[0]]
+            ent_id = self.new_map[int(i_id)]
             padded_e_ids.append([ent_id] if ent_id != -1 else [pad_index])
         return np.array(padded_e_ids)
 
@@ -131,7 +133,8 @@ class jtup(keras.Model):
 
         if kwargs['is_rec']:
             u_ids, i_ids = inputs
-            e_var = self.paddingItems(i_ids.data, self.ent_total-1)
+            # e_var = tf.map_fn(fn=self.paddingItems, elems=(i_ids, self.ent_total-1))
+            e_var = self.paddingItems(i_ids)
             u_e = self.user_embeddings(u_ids)
             i_e = self.item_embeddings(i_ids)
             e_e = self.ent_embeddings(e_var)
@@ -224,10 +227,39 @@ class jtup(keras.Model):
 
         return losses
 
-    @tf.function
+    # @tf.function
     def predict(self, inputs, training=False, **kwargs):
         score = self.call(inputs=inputs, training=training, is_rec=True)
         return score
+
+    # @tf.function
+    def get_recs(self, inputs, training=False, **kwargs):
+        """
+        Get full predictions on the whole users/items matrix.
+
+        Returns:
+            The matrix of predicted values.
+        """
+        u_ids, i_ids = inputs
+
+        e_var = tf.map_fn(fn=self.paddingItems, elems=i_ids)
+        # e_var = self.paddingItems(i_ids, self.ent_total - 1)
+        u_e = self.user_embeddings(u_ids)
+        i_e = self.item_embeddings(i_ids)
+        e_e = self.ent_embeddings(e_var)
+        ie_e = i_e + e_e
+
+        _, r_e, norm = self.getPreferences(u_e, ie_e)
+
+        proj_u_e = self.projection_trans_h(u_e, norm)
+        proj_i_e = self.projection_trans_h(ie_e, norm)
+
+        if self.L1_flag:
+            score = tf.reduce_sum(tf.abs(proj_u_e + r_e - proj_i_e), 1)
+        else:
+            score = tf.reduce_sum((proj_u_e + r_e - proj_i_e) ** 2, 1)
+        # output = self(inputs, training=training, is_rec=True)
+        return tf.squeeze(score)
 
     @tf.function
     def get_top_k(self, preds, train_mask, k=100):

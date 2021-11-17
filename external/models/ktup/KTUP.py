@@ -10,6 +10,7 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 from tqdm import tqdm
 import numpy as np
 import typing as t
+from collections import defaultdict
 
 from elliot.dataset.samplers import custom_sampler as cs
 from elliot.evaluation.evaluator import Evaluator
@@ -103,13 +104,16 @@ class KTUP(RecMixin, BaseRecommenderModel):
         # self.evaluator = Evaluator(self._data, self._params)
         if self._batch_size < 1:
             self._batch_size = self._data.num_users
+        self._i_items_set = list(range(self._num_items))
 
+        new_map = defaultdict(lambda: -1)
+        new_map.update({self._data.public_items[i]: idx for i, idx in self._side.public_items_entitiesidx.items()})
         ######################################
 
         # self._dropout_rate = 1. - self._dropout_rate
         #
         self._model = jtup(self._L1, self._embedding_size, self._data.num_users, self._data.num_items, len(self._side.entity_set),
-                           len(self._side.predicate_set), self._side.public_items_entitiesidx, self._side.public_items_entitiesidx)
+                           len(self._side.predicate_set), new_map, new_map)
 
 
 
@@ -135,9 +139,10 @@ class KTUP(RecMixin, BaseRecommenderModel):
                         steps += 1
                         loss += self._model.train_step_rec(batch, is_rec=True)
                 else:
-                    for batch in self._sampler.step(self._data.transactions, self._batch_size):
-                        steps += 1
-                        loss += self._model.train_step_kg(batch, is_rec=False, kg_lambda=self._kg_lambda)
+                    pass
+                    # for batch in self._sampler.step(self._data.transactions, self._batch_size):
+                    #     steps += 1
+                    #     loss += self._model.train_step_kg(batch, is_rec=False, kg_lambda=self._kg_lambda)
                 t.set_postfix({'loss': f'{loss.numpy() / steps:.5f}'})
                 t.update()
 
@@ -156,38 +161,55 @@ class KTUP(RecMixin, BaseRecommenderModel):
                     if self._save_recs:
                         store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}-it:{it + 1}.tsv")
 
+    # def get_recommendations(self, k: int = 100):
+    #     predictions_top_k = {}
+    #     for index, offset in enumerate(range(0, self._data.num_users, self._batch_size)):
+    #         offset_stop = min(offset + self._batch_size, self._data.num_users)
+    #         predictions = self._model.get_recs(
+    #             (
+    #                 np.repeat(np.array(list(range(offset, offset_stop)))[:, None], repeats=self._data.num_items, axis=1),
+    #                 np.array([self._data.items for _ in range(offset, offset_stop)])
+    #              )
+    #         )
+    #         v, i = self._model.get_top_k(predictions, self.get_train_mask(offset, offset_stop), k=k)
+    #         items_ratings_pair = [list(zip(map(self._data.private_items.get, u_list[0]), u_list[1]))
+    #                               for u_list in list(zip(i.numpy(), v.numpy()))]
+    #         predictions_top_k.update(dict(zip(map(self._data.private_users.get,
+    #                                               range(offset, offset_stop)), items_ratings_pair)))
+    #     return predictions_top_k
+
     def get_recommendations(self, k: int = 100):
-        predictions_top_k = {}
-        for index, offset in enumerate(range(0, self._data.num_users, self._batch_size)):
-            offset_stop = min(offset + self._batch_size, self._data.num_users)
+        predictions_top_k_test = {}
+        predictions_top_k_val = {}
+        for index, offset in enumerate(range(0, self._num_users, self._batch_size)):
+            offset_stop = min(offset + self._batch_size, self._num_users)
             predictions = self._model.get_recs(
                 (
-                    np.repeat(np.array(list(range(offset, offset_stop)))[:, None], repeats=self._data.num_items, axis=1),
-                    np.array([self._data.items for _ in range(offset, offset_stop)])
-                 )
+                    np.repeat(np.array(list(range(offset, offset_stop)))[:, None], repeats=self._num_items, axis=1),
+                    np.array([self._i_items_set for _ in range(offset, offset_stop)])
+                )
             )
-            v, i = self._model.get_top_k(predictions, self.get_train_mask(offset, offset_stop), k=k)
-            items_ratings_pair = [list(zip(map(self._data.private_items.get, u_list[0]), u_list[1]))
-                                  for u_list in list(zip(i.numpy(), v.numpy()))]
-            predictions_top_k.update(dict(zip(map(self._data.private_users.get,
-                                                  range(offset, offset_stop)), items_ratings_pair)))
-        return predictions_top_k
+            recs_val, recs_test = self.process_protocol(k, predictions, offset, offset_stop)
 
-    def load_feature_names(self, infile, separator='\t'):
-        feature_names = {}
-        with open(infile, "r") as file:
-            for line in file:
-                line = line.split(separator)
-                pattern = line[1].split('><')
-                pattern[0] = pattern[0][1:]
-                pattern[1] = pattern[1][:-2]
-                feature_names[int(line[0])] = pattern
-        return feature_names
+            predictions_top_k_val.update(recs_val)
+            predictions_top_k_test.update(recs_test)
+        return predictions_top_k_val, predictions_top_k_test
 
-    def load_mapping(self, infile, separator="\t"):
-        mapping = {}
-        with open(infile, "r") as fin:
-            for line in fin:
-                line = line.rstrip("\n").split(separator)
-                mapping[line[1]] = int(line[0])
-        return mapping
+    # def load_feature_names(self, infile, separator='\t'):
+    #     feature_names = {}
+    #     with open(infile, "r") as file:
+    #         for line in file:
+    #             line = line.split(separator)
+    #             pattern = line[1].split('><')
+    #             pattern[0] = pattern[0][1:]
+    #             pattern[1] = pattern[1][:-2]
+    #             feature_names[int(line[0])] = pattern
+    #     return feature_names
+    #
+    # def load_mapping(self, infile, separator="\t"):
+    #     mapping = {}
+    #     with open(infile, "r") as fin:
+    #         for line in fin:
+    #             line = line.rstrip("\n").split(separator)
+    #             mapping[line[1]] = int(line[0])
+    #     return mapping
