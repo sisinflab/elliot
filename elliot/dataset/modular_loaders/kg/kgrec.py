@@ -1,6 +1,7 @@
 from types import SimpleNamespace
 import typing as t
 from os.path import splitext
+from collections import defaultdict
 
 import numpy as np
 
@@ -83,6 +84,13 @@ class KGRec(AbstractLoader):
     def create_namespace(self):
         ns = SimpleNamespace()
         ns.__name__ = "KGRec"
+        self.public_items_entitiesidx = defaultdict(lambda: -1)
+        # for i in self.items:
+        #     if i in self.mapping.keys():
+        #         if self.mapping[i] in self.entity_to_idx.keys():
+        #             self.public_items_entitiesidx[i] = self.entity_to_idx[self.mapping[i]]
+        [self.public_items_entitiesidx.update({i:self.entity_to_idx[self.mapping[i]]})
+          for i in self.items if i in self.mapping.keys() and self.mapping[i] in self.entity_to_idx.keys()]
         ns.object = self
         ns.__dict__.update(self.__dict__)
         return ns
@@ -114,6 +122,6 @@ class KGRec(AbstractLoader):
         map = {}
         with open(mapping_file) as file:
             for line in file:
-                line = line.split(separator)
+                line = line.rstrip("\n").split(separator)
                 map[int(line[0])] = line[1]
         return map
