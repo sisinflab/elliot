@@ -18,19 +18,20 @@ class jtup(keras.Model):
     """Combines the encoder and decoder into an end-to-end model for training."""
 
     def __init__(self,
+                 learning_rate,
                  L1_flag,
                  embedding_size,
                  user_total,
                  item_total,
                  entity_total,
                  relation_total,
-                 i_map,
                  new_map,
                  name="jtup",
                  **kwargs):
         super().__init__(name=name, **kwargs)
         tf.random.set_seed(42)
 
+        self.learning_rate = learning_rate
         self.L1_flag = L1_flag
         # self.is_share = isShare
         # self.use_st_gumbel = use_st_gumbel
@@ -42,8 +43,8 @@ class jtup(keras.Model):
         self.rel_total = relation_total
         self.is_pretrained = False
         # store item to item-entity dic
-        self.i_map = i_map
-        # store item-entity to (entity, item)
+        # self.i_map = i_map
+        # store item to item-entity to (entity, item)
         self.new_map = new_map
         # todo: simiplifying the init
 
@@ -95,6 +96,14 @@ class jtup(keras.Model):
         self.norm_embeddings(0)
         self.norm_embeddings.weights[0] = tf.math.l2_normalize(self.norm_embeddings.weights[0])
 
+        keys, values = tuple(zip(*self.new_map.items()))
+        init = tf.lookup.KeyValueTensorInitializer(keys, values)
+        self.table = tf.lookup.StaticHashTable(
+            init,
+            default_value=self.ent_total-1)
+
+
+
         # self.item_embedding = keras.layers.Embedding(input_dim=item_factors.shape[0], output_dim=item_factors.shape[1],
         #                                              weights=[item_factors],
         #                                              embeddings_regularizer=keras.regularizers.l2(regularization_lambda),
@@ -108,7 +117,7 @@ class jtup(keras.Model):
         # self.decoder = Decoder(output_dim,
         #                        intermediate_dim=intermediate_dim,
         #                        regularization_lambda=regularization_lambda)
-        self.optimizer = tf.optimizers.Adam(0.01)
+        self.optimizer = tf.optimizers.Adam(self.learning_rate)
         # tf.Graph().finalize()
 
     def get_config(self):
@@ -128,16 +137,18 @@ class jtup(keras.Model):
             padded_e_ids.append([ent_id] if ent_id != -1 else [pad_index])
         return np.array(padded_e_ids)
 
-    # @tf.function
+    @tf.function
     def call(self, inputs, training=None, **kwargs):
 
         if kwargs['is_rec']:
             u_ids, i_ids = inputs
             # e_var = tf.map_fn(fn=self.paddingItems, elems=(i_ids, self.ent_total-1))
-            e_var = self.paddingItems(i_ids)
-            u_e = self.user_embeddings(u_ids)
-            i_e = self.item_embeddings(i_ids)
-            e_e = self.ent_embeddings(e_var)
+            # tf.map_fn(fn=self.new_map.__getitem__, elems=i_ids)
+            e_var = self.table.lookup(tf.squeeze(tf.cast(i_ids, tf.int32)))
+            # e_var = self.paddingItems(i_ids)
+            u_e = self.user_embeddings(tf.squeeze(u_ids))
+            i_e = self.item_embeddings(tf.squeeze(i_ids))
+            e_e = self.ent_embeddings(tf.squeeze(e_var))
             ie_e = i_e + e_e
 
             _, r_e, norm = self.getPreferences(u_e, ie_e)
@@ -146,9 +157,9 @@ class jtup(keras.Model):
             proj_i_e = self.projection_trans_h(ie_e, norm)
 
             if self.L1_flag:
-                score = tf.reduce_sum(tf.abs(proj_u_e + r_e - proj_i_e), 1)
+                score = tf.reduce_sum(tf.abs(proj_u_e + r_e - proj_i_e), -1)
             else:
-                score = tf.reduce_sum((proj_u_e + r_e - proj_i_e) ** 2, 1)
+                score = tf.reduce_sum((proj_u_e + r_e - proj_i_e) ** 2, -1)
 
         elif not kwargs['is_rec']:
             h, t, r = inputs
@@ -180,7 +191,7 @@ class jtup(keras.Model):
     def projection_trans_h(self, original, norm):
         return original - tf.reduce_sum(original * norm, axis=len(original.shape.as_list()) - 1, keepdims=True) * norm
 
-    # @tf.function
+    @tf.function
     def train_step_rec(self, batch, **kwargs):
         with tf.GradientTape() as tape:
 
@@ -201,7 +212,7 @@ class jtup(keras.Model):
 
         return losses
 
-    # @tf.function
+    @tf.function
     def train_step_kg(self, batch, **kwargs):
         with tf.GradientTape() as tape:
 
@@ -227,12 +238,12 @@ class jtup(keras.Model):
 
         return losses
 
-    # @tf.function
+    @tf.function
     def predict(self, inputs, training=False, **kwargs):
         score = self.call(inputs=inputs, training=training, is_rec=True)
         return score
 
-    # @tf.function
+    @tf.function
     def get_recs(self, inputs, training=False, **kwargs):
         """
         Get full predictions on the whole users/items matrix.
@@ -242,7 +253,13 @@ class jtup(keras.Model):
         """
         u_ids, i_ids = inputs
 
-        e_var = tf.map_fn(fn=self.paddingItems, elems=i_ids)
+        # e_var = tf.map_fn(fn=self.paddingItems, elems=i_ids)
+        # e_var_list = []
+        # for elem in tf.unstack(i_ids):
+        #     e_var_list.append(self.paddingItems(elem))
+        # e_var = tf.stack(e_var_list)
+        e_var = self.table.lookup(tf.squeeze(tf.cast(i_ids, tf.int32)))
+        # e_var = tf.stack([self.paddingItems(elem) for elem in tf.unstack(i_ids)])
         # e_var = self.paddingItems(i_ids, self.ent_total - 1)
         u_e = self.user_embeddings(u_ids)
         i_e = self.item_embeddings(i_ids)
@@ -255,9 +272,9 @@ class jtup(keras.Model):
         proj_i_e = self.projection_trans_h(ie_e, norm)
 
         if self.L1_flag:
-            score = tf.reduce_sum(tf.abs(proj_u_e + r_e - proj_i_e), 1)
+            score = tf.reduce_sum(tf.abs(proj_u_e + r_e - proj_i_e), -1)
         else:
-            score = tf.reduce_sum((proj_u_e + r_e - proj_i_e) ** 2, 1)
+            score = tf.reduce_sum((proj_u_e + r_e - proj_i_e) ** 2, -1)
         # output = self(inputs, training=training, is_rec=True)
         return tf.squeeze(score)
 
@@ -271,10 +288,10 @@ class jtup(keras.Model):
 
     def orthogonalLoss(self, rel_embeddings, norm_embeddings):
         return tf.reduce_sum(
-            tf.reduce_sum(norm_embeddings * rel_embeddings, axis=1, keepdims=True) ** 2 /
-            tf.reduce_sum(rel_embeddings ** 2, axis=1, keepdims=True))
+            tf.reduce_sum(norm_embeddings * rel_embeddings, axis=-1, keepdims=True) ** 2 /
+            tf.reduce_sum(rel_embeddings ** 2, axis=-1, keepdims=True))
 
-    def normLoss(self, embeddings, dim=1):
+    def normLoss(self, embeddings, dim=-1):
         norm = tf.reduce_sum(embeddings ** 2, axis=dim, keepdims=True)
         return tf.reduce_sum(tf.reduce_max(norm - (tf.Variable(tf.Tensor([1.0]))), (tf.Variable(tf.Tensor([0.0])))))
 

@@ -112,8 +112,8 @@ class KTUP(RecMixin, BaseRecommenderModel):
 
         # self._dropout_rate = 1. - self._dropout_rate
         #
-        self._model = jtup(self._L1, self._embedding_size, self._data.num_users, self._data.num_items, len(self._side.entity_set),
-                           len(self._side.predicate_set), new_map, new_map)
+        self._model = jtup(self._learning_rate, self._L1, self._embedding_size, self._data.num_users, self._data.num_items, len(self._side.entity_set),
+                           len(self._side.predicate_set), new_map)
 
 
 
@@ -138,13 +138,15 @@ class KTUP(RecMixin, BaseRecommenderModel):
                     for batch in self._sampler.step(self._data.transactions, self._batch_size):
                         steps += 1
                         loss += self._model.train_step_rec(batch, is_rec=True)
+                        t.set_postfix({'loss': f'{loss.numpy() / steps:.5f}'})
+                        t.update()
                 else:
                     pass
                     # for batch in self._sampler.step(self._data.transactions, self._batch_size):
                     #     steps += 1
                     #     loss += self._model.train_step_kg(batch, is_rec=False, kg_lambda=self._kg_lambda)
-                t.set_postfix({'loss': f'{loss.numpy() / steps:.5f}'})
-                t.update()
+                    # t.set_postfix({'loss': f'{loss.numpy() / steps:.5f}'})
+                    # t.update()
 
             if not (it + 1) % self._validation_rate:
                 recs = self.get_recommendations(self.evaluator.get_needed_recommendations())

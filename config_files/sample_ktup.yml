@@ -44,7 +44,7 @@ experiment:
         save_recs: False
 #        restore: True
       epochs: 10
-      batch_size: 1000
+      batch_size: 100
 #    MultiVAE:
 #      meta:
 #        hyper_max_evals: 20
