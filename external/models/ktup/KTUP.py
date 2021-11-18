@@ -93,14 +93,16 @@ class KTUP(RecMixin, BaseRecommenderModel):
         for it in range(self._epochs):
             loss = 0
             steps = 0
-            with tqdm(total=int(self._data.transactions // self._batch_size), disable=not self._verbose) as t:
-                if it % 10 < self._step_to_switch:
+
+            if it % 10 < self._step_to_switch:
+                with tqdm(total=int(self._data.transactions // self._batch_size), disable=not self._verbose) as t:
                     for batch in self._sampler.step(self._data.transactions, self._batch_size):
                         steps += 1
                         loss += self._model.train_step_rec(batch, is_rec=True)
                         t.set_postfix({'loss': f'{loss.numpy() / steps:.5f}'})
                         t.update()
-                else:
+            else:
+                with tqdm(total=int(len(self._side.Xs) // self._batch_size), disable=not self._verbose) as t:
                     for batch in self._triple_sampler.step(self._batch_size):
                         steps += 1
                         loss += self._model.train_step_kg(batch, is_rec=False, kg_lambda=self._kg_lambda)
