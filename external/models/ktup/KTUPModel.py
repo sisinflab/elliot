@@ -14,6 +14,7 @@ from tensorflow import keras
 from tensorflow.keras import layers
 import numpy as np
 
+
 class jtup(keras.Model):
     """Combines the encoder and decoder into an end-to-end model for training."""
 
@@ -101,23 +102,9 @@ class jtup(keras.Model):
         self.table = tf.lookup.StaticHashTable(
             init,
             default_value=self.ent_total-1)
-
-
-
-        # self.item_embedding = keras.layers.Embedding(input_dim=item_factors.shape[0], output_dim=item_factors.shape[1],
-        #                                              weights=[item_factors],
-        #                                              embeddings_regularizer=keras.regularizers.l2(regularization_lambda),
-        #                                              trainable=True, dtype=tf.float32)
-        # # needed for initialization
-        # self.item_embedding(0)
-        # self.encoder = Encoder(latent_dim=latent_dim,
-        #                        intermediate_dim=intermediate_dim,
-        #                        dropout_rate=dropout_rate,
-        #                        regularization_lambda=regularization_lambda)
-        # self.decoder = Decoder(output_dim,
-        #                        intermediate_dim=intermediate_dim,
-        #                        regularization_lambda=regularization_lambda)
         self.optimizer = tf.optimizers.Adam(self.learning_rate)
+        self.one = tf.Variable(1.0)
+        self.zero = tf.Variable(0.0)
         # tf.Graph().finalize()
 
     def get_config(self):
@@ -172,9 +159,9 @@ class jtup(keras.Model):
             proj_t_e = self.projection_trans_h(t_e, norm_e)
 
             if self.L1_flag:
-                score = tf.reduce_sum(tf.abs(proj_h_e + r_e - proj_t_e), 1)
+                score = tf.reduce_sum(tf.abs(proj_h_e + r_e - proj_t_e), -1)
             else:
-                score = tf.reduce_sum((proj_h_e + r_e - proj_t_e) ** 2, 1)
+                score = tf.reduce_sum((proj_h_e + r_e - proj_t_e) ** 2, -1)
 
         return score
 
@@ -216,15 +203,15 @@ class jtup(keras.Model):
     def train_step_kg(self, batch, **kwargs):
         with tf.GradientTape() as tape:
 
-            ph, pt, pr, nh, nt, nr = batch
+            ph, pr, pt, nh, nr, nt = batch
 
             pos_score = self.call(inputs=(ph, pt, pr), training=True, **kwargs)
             neg_score = self.call(inputs=(nh, nt, nr), training=True, **kwargs)
 
             losses = self.marginLoss(pos_score, neg_score, 0.01) # fix margin loss value
-            ent_embeddings = self.ent_embeddings(tf.concat([ph, pt, nh, nt]))
-            rel_embeddings = self.rel_embeddings(tf.concat([pr, nr]))
-            norm_embeddings = self.norm_embeddings(tf.concat([pr, nr]))
+            ent_embeddings = self.ent_embeddings(tf.concat([ph, pt, nh, nt], 0))
+            rel_embeddings = self.rel_embeddings(tf.concat([pr, nr], 0))
+            norm_embeddings = self.norm_embeddings(tf.concat([pr, nr], 0))
             losses += self.orthogonalLoss(rel_embeddings, norm_embeddings)
             losses += self.normLoss(ent_embeddings) + self.normLoss(rel_embeddings)
             losses = kwargs['kg_lambda'] * losses
@@ -293,7 +280,7 @@ class jtup(keras.Model):
 
     def normLoss(self, embeddings, dim=-1):
         norm = tf.reduce_sum(embeddings ** 2, axis=dim, keepdims=True)
-        return tf.reduce_sum(tf.reduce_max(norm - (tf.Variable(tf.Tensor([1.0]))), (tf.Variable(tf.Tensor([0.0])))))
+        return tf.reduce_sum(tf.math.maximum(norm - self.one, self.zero))
 
     def marginLoss(self, pos, neg, margin):
         zero_tensor = tf.zeros(len(pos))

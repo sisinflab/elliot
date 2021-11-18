@@ -43,8 +43,9 @@ experiment:
         save_weights: False
         save_recs: False
 #        restore: True
-      epochs: 10
-      batch_size: 100
+      epochs: 20
+      batch_size: 200
+      joint_ratio: 0.7
 #    MultiVAE:
 #      meta:
 #        hyper_max_evals: 20
