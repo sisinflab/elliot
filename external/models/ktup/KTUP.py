@@ -72,10 +72,8 @@ class KTUP(RecMixin, BaseRecommenderModel):
         new_map.update({self._data.public_items[i]: idx for i, idx in self._side.public_items_entitiesidx.items()})
         ######################################
 
-        self._model = jtup(self._learning_rate, self._L1, self._embedding_size, self._data.num_users, self._data.num_items, len(self._side.entity_set),
+        self._model = jtup(self._learning_rate, self._L1, self._l2_lambda, self._embedding_size, self._data.num_users, self._data.num_items, len(self._side.entity_set),
                            len(self._side.predicate_set), new_map)
-
-
 
     @property
     def name(self):
@@ -88,9 +86,7 @@ class KTUP(RecMixin, BaseRecommenderModel):
         if self._restore:
             return self.restore_weights()
 
-        best_metric_value = 0
-        self._update_count = 0
-        for it in range(self._epochs):
+        for it in self.iterate(self._epochs):
             loss = 0
             steps = 0
 
@@ -109,20 +105,7 @@ class KTUP(RecMixin, BaseRecommenderModel):
                         t.set_postfix({'loss': f'{loss.numpy() / steps:.5f}'})
                         t.update()
 
-            if not (it + 1) % self._validation_rate:
-                recs = self.get_recommendations(self.evaluator.get_needed_recommendations())
-                result_dict = self.evaluator.eval(recs)
-                self._results.append(result_dict)
-
-                print(f'Epoch {(it + 1)}/{self._epochs} loss {loss:.3f}')
-
-                if self._results[-1][self._validation_k]["val_results"][self._validation_metric] > best_metric_value:
-                    print("******************************************")
-                    best_metric_value = self._results[-1][self._validation_k]["val_results"][self._validation_metric]
-                    if self._save_weights:
-                        self._model.save_weights(self._saving_filepath)
-                    if self._save_recs:
-                        store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}-it:{it + 1}.tsv")
+            self.evaluate(it, loss/(it + 1))
 
     def get_recommendations(self, k: int = 100):
         predictions_top_k_test = {}
