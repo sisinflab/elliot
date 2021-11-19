@@ -38,17 +38,24 @@ experiment:
       meta:
         hyper_max_evals: 1
         hyper_opt_alg: tpe
-        validation_rate: 1
+        validation_rate: 8
         verbose: True
         save_weights: False
         save_recs: False
 #        restore: True
-      learning_rate: 0.005
+      learning_rate: 0.001
       embedding_size: 100
-      l2_lambda: 0.00005
-      epochs: 20
+      l2_lambda: 0.0
+      epochs: 781
       batch_size: 200
       joint_ratio: 0.7
+      use_st_gumbel: False
+      early_stopping:
+        patience: 40
+        monitor: nDCG@10
+        mode: auto
+        verbose: True
+      # 40 epoche di early stopping
 #    MultiVAE:
 #      meta:
 #        hyper_max_evals: 20

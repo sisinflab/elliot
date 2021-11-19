@@ -109,7 +109,7 @@ class jtup(keras.Model):
             init,
             default_value=self.ent_total-1)
         # self.optimizer = tfa.optimizers.AdamW(learning_rate=self.learning_rate, weight_decay=)
-        self.optimizer = tf.optimizers.Adagrad(self.learning_rate)
+        self.optimizer = tf.optimizers.Adam(self.learning_rate)
         self.one = tf.Variable(1.0)
         self.zero = tf.Variable(0.0)
 
