@@ -7,12 +7,13 @@ __version__ = '0.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
+import math
 from tqdm import tqdm
 import numpy as np
 import typing as t
 from collections import defaultdict
 
-from elliot.dataset.samplers import custom_sampler as cs
+from . import rating_sampler as rs
 from elliot.evaluation.evaluator import Evaluator
 from elliot.recommender import BaseRecommenderModel
 from .KTUPModel import jtup
@@ -62,9 +63,12 @@ class KTUP(RecMixin, BaseRecommenderModel):
         if self._batch_size < 1:
             self._batch_size = self._data.num_users
 
+        triple_epoch_length = math.ceil(float(len(self._side.Xs)) / (1 - self._joint_ratio))
+        rating_epoch_length = math.ceil(float(self._data.transactions) / self._joint_ratio)
 
-        self._sampler = cs.Sampler(self._data.i_train_dict)
-        self._triple_sampler = ts.Sampler(self._side.entity_to_idx, self._side.Xs, self._side.Xp, self._side.Xo)
+        epoch_length = max(triple_epoch_length, rating_epoch_length)
+        self._sampler = rs.Sampler(self._data.i_train_dict, epoch_length)
+        self._triple_sampler = ts.Sampler(self._side.entity_to_idx, self._side.Xs, self._side.Xp, self._side.Xo, epoch_length)
 
         self._i_items_set = list(range(self._num_items))
 
@@ -92,7 +96,7 @@ class KTUP(RecMixin, BaseRecommenderModel):
 
             if it % 10 < self._step_to_switch:
                 with tqdm(total=int(self._data.transactions // self._batch_size), disable=not self._verbose) as t:
-                    for batch in self._sampler.step(self._data.transactions, self._batch_size):
+                    for batch in self._sampler.step(self._batch_size):
                         steps += 1
                         loss += self._model.train_step_rec(batch, is_rec=True)
                         t.set_postfix({'loss REC': f'{loss.numpy() / steps:.5f}'})

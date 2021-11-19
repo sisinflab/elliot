@@ -13,9 +13,10 @@ import numpy as np
 
 
 class Sampler:
-    def __init__(self, entity_to_idx, Xs, Xp, Xo
+    def __init__(self, entity_to_idx, Xs, Xp, Xo, events
                  ):
         random.seed(42)
+        self.events = events
         self.Xs, self.Xp, self.Xo = Xs, Xp, Xo
         # self.headDict = {(p, o): s for s, p, o in zip(Xs, Xp, Xo)}
         # self.tailDict = {(s, p): o for s, p, o in zip(Xs, Xp, Xo)}
@@ -28,7 +29,7 @@ class Sampler:
 
     def step(self, batch_size: int):
         ntriples = len(self.Xs)
-        shuffled_list = random.sample(range(ntriples), ntriples)
+        shuffled_list = random.sample(range(ntriples), self.events)
 
         for start_idx in range(0, ntriples, batch_size):
             end_idx = min(start_idx + batch_size, ntriples)
