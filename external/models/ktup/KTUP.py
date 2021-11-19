@@ -45,7 +45,7 @@ class KTUP(RecMixin, BaseRecommenderModel):
         # autoset params
         self._params_list = [
             ("_l2_lambda", "l2_lambda", "l2", 0, None, None),
-            ("_embedding_size", "embedding_size", "es", 100, int, None),
+            ("_embedding_size", "embedding_size", "es", 64, int, None),
             ("_learning_rate", "lr", "lr", 0.001, None, None),
             ("_joint_ratio", "joint_ratio", "jr", 0.7, None, None),
             ("_L1", "L1_flag", "l1", True, None, None),
@@ -95,14 +95,14 @@ class KTUP(RecMixin, BaseRecommenderModel):
                     for batch in self._sampler.step(self._data.transactions, self._batch_size):
                         steps += 1
                         loss += self._model.train_step_rec(batch, is_rec=True)
-                        t.set_postfix({'loss': f'{loss.numpy() / steps:.5f}'})
+                        t.set_postfix({'loss REC': f'{loss.numpy() / steps:.5f}'})
                         t.update()
             else:
                 with tqdm(total=int(len(self._side.Xs) // self._batch_size), disable=not self._verbose) as t:
                     for batch in self._triple_sampler.step(self._batch_size):
                         steps += 1
                         loss += self._model.train_step_kg(batch, is_rec=False, kg_lambda=self._kg_lambda)
-                        t.set_postfix({'loss': f'{loss.numpy() / steps:.5f}'})
+                        t.set_postfix({'loss KGC': f'{loss.numpy() / steps:.5f}'})
                         t.update()
 
             self.evaluate(it, loss/(it + 1))

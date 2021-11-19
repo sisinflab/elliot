@@ -7,12 +7,9 @@ __version__ = '0.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
-import logging
-import os
+import numpy as np
 import tensorflow as tf
 from tensorflow import keras
-from tensorflow.keras import layers
-import numpy as np
 
 
 class jtup(keras.Model):
@@ -112,7 +109,7 @@ class jtup(keras.Model):
             init,
             default_value=self.ent_total-1)
         # self.optimizer = tfa.optimizers.AdamW(learning_rate=self.learning_rate, weight_decay=)
-        self.optimizer = tf.optimizers.Adam(self.learning_rate)
+        self.optimizer = tf.optimizers.Adagrad(self.learning_rate)
         self.one = tf.Variable(1.0)
         self.zero = tf.Variable(0.0)
 
@@ -171,10 +168,12 @@ class jtup(keras.Model):
 
         return score
 
-    def getPreferences(self, u_e, i_e):
+    def getPreferences(self, u_e, i_e, use_st_gumbel=False):
         # use item and user embedding to compute preference distribution
         # pre_probs: batch * rel, or batch * item * rel
         pre_probs = tf.matmul(u_e + i_e, tf.transpose(self.pref_embeddings.weights[0] + self.rel_embeddings.weights[0])) / 2
+        if use_st_gumbel:
+            pre_probs = self.st_gumbel_softmax(pre_probs)
 
         r_e = tf.matmul(pre_probs, self.pref_embeddings.weights[0] + self.rel_embeddings.weights[0]) / 2
         norm = tf.matmul(pre_probs, self.pref_norm_embeddings.weights[0] + self.norm_embeddings.weights[0]) / 2
@@ -184,8 +183,35 @@ class jtup(keras.Model):
     def projection_trans_h(self, original, norm):
         return original - tf.reduce_sum(original * norm, axis=len(original.shape.as_list()) - 1, keepdims=True) * norm
 
+    def st_gumbel_softmax(self, logits, temperature=1.0):
+        eps = 1e-20
+        u = tf.random.uniform(tf.shape(logits), dtype=tf.float32)
+        gumbel_noise = -tf.math.log(-tf.math.log(u + eps) + eps)
+        y = logits + gumbel_noise
+        y = self.masked_softmax(logits=y / temperature)
+        y_argmax = tf.argmax(y, axis=len(y.shape) - 1)
+        y_hard = self.convert_to_one_hot(
+            indices=y_argmax,
+            num_classes=tf.shape(y)[len(y.shape) - 1])
+
+        # gumbel_softmax_distribution_ = GumbelSoftmax(1.0, logits=logits, dtype=tf.float32)
+        # one_hot = gumbel_softmax_distribution_.convert_to_one_hot(logits)
+
+        y = tf.stop_gradient(y_hard - y) + y
+        return y
+
+    def masked_softmax(self, logits):
+        eps = 1e-20
+        probs = tf.nn.softmax(logits, axis=len(logits.shape) - 1)
+        return probs
+
+    def convert_to_one_hot(self, indices, num_classes):
+        one_hot = tf.one_hot(indices, num_classes)
+        return one_hot
+
     @tf.function
     def train_step_rec(self, batch, **kwargs):
+
         with tf.GradientTape() as tape:
 
             user, pos, neg = batch
@@ -197,7 +223,7 @@ class jtup(keras.Model):
             losses += self.orthogonalLoss(self.pref_embeddings.weights[0], self.pref_norm_embeddings.weights[0])
 
         grads = tape.gradient(losses, self.trainable_weights)
-        grads, _ = tf.clip_by_global_norm(grads, 1) # fix clipping value
+        grads, _ = tf.clip_by_global_norm(grads, 5) # fix clipping value
         self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
 
         return losses
@@ -211,7 +237,7 @@ class jtup(keras.Model):
             pos_score = self.call(inputs=(ph, pt, pr), training=True, **kwargs)
             neg_score = self.call(inputs=(nh, nt, nr), training=True, **kwargs)
 
-            losses = self.marginLoss(pos_score, neg_score, 0.01) # fix margin loss value
+            losses = self.marginLoss(pos_score, neg_score, 1) # fix margin loss value
             ent_embeddings = self.ent_embeddings(tf.concat([ph, pt, nh, nt], 0))
             rel_embeddings = self.rel_embeddings(tf.concat([pr, nr], 0))
             norm_embeddings = self.norm_embeddings(tf.concat([pr, nr], 0))
