@@ -66,9 +66,9 @@ class KTUP(RecMixin, BaseRecommenderModel):
         triple_epoch_length = math.ceil(float(len(self._side.Xs)) / (1 - self._joint_ratio))
         rating_epoch_length = math.ceil(float(self._data.transactions) / self._joint_ratio)
 
-        epoch_length = max(triple_epoch_length, rating_epoch_length)
-        self._sampler = rs.Sampler(self._data.i_train_dict, epoch_length)
-        self._triple_sampler = ts.Sampler(self._side.entity_to_idx, self._side.Xs, self._side.Xp, self._side.Xo, epoch_length)
+        self._epoch_length = max(triple_epoch_length, rating_epoch_length)
+        self._sampler = rs.Sampler(self._data.i_train_dict, self._epoch_length)
+        self._triple_sampler = ts.Sampler(self._side.entity_to_idx, self._side.Xs, self._side.Xp, self._side.Xo, self._epoch_length)
 
         self._i_items_set = list(range(self._num_items))
 
@@ -95,14 +95,14 @@ class KTUP(RecMixin, BaseRecommenderModel):
             steps = 0
 
             if it % 10 < self._step_to_switch:
-                with tqdm(total=int(self._data.transactions // self._batch_size), disable=not self._verbose) as t:
+                with tqdm(total=int(self._epoch_length // self._batch_size), disable=not self._verbose) as t:
                     for batch in self._sampler.step(self._batch_size):
                         steps += 1
                         loss += self._model.train_step_rec(batch, is_rec=True)
                         t.set_postfix({'loss REC': f'{loss.numpy() / steps:.5f}'})
                         t.update()
             else:
-                with tqdm(total=int(len(self._side.Xs) // self._batch_size), disable=not self._verbose) as t:
+                with tqdm(total=int(self._epoch_length // self._batch_size), disable=not self._verbose) as t:
                     for batch in self._triple_sampler.step(self._batch_size):
                         steps += 1
                         loss += self._model.train_step_kg(batch, is_rec=False, kg_lambda=self._kg_lambda)
