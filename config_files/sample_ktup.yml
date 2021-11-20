@@ -50,7 +50,7 @@ experiment:
       learning_rate: 0.001
       embedding_size: 100
       l2_lambda: 0.0
-      epochs: 781
+      epochs: 771
       batch_size: 200
       joint_ratio: 0.7
       use_st_gumbel: False
