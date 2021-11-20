@@ -32,7 +32,7 @@ class Sampler:
         # shuffled_list = random.sample(range(ntriples), self.events)
         shuffled_list = [random.choice(range(ntriples)) for _ in range(self.events)]
 
-        for start_idx in range(0, ntriples, batch_size):
+        for start_idx in range(0, self.events, batch_size):
             end_idx = min(start_idx + batch_size, ntriples)
             ph, pr, pt = self.Xs[shuffled_list[start_idx:end_idx]], self.Xp[shuffled_list[start_idx:end_idx]], self.Xo[shuffled_list[start_idx:end_idx]]
             nh, nr, nt = self.getTrainTripleBatch(zip(ph, pr, pt))
