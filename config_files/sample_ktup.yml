@@ -27,8 +27,8 @@ experiment:
   top_k: 10
 #  config_test: True
   evaluation:
-    cutoffs: [10, 5]
-    simple_metrics: [nDCG, Precision, Recall, ItemCoverage, HR, MAP, F1, Gini, SEntropy]
+    cutoffs: [10]
+    simple_metrics: [nDCG, Recall, HR]
     relevance_threshold: 3
 #    paired_ttest: True
 #    wilcoxon_test: True
@@ -55,7 +55,7 @@ experiment:
       joint_ratio: 0.7
       use_st_gumbel: False
       early_stopping:
-        patience: 40
+        patience: 5
         monitor: nDCG@10
         mode: auto
         verbose: True
