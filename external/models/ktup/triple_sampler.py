@@ -29,7 +29,8 @@ class Sampler:
 
     def step(self, batch_size: int):
         ntriples = len(self.Xs)
-        shuffled_list = random.sample(range(ntriples), self.events)
+        # shuffled_list = random.sample(range(ntriples), self.events)
+        shuffled_list = [random.choice(range(ntriples)) for _ in range(self.events)]
 
         for start_idx in range(0, ntriples, batch_size):
             end_idx = min(start_idx + batch_size, ntriples)
