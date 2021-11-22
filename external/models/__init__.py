@@ -12,6 +12,7 @@ from .most_popular import MostPop
 from .msap import MSAPMF
 from .AdversarialMF import AdversarialMF
 from .ktup import KTUP
+from .kgflex import KGFlex
 
 import sys
 for _backend in sys.modules["external"].backend:
