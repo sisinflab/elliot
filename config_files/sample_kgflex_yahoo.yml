@@ -1,0 +1,50 @@
+experiment:
+  dataset: facebook-books
+  data_config:
+    strategy: dataset
+    dataset_path: ../data/{0}/ratings.dat
+#    strategy: dataset
+#    dataset_path: ../data/{0}/dataset.tsv
+#    dataloader: KGFlexLoader
+    side_information:
+      - dataloader: KGFlexLoader
+        mapping: ../data/{0}/mapping.tsv
+        kg_train: ../data/{0}/kg_train.tsv
+        kg_dev: ../data/{0}/kg_valid.tsv
+        kg_test: ../data/{0}/kg_test.tsv
+        properties: ../data/{0}/properties.conf
+#      work_directory: ../data/{0}
+#      map: ../data/{0}/mapping.tsv
+#      features: ../data/{0}/item_features.tsv
+#      predicates: ../data/{0}/predicate_mapping.tsv
+#  prefiltering:
+#    strategy: iterative_k_core
+#    core: 5
+  splitting:
+#    save_on_disk: True
+#    save_folder: ../data/{0}/splitting/
+    test_splitting:
+        strategy: random_subsampling
+        test_ratio: 0.2
+  top_k: 10
+  gpu: 1
+  external_models_path: ../external/models/__init__.py
+  evaluation:
+#    cutoffs: [10, 9, 8, 7, 6, 5, 4, 3, 2, 1]
+    cutoffs: [10]
+#    simple_metrics: [nDCGRendle2020, nDCG, HR, Precision, Recall, MAP, MRR, ItemCoverage, UserCoverage, NumRetrieved, UserCoverage, Gini, SEntropy, EFD, EPC]
+    simple_metrics: [nDCGRendle2020, nDCG, HR, Precision, ItemCoverage]
+  models:
+    external.KGFlex:
+      meta:
+        verbose: True
+        validation_rate: 10
+        save_recs: True
+      lr: 0.1
+      epochs: 100
+      q: 0.1
+      embedding: 10
+      parallel_ufm: 48
+      first_order_limit: 100
+      second_order_limit: 100
+      loader: KGFlexLoader

@@ -1,18 +1,14 @@
-import random
-
 import numpy as np
 from scipy.sparse import csr_matrix
 from tqdm import tqdm
-import math
 
 from elliot.recommender import BaseRecommenderModel
 from elliot.recommender.base_recommender_model import init_charger
 from elliot.recommender.recommender_utils_mixin import RecMixin
-from elliot.utils.write import store_recommendation
 from elliot.dataset.samplers import custom_sampler as cs
 
 from .UserFeatureMapper import UserFeatureMapper
-from . import Client, ClientModel, Server, ServerModel
+from .UserFeatureMapper2 import UserFeatureMapper2
 from collections import defaultdict
 from .kgflexmodel import KGFlexModel
 
@@ -31,31 +27,26 @@ class KGFlex(RecMixin, BaseRecommenderModel):
         np.random.seed(self._seed)
         self._side = getattr(self._data.side_information, self._loader, None)
 
-        # training_set = self._data.train_pd
-        # self.transactions = len(training_set)
-
         # ------------------------------ ITEM FEATURES ------------------------------
         print('importing items features')
         # pd.merge(self._side.triples, self._side.triples, left_on='object', right_on='uri', how='left')
-        self.item_features_mapper = {item: set(map(tuple,
-                                                   self._side.triples[
+        self.item_features = {item: set(map(tuple,
+                                            self._side.triples[
                                                        self._side.triples.uri ==
                                                        self._side.mapping[self._data.private_items[item]]]
                                                    [['predicate', 'object']].values))
-                                     for item in self._data.private_items}
+                              for item in self._data.private_items}
 
         # ------------------------------ USER FEATURES ------------------------------
         print('user features loading')
 
+        self.user_feature_mapper = UserFeatureMapper2(data=self._data,
+                                                      item_features=self.item_features)
+
         self.user_feature_mapper = UserFeatureMapper(self._data.i_train_dict,
-                                                     self.item_features_mapper,
+                                                     self.item_features,
                                                      self._side.mapping, self._seed)
         client_ids = list(self._data.i_train_dict.keys())
-
-        # self.users = list(self._data.private_users.keys())
-        # self.items = list(self._data.private_items.keys())
-        # n_users = len(self.users)
-        # n_items = len(self.items)
 
         self.user_feature_mapper.compute_and_export_features(client_ids, self._parallel_ufm, self._first_order_limit,
                                                              self._second_order_limit)
@@ -75,11 +66,10 @@ class KGFlex(RecMixin, BaseRecommenderModel):
             for feature in users_features[c]:
                 _ = features_mapping[feature]
 
-
         # total number of features (i.e. columns of the item matrix / latent factors)
         print('FEATURES INFO: {} features found'.format(len(features_mapping)))
         item_features_mask = []
-        for _, v in self.item_features_mapper.items():
+        for _, v in self.item_features.items():
             common = set.intersection(set(features_mapping.keys()), set(v))
             item_features_mask.append([True if f in common else False for f in features_mapping])
         self.item_features_mask = csr_matrix(item_features_mask)
@@ -90,11 +80,6 @@ class KGFlex(RecMixin, BaseRecommenderModel):
         # ------------------------------ POSITIVE AND NEGATIVE ITEMS ------------------------------
 
         self._sampler = cs.Sampler(self._data.i_train_dict)
-        # positive items are the one in the training set
-        # self.positive_items = {user: set(ratings.keys()) for user, ratings in self._data.i_train_dict.items()}
-        # self.all_items = set(self._data.private_items)
-        # self.negative_items = {user: self.all_items - items for user, items in self.positive_items.items()}
-
 
         # ------------------------------ MODEL ------------------------------
 
@@ -104,7 +89,7 @@ class KGFlex(RecMixin, BaseRecommenderModel):
                                   n_items=self._data.num_items,
                                   n_features=len(features_mapping),
                                   feature_key_mapping=feature_key_mapping,
-                                  item_features_mapper=self.item_features_mapper,
+                                  item_features_mapper=self.item_features,
                                   embedding_size=self._embedding,
                                   index_mask=index_mask,
                                   users_features=users_features,

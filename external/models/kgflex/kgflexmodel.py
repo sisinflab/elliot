@@ -16,20 +16,16 @@ from scipy.sparse import csr_matrix
 
 _RANDOM_SEED = 42
 
-
 class KGFlexModel():
-    def __init__(self, learning_rate,
-                 n_users,
-                 users,
-                 n_items,
+    def __init__(self,
+                 data,
+                 learning_rate,
                  n_features,
                  feature_key_mapping,
                  item_features_mapper,
                  embedding_size,
                  index_mask,
                  users_features,
-                 data,
-                 name="VBPRMF",
                  random_seed=_RANDOM_SEED,
                  **kwargs):
                 
@@ -37,8 +33,9 @@ class KGFlexModel():
 
         self._data = data
         self._learning_rate = learning_rate
-        self._n_users = n_users
-        self._n_items = n_items
+        self._n_users = data.num_users
+        self._n_items = data.num_items
+        self._users = data.privateusers.keys()
 
         self._n_features = n_features
         self._embedding_size = embedding_size
