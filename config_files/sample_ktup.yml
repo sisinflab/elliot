@@ -1,28 +1,34 @@
 experiment:
+  version: 0.3.1
+  backend: tensorflow
   data_config:
-    strategy: dataset
-    dataset_path: ../data/{0}/ratings.dat
+    strategy: fixed
+    train_path: ../data/{0}/train.dat
+    validation_path: ../data/{0}/valid.dat
+    test_path: ../data/{0}/test.dat
+#    strategy: dataset
+#    dataset_path: ../data/{0}/ratings.dat
 #    root_folder: ../data/{0}/splitting/
     side_information:
       - dataloader: KGRec
-        mapping: ../data/{0}/mapping.tsv
+        mapping: ../data/{0}/ktup_mapping.tsv
         kg_train: ../data/{0}/kg_train.tsv
         kg_dev: ../data/{0}/kg_valid.tsv
         kg_test: ../data/{0}/kg_test.tsv
-  splitting:
-#    save_on_disk: True
-#    save_folder: ../data/{0}/splitting/
-    test_splitting:
-        strategy: temporal_hold_out
-        test_ratio: 0.2
+#  splitting:
+##    save_on_disk: True
+##    save_folder: ../data/{0}/splitting/
+#    test_splitting:
+#        strategy: temporal_hold_out
+#        test_ratio: 0.2
   dataset: ml1m_ktup
   external_models_path: ../external/models/__init__.py
 #  print_results_as_triplets: True
   top_k: 10
 #  config_test: True
   evaluation:
-    cutoffs: [10, 5]
-    simple_metrics: [nDCG, Precision, Recall, ItemCoverage, HR, MAP, F1, Gini, SEntropy]
+    cutoffs: [10]
+    simple_metrics: [nDCG, Recall, HR]
     relevance_threshold: 3
 #    paired_ttest: True
 #    wilcoxon_test: True
@@ -36,13 +42,24 @@ experiment:
       meta:
         hyper_max_evals: 1
         hyper_opt_alg: tpe
-        validation_rate: 1
-        verbose: False
+        validation_rate: 8
+        verbose: True
         save_weights: False
         save_recs: False
 #        restore: True
-      epochs: 10
-      batch_size: 10
+      learning_rate: 0.001
+      embedding_size: 100
+      l2_lambda: 0.0
+      epochs: 771
+      batch_size: 200
+      joint_ratio: 0.7
+      use_st_gumbel: False
+      early_stopping:
+        patience: 5
+        monitor: nDCG@10
+        mode: auto
+        verbose: True
+      # 40 epoche di early stopping
 #    MultiVAE:
 #      meta:
 #        hyper_max_evals: 20
