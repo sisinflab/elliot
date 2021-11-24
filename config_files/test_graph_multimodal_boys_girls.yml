@@ -16,7 +16,7 @@ experiment:
     simple_metrics: [Recall]
     wilcoxon_test: False
     paired_ttest: False
-  gpu: 0
+  gpu: 1
   external_models_path: ../external/models/__init__.py
   models:
     external.EGCF:
