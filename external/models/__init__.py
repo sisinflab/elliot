@@ -12,6 +12,7 @@ from .most_popular import MostPop
 from .msap import MSAPMF
 from .AdversarialMF import AdversarialMF
 from .ktup import KTUP
+from .cofm import CoFM
 from .kgflex import KGFlex
 
 import sys
