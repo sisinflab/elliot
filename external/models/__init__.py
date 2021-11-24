@@ -28,3 +28,4 @@ for _backend in sys.modules["external"].backend:
         from .mmgcn.MMGCN import MMGCN
         from .dgcf.DGCF import DGCF
         from .egcf.EGCF import EGCF
+        from .aspects.Aspects import Aspects
