@@ -9,7 +9,6 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malite
 
 from abc import ABC
 
-from torch_geometric.nn import GATConv
 from torch_geometric.nn import GCNConv
 from collections import OrderedDict
 

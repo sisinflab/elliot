@@ -75,11 +75,11 @@ class EGCF(RecMixin, BaseRecommenderModel):
              lambda x: list(make_tuple(x)),
              lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
             ("_l_w", "l_w", "l_w", 0.01, float, None),
-            ("_loader", "loader", "loader", 'TextualAttributes', str, None)
+            ("_loader", "loader", "loader", 'InteractionsTextualAttributes', str, None)
         ]
         self.autoset_params()
 
-        self._side_edge_textual = self._data.side_information.TextualAttributes
+        self._side_edge_textual = self._data.side_information.InteractionsTextualAttributes
 
         row, col = data.sp_i_train.nonzero()
         col = [c + self._num_users for c in col]
@@ -121,7 +121,7 @@ class EGCF(RecMixin, BaseRecommenderModel):
             weight_size_edges=self._weight_size_edges,
             weight_size_nodes_edges=self._weight_size_nodes_edges,
             n_layers=self._n_layers,
-            edge_features=self._side_edge_textual.object.get_all_features(evaluate=True),
+            edge_features=self._side_edge_textual.object.get_all_features(),
             edge_index=self.edge_index,
             node_edge_index=self.node_edge_index,
             edge_edge_index=self.edge_edge_index,

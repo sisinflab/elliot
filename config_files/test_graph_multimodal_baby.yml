@@ -6,8 +6,9 @@ experiment:
     validation_path: ../data/{0}/validationset.tsv
     test_path: ../data/{0}/testset.tsv
     side_information:
-      - dataloader: TextualAttribute
-        textual_features: ../data/{0}/original/text_features_all-mpnet-base-v2/
+      - dataloader: InteractionsTextualAttributes
+        interactions_features: ../data/{0}/original/text_features_all-mpnet-base-v2/
+        interactions: ../data/{0}/interactions.tsv
   dataset: amazon_baby
   top_k: 50
   evaluation:
@@ -18,46 +19,46 @@ experiment:
   gpu: 0
   external_models_path: ../external/models/__init__.py
   models:
-    external.NGCF:
-      meta:
-        validation_rate: 1
-        verbose: True
-        save_weights: False
-        save_recs: True
-        validation_metric: Recall
-        restore: False
-      lr: [0.0001, 0.005]
-      epochs: 400
-      factors: 64
-      batch_size: 256
-      l_w: [10e-5, 10e-3, 10e-1, 10]
-      weight_size: (64,64,64)
-      node_dropout: (0,0,0)
-      message_dropout: (0.1,0.1,0.1)
-      early_stopping:
-        patience: 50
-        monitor: Recall@20
-        mode: auto
-        verbose: True
-    external.LightGCN:
-      meta:
-        validation_rate: 1
-        verbose: True
-        save_weights: False
-        save_recs: True
-        validation_metric: Recall
-        restore: False
-      lr: [0.0001, 0.001]
-      epochs: 1000
-      factors: 64
-      batch_size: 256
-      l_w: [10e-5, 10e-3, 10e-1, 10]
-      n_layers: [2, 3]
-      early_stopping:
-        patience: 50
-        monitor: Recall@20
-        mode: auto
-        verbose: True
+#    external.NGCF:
+#      meta:
+#        validation_rate: 1
+#        verbose: True
+#        save_weights: False
+#        save_recs: True
+#        validation_metric: Recall
+#        restore: False
+#      lr: [0.0001, 0.005]
+#      epochs: 400
+#      factors: 64
+#      batch_size: 256
+#      l_w: [10e-5, 10e-3, 10e-1, 10]
+#      weight_size: (64,64,64)
+#      node_dropout: (0,0,0)
+#      message_dropout: (0.1,0.1,0.1)
+#      early_stopping:
+#        patience: 50
+#        monitor: Recall@20
+#        mode: auto
+#        verbose: True
+#    external.LightGCN:
+#      meta:
+#        validation_rate: 1
+#        verbose: True
+#        save_weights: False
+#        save_recs: True
+#        validation_metric: Recall
+#        restore: False
+#      lr: [0.0001, 0.001]
+#      epochs: 1000
+#      factors: 64
+#      batch_size: 256
+#      l_w: [10e-5, 10e-3, 10e-1, 10]
+#      n_layers: [2, 3]
+#      early_stopping:
+#        patience: 50
+#        monitor: Recall@20
+#        mode: auto
+#        verbose: True
     external.EGCF:
       meta:
         validation_rate: 1
