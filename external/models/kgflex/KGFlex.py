@@ -8,9 +8,8 @@ from elliot.recommender.recommender_utils_mixin import RecMixin
 from elliot.dataset.samplers import custom_sampler as cs
 
 from .UserFeatureMapper import UserFeatureMapper
-from .UserFeatureMapper2 import UserFeatureMapper2
-from collections import defaultdict
 from .kgflexmodel import KGFlexModel
+
 
 class KGFlex(RecMixin, BaseRecommenderModel):
     @init_charger
@@ -26,58 +25,52 @@ class KGFlex(RecMixin, BaseRecommenderModel):
         self.autoset_params()
         np.random.seed(self._seed)
         self._side = getattr(self._data.side_information, self._loader, None)
+        users = list(self._data.private_users.keys())
+        first_order_limit = self._params.first_order_limit
+        second_order_limit = self._params.second_order_limit
 
         # ------------------------------ ITEM FEATURES ------------------------------
         print('importing items features')
-        # pd.merge(self._side.triples, self._side.triples, left_on='object', right_on='uri', how='left')
         self.item_features = {item: set(map(tuple,
                                             self._side.triples[
-                                                       self._side.triples.uri ==
-                                                       self._side.mapping[self._data.private_items[item]]]
-                                                   [['predicate', 'object']].values))
-                              for item in self._data.private_items}
+                                                self._side.triples.uri ==
+                                                self._side.mapping[self._data.private_items[item]]]
+                                            [['predicate', 'object']].values))
+                              for item in tqdm(self._data.private_items, desc='first order features')}
+
+        self.item_features2 = dict()
+        sof = self._side.second_order_features
+        for item in tqdm(self._data.private_items, desc='second order features'):
+            item_f = sof[sof.uri_x == self._side.mapping[self._data.private_items[item]]][
+                ['predicate_x', 'predicate_y', 'object_y']]
+            self.item_features2[item] = {(f'<{p1}><{p2}>', o) for p1, p2, o in item_f.values}
 
         # ------------------------------ USER FEATURES ------------------------------
-        print('user features loading')
-
-        self.user_feature_mapper = UserFeatureMapper2(data=self._data,
-                                                      item_features=self.item_features)
-
-        self.user_feature_mapper = UserFeatureMapper(self._data.i_train_dict,
-                                                     self.item_features,
-                                                     self._side.mapping, self._seed)
-        client_ids = list(self._data.i_train_dict.keys())
-
-        self.user_feature_mapper.compute_and_export_features(client_ids, self._parallel_ufm, self._first_order_limit,
-                                                             self._second_order_limit)
+        self.user_feature_mapper = UserFeatureMapper(data=self._data,
+                                                     item_features=self.item_features,
+                                                     item_features2=self.item_features2,
+                                                     first_order_limit=first_order_limit,
+                                                     second_order_limit=second_order_limit)
 
         # ------------------------------ MODEL FEATURES ------------------------------
         print('features mapping')
-        users_features = self.user_feature_mapper.client_features
-
+        users_features = self.user_feature_mapper.users_features
         features = set()
-        for c in client_ids:
-            features = set.union(features, users_features[c])
+        for _, f in users_features.items():
+            features = set.union(features, set(f))
+
         feature_key_mapping = dict(zip(list(features), range(len(features))))
 
-        # mapping features in columns
-        features_mapping = defaultdict(lambda: len(features_mapping))
-        for c in client_ids:
-            for feature in users_features[c]:
-                _ = features_mapping[feature]
+        print('FEATURES INFO: {} features found'.format(len(features)))
 
-        # total number of features (i.e. columns of the item matrix / latent factors)
-        print('FEATURES INFO: {} features found'.format(len(features_mapping)))
         item_features_mask = []
         for _, v in self.item_features.items():
-            common = set.intersection(set(features_mapping.keys()), set(v))
-            item_features_mask.append([True if f in common else False for f in features_mapping])
+            common = set.intersection(set(feature_key_mapping.keys()), set(v))
+            item_features_mask.append([True if f in common else False for f in feature_key_mapping])
         self.item_features_mask = csr_matrix(item_features_mask)
 
-        index_mask = {user: [True if f in users_features[user] else False
-                             for f in features_mapping] for user in self._data.privateusers.keys()}
-
-        # ------------------------------ POSITIVE AND NEGATIVE ITEMS ------------------------------
+        users_features_mask = {user: [True if f in users_features[user] else False
+                                      for f in feature_key_mapping] for user in self._data.private_users.keys()}
 
         self._sampler = cs.Sampler(self._data.i_train_dict)
 
@@ -85,16 +78,14 @@ class KGFlex(RecMixin, BaseRecommenderModel):
 
         self._model = KGFlexModel(learning_rate=self._lr,
                                   n_users=self._data.num_users,
-                                  users=self._data.privateusers.keys(),
                                   n_items=self._data.num_items,
-                                  n_features=len(features_mapping),
+                                  n_features=len(features),
                                   feature_key_mapping=feature_key_mapping,
                                   item_features_mapper=self.item_features,
                                   embedding_size=self._embedding,
-                                  index_mask=index_mask,
+                                  index_mask=users_features_mask,
                                   users_features=users_features,
                                   data=self._data)
-
 
     @property
     def name(self):
@@ -104,6 +95,10 @@ class KGFlex(RecMixin, BaseRecommenderModel):
 
     def get_single_recommendation(self, mask, k, *args):
         return {u: self._model.get_user_recs(u, mask, k) for u in self._data.users}
+
+
+    def get_single_recommendation_worker(self, user, mask, k, *args):
+        return user, self._model.get_user_recs(user, mask, k)
 
     def get_recommendations(self, k: int = 10):
         predictions_top_k_val = {}

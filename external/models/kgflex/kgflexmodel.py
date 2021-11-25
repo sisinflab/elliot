@@ -11,8 +11,6 @@ import time
 
 import tensorflow as tf
 import numpy as np
-from tensorflow import keras
-from scipy.sparse import csr_matrix
 
 _RANDOM_SEED = 42
 
@@ -35,7 +33,7 @@ class KGFlexModel():
         self._learning_rate = learning_rate
         self._n_users = data.num_users
         self._n_items = data.num_items
-        self._users = data.privateusers.keys()
+        self._users = data.private_users.keys()
 
         self._n_features = n_features
         self._embedding_size = embedding_size
@@ -46,7 +44,7 @@ class KGFlexModel():
 
         # PERSONAL
         # users features mask
-        self.Mu = np.zeros(shape=(n_users, n_features))
+        self.Mu = np.zeros(shape=(self._n_users, n_features))
         for k, m in index_mask.items():
             self.Mu[k] = m
         self.Mu = self.Mu.astype(bool)
@@ -54,17 +52,17 @@ class KGFlexModel():
         # users features mask along embedding axis
         self.Me = np.repeat(self.Mu[:, :, np.newaxis], embedding_size, axis=2)
         # initialize users features vectors
-        self.P = np.zeros((n_users, n_features, embedding_size))
+        self.P = np.zeros((self._n_users, n_features, embedding_size))
         self.P[self.Me] = np.random.randn(*self.P[self.Me].shape) / 10
 
         # users constant weights
-        self.K = np.zeros(shape=(n_users, n_features))
-        for u in users:
+        self.K = np.zeros(shape=(self._n_users, n_features))
+        for u in self._users:
             for feature in users_features[u].keys():
                 self.K[u][feature_key_mapping[feature]] = users_features[u][feature]
 
         # item features mask
-        self.Mi = np.zeros(shape=(n_items, n_features))
+        self.Mi = np.zeros(shape=(self._n_items, n_features))
         for item, features in item_features_mapper.items():
             for f in features:
                 key = feature_key_mapping.get(f)
@@ -168,12 +166,5 @@ class KGFlexModel():
         local_top_k = real_values.argsort()[::-1]
         return [(real_indices[item], real_values[item]) for item in local_top_k]
 
-
     def get_config(self):
         raise NotImplementedError
-
-    # def get_top_k_(self, preds, train_mask, k=100):
-    #     return tf.nn.top_k(tf.where(train_mask, preds, -np.inf), k=k, sorted=True)
-    #
-    # def get_top_k(self, preds, train_mask, k=100):
-    #     return tf.nn.top_k(tf.where(train_mask, preds, -np.inf), k=k, sorted=True)

@@ -1,8 +1,9 @@
 experiment:
-  dataset: facebook-books
+  dataset: yahoo_movies
   data_config:
     strategy: dataset
-    dataset_path: ../data/{0}/dataset.tsv
+    dataset_path: ../data/{0}/trainingset.tsv
+    testset_path: ../data/{0}/testset.tsv
 #    strategy: dataset
 #    dataset_path: ../data/{0}/dataset.tsv
 #    dataloader: KGFlexLoader
@@ -42,6 +43,7 @@ experiment:
         save_recs: True
       lr: 0.1
       epochs: 100
+      batch_size: 1000
       q: 0.1
       embedding: 10
       parallel_ufm: 48

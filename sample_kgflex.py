@@ -24,4 +24,5 @@ from elliot.run import run_experiment
 #     f.writelines(ml_1m_ratings)
 #
 # print("Done! We are now starting the Elliot's experiment")
-run_experiment("config_files/facebook-books_kgflex.yml")
+run_experiment("config_files/yahoo_movies_kgflex.yml")
+# run_experiment("config_files/facebook-books_kgflex.yml")

@@ -1,7 +1,6 @@
 from types import SimpleNamespace
 import typing as t
 from os.path import splitext
-from collections import defaultdict
 
 import numpy as np
 import pandas as pd
@@ -16,6 +15,7 @@ class KGFlexLoader(AbstractLoader):
         self.train_path = getattr(ns, "kg_train", None)
         self.dev_path = getattr(ns, "kg_dev", None)
         self.test_path = getattr(ns, "kg_test", None)
+        self.second_hop_path = getattr(ns, "second_hop", None)
         self.properties_file = getattr(ns, "properties", None)
         self.additive = getattr(ns, "additive", True)
         self.threshold = getattr(ns, "threshold", 10)
@@ -34,67 +34,42 @@ class KGFlexLoader(AbstractLoader):
         self.triples = pd.concat([train_triples, self.dev_triples, self.test_triples])
         del train_triples, self.dev_triples, self.test_triples
 
+        self.second_hop = pd.DataFrame(columns=['uri', 'predicate', 'object'])
+        if self.second_hop_path:
+            self.second_hop = pd.read_csv(self.second_hop_path, sep='\t', names=['uri', 'predicate', 'object'])
+
         if self.properties:
-            self.triples = self.triples[self.triples["predicate"].isin(self.properties)]
+            if self.additive:
+                self.triples = self.triples[self.triples["predicate"].isin(self.properties)]
+                self.second_hop = self.second_hop[self.second_hop["predicate"].isin(self.properties)]
+            else:
+                self.triples = self.triples[~self.triples["predicate"].isin(self.properties)]
+                self.second_hop = self.second_hop[~self.second_hop["predicate"].isin(self.properties)]
+
+        # COMPUTE FEATURES
+
         occurrences_per_feature = self.triples.groupby(['predicate', 'object']).size().to_dict()
-        keep_set = {f for f in occurrences_per_feature if occurrences_per_feature[f] > self.threshold}
+        keep_set = {f for f, occ in occurrences_per_feature.items() if occ > self.threshold}
+
+        second_order_features = self.triples.merge(self.second_hop, left_on='object', right_on='uri', how='left')
+        second_order_features = second_order_features[second_order_features['uri_y'].notna()]
+        occurrences_per_feature_2 = second_order_features.groupby(['predicate_x', 'predicate_y', 'object_y'])\
+            .size().to_dict()
+        keep_set2 = {f for f, occ in occurrences_per_feature_2.items() if occ > self.threshold}
 
         self.triples = self.triples[
             self.triples[['predicate', 'object']].set_index(['predicate', 'object']).index.map(
                 lambda f: f in keep_set)].astype(str)
+
+        self.second_order_features = second_order_features[second_order_features[
+            ['predicate_x', 'predicate_y', 'object_y']].set_index(['predicate_x', 'predicate_y', 'object_y'])
+            .index.map(lambda f: f in keep_set2)].astype(str)
+        self.second_order_features = self.second_order_features.drop(['object_x', 'uri_y'], axis=1)
+
         possible_items = [str(uri) for uri in self.triples["uri"].unique()]
         self.mapping = {k: v for k, v in self.mapping.items() if v in possible_items}
         self.items = {i for i in self.items if i in self.mapping.keys()}
-        # assert self.input_type in {'standard', 'reciprocal'}
-        #
-        # self.Xi = self.Xs = self.Xp = self.Xo = None
-        #
-        # # Loading the dataset
-        # self.train_triples = self.read_triples(self.train_path) if self.train_path else []
-        # self.original_predicate_names = {p for (_, p, _) in self.train_triples}
-        #
-        # self.reciprocal_train_triples = None
-        # if self.input_type in {'reciprocal'}:
-        #     self.reciprocal_train_triples = [(o, f'inverse_{p}', s) for (s, p, o) in self.train_triples]
-        #     self.train_triples += self.reciprocal_train_triples
-        #
-        # self.dev_triples = self.read_triples(self.dev_path) if self.dev_path else []
-        # self.test_triples = self.read_triples(self.test_path) if self.test_path else []
-        #
-        # self.test_i_triples = self.read_triples(self.test_i_path) if self.test_i_path else []
-        # self.test_ii_triples = self.read_triples(self.test_ii_path) if self.test_ii_path else []
-        #
-        # self.all_triples = self.train_triples + self.dev_triples + self.test_triples
-        #
-        # self.entity_set = {s for (s, _, _) in self.all_triples} | {o for (_, _, o) in self.all_triples}
-        # self.predicate_set = {p for (_, p, _) in self.all_triples}
-        #
-        # self.nb_examples = len(self.train_triples)
-        #
-        # self.entity_to_idx = {entity: idx for idx, entity in enumerate(sorted(self.entity_set))}
-        # self.nb_entities = max(self.entity_to_idx.values()) + 1
-        # self.idx_to_entity = {v: k for k, v in self.entity_to_idx.items()}
-        #
-        # self.predicate_to_idx = {predicate: idx for idx, predicate in enumerate(sorted(self.predicate_set))}
-        # self.nb_predicates = max(self.predicate_to_idx.values()) + 1
-        # self.idx_to_predicate = {v: k for k, v in self.predicate_to_idx.items()}
-        #
-        # self.inverse_of_idx = {}
-        # if self.input_type in {'reciprocal'}:
-        #     for p in self.original_predicate_names:
-        #         p_idx, ip_idx = self.predicate_to_idx[p], self.predicate_to_idx[f'inverse_{p}']
-        #         self.inverse_of_idx.update({p_idx: ip_idx, ip_idx: p_idx})
-        #
-        # # Triples
-        # self.Xs, self.Xp, self.Xo = self.triples_to_vectors(self.train_triples, self.entity_to_idx, self.predicate_to_idx)
-        # self.Xi = np.arange(start=0, stop=self.Xs.shape[0], dtype=np.int32)
-        #
-        # self.dev_Xs, self.dev_Xp, self.dev_Xo = self.triples_to_vectors(self.dev_triples, self.entity_to_idx,
-        #                                                            self.predicate_to_idx)
-        # self.dev_Xi = np.arange(start=0, stop=self.dev_Xs.shape[0], dtype=np.int32)
-        #
-        # assert self.Xs.shape == self.Xp.shape == self.Xo.shape == self.Xi.shape
-        # assert self.dev_Xs.shape == self.dev_Xp.shape == self.dev_Xo.shape == self.dev_Xi.shape
+
 
     def get_mapped(self):
         return self.users, self.items
@@ -107,13 +82,6 @@ class KGFlexLoader(AbstractLoader):
     def create_namespace(self):
         ns = SimpleNamespace()
         ns.__name__ = "KGFlexLoader"
-        # self.public_items_entitiesidx = defaultdict(lambda: -1)
-        # # for i in self.items:
-        # #     if i in self.mapping.keys():
-        # #         if self.mapping[i] in self.entity_to_idx.keys():
-        # #             self.public_items_entitiesidx[i] = self.entity_to_idx[self.mapping[i]]
-        # [self.public_items_entitiesidx.update({i:self.entity_to_idx[self.mapping[i]]})
-        #   for i in self.items if i in self.mapping.keys() and self.mapping[i] in self.entity_to_idx.keys()]
         ns.object = self
         ns.__dict__.update(self.__dict__)
         return ns
