@@ -9,14 +9,14 @@ experiment:
       - dataloader: InteractionsTextualAttributes
         interactions_features: ../data/{0}/original/text_features_all-mpnet-base-v2/
         interactions: ../data/{0}/interactions.tsv
-  dataset: amazon_boys_girls
+  dataset: amazon_baby
   top_k: 50
   evaluation:
     cutoffs: [10, 20, 50]
     simple_metrics: [Recall]
     wilcoxon_test: False
     paired_ttest: False
-  gpu: 1
+  gpu: 0
   external_models_path: ../external/models/__init__.py
   models:
     external.EGCF:
