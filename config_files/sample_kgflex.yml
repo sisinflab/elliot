@@ -10,7 +10,7 @@ experiment:
         kg_train: ../data/{0}/kg_train.tsv
         second_hop: ../data/{0}/kg_train_2hop.tsv
         properties: ../data/{0}/properties.conf
-        additive: False
+        additive: True
 #  splitting:
 #    test_splitting:
 #        strategy: random_subsampling
@@ -25,12 +25,15 @@ experiment:
     external.KGFlex:
       meta:
         verbose: True
-        validation_rate: 10
-        save_recs: True
+        validation_rate: 1
+        save_recs: False
+        save_weights: True
+        restore: False
+      seed: 42
       lr: 0.1
       epochs: 100
       batch_size: 1000
       embedding: 10
-      first_order_limit: 100
-      second_order_limit: 100
+      first_order_limit: 1
+      second_order_limit: 0
       loader: KGFlexLoader

@@ -9,7 +9,6 @@ from collections import OrderedDict, Counter
 class UserFeatureMapper:
     def __init__(self, data, item_features: dict, item_features2=None, random_seed=42,
                  first_order_limit=100, second_order_limit=100):
-        np.random.seed(random_seed)
 
         # for all the users compute the information for each feature
         self._data = data

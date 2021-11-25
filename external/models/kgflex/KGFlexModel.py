@@ -7,7 +7,7 @@ __version__ = '0.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malitesta@poliba.it'
 
-import time
+import pickle
 
 import tensorflow as tf
 import numpy as np
@@ -39,11 +39,11 @@ class KGFlexModel():
         self._n_features = n_features
         self._embedding_size = embedding_size
 
-        # GLOBAL
+        # Global features embeddings
         self.Gf = np.random.randn(n_features, embedding_size) / 10
         self.Gb = np.random.randn(n_features) / 10
 
-        # PERSONAL
+        # Personal features embeddings
         # users features mask
         self.Mu = np.zeros(shape=(self._n_users, n_features))
         for k, m in index_mask.items():
@@ -101,6 +101,8 @@ class KGFlexModel():
             # user item interaction
             x_ui.append(np.sum(((np.sum(np.multiply(p_uf, g_f), axis=1) + b_f) * kk)))
 
+        #np.array(np.sum(((np.sum(np.multiply(p[u, f, :], self.Gf[f, :]), axis=1) + self.Gb[f]) * k[u][f])) for u, f in [(u, feature_indexes[u]) for u in range(batch_size)])
+
         return np.array(x_ui)
 
     def train_step(self, batch):
@@ -154,7 +156,6 @@ class KGFlexModel():
         user_recs[~user_recs_mask] = -np.inf
         indices, values = zip(*[(self._data.private_items.get(u_list[0]), u_list[1])
                                 for u_list in enumerate(user_recs)])
-
         # indices, values = zip(*predictions.items())
         indices = np.array(indices)
         values = np.array(values)
@@ -167,3 +168,31 @@ class KGFlexModel():
 
     def get_config(self):
         raise NotImplementedError
+
+    def get_model_state(self):
+        saving_dict = {
+            '_global_features': self.Gf,
+            '_global_bias': self.Gb,
+            '_user_feature_mask': self.Mu,
+            'user_feature_mask_along_embedding': self.Me,
+            '_user_feature_embeddings': self.P,
+            '_user_feature_weights': self.K,
+            '_item_feature_mask': self.Mi}
+        return saving_dict
+
+    def set_model_state(self, saving_dict):
+        self.Gf = saving_dict['_global_features']
+        self.Gb = saving_dict['_global_bias']
+        self.Mu = saving_dict['_user_feature_mask']
+        self.Me = saving_dict['user_feature_mask_along_embedding']
+        self.P = saving_dict['_user_feature_embeddings']
+        self.K = saving_dict['_user_feature_weights']
+        self.Mi = saving_dict['_item_feature_mask']
+
+    def load_weights(self, path):
+        with open(path, "rb") as f:
+            self.set_model_state(pickle.load(f))
+
+    def save_weights(self, path):
+        with open(path, "wb") as f:
+            pickle.dump(self.get_model_state(), f)

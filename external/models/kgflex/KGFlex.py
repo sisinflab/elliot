@@ -12,6 +12,7 @@ from .KGFlexModel import KGFlexModel
 
 
 class KGFlex(RecMixin, BaseRecommenderModel):
+
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
         # auto parameters
@@ -23,9 +24,12 @@ class KGFlex(RecMixin, BaseRecommenderModel):
             ("_loader", "loader", "load", "KGRec", None, None),
         ]
         self.autoset_params()
+
+        if self._batch_size < 1:
+            self._batch_size = self._data.transactions
+
         np.random.seed(self._seed)
         self._side = getattr(self._data.side_information, self._loader, None)
-        users = list(self._data.private_users.keys())
         first_order_limit = self._params.first_order_limit
         second_order_limit = self._params.second_order_limit
 
@@ -93,10 +97,7 @@ class KGFlex(RecMixin, BaseRecommenderModel):
                + f"_{self.get_params_shortcut()}"
 
     def get_single_recommendation(self, mask, k, *args):
-        return {u: self._model.get_user_recs(u, mask, k) for u in self._data.users}
-
-    def get_single_recommendation_worker(self, user, mask, k, *args):
-        return user, self._model.get_user_recs(user, mask, k)
+        return {u: self._model.get_user_recs(u, mask, k) for u in tqdm(self._data.users)}
 
     def get_recommendations(self, k: int = 10):
         predictions_top_k_val = {}
