@@ -14,6 +14,7 @@ import numpy as np
 
 _RANDOM_SEED = 42
 
+
 class KGFlexModel():
     def __init__(self,
                  data,
@@ -26,7 +27,7 @@ class KGFlexModel():
                  users_features,
                  random_seed=_RANDOM_SEED,
                  **kwargs):
-                
+
         tf.random.set_seed(random_seed)
 
         self._data = data
@@ -71,8 +72,6 @@ class KGFlexModel():
         self.Mi = self.Mi.astype(bool)
 
     def __call__(self, *inputs):
-
-        # TODO: gestire caso assenza di feature in comune
 
         # return x_ui
         user, item = inputs
@@ -141,7 +140,7 @@ class KGFlexModel():
         return loss
 
     def predict(self, user):
-        eval_user = [user]*self._n_items
+        eval_user = [user] * self._n_items
         eval_items = list(range(self._n_items))
         results = self((eval_user, eval_items))
         return {user: list(zip(eval_items, results))}
@@ -154,7 +153,7 @@ class KGFlexModel():
         user_recs_mask = mask[user_id]
         user_recs[~user_recs_mask] = -np.inf
         indices, values = zip(*[(self._data.private_items.get(u_list[0]), u_list[1])
-                              for u_list in enumerate(user_recs)])
+                                for u_list in enumerate(user_recs)])
 
         # indices, values = zip(*predictions.items())
         indices = np.array(indices)

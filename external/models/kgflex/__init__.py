@@ -1,2 +1,2 @@
 from .KGFlex import KGFlex
-from .kgflexmodel import KGFlexModel
+from .KGFlexModel import KGFlexModel

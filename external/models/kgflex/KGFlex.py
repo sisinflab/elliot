@@ -8,7 +8,7 @@ from elliot.recommender.recommender_utils_mixin import RecMixin
 from elliot.dataset.samplers import custom_sampler as cs
 
 from .UserFeatureMapper import UserFeatureMapper
-from .kgflexmodel import KGFlexModel
+from .KGFlexModel import KGFlexModel
 
 
 class KGFlex(RecMixin, BaseRecommenderModel):
@@ -53,7 +53,7 @@ class KGFlex(RecMixin, BaseRecommenderModel):
                                                      second_order_limit=second_order_limit)
 
         # ------------------------------ MODEL FEATURES ------------------------------
-        print('features mapping')
+        self.logger.info('Features mapping started')
         users_features = self.user_feature_mapper.users_features
         features = set()
         for _, f in users_features.items():
@@ -61,7 +61,7 @@ class KGFlex(RecMixin, BaseRecommenderModel):
 
         feature_key_mapping = dict(zip(list(features), range(len(features))))
 
-        print('FEATURES INFO: {} features found'.format(len(features)))
+        self.logger.info('FEATURES INFO: {} features found'.format(len(features)))
 
         item_features_mask = []
         for _, v in self.item_features.items():
@@ -75,7 +75,6 @@ class KGFlex(RecMixin, BaseRecommenderModel):
         self._sampler = cs.Sampler(self._data.i_train_dict)
 
         # ------------------------------ MODEL ------------------------------
-
         self._model = KGFlexModel(learning_rate=self._lr,
                                   n_users=self._data.num_users,
                                   n_items=self._data.num_items,
@@ -95,7 +94,6 @@ class KGFlex(RecMixin, BaseRecommenderModel):
 
     def get_single_recommendation(self, mask, k, *args):
         return {u: self._model.get_user_recs(u, mask, k) for u in self._data.users}
-
 
     def get_single_recommendation_worker(self, user, mask, k, *args):
         return user, self._model.get_user_recs(user, mask, k)
