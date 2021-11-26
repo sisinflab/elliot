@@ -19,6 +19,20 @@ experiment:
   gpu: 0
   external_models_path: ../external/models/__init__.py
   models:
+    external.LGACN:
+      meta:
+        validation_rate: 1
+        verbose: True
+        save_weights: False
+        save_recs: True
+        validation_metric: Recall
+        restore: False
+      lr: 0.0005
+      epochs: 50
+      batch_size: 512
+      factors: 64
+      l_w: 0.1
+      n_layers: 3
     external.EGCF:
       meta:
         validation_rate: 1
