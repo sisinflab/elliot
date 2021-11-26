@@ -28,7 +28,6 @@ class KGFlex(RecMixin, BaseRecommenderModel):
         if self._batch_size < 1:
             self._batch_size = self._data.transactions
 
-        np.random.seed(self._seed)
         self._side = getattr(self._data.side_information, self._loader, None)
         first_order_limit = self._params.first_order_limit
         second_order_limit = self._params.second_order_limit
@@ -104,7 +103,6 @@ class KGFlex(RecMixin, BaseRecommenderModel):
         predictions_top_k_test = {}
 
         recs_val, recs_test = self.process_protocol(k)
-
         predictions_top_k_val.update(recs_val)
         predictions_top_k_test.update(recs_test)
 
