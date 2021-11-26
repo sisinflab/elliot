@@ -11,6 +11,8 @@ import pickle
 
 import tensorflow as tf
 import numpy as np
+import random
+from tqdm import tqdm
 
 _RANDOM_SEED = 42
 
@@ -29,7 +31,8 @@ class KGFlexModel():
                  **kwargs):
 
         tf.random.set_seed(random_seed)
-
+        np.random.seed(random_seed)
+        random.seed(random_seed)
         self._data = data
         self._learning_rate = learning_rate
         self._n_users = data.num_users
@@ -71,45 +74,31 @@ class KGFlexModel():
                     self.Mi[item][key] = 1
         self.Mi = self.Mi.astype(bool)
 
+        # user item features
+        self.user_item_features = dict()
+        self._n_features_range = np.array(range(self._n_features))
+        for u in tqdm(range(self._n_users), desc='user-item features'):
+            u_i = dict()
+            for i in range(self._n_items):
+                u_i[i] = self._n_features_range[np.multiply(self.Mu[u], self.Mi[i])]
+            self.user_item_features[u] = u_i
+
     def __call__(self, *inputs):
 
-        # return x_ui
         user, item = inputs
         user, item = np.array(user), np.array(item)
-        batch_size = user.shape[0]
-
-        p = self.P[user]
-        k = self.K[user]
-        m = np.multiply(self.Mu[user], self.Mi[item])
-        indexes = np.array(range(self._n_features))
-        feature_indexes = []
-        for u in range(batch_size):
-            feature_indexes.append(indexes[m[u]])
-
-        x_ui = []
-
-        for u in range(batch_size):
-            f = feature_indexes[u]
-            # user-common features-embedding
-            p_uf = p[u, f, :]
-            # common features-embedding
-            g_f = self.Gf[f, :]
-            # bias on common features
-            b_f = self.Gb[f]
-            # weights of common features
-            kk = k[u][f]
-            # user item interaction
-            x_ui.append(np.sum(((np.sum(np.multiply(p_uf, g_f), axis=1) + b_f) * kk)))
-
-        #np.array(np.sum(((np.sum(np.multiply(p[u, f, :], self.Gf[f, :]), axis=1) + self.Gb[f]) * k[u][f])) for u, f in [(u, feature_indexes[u]) for u in range(batch_size)])
-
-        return np.array(x_ui)
+        return np.array(
+            [np.sum(
+                (np.sum(
+                    np.multiply(
+                        self.P[u, self.user_item_features[u][i], :], self.Gf[self.user_item_features[u][i], :]),
+                    axis=1) + self.Gb[self.user_item_features[u][i]]
+                 ) * self.K[u][self.user_item_features[u][i]]
+            ) for u, i in zip(user, item)])
 
     def train_step(self, batch):
 
         loss = 0.0
-        # user, pos, neg = batch
-        # for sample in zip(*batch):
         user, pos, neg = batch
         user = user[:, 0]
         pos = pos[:, 0]
@@ -142,21 +131,30 @@ class KGFlexModel():
         return loss
 
     def predict(self, user):
-        eval_user = [user] * self._n_items
+
         eval_items = list(range(self._n_items))
-        results = self((eval_user, eval_items))
-        return {user: list(zip(eval_items, results))}
+
+        selfPu = self.P[user]
+        selfGf = self.Gf
+        selfGb = self.Gb
+        selfKu = self.K[user]
+        selfuser_item_featuresu = self.user_item_features[user]
+        return np.array(
+            [np.sum(
+                (np.sum(
+                    np.multiply(
+                        selfPu[ui], selfGf[ui]),
+                    axis=1) + selfGb[ui]
+                 ) * selfKu[ui]
+            ) for ui in [selfuser_item_featuresu[i] for i in eval_items]])
 
     def get_user_recs(self, u, mask, k):
         user_id = self._data.public_users.get(u)
-        eval_user = [user_id] * self._n_items
-        eval_items = list(range(self._n_items))
-        user_recs = self(eval_user, eval_items)
+        user_recs = self.predict(user_id)
         user_recs_mask = mask[user_id]
         user_recs[~user_recs_mask] = -np.inf
         indices, values = zip(*[(self._data.private_items.get(u_list[0]), u_list[1])
                                 for u_list in enumerate(user_recs)])
-        # indices, values = zip(*predictions.items())
         indices = np.array(indices)
         values = np.array(values)
         local_k = min(k, len(values))
