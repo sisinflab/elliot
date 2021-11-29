@@ -25,7 +25,7 @@ experiment:
     external.KGFlex:
       meta:
         verbose: True
-        validation_rate: 1
+        validation_rate: 20
         save_recs: False
         save_weights: True
         restore: False

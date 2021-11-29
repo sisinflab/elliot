@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.sparse import csr_matrix
 from tqdm import tqdm
+import pandas as pd
 
 from elliot.recommender import BaseRecommenderModel
 from elliot.recommender.base_recommender_model import init_charger
@@ -31,46 +32,61 @@ class KGFlex(RecMixin, BaseRecommenderModel):
         self._side = getattr(self._data.side_information, self._loader, None)
         first_order_limit = self._params.first_order_limit
         second_order_limit = self._params.second_order_limit
+        embedding = self._embedding
 
         # ------------------------------ ITEM FEATURES ------------------------------
-        print('importing items features')
-        self.item_features = {item: set(map(tuple,
-                                            self._side.triples[
-                                                self._side.triples.uri ==
-                                                self._side.mapping[self._data.private_items[item]]]
-                                            [['predicate', 'object']].values))
-                              for item in tqdm(self._data.private_items, desc='first order features')}
+        # self.item_features = {item: set(map(tuple,
+        #                                     self._side.triples[
+        #                                         self._side.triples.uri ==
+        #                                         self._side.mapping[self._data.private_items[item]]]
+        #                                     [['predicate', 'object']].values))
+        #                       for item in tqdm(self._data.private_items, desc='first order features')}
+        #
+        # self.item_features2 = dict()
+        # sof = self._side.second_order_features
+        # for item in tqdm(self._data.private_items, desc='second order features'):
+        #     item_f = sof[sof.uri_x == self._side.mapping[self._data.private_items[item]]][
+        #         ['predicate_x', 'predicate_y', 'object_y']]
+        #     self.item_features2[item] = {(f'<{p1}><{p2}>', o) for p1, p2, o in item_f.values}
 
-        self.item_features2 = dict()
-        sof = self._side.second_order_features
-        for item in tqdm(self._data.private_items, desc='second order features'):
-            item_f = sof[sof.uri_x == self._side.mapping[self._data.private_items[item]]][
-                ['predicate_x', 'predicate_y', 'object_y']]
-            self.item_features2[item] = {(f'<{p1}><{p2}>', o) for p1, p2, o in item_f.values}
+        uri_to_private = {v: self._data.public_items[k] for k, v in self._side.mapping.items()}
+        self.logger.info('Item features extraction...')
+        item_features_df = pd.DataFrame()
+        item_features_df['item'] = self._side.triples['uri'].map(uri_to_private)
+        item_features_df['f'] = list(zip(self._side.triples['predicate'], self._side.triples['object']))
+        item_features_df = item_features_df.dropna().astype({'item': int})
+        self.item_features1 = item_features_df.groupby('item')['f'].apply(set).to_dict()
+
+        item_features_df = pd.DataFrame()
+        item_features_df['item'] = self._side.second_order_features['uri_x'].map(uri_to_private)
+        item_features_df['f'] = list(
+            zip(self._side.second_order_features['predicate_x'], self._side.second_order_features['predicate_y'],
+                self._side.second_order_features['object_y']))
+        item_features_df = item_features_df.dropna().astype({'item': int})
+        self.item_features2 = item_features_df.groupby('item')['f'].apply(set).to_dict()
 
         # ------------------------------ USER FEATURES ------------------------------
+        self.logger.info('FEATURES INFO: user features selection...')
         self.user_feature_mapper = UserFeatureMapper(data=self._data,
-                                                     item_features=self.item_features,
+                                                     item_features=self.item_features1,
                                                      item_features2=self.item_features2,
                                                      first_order_limit=first_order_limit,
                                                      second_order_limit=second_order_limit)
 
         # ------------------------------ MODEL FEATURES ------------------------------
         self.logger.info('Features mapping started')
-        users_features = self.user_feature_mapper.users_features
+
         features = set()
+        users_features = self.user_feature_mapper.users_features
         for _, f in users_features.items():
             features = set.union(features, set(f))
 
-        feature_key_mapping = dict(zip(list(features), range(len(features))))
+        item_features = {item: set.intersection(set.union(self.item_features1.get(item, {}),
+            self.item_features2.get(item, {})), features) for item in self._data.private_items}
+
+        feature_key_mapping = dict(zip(features, range(len(features))))
 
         self.logger.info('FEATURES INFO: {} features found'.format(len(features)))
-
-        item_features_mask = []
-        for _, v in self.item_features.items():
-            common = set.intersection(set(feature_key_mapping.keys()), set(v))
-            item_features_mask.append([True if f in common else False for f in feature_key_mapping])
-        self.item_features_mask = csr_matrix(item_features_mask)
 
         users_features_mask = {user: [True if f in users_features[user] else False
                                       for f in feature_key_mapping] for user in self._data.private_users.keys()}
@@ -83,9 +99,8 @@ class KGFlex(RecMixin, BaseRecommenderModel):
                                   n_items=self._data.num_items,
                                   n_features=len(features),
                                   feature_key_mapping=feature_key_mapping,
-                                  item_features_mapper=self.item_features,
-                                  embedding_size=self._embedding,
-                                  index_mask=users_features_mask,
+                                  item_features_mapper=item_features,
+                                  embedding_size=embedding,
                                   users_features=users_features,
                                   data=self._data)
 
