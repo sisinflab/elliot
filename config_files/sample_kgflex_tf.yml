@@ -1,0 +1,39 @@
+experiment:
+  dataset: yahoo_movies
+  data_config:
+    strategy: fixed
+    train_path: ../data/{0}/trainingset.tsv
+    test_path: ../data/{0}/testset.tsv
+    side_information:
+      - dataloader: KGFlexLoader
+        mapping: ../data/{0}/mapping.tsv
+        kg_train: ../data/{0}/kg_train.tsv
+        second_hop: ../data/{0}/kg_train_2hop.tsv
+        properties: ../data/{0}/properties.conf
+        additive: True
+#  splitting:
+#    test_splitting:
+#        strategy: random_subsampling
+#        test_ratio: 0.2
+  top_k: 10
+  gpu: 1
+  external_models_path: ../external/models/__init__.py
+  evaluation:
+    cutoffs: [10]
+    simple_metrics: [nDCGRendle2020, nDCG, HR, Precision, ItemCoverage]
+  models:
+    external.KGFlexTF:
+      meta:
+        verbose: True
+        validation_rate: 1
+        save_recs: False
+        save_weights: True
+        restore: False
+      seed: 42
+      lr: 0.01
+      epochs: 100
+      batch_size: 1000
+      embedding: 10
+      first_order_limit: 10
+      second_order_limit: 10
+      loader: KGFlexLoader
