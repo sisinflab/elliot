@@ -27,7 +27,7 @@ experiment:
         verbose: True
         validation_rate: 20
         save_recs: False
-        save_weights: True
+        save_weights: False
         restore: False
       seed: 42
       lr: 0.01

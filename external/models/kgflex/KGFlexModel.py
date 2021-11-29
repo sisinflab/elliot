@@ -29,9 +29,9 @@ class KGFlexModel():
                  random_seed=_RANDOM_SEED,
                  **kwargs):
 
-        tf.random.set_seed(random_seed)
-        np.random.seed(random_seed)
-        random.seed(random_seed)
+        # tf.random.set_seed(random_seed)
+        # np.random.seed(random_seed)
+        # random.seed(random_seed)
 
         self._data = data
         self._learning_rate = learning_rate
