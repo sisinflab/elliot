@@ -22,12 +22,12 @@ experiment:
     cutoffs: [10]
     simple_metrics: [nDCGRendle2020, nDCG, HR, Precision, ItemCoverage]
   models:
-    external.KGFlex:
+    external.KGFlexTF:
       meta:
         verbose: True
-        validation_rate: 20
+        validation_rate: 1
         save_recs: False
-        save_weights: False
+        save_weights: True
         restore: False
       seed: 42
       lr: 0.01

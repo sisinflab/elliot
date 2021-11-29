@@ -24,19 +24,24 @@ class KGFlexLoader(AbstractLoader):
 
         self.mapping = self.load_mapping_file(self.mapping_path)
         self.properties = self.load_properties(self.properties_file)
-        train_triples = pd.read_csv(self.train_path, sep='\t', names=['uri', 'predicate', 'object'])
+        train_triples = pd.read_csv(self.train_path, sep='\t', names=['uri', 'predicate', 'object'],
+                                    dtype={'uri': str, 'predicate': str, 'object': str})
         self.dev_triples = None
         if self.dev_path:
-            self.dev_triples = pd.read_csv(self.dev_path, sep='\t', names=['uri', 'predicate', 'object'])
+            self.dev_triples = pd.read_csv(self.dev_path, sep='\t', names=['uri', 'predicate', 'object'],
+                                    dtype={'uri': str, 'predicate': str, 'object': str})
         self.test_triples = None
         if self.test_path:
-            self.test_triples = pd.read_csv(self.test_path, sep='\t', names=['uri', 'predicate', 'object'])
+            self.test_triples = pd.read_csv(self.test_path, sep='\t', names=['uri', 'predicate', 'object'],
+                                    dtype={'uri': str, 'predicate': str, 'object': str})
         self.triples = pd.concat([train_triples, self.dev_triples, self.test_triples])
         del train_triples, self.dev_triples, self.test_triples
 
-        self.second_hop = pd.DataFrame(columns=['uri', 'predicate', 'object'])
+        self.second_hop = pd.DataFrame(columns=['uri', 'predicate', 'object'])\
+            .astype(dtype={'uri': str, 'predicate': str, 'object': str})
         if self.second_hop_path:
-            self.second_hop = pd.read_csv(self.second_hop_path, sep='\t', names=['uri', 'predicate', 'object'])
+            self.second_hop = pd.read_csv(self.second_hop_path, sep='\t', names=['uri', 'predicate', 'object'],
+                                    dtype={'uri': str, 'predicate': str, 'object': str})
 
         if self.properties:
             if self.additive:
@@ -47,13 +52,12 @@ class KGFlexLoader(AbstractLoader):
                 self.second_hop = self.second_hop[~self.second_hop["predicate"].isin(self.properties)]
 
         # COMPUTE FEATURES
-
         occurrences_per_feature = self.triples.groupby(['predicate', 'object']).size().to_dict()
         keep_set = {f for f, occ in occurrences_per_feature.items() if occ > self.threshold}
 
         second_order_features = self.triples.merge(self.second_hop, left_on='object', right_on='uri', how='left')
         second_order_features = second_order_features[second_order_features['uri_y'].notna()]
-        occurrences_per_feature_2 = second_order_features.groupby(['predicate_x', 'predicate_y', 'object_y'])\
+        occurrences_per_feature_2 = second_order_features.groupby(['predicate_x', 'predicate_y', 'object_y']) \
             .size().to_dict()
         keep_set2 = {f for f, occ in occurrences_per_feature_2.items() if occ > self.threshold}
 
@@ -64,12 +68,12 @@ class KGFlexLoader(AbstractLoader):
         self.second_order_features = second_order_features[second_order_features[
             ['predicate_x', 'predicate_y', 'object_y']].set_index(['predicate_x', 'predicate_y', 'object_y'])
             .index.map(lambda f: f in keep_set2)].astype(str)
-        self.second_order_features = self.second_order_features.drop(['object_x', 'uri_y'], axis=1)
+        #self.second_order_features = self.second_order_features.drop(['object_x', 'uri_y'], axis=1)
+        self.second_order_features = self.second_order_features.drop(['uri_y'], axis=1)
 
         possible_items = [str(uri) for uri in self.triples["uri"].unique()]
         self.mapping = {k: v for k, v in self.mapping.items() if v in possible_items}
-        self.items = {i for i in self.items if i in self.mapping.keys()}
-
+        #self.items = {i for i in self.items if i in self.mapping.keys()}
 
     def get_mapped(self):
         return self.users, self.items

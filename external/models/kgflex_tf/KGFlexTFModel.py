@@ -17,7 +17,7 @@ from tqdm import tqdm
 _RANDOM_SEED = 42
 
 
-class KGFlexModel():
+class KGFlexTFModel():
     def __init__(self,
                  data,
                  learning_rate,
@@ -25,14 +25,14 @@ class KGFlexModel():
                  feature_key_mapping,
                  item_features_mapper,
                  embedding_size,
+                 index_mask,
                  users_features,
                  random_seed=_RANDOM_SEED,
                  **kwargs):
 
-        # tf.random.set_seed(random_seed)
-        # np.random.seed(random_seed)
-        # random.seed(random_seed)
-
+        tf.random.set_seed(random_seed)
+        np.random.seed(random_seed)
+        random.seed(random_seed)
         self._data = data
         self._learning_rate = learning_rate
         self._n_users = data.num_users
@@ -49,8 +49,8 @@ class KGFlexModel():
         # Personal features embeddings
         # users features mask
         self.Mu = np.zeros(shape=(self._n_users, n_features))
-        for u, f in users_features.items():
-            self.Mu[u][list(map(feature_key_mapping.get, f))] = 1
+        for k, m in index_mask.items():
+            self.Mu[k] = m
         self.Mu = self.Mu.astype(bool)
 
         # users features mask along embedding axis
