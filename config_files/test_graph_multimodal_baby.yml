@@ -16,26 +16,10 @@ experiment:
     simple_metrics: [Recall]
     wilcoxon_test: False
     paired_ttest: False
-  gpu: 0
+  gpu: 1
   external_models_path: ../external/models/__init__.py
   models:
-#    external.DGCF:
-#      meta:
-#        validation_rate: 1
-#        verbose: True
-#        save_weights: False
-#        save_recs: True
-#        validation_metric: Recall
-#        restore: False
-#      lr: 0.0005
-#      epochs: 50
-#      batch_size: 512
-#      factors: 64
-#      l_w: 0.1
-#      n_layers: 3
-#      intents: 16
-#      routing_iterations: 2
-    external.LGACN:
+    external.DGCF:
       meta:
         validation_rate: 1
         verbose: True
@@ -43,17 +27,33 @@ experiment:
         save_recs: True
         validation_metric: Recall
         restore: False
-      lr: [ 0.0001, 0.001 ]
-      epochs: 1000
+      lr: 0.0005
+      epochs: 50
+      batch_size: 512
       factors: 64
-      batch_size: 256
-      l_w: [ 10e-5, 10e-3, 10e-1, 10 ]
-      n_layers: [ 2, 3 ]
-      early_stopping:
-        patience: 50
-        monitor: Recall@20
-        mode: auto
-        verbose: True
+      l_w: 0.1
+      n_layers: 3
+      intents: 16
+      routing_iterations: 2
+#    external.LGACN:
+#      meta:
+#        validation_rate: 1
+#        verbose: True
+#        save_weights: False
+#        save_recs: True
+#        validation_metric: Recall
+#        restore: False
+#      lr: [ 0.0001, 0.001 ]
+#      epochs: 1000
+#      factors: 64
+#      batch_size: 256
+#      l_w: [ 10e-5, 10e-3, 10e-1, 10 ]
+#      n_layers: [ 2, 3 ]
+#      early_stopping:
+#        patience: 50
+#        monitor: Recall@20
+#        mode: auto
+#        verbose: True
 #    external.EGCF:
 #      meta:
 #        validation_rate: 1
@@ -76,43 +76,43 @@ experiment:
 #        monitor: Recall@20
 #        mode: auto
 #        verbose: True
-    external.NGCF:
-      meta:
-        validation_rate: 1
-        verbose: True
-        save_weights: False
-        save_recs: True
-        validation_metric: Recall
-        restore: False
-      lr: [0.0001, 0.005]
-      epochs: 400
-      factors: 64
-      batch_size: 256
-      l_w: [10e-5, 10e-3, 10e-1, 10]
-      weight_size: (64,64,64)
-      node_dropout: (0,0,0)
-      message_dropout: (0.1,0.1,0.1)
-      early_stopping:
-        patience: 50
-        monitor: Recall@20
-        mode: auto
-        verbose: True
-    external.LightGCN:
-      meta:
-        validation_rate: 1
-        verbose: True
-        save_weights: False
-        save_recs: True
-        validation_metric: Recall
-        restore: False
-      lr: [0.0001, 0.001]
-      epochs: 1000
-      factors: 64
-      batch_size: 256
-      l_w: [10e-5, 10e-3, 10e-1, 10]
-      n_layers: [2, 3]
-      early_stopping:
-        patience: 50
-        monitor: Recall@20
-        mode: auto
-        verbose: True
+#    external.NGCF:
+#      meta:
+#        validation_rate: 1
+#        verbose: True
+#        save_weights: False
+#        save_recs: True
+#        validation_metric: Recall
+#        restore: False
+#      lr: [0.0001, 0.005]
+#      epochs: 400
+#      factors: 64
+#      batch_size: 256
+#      l_w: [10e-5, 10e-3, 10e-1, 10]
+#      weight_size: (64,64,64)
+#      node_dropout: (0,0,0)
+#      message_dropout: (0.1,0.1,0.1)
+#      early_stopping:
+#        patience: 50
+#        monitor: Recall@20
+#        mode: auto
+#        verbose: True
+#    external.LightGCN:
+#      meta:
+#        validation_rate: 1
+#        verbose: True
+#        save_weights: False
+#        save_recs: True
+#        validation_metric: Recall
+#        restore: False
+#      lr: [0.0001, 0.001]
+#      epochs: 1000
+#      factors: 64
+#      batch_size: 256
+#      l_w: [10e-5, 10e-3, 10e-1, 10]
+#      n_layers: [2, 3]
+#      early_stopping:
+#        patience: 50
+#        monitor: Recall@20
+#        mode: auto
+#        verbose: True

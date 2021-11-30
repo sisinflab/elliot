@@ -68,23 +68,41 @@ class DGCFModel(torch.nn.Module, ABC):
         ego_embeddings = torch.reshape(torch.cat((self.Gu.to(self.device), self.Gi.to(self.device)), 0),
                                        (self.num_users + self.num_items, self.intents, self.embed_k // self.intents))
         all_embeddings = [ego_embeddings]
+        row, col = self.edge_index
+        col -= self.num_users
 
         for layer in range(self.n_layers):
-            if not evaluate:
-                all_embeddings += list(
-                    self.dgcf_network.children()
-                )[layer](all_embeddings[layer].to(self.device),
-                         self.edge_index.to(self.device),
-                         self.edge_index_intents.to(self.device))
-            else:
-                self.dgcf_network.eval()
-                with torch.no_grad():
-                    pass
+            current_edge_index_intents = self.edge_index_intents
+            current_embeddings = all_embeddings[layer]
+            _, current_0_gi = torch.split(current_embeddings, [self.num_users, self.num_items], 0)
+            for routing in range(self.routing_iterations):
+                if not evaluate:
+                    current_embeddings = list(
+                        self.dgcf_network.children()
+                    )[layer](all_embeddings[layer].to(self.device),
+                             self.edge_index.to(self.device),
+                             current_edge_index_intents.to(self.device))
+                    current_t_gu, _ = torch.split(current_embeddings, [self.num_users, self.num_items], 0)
+                    current_edge_index_intents += torch.sum(current_t_gu[row] * torch.tanh(current_0_gi[col]),
+                                                            dim=-1).permute(1, 0)
+                else:
+                    self.dgcf_network.eval()
+                    with torch.no_grad():
+                        current_embeddings = list(
+                            self.dgcf_network.children()
+                        )[layer](all_embeddings[layer].to(self.device),
+                                 self.edge_index.to(self.device),
+                                 current_edge_index_intents.to(self.device))
+                        current_t_gu, _ = torch.split(current_embeddings, [self.num_users, self.num_items], 0)
+                        current_edge_index_intents += torch.sum(current_t_gu[row] * torch.tanh(current_0_gi[col]),
+                                                                dim=-1).permute(1, 0)
+            self.edge_index_intents = current_edge_index_intents
+            all_embeddings += [current_embeddings]
 
         if evaluate:
             self.dgcf_network.train()
 
-        all_embeddings = torch.cat(all_embeddings, 1)
+        all_embeddings = sum(all_embeddings)
         gu, gi = torch.split(all_embeddings, [self.num_users, self.num_items], 0)
         return gu, gi
 
@@ -102,17 +120,17 @@ class DGCFModel(torch.nn.Module, ABC):
 
     def train_step(self, batch):
         gu, gi = self.propagate_embeddings()
+        gu, gi = torch.reshape(gu, (gu.shape[0], gu.shape[1] * gu.shape[2])), torch.reshape(gi, (
+            gi.shape[0], gi.shape[1] * gi.shape[2]))
         user, pos, neg = batch
         xu_pos = self.forward(inputs=(gu[user], gi[pos]))
         xu_neg = self.forward(inputs=(gu[user], gi[neg]))
 
         difference = torch.clamp(xu_pos - xu_neg, -80.0, 1e8)
-        loss = torch.sum(self.softplus(-difference))
+        loss_bpr = torch.sum(self.softplus(-difference))
         reg_loss = self.l_w * (torch.norm(self.Gu, 2) +
-                               torch.norm(self.Gi, 2) +
-                               torch.stack([torch.norm(value, 2) for value in self.dgcf_network.parameters()],
-                                           dim=0).sum(dim=0)) * 2
-        loss += reg_loss
+                               torch.norm(self.Gi, 2)) * 2
+        loss_bpr += reg_loss
 
         self.optimizer.zero_grad()
         loss.backward()
