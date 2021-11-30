@@ -10,6 +10,7 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malite
 from tqdm import tqdm
 import numpy as np
 
+from elliot.dataset.samplers import custom_sampler as cs
 from elliot.recommender import BaseRecommenderModel
 from elliot.recommender.base_recommender_model import init_charger
 from elliot.recommender.recommender_utils_mixin import RecMixin
@@ -29,7 +30,7 @@ class DGCF(RecMixin, BaseRecommenderModel):
         batch_size: Batch size
         l_w: Regularization coefficient
         n_layers: Number of propagation embedding layers
-        disen_k: Tuple with factor for disentanglement for each embedding propagation layer
+        intents: Number of intents for disentanglement
         routing_iterations: Number of routing iterations
 
     To include the recommendation model, add it to the config file adopting the following pattern:
@@ -46,11 +47,13 @@ class DGCF(RecMixin, BaseRecommenderModel):
           factors: 64
           l_w: 0.1
           n_layers: 3
-          disen_k: 16
+          intents: 16
           routing_iterations: 2
     """
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
+
+        self._sampler = cs.Sampler(self._data.i_train_dict)
 
         if self._batch_size < 1:
             self._batch_size = self._num_users
@@ -58,12 +61,12 @@ class DGCF(RecMixin, BaseRecommenderModel):
         ######################################
 
         self._params_list = [
-            ("_learning_rate", "lr", "lr", 0.0005, None, None),
-            ("_factors", "factors", "factors", 64, None, None),
-            ("_l_w", "l_w", "l_w", 0.01, None, None),
-            ("_n_layers", "n_layers", "n_layers", 3, None, None),
-            ("_disen_k", "disen_k", "disen_k", 16, None, None),
-            ("_routing_iterations", "routing_iterations", "routing_iterations", 5, None, None)
+            ("_learning_rate", "lr", "lr", 0.0005, float, None),
+            ("_factors", "factors", "factors", 64, int, None),
+            ("_l_w", "l_w", "l_w", 0.01, float, None),
+            ("_n_layers", "n_layers", "n_layers", 3, int, None),
+            ("_intents", "intents", "intents", 16, int, None),
+            ("_routing_iterations", "routing_iterations", "routing_iterations", 2, int, None)
         ]
         self.autoset_params()
 
@@ -78,7 +81,7 @@ class DGCF(RecMixin, BaseRecommenderModel):
             embed_k=self._factors,
             l_w=self._l_w,
             n_layers=self._n_layers,
-            disen_k=self._disen_k,
+            intents=self._intents,
             routing_iterations=self._routing_iterations,
             edge_index=self.edge_index,
             random_seed=self._seed

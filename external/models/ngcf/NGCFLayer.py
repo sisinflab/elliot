@@ -15,7 +15,9 @@ class NGCFLayer(MessagePassing, ABC):
 
     def forward(self, x, edge_index):
         row, col = edge_index
-        deg = degree(col, x.size(0), dtype=x.dtype)
+        deg_row = degree(row, x.size(0), dtype=x.dtype)
+        deg_col = degree(col, x.size(0), dtype=x.dtype)
+        deg = deg_row + deg_col
         deg_inv_sqrt = deg.pow(-0.5)
         deg_inv_sqrt[deg_inv_sqrt == float('inf')] = 0
         norm = deg_inv_sqrt[row] * deg_inv_sqrt[col]
