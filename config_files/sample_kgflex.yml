@@ -32,7 +32,7 @@ experiment:
       lr: [0.1, 0.01, 0.001]
       epochs: 200
       batch_size: 128
-      embedding: [1, 10, 100]
+      embedding: [10]
       first_order_limit: [0, 10, 100]
       second_order_limit: [0, 10, 100]
       loader: KGFlexLoader
