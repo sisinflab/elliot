@@ -70,14 +70,15 @@ class KGFlexTF(RecMixin, BaseRecommenderModel):
 
         self.logger.info('FEATURES INFO: {} features found'.format(len(features)))
 
-        item_features_mask = []
+        item_features = []
         for _, v in self.item_features.items():
-            common = set.intersection(set(feature_key_mapping.keys()), set(v))
-            item_features_mask.append([True if f in common else False for f in feature_key_mapping])
-        self.item_features_mask = csr_matrix(item_features_mask)
+            common = set.intersection(set(feature_key_mapping.keys()), v)
+            item_features.append(set(map(lambda x: feature_key_mapping[x], common)))
 
-        users_features_mask = {user: [True if f in users_features[user] else False
-                                      for f in feature_key_mapping] for user in self._data.private_users.keys()}
+        user_item_features = [[list(set.intersection(set(map(lambda x: feature_key_mapping[x], users_features[user])), it_f))
+                               for it_f in item_features] for user in tqdm(self._data.private_users.keys())]
+
+        print('FATTO!')
 
         self._sampler = cs.Sampler(self._data.i_train_dict)
 
