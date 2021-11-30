@@ -11,12 +11,15 @@ experiment:
         second_hop: ../data/{0}/kg_train_2hop.tsv
         properties: ../data/{0}/properties.conf
         additive: True
+  prefiltering:
+    strategy: iterative_k_core
+    core: 10
 #  splitting:
 #    test_splitting:
 #        strategy: random_subsampling
 #        test_ratio: 0.2
   top_k: 10
-  gpu: 1
+  gpu: 0
   external_models_path: ../external/models/__init__.py
   evaluation:
     cutoffs: [10]
