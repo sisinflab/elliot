@@ -73,9 +73,9 @@ class DGCFModel(torch.nn.Module, ABC):
             if not evaluate:
                 all_embeddings += list(
                     self.dgcf_network.children()
-                )[0][layer](all_embeddings[layer].to(self.device),
-                            self.edge_index.to(self.device),
-                            self.edge_index_intents.to(self.device))
+                )[layer](all_embeddings[layer].to(self.device),
+                         self.edge_index.to(self.device),
+                         self.edge_index_intents.to(self.device))
             else:
                 self.dgcf_network.eval()
                 with torch.no_grad():
