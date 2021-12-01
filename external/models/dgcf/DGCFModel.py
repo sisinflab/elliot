@@ -84,7 +84,8 @@ class DGCFModel(torch.nn.Module, ABC):
                              current_edge_index_intents.to(self.device))
                     current_t_gu, _ = torch.split(current_embeddings, [self.num_users, self.num_items], 0)
                     current_edge_index_intents += torch.sum(
-                        current_t_gu[row].to(self.device) * torch.tanh(current_0_gi[col]).to(self.device),
+                        current_t_gu[row].to(self.device) * torch.tanh(current_0_gi[col].to(self.device)).to(
+                            self.device),
                         dim=-1).permute(1, 0)
                 else:
                     self.dgcf_network.eval()
@@ -96,7 +97,8 @@ class DGCFModel(torch.nn.Module, ABC):
                                  current_edge_index_intents.to(self.device))
                         current_t_gu, _ = torch.split(current_embeddings, [self.num_users, self.num_items], 0)
                         current_edge_index_intents += torch.sum(
-                            current_t_gu[row].to(self.device) * torch.tanh(current_0_gi[col]).to(self.device),
+                            current_t_gu[row].to(self.device) * torch.tanh(current_0_gi[col].to(self.device)).to(
+                                self.device),
                             dim=-1).permute(1, 0)
             self.edge_index_intents = current_edge_index_intents
             all_embeddings += [current_embeddings]
