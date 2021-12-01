@@ -72,7 +72,7 @@ class DGCFModel(torch.nn.Module, ABC):
         col -= self.num_users
 
         for layer in range(self.n_layers):
-            current_edge_index_intents = self.edge_index_intents
+            current_edge_index_intents = self.edge_index_intents.to(self.device)
             current_embeddings = all_embeddings[layer]
             _, current_0_gi = torch.split(current_embeddings, [self.num_users, self.num_items], 0)
             for routing in range(self.routing_iterations):
