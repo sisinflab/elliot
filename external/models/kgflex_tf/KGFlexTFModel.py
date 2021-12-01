@@ -105,9 +105,10 @@ class KGFlexTFModel(keras.Model):
                       batch_dims=1), axis=-1).to_tensor()
         return predictions
 
-    def get_all_topks(self, predictions, mask, k, user_map):
-        predictions_top_k = {user_map[u]: list(zip(*map(lambda x: x.numpy(), top[::-1]))) for u, top in
-                             enumerate(zip(*tf.nn.top_k(tf.where(mask, predictions, -np.inf), k=k)))}
+    def get_all_topks(self, predictions, mask, k, user_map, item_map):
+        predictions_top_k = {
+            user_map[u]: list(map(lambda x: (item_map.get(x[0]), x[1]), zip(*map(lambda x: x.numpy(), top[::-1])))) for
+            u, top in enumerate(zip(*tf.nn.top_k(tf.where(mask, predictions, -np.inf), k=k)))}
         return predictions_top_k
 
     #@tf.function

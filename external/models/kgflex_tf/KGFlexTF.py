@@ -13,6 +13,8 @@ from elliot.dataset.samplers import custom_sampler as cs
 from .UserFeatureMapper import UserFeatureMapper
 from .KGFlexTFModel import KGFlexTFModel
 
+# mp.set_start_method('fork')
+
 
 def uif_worker(us_f, its_f, mapping):
     uif = []
@@ -119,9 +121,9 @@ class KGFlexTF(RecMixin, BaseRecommenderModel):
     def get_recommendations(self, k: int = 10):
         predictions = self._model.get_all_recs()
         return self._model.get_all_topks(predictions, self.get_candidate_mask(validation=True), k,
-                                         self._data.private_users) if hasattr(self._data,
-                                                                              "val_dict") else {}, \
-               self._model.get_all_topks(predictions, self.get_candidate_mask(), k, self._data.private_users)
+                                         self._data.private_users, self._data.private_items) if hasattr(self._data,
+                                                                                                        "val_dict") else {}, self._model.get_all_topks(
+            predictions, self.get_candidate_mask(), k, self._data.private_users, self._data.private_items)
 
     def train(self):
         if self._restore:
