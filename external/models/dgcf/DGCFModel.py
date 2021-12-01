@@ -130,7 +130,7 @@ class DGCFModel(torch.nn.Module, ABC):
             for intent_p in range(self.intents):
                 if intent != intent_p:
                     loss_ind += (torch.cov(
-                        (all_embeddings[:, intent].to(self.device), all_embeddings[:, intent_p].to(self.device))) / (
+                        all_embeddings[:, intent].to(self.device), all_embeddings[:, intent_p].to(self.device)) / (
                                      torch.sqrt(torch.var(all_embeddings[:, intent].to(self.device)) * torch.var(
                                          all_embeddings[:, intent_p].to(self.device)))))
 
