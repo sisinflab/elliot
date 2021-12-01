@@ -72,7 +72,7 @@ class DGCFModel(torch.nn.Module, ABC):
         col -= self.num_users
 
         for layer in range(self.n_layers):
-            current_edge_index_intents = self.edge_index_intents
+            current_edge_index_intents = self.edge_index_intents.to(self.device)
             current_embeddings = all_embeddings[layer]
             _, current_0_gi = torch.split(current_embeddings, [self.num_users, self.num_items], 0)
             for routing in range(self.routing_iterations):
@@ -83,8 +83,10 @@ class DGCFModel(torch.nn.Module, ABC):
                              self.edge_index.to(self.device),
                              current_edge_index_intents.to(self.device))
                     current_t_gu, _ = torch.split(current_embeddings, [self.num_users, self.num_items], 0)
-                    current_edge_index_intents += torch.sum(current_t_gu[row] * torch.tanh(current_0_gi[col]),
-                                                            dim=-1).permute(1, 0)
+                    current_edge_index_intents += torch.sum(
+                        current_t_gu[row].to(self.device) * torch.tanh(current_0_gi[col].to(self.device)).to(
+                            self.device),
+                        dim=-1).permute(1, 0)
                 else:
                     self.dgcf_network.eval()
                     with torch.no_grad():
@@ -94,8 +96,10 @@ class DGCFModel(torch.nn.Module, ABC):
                                  self.edge_index.to(self.device),
                                  current_edge_index_intents.to(self.device))
                         current_t_gu, _ = torch.split(current_embeddings, [self.num_users, self.num_items], 0)
-                        current_edge_index_intents += torch.sum(current_t_gu[row] * torch.tanh(current_0_gi[col]),
-                                                                dim=-1).permute(1, 0)
+                        current_edge_index_intents += torch.sum(
+                            current_t_gu[row].to(self.device) * torch.tanh(current_0_gi[col].to(self.device)).to(
+                                self.device),
+                            dim=-1).permute(1, 0)
             self.edge_index_intents = current_edge_index_intents
             all_embeddings += [current_embeddings]
 
@@ -103,8 +107,7 @@ class DGCFModel(torch.nn.Module, ABC):
             self.dgcf_network.train()
 
         all_embeddings = sum(all_embeddings)
-        gu, gi = torch.split(all_embeddings, [self.num_users, self.num_items], 0)
-        return gu, gi
+        return all_embeddings
 
     def forward(self, inputs, **kwargs):
         gu, gi = inputs
@@ -119,7 +122,20 @@ class DGCFModel(torch.nn.Module, ABC):
         return torch.matmul(gu.to(self.device), torch.transpose(gi.to(self.device), 0, 1))
 
     def train_step(self, batch):
-        gu, gi = self.propagate_embeddings()
+        all_embeddings = self.propagate_embeddings()
+
+        # independence loss
+        loss_ind = 0.0
+        for intent in range(self.intents):
+            for intent_p in range(self.intents):
+                if intent != intent_p:
+                    loss_ind += (torch.cov(
+                        (all_embeddings[:, intent].to(self.device), all_embeddings[:, intent_p].to(self.device))) / (
+                                     torch.sqrt(torch.var(all_embeddings[:, intent].to(self.device)) * torch.var(
+                                         all_embeddings[:, intent_p].to(self.device)))))
+
+        # bpr loss
+        gu, gi = torch.split(all_embeddings, [self.num_users, self.num_items], 0)
         gu, gi = torch.reshape(gu, (gu.shape[0], gu.shape[1] * gu.shape[2])), torch.reshape(gi, (
             gi.shape[0], gi.shape[1] * gi.shape[2]))
         user, pos, neg = batch
@@ -132,6 +148,8 @@ class DGCFModel(torch.nn.Module, ABC):
                                torch.norm(self.Gi, 2)) * 2
         loss_bpr += reg_loss
 
+        # sum and optimize according to the overall loss
+        loss = loss_bpr + loss_ind
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
