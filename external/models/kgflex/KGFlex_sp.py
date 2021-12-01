@@ -9,7 +9,8 @@ from elliot.recommender.recommender_utils_mixin import RecMixin
 from elliot.dataset.samplers import custom_sampler as cs
 
 from .UserFeatureMapper import UserFeatureMapper
-from .KGFlexModel_sp import KGFlexModel
+from .KGFlexModel import KGFlexModel
+
 
 class KGFlex(RecMixin, BaseRecommenderModel):
 

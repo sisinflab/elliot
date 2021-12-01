@@ -2,6 +2,8 @@ import numpy as np
 from scipy.sparse import csr_matrix
 from tqdm import tqdm
 import pandas as pd
+import multiprocessing as mp
+import tensorflow as tf
 
 from elliot.recommender import BaseRecommenderModel
 from elliot.recommender.base_recommender_model import init_charger
@@ -10,6 +12,16 @@ from elliot.dataset.samplers import custom_sampler as cs
 
 from .UserFeatureMapper import UserFeatureMapper
 from .KGFlexTFModel import KGFlexTFModel
+
+
+def uif_worker(us_f, its_f, mapping):
+    uif = []
+    lengths = []
+    for it_f in its_f:
+        s = set.intersection(set(map(lambda x: mapping[x], us_f)), it_f)
+        lengths.append(len(s))
+        uif.extend(list(s))
+    return tf.RaggedTensor.from_row_lengths(uif, lengths)
 
 
 class KGFlexTF(RecMixin, BaseRecommenderModel):
@@ -75,24 +87,28 @@ class KGFlexTF(RecMixin, BaseRecommenderModel):
             common = set.intersection(set(feature_key_mapping.keys()), v)
             item_features.append(set(map(lambda x: feature_key_mapping[x], common)))
 
-        user_item_features = [[list(set.intersection(set(map(lambda x: feature_key_mapping[x], users_features[user])), it_f))
-                               for it_f in item_features] for user in tqdm(self._data.private_users.keys())]
+        def uif_args():
+            return ((users_features[u],
+                     item_features,
+                     feature_key_mapping) for u in self._data.private_users.keys())
+
+        arguments = uif_args()
+        with mp.Pool(processes=mp.cpu_count()) as pool:
+            user_item_features = pool.starmap(uif_worker, tqdm(arguments, total=len(self._data.private_users.keys()),
+                                                               desc='User-Item Features'))
+        user_item_features = tf.ragged.stack(user_item_features)
 
         print('FATTO!')
 
         self._sampler = cs.Sampler(self._data.i_train_dict)
 
         # ------------------------------ MODEL ------------------------------
-        self._model = KGFlexTFModel(learning_rate=self._lr,
-                                    n_users=self._data.num_users,
-                                    n_items=self._data.num_items,
-                                    n_features=len(features),
-                                    feature_key_mapping=feature_key_mapping,
-                                    item_features_mapper=self.item_features,
-                                    embedding_size=self._embedding,
-                                    index_mask=users_features_mask,
-                                    users_features=users_features,
-                                    data=self._data)
+        self._model = KGFlexTFModel(num_users=self._data.num_users,
+                                    num_items=self._data.num_items,
+                                    user_item_features=user_item_features,
+                                    num_features=len(feature_key_mapping),
+                                    factors=self._embedding,
+                                    learning_rate=self._lr)
 
     @property
     def name(self):
@@ -100,18 +116,12 @@ class KGFlexTF(RecMixin, BaseRecommenderModel):
                + "_e:" + str(self._epochs) \
                + f"_{self.get_params_shortcut()}"
 
-    def get_single_recommendation(self, mask, k, *args):
-        return {u: self._model.get_user_recs(u, mask, k) for u in tqdm(self._data.users)}
-
     def get_recommendations(self, k: int = 10):
-        predictions_top_k_val = {}
-        predictions_top_k_test = {}
-
-        recs_val, recs_test = self.process_protocol(k)
-        predictions_top_k_val.update(recs_val)
-        predictions_top_k_test.update(recs_test)
-
-        return predictions_top_k_val, predictions_top_k_test
+        predictions = self._model.get_all_recs()
+        return self._model.get_all_topks(predictions, self.get_candidate_mask(validation=True), k,
+                                         self._data.private_users) if hasattr(self._data,
+                                                                              "val_dict") else {}, \
+               self._model.get_all_topks(predictions, self.get_candidate_mask(), k, self._data.private_users)
 
     def train(self):
         if self._restore:

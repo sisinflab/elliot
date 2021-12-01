@@ -1,196 +1,124 @@
 """
 Module description:
-
 """
 
 __version__ = '0.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta'
-__email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malitesta@poliba.it'
+__email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
-import pickle
-
-import tensorflow as tf
+import os
 import numpy as np
-import random
-from tqdm import tqdm
+import tensorflow as tf
+from tensorflow import keras
 
-_RANDOM_SEED = 42
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+tf.random.set_seed(0)
 
 
-class KGFlexTFModel():
+class KGFlexTFModel(keras.Model):
     def __init__(self,
-                 data,
-                 learning_rate,
-                 n_features,
-                 feature_key_mapping,
-                 item_features_mapper,
-                 embedding_size,
-                 index_mask,
-                 users_features,
-                 random_seed=_RANDOM_SEED,
+                 num_users,
+                 num_items,
+                 user_item_features,
+                 num_features,
+                 factors=10,
+                 learning_rate=0.01,
+                 name="KGFlex_TF",
                  **kwargs):
+        super().__init__(name=name, **kwargs)
+        tf.random.set_seed(42)
+        self.num_users = num_users
+        self.num_items = num_items
+        self.num_features = num_features
+        self._factors = factors
 
-        tf.random.set_seed(random_seed)
-        np.random.seed(random_seed)
-        random.seed(random_seed)
-        self._data = data
-        self._learning_rate = learning_rate
-        self._n_users = data.num_users
-        self._n_items = data.num_items
-        self._users = data.private_users.keys()
+        self.initializer = tf.initializers.GlorotUniform()
 
-        self._n_features = n_features
-        self._embedding_size = embedding_size
+        self.K = tf.Variable(self.initializer(shape=[self.num_users, self.num_features]), name='H', dtype=tf.float32,
+                             trainable=False)
+        self.H = tf.Variable(self.initializer(shape=[self.num_users, self._factors]), name='H', dtype=tf.float32)
+        self.G = tf.Variable(self.initializer(shape=[self.num_features, self._factors]), name='G', dtype=tf.float32)
+        self.C = user_item_features
 
-        # Global features embeddings
-        self.Gf = np.random.randn(n_features, embedding_size) / 10
-        self.Gb = np.random.randn(n_features) / 10
+        self.loss = keras.losses.MeanSquaredError()
+        self.optimizer = tf.optimizers.Adam(learning_rate)
 
-        # Personal features embeddings
-        # users features mask
-        self.Mu = np.zeros(shape=(self._n_users, n_features))
-        for k, m in index_mask.items():
-            self.Mu[k] = m
-        self.Mu = self.Mu.astype(bool)
-
-        # users features mask along embedding axis
-        self.Me = np.repeat(self.Mu[:, :, np.newaxis], embedding_size, axis=2)
-        # initialize users features vectors
-        self.P = np.zeros((self._n_users, n_features, embedding_size))
-        self.P[self.Me] = np.random.randn(*self.P[self.Me].shape) / 10
-
-        # users constant weights
-        self.K = np.zeros(shape=(self._n_users, n_features))
-        for u in self._users:
-            for feature in users_features[u].keys():
-                self.K[u][feature_key_mapping[feature]] = users_features[u][feature]
-
-        # item features mask
-        self.Mi = np.zeros(shape=(self._n_items, n_features))
-        for item, features in item_features_mapper.items():
-            for f in features:
-                key = feature_key_mapping.get(f)
-                if key:
-                    self.Mi[item][key] = 1
-        self.Mi = self.Mi.astype(bool)
-
-        # user item features
-        self.user_item_features = dict()
-        self._n_features_range = np.array(range(self._n_features))
-        for u in tqdm(range(self._n_users), desc='user-item features'):
-            u_i = dict()
-            for i in range(self._n_items):
-                u_i[i] = self._n_features_range[np.multiply(self.Mu[u], self.Mi[i])]
-            self.user_item_features[u] = u_i
-
-    def __call__(self, *inputs):
-
+    #@tf.function
+    def call(self, inputs, training=None, mask=None):
         user, item = inputs
-        user, item = np.array(user), np.array(item)
-        return np.array(
-            [np.sum(
-                (np.sum(
-                    np.multiply(
-                        self.P[u, self.user_item_features[u][i], :], self.Gf[self.user_item_features[u][i], :]),
-                    axis=1) + self.Gb[self.user_item_features[u][i]]
-                 ) * self.K[u][self.user_item_features[u][i]]
-            ) for u, i in zip(user, item)])
+        h_u = tf.squeeze(tf.nn.embedding_lookup(self.H, user))
+        z_u = h_u @ tf.transpose(self.G)  # num_features x 1
+        k_u = tf.squeeze(tf.nn.embedding_lookup(self.K, user))  # num_features x 1
+        a_u = k_u * z_u
+        ui_pairs = tf.stack(tf.squeeze([user, item]), axis=-1)
+        features = tf.gather_nd(self.C, ui_pairs)
+        x_ui = tf.reduce_sum(tf.gather(a_u, features, batch_dims=1), axis=-1)
 
+        return x_ui
+
+    #@tf.function
     def train_step(self, batch):
-
-        loss = 0.0
         user, pos, neg = batch
-        user = user[:, 0]
-        pos = pos[:, 0]
-        neg = neg[:, 0]
-        x_p = self(user, pos)
-        x_n = self(user, neg)
-        x_pn = np.subtract(x_p, x_n)
-        d_loss = (1 / (1 + np.exp(x_pn)))
+        with tf.GradientTape() as tape:
+            # Clean Inference
+            xu_pos = self(inputs=(user, pos), training=True)
+            xu_neg = self(inputs=(user, neg), training=True)
 
-        m_p = np.multiply(self.Mu[user], self.Mi[pos])
-        m_n = np.multiply(self.Mu[user], self.Mi[neg])
+            difference = tf.clip_by_value(xu_pos - xu_neg, -80.0, 1e8)
+            loss = tf.reduce_sum(tf.nn.softplus(-difference))
+            # Regularization Component
+            # reg_loss = self._l_w * tf.reduce_sum([tf.nn.l2_loss(gamma_u),
+            #                                      tf.nn.l2_loss(gamma_pos),
+            #                                      tf.nn.l2_loss(gamma_neg)]) \
+            #            + self._l_b * tf.nn.l2_loss(beta_pos) \
+            #            + self._l_b * tf.nn.l2_loss(beta_neg) / 10
 
-        indexes_p = np.array(range(self._n_features))
-        indexes_n = np.array(range(self._n_features))
+            # Loss to be optimized
+            # loss += reg_loss
 
-        for us_, mask_pos, mask_neg, d_loss_ in zip(user, m_p, m_n, d_loss):
-            f_p = indexes_p[mask_pos]
-            f_n = indexes_n[mask_neg]
+        grads = tape.gradient(loss, self.trainable_weights)
+        self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
 
-            # updates
-            self.P[us_, f_p] += self._learning_rate * self.Gf[f_p] * self.K[us_][f_p][:, np.newaxis] * d_loss_
-            self.Gf[f_p] += self._learning_rate * self.P[us_, f_p] * self.K[us_][f_p][:, np.newaxis] * d_loss_
-            self.Gb[f_p] += self._learning_rate * self.K[us_][f_p] * d_loss_
-
-            self.P[us_, f_n] += self._learning_rate * self.Gf[f_n] * -self.K[us_][f_n][:, np.newaxis] * d_loss_
-            self.Gf[f_n] += self._learning_rate * self.P[us_, f_n] * -self.K[us_][f_n][:, np.newaxis] * d_loss_
-            self.Gb[f_n] += self._learning_rate * -self.K[us_][f_n] * d_loss_
-
-            loss += d_loss_
         return loss
 
-    def predict(self, user):
 
-        eval_items = list(range(self._n_items))
+    #@tf.function
+    def predict(self, inputs, training=False, **kwargs):
+        """
+        Get full predictions on the whole users/items matrix.
+        Returns:
+            The matrix of predicted values.
+        """
+        output = self.call(inputs=inputs, training=training)
+        return output
 
-        selfPu = self.P[user]
-        selfGf = self.Gf
-        selfGb = self.Gb
-        selfKu = self.K[user]
-        selfuser_item_featuresu = self.user_item_features[user]
-        return np.array(
-            [np.sum(
-                (np.sum(
-                    np.multiply(
-                        selfPu[ui], selfGf[ui]),
-                    axis=1) + selfGb[ui]
-                 ) * selfKu[ui]
-            ) for ui in [selfuser_item_featuresu[i] for i in eval_items]])
+    #@tf.function
+    def compute_feature_matrices(self):
+        Z = self.H @ tf.transpose(self.G)
+        return self.K * Z
 
-    def get_user_recs(self, u, mask, k):
-        user_id = self._data.public_users.get(u)
-        user_recs = self.predict(user_id)
-        user_recs_mask = mask[user_id]
-        user_recs[~user_recs_mask] = -np.inf
-        indices, values = zip(*[(self._data.private_items.get(u_list[0]), u_list[1])
-                                for u_list in enumerate(user_recs)])
-        indices = np.array(indices)
-        values = np.array(values)
-        local_k = min(k, len(values))
-        partially_ordered_preds_indices = np.argpartition(values, -local_k)[-local_k:]
-        real_values = values[partially_ordered_preds_indices]
-        real_indices = indices[partially_ordered_preds_indices]
-        local_top_k = real_values.argsort()[::-1]
-        return [(real_indices[item], real_values[item]) for item in local_top_k]
+    def get_all_recs(self):
+        Z = self.H @ tf.transpose(self.G)
+        A = self.K * Z
+        predictions = tf.reduce_sum(
+            tf.gather(tf.gather(A, list(range(self.num_users))), tf.gather(self.C, list(range(self.num_users))),
+                      batch_dims=1), axis=-1).to_tensor()
+        return predictions
 
-    def get_config(self):
-        raise NotImplementedError
+    def get_all_topks(self, predictions, mask, k, user_map):
+        predictions_top_k = {user_map[u]: list(zip(*map(lambda x: x.numpy(), top[::-1]))) for u, top in
+                             enumerate(zip(*tf.nn.top_k(tf.where(mask, predictions, -np.inf), k=k)))}
+        return predictions_top_k
 
-    def get_model_state(self):
-        saving_dict = {
-            '_global_features': self.Gf,
-            '_global_bias': self.Gb,
-            '_user_feature_mask': self.Mu,
-            'user_feature_mask_along_embedding': self.Me,
-            '_user_feature_embeddings': self.P,
-            '_user_feature_weights': self.K,
-            '_item_feature_mask': self.Mi}
-        return saving_dict
+    #@tf.function
+    def get_user_recs(self, user, A):
+        """
+        Get full predictions on the whole users/items matrix.
+        Returns:
+            The matrix of predicted values.
+        """
+        return tf.reduce_sum(tf.gather(tf.gather(A, user), tf.gather(self.C, user)), axis=-1)
 
-    def set_model_state(self, saving_dict):
-        self.Gf = saving_dict['_global_features']
-        self.Gb = saving_dict['_global_bias']
-        self.Mu = saving_dict['_user_feature_mask']
-        self.Me = saving_dict['user_feature_mask_along_embedding']
-        self.P = saving_dict['_user_feature_embeddings']
-        self.K = saving_dict['_user_feature_weights']
-        self.Mi = saving_dict['_item_feature_mask']
-
-    def load_weights(self, path):
-        with open(path, "rb") as f:
-            self.set_model_state(pickle.load(f))
-
-    def save_weights(self, path):
-        with open(path, "wb") as f:
-            pickle.dump(self.get_model_state(), f)
+    @tf.function
+    def get_top_k(self, preds, train_mask, k=100):
+        return tf.nn.top_k(tf.where(train_mask, preds, -np.inf), k=k, sorted=True)
