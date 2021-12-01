@@ -83,8 +83,9 @@ class DGCFModel(torch.nn.Module, ABC):
                              self.edge_index.to(self.device),
                              current_edge_index_intents.to(self.device))
                     current_t_gu, _ = torch.split(current_embeddings, [self.num_users, self.num_items], 0)
-                    current_edge_index_intents += torch.sum(current_t_gu[row] * torch.tanh(current_0_gi[col]),
-                                                            dim=-1).permute(1, 0)
+                    current_edge_index_intents += torch.sum(
+                        current_t_gu[row].to(self.device) * torch.tanh(current_0_gi[col]).to(self.device),
+                        dim=-1).permute(1, 0)
                 else:
                     self.dgcf_network.eval()
                     with torch.no_grad():
@@ -94,8 +95,9 @@ class DGCFModel(torch.nn.Module, ABC):
                                  self.edge_index.to(self.device),
                                  current_edge_index_intents.to(self.device))
                         current_t_gu, _ = torch.split(current_embeddings, [self.num_users, self.num_items], 0)
-                        current_edge_index_intents += torch.sum(current_t_gu[row] * torch.tanh(current_0_gi[col]),
-                                                                dim=-1).permute(1, 0)
+                        current_edge_index_intents += torch.sum(
+                            current_t_gu[row].to(self.device) * torch.tanh(current_0_gi[col]).to(self.device),
+                            dim=-1).permute(1, 0)
             self.edge_index_intents = current_edge_index_intents
             all_embeddings += [current_embeddings]
 
@@ -125,8 +127,10 @@ class DGCFModel(torch.nn.Module, ABC):
         for intent in range(self.intents):
             for intent_p in range(self.intents):
                 if intent != intent_p:
-                    loss_ind += (torch.cov((all_embeddings[:, intent], all_embeddings[:, intent_p])) / (
-                        torch.sqrt(torch.var(all_embeddings[:, intent]) * torch.var(all_embeddings[:, intent_p]))))
+                    loss_ind += (torch.cov(
+                        (all_embeddings[:, intent].to(self.device), all_embeddings[:, intent_p].to(self.device))) / (
+                                     torch.sqrt(torch.var(all_embeddings[:, intent].to(self.device)) * torch.var(
+                                         all_embeddings[:, intent_p].to(self.device)))))
 
         # bpr loss
         gu, gi = torch.split(all_embeddings, [self.num_users, self.num_items], 0)
