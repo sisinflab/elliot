@@ -16,8 +16,10 @@ class DGCFLayer(MessagePassing, ABC):
     def forward(self, x, edge_index, edge_index_intents):
         normalized_edge_index_intents = torch.softmax(edge_index_intents, dim=0)
         row, col = edge_index
-        deg_row = self.weighted_degree(row, normalized_edge_index_intents, x.size(0), dtype=x.dtype)
-        deg_col = self.weighted_degree(col, normalized_edge_index_intents, x.size(0), dtype=x.dtype)
+        deg_row = self.weighted_degree(index=row, weights=normalized_edge_index_intents, num_nodes=x.size(0),
+                                       dtype=x.dtype)
+        deg_col = self.weighted_degree(index=col, weights=normalized_edge_index_intents, num_nodes=x.size(0),
+                                       dtype=x.dtype)
         deg = deg_row + deg_col
         deg_inv_sqrt = deg.pow(-0.5)
         deg_inv_sqrt[deg_inv_sqrt == float('inf')] = 0

@@ -31,7 +31,9 @@ experiment:
       epochs: 50
       batch_size: 512
       factors: 64
-      l_w: 0.1
+      l_w_bpr: 0.1
+      l_w_ind: 0.1
+      ind_batch_size: 512
       n_layers: 3
       intents: 16
       routing_iterations: 2

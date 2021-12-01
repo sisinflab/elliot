@@ -22,11 +22,14 @@ class DGCFModel(torch.nn.Module, ABC):
                  num_items,
                  learning_rate,
                  embed_k,
-                 l_w,
+                 l_w_bpr,
+                 l_w_ind,
+                 ind_batch_size,
                  n_layers,
                  intents,
                  routing_iterations,
                  edge_index,
+                 edge_index_unbiased,
                  random_seed,
                  name="DGCF",
                  **kwargs
@@ -40,18 +43,21 @@ class DGCFModel(torch.nn.Module, ABC):
         self.num_items = num_items
         self.embed_k = embed_k
         self.learning_rate = learning_rate
-        self.l_w = l_w
+        self.l_w_bpr = l_w_bpr
+        self.l_w_ind = l_w_ind
+        self.ind_batch_size = ind_batch_size
         self.n_layers = n_layers
         self.intents = intents
         self.routing_iterations = routing_iterations
         self.edge_index = torch.tensor(edge_index, dtype=torch.int64)
+        self.edge_index_unbiased = torch.tensor(edge_index_unbiased, dtype=torch.int64)
         self.edge_index_intents = torch.ones((self.intents, self.edge_index.shape[1]), dtype=torch.float32)
 
         self.Gu = torch.nn.Parameter(
-            torch.nn.init.zeros_(torch.empty((self.num_users, self.embed_k))))
+            torch.nn.init.xavier_normal_(torch.empty((self.num_users, self.embed_k))))
         self.Gu.to(self.device)
         self.Gi = torch.nn.Parameter(
-            torch.nn.init.zeros_(torch.empty((self.num_items, self.embed_k))))
+            torch.nn.init.xavier_normal_(torch.empty((self.num_items, self.embed_k))))
         self.Gi.to(self.device)
 
         dgcf_network_list = []
@@ -68,8 +74,7 @@ class DGCFModel(torch.nn.Module, ABC):
         ego_embeddings = torch.reshape(torch.cat((self.Gu.to(self.device), self.Gi.to(self.device)), 0),
                                        (self.num_users + self.num_items, self.intents, self.embed_k // self.intents))
         all_embeddings = [ego_embeddings]
-        row, col = self.edge_index
-        col -= self.num_users
+        row, col = self.edge_index_unbiased
 
         for layer in range(self.n_layers):
             current_edge_index_intents = self.edge_index_intents.to(self.device)
@@ -83,7 +88,7 @@ class DGCFModel(torch.nn.Module, ABC):
                              self.edge_index.to(self.device),
                              current_edge_index_intents.to(self.device))
                     current_t_gu, _ = torch.split(current_embeddings, [self.num_users, self.num_items], 0)
-                    current_edge_index_intents += torch.sum(
+                    current_edge_index_intents = current_edge_index_intents.clone() + torch.sum(
                         current_t_gu[row].to(self.device) * torch.tanh(current_0_gi[col].to(self.device)).to(
                             self.device),
                         dim=-1).permute(1, 0)
@@ -96,7 +101,7 @@ class DGCFModel(torch.nn.Module, ABC):
                                  self.edge_index.to(self.device),
                                  current_edge_index_intents.to(self.device))
                         current_t_gu, _ = torch.split(current_embeddings, [self.num_users, self.num_items], 0)
-                        current_edge_index_intents += torch.sum(
+                        current_edge_index_intents = current_edge_index_intents.clone() + torch.sum(
                             current_t_gu[row].to(self.device) * torch.tanh(current_0_gi[col].to(self.device)).to(
                                 self.device),
                             dim=-1).permute(1, 0)
@@ -107,7 +112,8 @@ class DGCFModel(torch.nn.Module, ABC):
             self.dgcf_network.train()
 
         all_embeddings = sum(all_embeddings)
-        return all_embeddings
+        gu, gi = torch.split(all_embeddings, [self.num_users, self.num_items], 0)
+        return gu, gi
 
     def forward(self, inputs, **kwargs):
         gu, gi = inputs
@@ -121,21 +127,71 @@ class DGCFModel(torch.nn.Module, ABC):
     def predict(self, gu, gi, **kwargs):
         return torch.matmul(gu.to(self.device), torch.transpose(gi.to(self.device), 0, 1))
 
+    def sample_users_items_for_loss_ind(self):
+        # we sample ind_batch_size users and items because of memory issues as underlined in:
+        # https://github.com/xiangwang1223/disentangled_graph_collaborative_filtering/blob/56dbc30ad82519d2d0655ca01eec935674923b7b/DGCF_v1/DGCF.py#311
+
+        # sample users
+        perm = torch.randperm(self.Gu.shape[0])
+        sampled_users = perm[:self.ind_batch_size]
+
+        # sample items
+        perm = torch.randperm(self.Gi.shape[0])
+        sampled_items = perm[:self.ind_batch_size]
+
+        return sampled_users, sampled_items
+
+    @staticmethod
+    def get_loss_ind(x1, x2):
+        # reference: https://recbole.io/docs/_modules/recbole/model/general_recommender/dgcf.html
+        def _create_centered_distance(x):
+            r = torch.sum(x * x, dim=1, keepdim=True)
+            v = r - 2 * torch.mm(x, x.T + r.T)
+            z_v = torch.zeros_like(v)
+            v = torch.where(v > 0.0, v, z_v)
+            D = torch.sqrt(v + 1e-8)
+            D = D - torch.mean(D, dim=0, keepdim=True) - torch.mean(D, dim=1, keepdim=True) + torch.mean(D)
+            return D
+
+        def _create_distance_covariance(d1, d2):
+            v = torch.sum(d1 * d2) / (d1.shape[0] * d1.shape[0])
+            z_v = torch.zeros_like(v)
+            v = torch.where(v > 0.0, v, z_v)
+            dcov = torch.sqrt(v + 1e-8)
+            return dcov
+
+        D1 = _create_centered_distance(x1)
+        D2 = _create_centered_distance(x2)
+
+        dcov_12 = _create_distance_covariance(D1, D2)
+        dcov_11 = _create_distance_covariance(D1, D1)
+        dcov_22 = _create_distance_covariance(D2, D2)
+
+        # calculate the distance correlation
+        value = dcov_11 * dcov_22
+        zero_value = torch.zeros_like(value)
+        value = torch.where(value > 0.0, value, zero_value)
+        loss_ind = dcov_12 / (torch.sqrt(value) + 1e-10)
+        return loss_ind
+
     def train_step(self, batch):
-        all_embeddings = self.propagate_embeddings()
+        gu, gi = self.propagate_embeddings()
 
         # independence loss
-        loss_ind = 0.0
-        for intent in range(self.intents):
-            for intent_p in range(self.intents):
-                if intent != intent_p:
-                    loss_ind += (torch.cov(
-                        all_embeddings[:, intent].to(self.device), all_embeddings[:, intent_p].to(self.device)) / (
-                                     torch.sqrt(torch.var(all_embeddings[:, intent].to(self.device)) * torch.var(
-                                         all_embeddings[:, intent_p].to(self.device)))))
+        loss_ind = torch.tensor(0.0)
+        if self.intents > 1 and self.l_w_ind > 1e-9:
+            sampled_users, sampled_items = self.sample_users_items_for_loss_ind()
+            sampled_users.to(self.device)
+            sampled_items.to(self.device)
+            gu_sampled = gu[sampled_users]
+            gi_sampled = gi[sampled_items]
+            sampled_embeddings = torch.cat((gu_sampled, gi_sampled), dim=0)
+            for intent in range(self.intents - 1):
+                loss_ind += self.get_loss_ind(sampled_embeddings[:, intent], sampled_embeddings[:, intent + 1])
+            loss_ind /= ((self.intents + 1.0) * self.intents / 2)
+            loss_ind *= self.l_w_ind
 
         # bpr loss
-        gu, gi = torch.split(all_embeddings, [self.num_users, self.num_items], 0)
         gu, gi = torch.reshape(gu, (gu.shape[0], gu.shape[1] * gu.shape[2])), torch.reshape(gi, (
             gi.shape[0], gi.shape[1] * gi.shape[2]))
         user, pos, neg = batch
@@ -144,8 +200,8 @@ class DGCFModel(torch.nn.Module, ABC):
 
         difference = torch.clamp(xu_pos - xu_neg, -80.0, 1e8)
         loss_bpr = torch.sum(self.softplus(-difference))
-        reg_loss = self.l_w * (torch.norm(self.Gu, 2) +
-                               torch.norm(self.Gi, 2)) * 2
+        reg_loss = self.l_w_bpr * (torch.norm(self.Gu, 2) +
+                                   torch.norm(self.Gi, 2)) * 2
         loss_bpr += reg_loss
 
         # sum and optimize according to the overall loss

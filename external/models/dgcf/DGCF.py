@@ -29,7 +29,9 @@ class DGCF(RecMixin, BaseRecommenderModel):
         epochs: Number of epochs
         factors: Number of latent factors
         batch_size: Batch size
-        l_w: Regularization coefficient
+        l_w_bpr: Regularization coefficient for bpr loss
+        l_w_ind: Regularization coefficient for independence loss
+        ind_batch_size: Batch size for the independence loss
         n_layers: Number of propagation embedding layers
         intents: Number of intents for disentanglement
         routing_iterations: Number of routing iterations
@@ -46,7 +48,9 @@ class DGCF(RecMixin, BaseRecommenderModel):
           epochs: 50
           batch_size: 512
           factors: 64
-          l_w: 0.1
+          l_w_bpr: 0.1
+          l_w_ind: 0.1
+          ind_batch_size: 512
           n_layers: 3
           intents: 16
           routing_iterations: 2
@@ -64,7 +68,9 @@ class DGCF(RecMixin, BaseRecommenderModel):
         self._params_list = [
             ("_learning_rate", "lr", "lr", 0.0005, float, None),
             ("_factors", "factors", "factors", 64, int, None),
-            ("_l_w", "l_w", "l_w", 0.01, float, None),
+            ("_l_w_bpr", "l_w_bpr", "l_w_bpr", 0.01, float, None),
+            ("_l_w_ind", "l_w_ind", "l_w_ind", 0.01, float, None),
+            ("_ind_batch_size", "ind_batch_size", "ind_batch_size", 512, int, None),
             ("_n_layers", "n_layers", "n_layers", 3, int, None),
             ("_intents", "intents", "intents", 16, int, None),
             ("_routing_iterations", "routing_iterations", "routing_iterations", 2, int, None)
@@ -72,6 +78,7 @@ class DGCF(RecMixin, BaseRecommenderModel):
         self.autoset_params()
 
         row, col = data.sp_i_train.nonzero()
+        self.edge_index_unbiased = np.array([row, col])
         col = [c + self._num_users for c in col]
         self.edge_index = np.array([row, col])
 
@@ -80,11 +87,14 @@ class DGCF(RecMixin, BaseRecommenderModel):
             num_items=self._num_items,
             learning_rate=self._learning_rate,
             embed_k=self._factors,
-            l_w=self._l_w,
+            l_w_bpr=self._l_w_bpr,
+            l_w_ind=self._l_w_ind,
+            ind_batch_size=self._ind_batch_size,
             n_layers=self._n_layers,
             intents=self._intents,
             routing_iterations=self._routing_iterations,
             edge_index=self.edge_index,
+            edge_index_unbiased=self.edge_index_unbiased,
             random_seed=self._seed
         )
 
@@ -113,8 +123,7 @@ class DGCF(RecMixin, BaseRecommenderModel):
     def get_recommendations(self, k: int = 100):
         predictions_top_k_test = {}
         predictions_top_k_val = {}
-        all_embeddings = self._model.propagate_embeddings(evaluate=True)
-        gu, gi = torch.split(all_embeddings, [self.num_users, self.num_items], 0)
+        gu, gi = self._model.propagate_embeddings(evaluate=True)
         gu, gi = torch.reshape(gu, (gu.shape[0], gu.shape[1] * gu.shape[2])), torch.reshape(gi, (
             gi.shape[0], gi.shape[1] * gi.shape[2]))
         for index, offset in enumerate(range(0, self._num_users, self._batch_size)):
