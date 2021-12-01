@@ -103,8 +103,7 @@ class DGCFModel(torch.nn.Module, ABC):
             self.dgcf_network.train()
 
         all_embeddings = sum(all_embeddings)
-        gu, gi = torch.split(all_embeddings, [self.num_users, self.num_items], 0)
-        return gu, gi
+        return all_embeddings
 
     def forward(self, inputs, **kwargs):
         gu, gi = inputs
@@ -119,7 +118,18 @@ class DGCFModel(torch.nn.Module, ABC):
         return torch.matmul(gu.to(self.device), torch.transpose(gi.to(self.device), 0, 1))
 
     def train_step(self, batch):
-        gu, gi = self.propagate_embeddings()
+        all_embeddings = self.propagate_embeddings()
+
+        # independence loss
+        loss_ind = 0.0
+        for intent in range(self.intents):
+            for intent_p in range(self.intents):
+                if intent != intent_p:
+                    loss_ind += (torch.cov((all_embeddings[:, intent], all_embeddings[:, intent_p])) / (
+                        torch.sqrt(torch.var(all_embeddings[:, intent]) * torch.var(all_embeddings[:, intent_p]))))
+
+        # bpr loss
+        gu, gi = torch.split(all_embeddings, [self.num_users, self.num_items], 0)
         gu, gi = torch.reshape(gu, (gu.shape[0], gu.shape[1] * gu.shape[2])), torch.reshape(gi, (
             gi.shape[0], gi.shape[1] * gi.shape[2]))
         user, pos, neg = batch
@@ -132,6 +142,8 @@ class DGCFModel(torch.nn.Module, ABC):
                                torch.norm(self.Gi, 2)) * 2
         loss_bpr += reg_loss
 
+        # sum and optimize according to the overall loss
+        loss = loss_bpr + loss_ind
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
