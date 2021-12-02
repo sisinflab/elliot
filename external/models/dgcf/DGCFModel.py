@@ -29,7 +29,6 @@ class DGCFModel(torch.nn.Module, ABC):
                  intents,
                  routing_iterations,
                  edge_index,
-                 edge_index_unbiased,
                  random_seed,
                  name="DGCF",
                  **kwargs
@@ -50,7 +49,6 @@ class DGCFModel(torch.nn.Module, ABC):
         self.intents = intents
         self.routing_iterations = routing_iterations
         self.edge_index = torch.tensor(edge_index, dtype=torch.int64)
-        self.edge_index_unbiased = torch.tensor(edge_index_unbiased, dtype=torch.int64)
         self.edge_index_intents = torch.ones((self.intents, self.edge_index.shape[1]), dtype=torch.float32)
 
         self.Gu = torch.nn.Parameter(
@@ -74,7 +72,9 @@ class DGCFModel(torch.nn.Module, ABC):
         ego_embeddings = torch.reshape(torch.cat((self.Gu.to(self.device), self.Gi.to(self.device)), 0),
                                        (self.num_users + self.num_items, self.intents, self.embed_k // self.intents))
         all_embeddings = [ego_embeddings]
-        row, col = self.edge_index_unbiased
+        current_egde_index = self.edge_index.clone()
+        row, col = current_egde_index
+        col -= self.num_users
 
         for layer in range(self.n_layers):
             current_edge_index_intents = self.edge_index_intents.to(self.device)
@@ -84,22 +84,23 @@ class DGCFModel(torch.nn.Module, ABC):
                 if not evaluate:
                     current_embeddings = list(
                         self.dgcf_network.children()
-                    )[layer](all_embeddings[layer].to(self.device),
-                             self.edge_index.to(self.device),
-                             current_edge_index_intents.to(self.device))
+                    )[0][layer](all_embeddings[layer].to(self.device),
+                                self.edge_index.to(self.device),
+                                current_edge_index_intents.to(self.device))
                     current_t_gu, _ = torch.split(current_embeddings, [self.num_users, self.num_items], 0)
-                    current_edge_index_intents = current_edge_index_intents.clone() + torch.sum(
-                        current_t_gu[row].to(self.device) * torch.tanh(current_0_gi[col].to(self.device)).to(
-                            self.device),
-                        dim=-1).permute(1, 0)
+                    with torch.no_grad():  # the update is done manually, the tensor is not learned during the training
+                        current_edge_index_intents = current_edge_index_intents.clone() + torch.sum(
+                            current_t_gu[row].to(self.device) * torch.tanh(current_0_gi[col].to(self.device)).to(
+                                self.device),
+                            dim=-1).permute(1, 0)
                 else:
                     self.dgcf_network.eval()
                     with torch.no_grad():
                         current_embeddings = list(
                             self.dgcf_network.children()
-                        )[layer](all_embeddings[layer].to(self.device),
-                                 self.edge_index.to(self.device),
-                                 current_edge_index_intents.to(self.device))
+                        )[0][layer](all_embeddings[layer].to(self.device),
+                                    self.edge_index.to(self.device),
+                                    current_edge_index_intents.to(self.device))
                         current_t_gu, _ = torch.split(current_embeddings, [self.num_users, self.num_items], 0)
                         current_edge_index_intents = current_edge_index_intents.clone() + torch.sum(
                             current_t_gu[row].to(self.device) * torch.tanh(current_0_gi[col].to(self.device)).to(

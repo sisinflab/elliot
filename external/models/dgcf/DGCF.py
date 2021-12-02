@@ -78,7 +78,6 @@ class DGCF(RecMixin, BaseRecommenderModel):
         self.autoset_params()
 
         row, col = data.sp_i_train.nonzero()
-        self.edge_index_unbiased = np.array([row, col])
         col = [c + self._num_users for c in col]
         self.edge_index = np.array([row, col])
 
@@ -94,7 +93,6 @@ class DGCF(RecMixin, BaseRecommenderModel):
             intents=self._intents,
             routing_iterations=self._routing_iterations,
             edge_index=self.edge_index,
-            edge_index_unbiased=self.edge_index_unbiased,
             random_seed=self._seed
         )
 
