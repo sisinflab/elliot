@@ -142,8 +142,7 @@ class DGCFModel(torch.nn.Module, ABC):
 
         return sampled_users, sampled_items
 
-    @staticmethod
-    def get_loss_ind(x1, x2):
+    def get_loss_ind(self, x1, x2):
         # reference: https://recbole.io/docs/_modules/recbole/model/general_recommender/dgcf.html
         def _create_centered_distance(x):
             r = torch.sum(x * x, dim=1, keepdim=True)
@@ -161,18 +160,19 @@ class DGCFModel(torch.nn.Module, ABC):
             dcov = torch.sqrt(v + 1e-8)
             return dcov
 
-        D1 = _create_centered_distance(x1)
-        D2 = _create_centered_distance(x2)
+        with torch.cuda.device(self.device):
+            D1 = _create_centered_distance(x1)
+            D2 = _create_centered_distance(x2)
 
-        dcov_12 = _create_distance_covariance(D1, D2)
-        dcov_11 = _create_distance_covariance(D1, D1)
-        dcov_22 = _create_distance_covariance(D2, D2)
+            dcov_12 = _create_distance_covariance(D1, D2)
+            dcov_11 = _create_distance_covariance(D1, D1)
+            dcov_22 = _create_distance_covariance(D2, D2)
 
-        # calculate the distance correlation
-        value = dcov_11 * dcov_22
-        zero_value = torch.zeros_like(value)
-        value = torch.where(value > 0.0, value, zero_value)
-        loss_ind = dcov_12 / (torch.sqrt(value) + 1e-10)
+            # calculate the distance correlation
+            value = dcov_11 * dcov_22
+            zero_value = torch.zeros_like(value)
+            value = torch.where(value > 0.0, value, zero_value)
+            loss_ind = dcov_12 / (torch.sqrt(value) + 1e-10)
         return loss_ind
 
     def train_step(self, batch):
