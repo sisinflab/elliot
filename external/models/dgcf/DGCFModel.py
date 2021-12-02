@@ -142,7 +142,8 @@ class DGCFModel(torch.nn.Module, ABC):
 
         return sampled_users, sampled_items
 
-    def get_loss_ind(self, x1, x2):
+    @staticmethod
+    def get_loss_ind(x1, x2):
         # reference: https://recbole.io/docs/_modules/recbole/model/general_recommender/dgcf.html
         def _create_centered_distance(x):
             r = torch.sum(x * x, dim=1, keepdim=True)
@@ -160,12 +161,12 @@ class DGCFModel(torch.nn.Module, ABC):
             dcov = torch.sqrt(v + 1e-8)
             return dcov
 
-        D1 = _create_centered_distance(x1.to(self.device))
-        D2 = _create_centered_distance(x2.to(self.device))
+        D1 = _create_centered_distance(x1)
+        D2 = _create_centered_distance(x2)
 
-        dcov_12 = _create_distance_covariance(D1.to(self.device), D2.to(self.device))
-        dcov_11 = _create_distance_covariance(D1.to(self.device), D1.to(self.device))
-        dcov_22 = _create_distance_covariance(D2.to(self.device), D2.to(self.device))
+        dcov_12 = _create_distance_covariance(D1, D2)
+        dcov_11 = _create_distance_covariance(D1, D1)
+        dcov_22 = _create_distance_covariance(D2, D2)
 
         # calculate the distance correlation
         value = dcov_11 * dcov_22
