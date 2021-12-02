@@ -19,6 +19,7 @@ class KGFlexTFModel(keras.Model):
     def __init__(self,
                  num_users,
                  num_items,
+                 user_feature_weights,
                  user_item_features,
                  num_features,
                  factors=10,
@@ -34,8 +35,7 @@ class KGFlexTFModel(keras.Model):
 
         self.initializer = tf.initializers.RandomNormal(stddev=0.1)
 
-        self.K = tf.Variable(self.initializer(shape=[self.num_users, self.num_features]), name='H', dtype=tf.float32,
-                             trainable=False)
+        self.K = user_feature_weights
         self.H = tf.Variable(self.initializer(shape=[self.num_users, self._factors]), name='H', dtype=tf.float32)
         self.G = tf.Variable(self.initializer(shape=[self.num_features, self._factors]), name='G', dtype=tf.float32)
         self.C = user_item_features
@@ -120,6 +120,6 @@ class KGFlexTFModel(keras.Model):
         """
         return tf.reduce_sum(tf.gather(tf.gather(A, user), tf.gather(self.C, user)), axis=-1)
 
-    @tf.function
+    #@tf.function
     def get_top_k(self, preds, train_mask, k=100):
         return tf.nn.top_k(tf.where(train_mask, preds, -np.inf), k=k, sorted=True)

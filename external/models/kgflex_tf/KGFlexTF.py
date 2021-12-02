@@ -84,6 +84,9 @@ class KGFlexTF(RecMixin, BaseRecommenderModel):
 
         self.logger.info('FEATURES INFO: {} features found'.format(len(features)))
 
+        user_feature_weights = tf.constant(
+            [[users_features[u].get(f, 0) for f in features] for u in self._data.private_users])
+
         item_features = []
         for _, v in self.item_features.items():
             common = set.intersection(set(feature_key_mapping.keys()), v)
@@ -107,6 +110,7 @@ class KGFlexTF(RecMixin, BaseRecommenderModel):
         # ------------------------------ MODEL ------------------------------
         self._model = KGFlexTFModel(num_users=self._data.num_users,
                                     num_items=self._data.num_items,
+                                    user_feature_weights=user_feature_weights,
                                     user_item_features=user_item_features,
                                     num_features=len(feature_key_mapping),
                                     factors=self._embedding,

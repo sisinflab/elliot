@@ -44,7 +44,8 @@ class UserFeatureMapper:
 
         arguments = args()
         with mp.Pool(processes=mp.cpu_count()) as pool:
-            results = pool.starmap(worker, tqdm(arguments, total=len(self._users)))
+            results = pool.starmap(worker, tqdm(arguments, total=len(self._users),
+                                                desc="Computing user features and entropy..."))
 
         return {u: f for u, f in results}
 

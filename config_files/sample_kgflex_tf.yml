@@ -35,7 +35,7 @@ experiment:
       seed: 42
       lr: 0.01
       epochs: 100
-      batch_size: 1000
+      batch_size: 64
       embedding: 10
       first_order_limit: 100
       second_order_limit: 100
