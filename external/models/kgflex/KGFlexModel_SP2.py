@@ -7,11 +7,12 @@ __version__ = '0.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malitesta@poliba.it'
 
-import time
 import pickle
+
+import tensorflow as tf
 import numpy as np
+import random
 from tqdm import tqdm
-from scipy.sparse import csr_matrix
 
 _RANDOM_SEED = 42
 
@@ -50,8 +51,6 @@ class KGFlexModel():
 
         # users features mask along embedding axis
         self.Me = np.repeat(self.Mu[:, :, np.newaxis], embedding_size, axis=2)
-
-
         # initialize users features vectors
         self.P = np.zeros((self._n_users, n_features, embedding_size))
         self.P[self.Me] = np.random.randn(*self.P[self.Me].shape) / 10
@@ -62,19 +61,6 @@ class KGFlexModel():
             for feature in users_features[u].keys():
                 self.K[u][feature_key_mapping[feature]] = users_features[u][feature]
 
-
-        self.P_sp = dict()
-        self.K_sp = dict()
-        for u in tqdm(range(self._n_users), desc='Sparse', total=self._n_users):
-            self.P_sp[u] = np.zeros((n_features, embedding_size))
-            self.P_sp[u][self.Me[u]] = np.random.randn(*self.P_sp[u][self.Me[u]].shape) / 10
-            self.P_sp[u] = csr_matrix(self.P_sp[u])
-
-            self.K_sp[u] = np.zeros(shape=n_features)
-            for feature, info_gain in users_features[u].items():
-                self.K_sp[u][feature_key_mapping[feature]] = info_gain
-            self.K_sp[u] = csr_matrix(self.K_sp[u])
-
         # item features mask
         self.Mi = np.zeros(shape=(self._n_items, n_features))
         for item, features in item_features_mapper.items():
@@ -83,6 +69,12 @@ class KGFlexModel():
                 if key:
                     self.Mi[item][key] = 1
         self.Mi = self.Mi.astype(bool)
+
+        self.P_sp = {u: np.random.randn(len(users_features[u]), self._embedding_size) / 10 for u in
+                     tqdm(range(self._n_users))}
+        self.u_f_i = {u: list(zip(list(map(feature_key_mapping.get, users_features[u].keys())), range(0, len(users_features[u])))) for u in tqdm(range(self._n_users))}
+        # self.K_sp = {u: }
+        # dict(zip(list(map(feature_key_mapping.get, users_features[0].keys())), range(len(users_features[0]))))
 
         # user item features
         self.user_item_features = dict()
@@ -97,43 +89,14 @@ class KGFlexModel():
 
         user, item = inputs
         user, item = np.array(user), np.array(item)
-
-        #p = self.P_sp[u][self.user_item_features[u][i]]
-
         return np.array(
             [np.sum(
                 (np.sum(
                     np.multiply(
-                        self.P_sp[u][self.user_item_features[u][i]].A, self.Gf[self.user_item_features[u][i], :]),
+                        self.P[u, self.user_item_features[u][i], :], self.Gf[self.user_item_features[u][i], :]),
                     axis=1) + self.Gb[self.user_item_features[u][i]]
-                 )
+                 ) * self.K[u][self.user_item_features[u][i]]
             ) for u, i in zip(user, item)])
-
-        # HYBRID SPARSE
-        # return np.array(
-        #     [np.sum(
-        #         (np.sum(
-        #             np.multiply(
-        #                 self.P_sp[u][self.user_item_features[u][i]].A, self.Gf[self.user_item_features[u][i], :]),
-        #             axis=1) + self.Gb[self.user_item_features[u][i]]
-        #          ) * self.K_sp[u].T[self.user_item_features[u][i]].A
-        #     ) for u, i in zip(user, item)])
-
-        # PURE SPARSE
-        # return np.array(
-        #     [np.sum((np.sum(csr_matrix.multiply(self.P_sp[u][self.user_item_features[u][i]],
-        #                                         self.Gf[self.user_item_features[u][i]]), axis=1).A1 + self.Gb[
-        #                  self.user_item_features[u][i]]) * self.K[u][self.user_item_features[u][i]]) for u, i in
-        #      zip(user, item)])
-        # DENSE
-        # return np.array(
-        #     [np.sum(
-        #         (np.sum(
-        #             np.multiply(
-        #                 self.P[u, self.user_item_features[u][i], :], self.Gf[self.user_item_features[u][i], :]),
-        #             axis=1) + self.Gb[self.user_item_features[u][i]]
-        #          ) * self.K[u][self.user_item_features[u][i]]
-        #     ) for u, i in zip(user, item)])
 
     def train_step(self, batch):
 
@@ -142,10 +105,8 @@ class KGFlexModel():
         user = user[:, 0]
         pos = pos[:, 0]
         neg = neg[:, 0]
-        call1 = time.perf_counter()
         x_p = self(user, pos)
         x_n = self(user, neg)
-        print(f'Calls: {time.perf_counter() - call1}')
         x_pn = np.subtract(x_p, x_n)
         d_loss = (1 / (1 + np.exp(x_pn)))
 
@@ -160,42 +121,13 @@ class KGFlexModel():
             f_n = indexes_n[mask_neg]
 
             # updates
-            #DENSE
-            # self.P[us_, f_p] += self._learning_rate * self.Gf[f_p] * self.K[us_][f_p][:, np.newaxis] * d_loss_
-            # self.P[us_, f_n] += self._learning_rate * self.Gf[f_n] * -self.K[us_][f_n][:, np.newaxis] * d_loss_
-            # self.Gf[f_p] += self._learning_rate * self.P[us_, f_p] * self.K[us_][f_p][:, np.newaxis] * d_loss_
-            # self.Gf[f_n] += self._learning_rate * self.P[us_, f_n] * -self.K[us_][f_n][:, np.newaxis] * d_loss_
-            # self.Gb[f_p] += self._learning_rate * self.K[us_][f_p] * d_loss_
-            # self.Gb[f_n] += self._learning_rate * -self.K[us_][f_n] * d_loss_
+            self.P[us_, f_p] += self._learning_rate * self.Gf[f_p] * self.K[us_][f_p][:, np.newaxis] * d_loss_
+            self.Gf[f_p] += self._learning_rate * self.P[us_, f_p] * self.K[us_][f_p][:, np.newaxis] * d_loss_
+            self.Gb[f_p] += self._learning_rate * self.K[us_][f_p] * d_loss_
 
-
-            # SPARSE
-            # k_f_p = self.K_sp[us_].T[f_p] * d_loss_ * self._learning_rate
-            # k_f_n = self.K_sp[us_].T[f_n] * d_loss_ * self._learning_rate
-            # self.P_sp[us_][f_p] += k_f_p.multiply(self.Gf[f_p])
-            # self.P_sp[us_][f_n] += k_f_n.multiply(self.Gf[f_n])
-            # self.Gf[f_p] += k_f_p.multiply(self.P_sp[us_][f_p])
-            # self.Gf[f_n] += k_f_n.multiply(self.P_sp[us_][f_n])
-            # self.Gb[f_p] += k_f_p.todense().A1
-            # self.Gb[f_n] += k_f_n.todense().A1
-
-            # self.P_sp[us_][f_p] += (self.K_sp[us_].T[f_p] * d_loss_).multiply(self._learning_rate * self.Gf[f_p])
-            # self.P_sp[us_][f_n] += (self.K_sp[us_].T[f_n] * d_loss_).multiply(self._learning_rate * self.Gf[f_n])
-            # self.Gf[f_p] += (self.K_sp[us_].T[f_p] * d_loss_).multiply(self._learning_rate * self.P_sp[us_][f_p])
-            # self.Gf[f_n] += (self.K_sp[us_].T[f_n] * d_loss_).multiply(self._learning_rate * self.P_sp[us_][f_n])
-            # self.Gb[f_p] += (self.K_sp[us_].T[f_p] * d_loss_).todense().A1
-            # self.Gb[f_n] += (self.K_sp[us_].T[f_n] * d_loss_).todense().A1
-
-            #MIXED
-            k_f_p = self.K_sp[us_].todense().A1[f_p] * d_loss_ * self._learning_rate
-            k_f_n = self.K_sp[us_].todense().A1[f_n] * d_loss_ * self._learning_rate
-            p_u = self.P_sp[us_].todense().A
-            self.P_sp[us_][f_p] += self.Gf[f_p] * k_f_p[:, np.newaxis]
-            self.P_sp[us_][f_n] += self.Gf[f_n] * k_f_n[:, np.newaxis]
-            self.Gf[f_p] += p_u[f_p] * k_f_p[:, np.newaxis]
-            self.Gf[f_n] += p_u[f_n] * k_f_n[:, np.newaxis]
-            self.Gb[f_p] += k_f_p
-            self.Gb[f_n] += k_f_n
+            self.P[us_, f_n] += self._learning_rate * self.Gf[f_n] * -self.K[us_][f_n][:, np.newaxis] * d_loss_
+            self.Gf[f_n] += self._learning_rate * self.P[us_, f_n] * -self.K[us_][f_n][:, np.newaxis] * d_loss_
+            self.Gb[f_n] += self._learning_rate * -self.K[us_][f_n] * d_loss_
 
             loss += d_loss_
         return loss

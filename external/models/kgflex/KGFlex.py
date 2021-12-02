@@ -9,7 +9,7 @@ from elliot.recommender.recommender_utils_mixin import RecMixin
 from elliot.dataset.samplers import custom_sampler as cs
 
 from .UserFeatureMapper import UserFeatureMapper
-from .KGFlexModel_sp import KGFlexModel
+from .KGFlexModel_SP2 import KGFlexModel
 
 class KGFlex(RecMixin, BaseRecommenderModel):
 
@@ -120,4 +120,4 @@ class KGFlex(RecMixin, BaseRecommenderModel):
                     loss += self._model.train_step(batch)
                     t.set_postfix({'loss': f'{loss / steps:.5f}'})
                     t.update()
-            self.evaluate(it, loss)
+            #self.evaluate(it, loss)
