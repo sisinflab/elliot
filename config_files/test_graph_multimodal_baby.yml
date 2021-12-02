@@ -16,7 +16,7 @@ experiment:
     simple_metrics: [Recall]
     wilcoxon_test: False
     paired_ttest: False
-  gpu: 1
+  gpu: 0
   external_models_path: ../external/models/__init__.py
   models:
     external.DGCF:
@@ -27,16 +27,21 @@ experiment:
         save_recs: True
         validation_metric: Recall
         restore: False
-      lr: 0.0005
+      lr: [0.0001, 0.005]
       epochs: 50
       batch_size: 512
       factors: 64
-      l_w_bpr: 0.1
-      l_w_ind: 0.1
+      l_w_bpr: [10e-3, 10e-5]
+      l_w_ind: [10e-3, 10e-5]
       ind_batch_size: 512
-      n_layers: 3
-      intents: 16
+      n_layers: [2, 3]
+      intents: 4
       routing_iterations: 2
+      early_stopping:
+        patience: 50
+        monitor: Recall@20
+        mode: auto
+        verbose: True
 #    external.LGACN:
 #      meta:
 #        validation_rate: 1
