@@ -145,20 +145,22 @@ class DGCFModel(torch.nn.Module, ABC):
     def get_loss_ind(self, x1, x2):
         # reference: https://recbole.io/docs/_modules/recbole/model/general_recommender/dgcf.html
         def _create_centered_distance(x):
-            r = torch.sum(x * x, dim=1, keepdim=True)
-            v = r - 2 * torch.mm(x, x.T + r.T)
-            z_v = torch.zeros_like(v)
-            v = torch.where(v > 0.0, v, z_v)
-            D = torch.sqrt(v + 1e-8)
-            D = D - torch.mean(D, dim=0, keepdim=True) - torch.mean(D, dim=1, keepdim=True) + torch.mean(D)
-            return D
+            with torch.cuda.device(self.device):
+                r = torch.sum(x * x, dim=1, keepdim=True)
+                v = r - 2 * torch.mm(x, x.T + r.T)
+                z_v = torch.zeros_like(v)
+                v = torch.where(v > 0.0, v, z_v)
+                D = torch.sqrt(v + 1e-8)
+                D = D - torch.mean(D, dim=0, keepdim=True) - torch.mean(D, dim=1, keepdim=True) + torch.mean(D)
+                return D
 
         def _create_distance_covariance(d1, d2):
-            v = torch.sum(d1 * d2) / (d1.shape[0] * d1.shape[0])
-            z_v = torch.zeros_like(v)
-            v = torch.where(v > 0.0, v, z_v)
-            dcov = torch.sqrt(v + 1e-8)
-            return dcov
+            with torch.cuda.device(self.device):
+                v = torch.sum(d1 * d2) / (d1.shape[0] * d1.shape[0])
+                z_v = torch.zeros_like(v)
+                v = torch.where(v > 0.0, v, z_v)
+                dcov = torch.sqrt(v + 1e-8)
+                return dcov
 
         with torch.cuda.device(self.device):
             D1 = _create_centered_distance(x1)
@@ -173,7 +175,7 @@ class DGCFModel(torch.nn.Module, ABC):
             zero_value = torch.zeros_like(value)
             value = torch.where(value > 0.0, value, zero_value)
             loss_ind = dcov_12 / (torch.sqrt(value) + 1e-10)
-        return loss_ind
+            return loss_ind
 
     def train_step(self, batch):
         gu, gi = self.propagate_embeddings()
