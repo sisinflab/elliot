@@ -178,21 +178,20 @@ class DGCFModel(torch.nn.Module, ABC):
     def train_step(self, batch):
         gu, gi = self.propagate_embeddings()
 
-        # independence loss
-        loss_ind = torch.tensor(0.0)
-        loss_ind.to(self.device)
-        if self.intents > 1 and self.l_w_ind > 1e-9:
-            sampled_users, sampled_items = self.sample_users_items_for_loss_ind()
-            sampled_users.to(self.device)
-            sampled_items.to(self.device)
-            gu_sampled = gu[sampled_users]
-            gi_sampled = gi[sampled_items]
-            sampled_embeddings = torch.cat((gu_sampled, gi_sampled), dim=0)
-            for intent in range(self.intents - 1):
-                loss_ind += self.get_loss_ind(sampled_embeddings[:, intent].to(self.device),
-                                              sampled_embeddings[:, intent + 1].to(self.device))
-            loss_ind /= ((self.intents + 1.0) * self.intents / 2)
-            loss_ind *= self.l_w_ind
+        with torch.cuda.device(self.device):
+            # independence loss
+            loss_ind = torch.tensor(0.0)
+            if self.intents > 1 and self.l_w_ind > 1e-9:
+                sampled_users, sampled_items = self.sample_users_items_for_loss_ind()
+                sampled_users.to(self.device)
+                sampled_items.to(self.device)
+                gu_sampled = gu[sampled_users]
+                gi_sampled = gi[sampled_items]
+                sampled_embeddings = torch.cat((gu_sampled, gi_sampled), dim=0)
+                for intent in range(self.intents - 1):
+                    loss_ind += self.get_loss_ind(sampled_embeddings[:, intent], sampled_embeddings[:, intent + 1])
+                loss_ind /= ((self.intents + 1.0) * self.intents / 2)
+                loss_ind *= self.l_w_ind
 
         # bpr loss
         gu, gi = torch.reshape(gu, (gu.shape[0], gu.shape[1] * gu.shape[2])), torch.reshape(gi, (
