@@ -84,9 +84,9 @@ class DGCFModel(torch.nn.Module, ABC):
                 if not evaluate:
                     current_embeddings = list(
                         self.dgcf_network.children()
-                    )[0][layer](all_embeddings[layer].to(self.device),
-                                self.edge_index.to(self.device),
-                                current_edge_index_intents.to(self.device))
+                    )[layer](all_embeddings[layer].to(self.device),
+                             self.edge_index.to(self.device),
+                             current_edge_index_intents.to(self.device))
                     current_t_gu, _ = torch.split(current_embeddings, [self.num_users, self.num_items], 0)
                     with torch.no_grad():  # the update is done manually, the tensor is not learned during the training
                         current_edge_index_intents = current_edge_index_intents.clone() + torch.sum(
@@ -98,9 +98,9 @@ class DGCFModel(torch.nn.Module, ABC):
                     with torch.no_grad():
                         current_embeddings = list(
                             self.dgcf_network.children()
-                        )[0][layer](all_embeddings[layer].to(self.device),
-                                    self.edge_index.to(self.device),
-                                    current_edge_index_intents.to(self.device))
+                        )[layer](all_embeddings[layer].to(self.device),
+                                 self.edge_index.to(self.device),
+                                 current_edge_index_intents.to(self.device))
                         current_t_gu, _ = torch.split(current_embeddings, [self.num_users, self.num_items], 0)
                         current_edge_index_intents = current_edge_index_intents.clone() + torch.sum(
                             current_t_gu[row].to(self.device) * torch.tanh(current_0_gi[col].to(self.device)).to(
