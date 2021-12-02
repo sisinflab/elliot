@@ -188,7 +188,8 @@ class DGCFModel(torch.nn.Module, ABC):
             gi_sampled = gi[sampled_items]
             sampled_embeddings = torch.cat((gu_sampled, gi_sampled), dim=0)
             for intent in range(self.intents - 1):
-                loss_ind += self.get_loss_ind(sampled_embeddings[:, intent], sampled_embeddings[:, intent + 1])
+                loss_ind += self.get_loss_ind(sampled_embeddings[:, intent].to(self.device),
+                                              sampled_embeddings[:, intent + 1].to(self.device))
             loss_ind /= ((self.intents + 1.0) * self.intents / 2)
             loss_ind *= self.l_w_ind
 
