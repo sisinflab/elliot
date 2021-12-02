@@ -32,7 +32,7 @@ class KGFlexTFModel(keras.Model):
         self.num_features = num_features
         self._factors = factors
 
-        self.initializer = tf.initializers.GlorotUniform()
+        self.initializer = tf.initializers.RandomNormal(stddev=0.1)
 
         self.K = tf.Variable(self.initializer(shape=[self.num_users, self.num_features]), name='H', dtype=tf.float32,
                              trainable=False)

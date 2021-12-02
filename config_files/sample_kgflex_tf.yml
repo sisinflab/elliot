@@ -1,9 +1,9 @@
 experiment:
   dataset: yahoo_movies
   data_config:
-    strategy: fixed
-    train_path: ../data/{0}/trainingset.tsv
-    test_path: ../data/{0}/testset.tsv
+    strategy: dataset
+    dataset_path: ../data/{0}/dataset.tsv
+    #test_path: ../data/{0}/testset.tsv
     side_information:
       - dataloader: KGFlexLoader
         mapping: ../data/{0}/mapping.tsv
@@ -14,10 +14,10 @@ experiment:
   prefiltering:
     strategy: iterative_k_core
     core: 10
-#  splitting:
-#    test_splitting:
-#        strategy: random_subsampling
-#        test_ratio: 0.2
+  splitting:
+    test_splitting:
+        strategy: random_subsampling
+        test_ratio: 0.2
   top_k: 10
   gpu: 0
   external_models_path: ../external/models/__init__.py
@@ -28,7 +28,7 @@ experiment:
     external.KGFlexTF:
       meta:
         verbose: True
-        validation_rate: 1
+        validation_rate: 10
         save_recs: False
         save_weights: True
         restore: False
@@ -37,6 +37,6 @@ experiment:
       epochs: 100
       batch_size: 1000
       embedding: 10
-      first_order_limit: 10
-      second_order_limit: 10
+      first_order_limit: 100
+      second_order_limit: 100
       loader: KGFlexLoader
