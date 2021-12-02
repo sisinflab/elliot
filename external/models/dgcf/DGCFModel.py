@@ -145,55 +145,52 @@ class DGCFModel(torch.nn.Module, ABC):
     def get_loss_ind(self, x1, x2):
         # reference: https://recbole.io/docs/_modules/recbole/model/general_recommender/dgcf.html
         def _create_centered_distance(x):
-            with torch.cuda.device(self.device):
-                r = torch.sum(x * x, dim=1, keepdim=True)
-                v = r - 2 * torch.mm(x, x.T + r.T)
-                z_v = torch.zeros_like(v)
-                v = torch.where(v > 0.0, v, z_v)
-                D = torch.sqrt(v + 1e-8)
-                D = D - torch.mean(D, dim=0, keepdim=True) - torch.mean(D, dim=1, keepdim=True) + torch.mean(D)
-                return D
+            r = torch.sum(x * x, dim=1, keepdim=True)
+            v = r - 2 * torch.mm(x, x.T + r.T)
+            z_v = torch.zeros_like(v)
+            v = torch.where(v > 0.0, v, z_v)
+            D = torch.sqrt(v + 1e-8)
+            D = D - torch.mean(D, dim=0, keepdim=True) - torch.mean(D, dim=1, keepdim=True) + torch.mean(D)
+            return D
 
         def _create_distance_covariance(d1, d2):
-            with torch.cuda.device(self.device):
-                v = torch.sum(d1 * d2) / (d1.shape[0] * d1.shape[0])
-                z_v = torch.zeros_like(v)
-                v = torch.where(v > 0.0, v, z_v)
-                dcov = torch.sqrt(v + 1e-8)
-                return dcov
+            v = torch.sum(d1 * d2) / (d1.shape[0] * d1.shape[0])
+            z_v = torch.zeros_like(v)
+            v = torch.where(v > 0.0, v, z_v)
+            dcov = torch.sqrt(v + 1e-8)
+            return dcov
 
-        with torch.cuda.device(self.device):
-            D1 = _create_centered_distance(x1)
-            D2 = _create_centered_distance(x2)
+        D1 = _create_centered_distance(x1.to(self.device))
+        D2 = _create_centered_distance(x2.to(self.device))
 
-            dcov_12 = _create_distance_covariance(D1, D2)
-            dcov_11 = _create_distance_covariance(D1, D1)
-            dcov_22 = _create_distance_covariance(D2, D2)
+        dcov_12 = _create_distance_covariance(D1.to(self.device), D2.to(self.device))
+        dcov_11 = _create_distance_covariance(D1.to(self.device), D1.to(self.device))
+        dcov_22 = _create_distance_covariance(D2.to(self.device), D2.to(self.device))
 
-            # calculate the distance correlation
-            value = dcov_11 * dcov_22
-            zero_value = torch.zeros_like(value)
-            value = torch.where(value > 0.0, value, zero_value)
-            loss_ind = dcov_12 / (torch.sqrt(value) + 1e-10)
-            return loss_ind
+        # calculate the distance correlation
+        value = dcov_11 * dcov_22
+        zero_value = torch.zeros_like(value)
+        value = torch.where(value > 0.0, value, zero_value)
+        loss_ind = dcov_12 / (torch.sqrt(value) + 1e-10)
+        return loss_ind
 
     def train_step(self, batch):
         gu, gi = self.propagate_embeddings()
 
-        with torch.cuda.device(self.device):
-            # independence loss
-            loss_ind = torch.tensor(0.0)
-            if self.intents > 1 and self.l_w_ind > 1e-9:
-                sampled_users, sampled_items = self.sample_users_items_for_loss_ind()
-                sampled_users.to(self.device)
-                sampled_items.to(self.device)
-                gu_sampled = gu[sampled_users]
-                gi_sampled = gi[sampled_items]
-                sampled_embeddings = torch.cat((gu_sampled, gi_sampled), dim=0)
-                for intent in range(self.intents - 1):
-                    loss_ind += self.get_loss_ind(sampled_embeddings[:, intent], sampled_embeddings[:, intent + 1])
-                loss_ind /= ((self.intents + 1.0) * self.intents / 2)
-                loss_ind *= self.l_w_ind
+        # independence loss
+        loss_ind = torch.tensor(0.0)
+        if self.intents > 1 and self.l_w_ind > 1e-9:
+            sampled_users, sampled_items = self.sample_users_items_for_loss_ind()
+            sampled_users.to(self.device)
+            sampled_items.to(self.device)
+            gu_sampled = gu[sampled_users]
+            gi_sampled = gi[sampled_items]
+            sampled_embeddings = torch.cat((gu_sampled.to(self.device), gi_sampled.to(self.device)), dim=0)
+            for intent in range(self.intents - 1):
+                loss_ind += self.get_loss_ind(sampled_embeddings[:, intent].to(self.device),
+                                              sampled_embeddings[:, intent + 1].to(self.device))
+            loss_ind /= ((self.intents + 1.0) * self.intents / 2)
+            loss_ind *= self.l_w_ind
 
         # bpr loss
         gu, gi = torch.reshape(gu, (gu.shape[0], gu.shape[1] * gu.shape[2])), torch.reshape(gi, (
