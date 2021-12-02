@@ -180,6 +180,7 @@ class DGCFModel(torch.nn.Module, ABC):
 
         # independence loss
         loss_ind = torch.tensor(0.0)
+        loss_ind.to(self.device)
         if self.intents > 1 and self.l_w_ind > 1e-9:
             sampled_users, sampled_items = self.sample_users_items_for_loss_ind()
             sampled_users.to(self.device)
