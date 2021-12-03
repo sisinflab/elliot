@@ -84,7 +84,7 @@ class KGFlex(RecMixin, BaseRecommenderModel):
                                   n_items=self._data.num_items,
                                   n_features=len(features),
                                   feature_key_mapping=feature_key_mapping,
-                                  item_features_mapper=item_features_selected,
+                                  item_features=item_features_selected,
                                   embedding_size=embedding,
                                   users_features=users_features,
                                   data=self._data)

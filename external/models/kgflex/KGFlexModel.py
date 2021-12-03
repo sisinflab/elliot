@@ -4,30 +4,25 @@ Module description:
 """
 
 __version__ = '0.1'
-__author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta'
-__email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malitesta@poliba.it'
+__author__ = 'Vito Walter Anelli, Antonio Ferrara, Alberto Carlo Maria Mancino'
+__email__ = 'vitowalter.anelli@poliba.it, antonio.ferrara@poliba.it, alberto.mancino@poliba.it'
 
 import pickle
 
-import tensorflow as tf
 import numpy as np
-import random
 from tqdm import tqdm
-
-_RANDOM_SEED = 42
 
 
 class KGFlexModel():
     def __init__(self,
                  data,
-                 learning_rate,
                  n_features,
-                 feature_key_mapping,
-                 item_features_mapper,
+                 learning_rate,
                  embedding_size,
                  users_features,
+                 item_features,
+                 feature_key_mapping,
                  **kwargs):
-
 
         self._data = data
         self._learning_rate = learning_rate
@@ -38,59 +33,50 @@ class KGFlexModel():
         self._n_features = n_features
         self._embedding_size = embedding_size
 
-        # Global features embeddings
+        # GLOBAL
+        # Global features embeddings and bias
         self.Gf = np.random.randn(n_features, embedding_size) / 10
         self.Gb = np.random.randn(n_features) / 10
 
-        # Personal features embeddings
+        # PERSONAL FEATURES
         # users features mask
-        self.Mu = np.zeros(shape=(self._n_users, n_features))
+        self.Mu = np.zeros(shape=(self._n_users, n_features)).astype(bool)
         for u, f in users_features.items():
-            self.Mu[u][list(map(feature_key_mapping.get, f))] = 1
-        self.Mu = self.Mu.astype(bool)
-
-        # users features mask along embedding axis
-        self.Me = np.repeat(self.Mu[:, :, np.newaxis], embedding_size, axis=2)
-        # initialize users features vectors
-        self.P = np.zeros((self._n_users, n_features, embedding_size))
-        self.P[self.Me] = np.random.randn(*self.P[self.Me].shape) / 10
-
-        # users constant weights
-        self.K = np.zeros(shape=(self._n_users, n_features))
-        for u in self._users:
-            for feature in users_features[u].keys():
-                self.K[u][feature_key_mapping[feature]] = users_features[u][feature]
+            self.Mu[u][list(map(feature_key_mapping.get, f))] = True
 
         # item features mask
-        self.Mi = np.zeros(shape=(self._n_items, n_features))
-        for item, features in item_features_mapper.items():
-            for f in features:
-                key = feature_key_mapping.get(f)
-                if key:
-                    self.Mi[item][key] = 1
-        self.Mi = self.Mi.astype(bool)
+        self.Mi = np.zeros(shape=(self._n_items, n_features)).astype(np.bool)
+        for i, row in enumerate(self.Mi):
+            self.Mi[i][list(map(feature_key_mapping.get, item_features[i]))] = True
+
+        # mapping global features indexing into user personal feature indexing
+        u_ft_idx = {u: dict(zip(map(feature_key_mapping.get, uf_), range(len(uf_)))) for u, uf_ in
+                    users_features.items()}
+
+        # personal feature embeddings
+        self.P_sp = {u: np.random.randn(len(users_features[u]), self._embedding_size) / 10 for u in
+                     range(self._n_users)}
+
+        # personal feature weights
+        self.K_sp = {u: np.array([ig for ig in fs.values()]) for u, fs in users_features.items()}
 
         # user item features
-        self.user_item_features = dict()
         self._n_features_range = np.array(range(self._n_features))
-        for u in tqdm(range(self._n_users), desc='user-item features'):
-            u_i = dict()
-            for i in range(self._n_items):
-                u_i[i] = self._n_features_range[np.multiply(self.Mu[u], self.Mi[i])]
-            self.user_item_features[u] = u_i
+        self.user_item_features = {u: {i: self._n_features_range[np.multiply(mu, mi)] for i, mi in enumerate(self.Mi)}
+                                   for u, mu in tqdm(enumerate(self.Mu), desc='user-item features', total=len(self.Mu))}
+
+        self.user_item_feature_idxs = {u: {i: list(map(u_ft_idx[u].get, f)) for i, f in its.items()} for u, its in
+                                       tqdm(self.user_item_features.items(), desc='user-item features indexed',
+                                            total=len(self.user_item_features))}
 
     def __call__(self, *inputs):
-
         user, item = inputs
         user, item = np.array(user), np.array(item)
         return np.array(
-            [np.sum(
-                (np.sum(
-                    np.multiply(
-                        self.P[u, self.user_item_features[u][i], :], self.Gf[self.user_item_features[u][i], :]),
-                    axis=1) + self.Gb[self.user_item_features[u][i]]
-                 ) * self.K[u][self.user_item_features[u][i]]
-            ) for u, i in zip(user, item)])
+            [np.sum((np.sum(
+                np.multiply(self.P_sp[u][self.user_item_feature_idxs[u][i]], self.Gf[self.user_item_features[u][i]]),
+                axis=1) + self.Gb[self.user_item_features[u][i]]) * self.K_sp[u][self.user_item_feature_idxs[u][i]])
+             for u, i in zip(user, item)])
 
     def train_step(self, batch):
 
@@ -104,24 +90,24 @@ class KGFlexModel():
         x_pn = np.subtract(x_p, x_n)
         d_loss = (1 / (1 + np.exp(x_pn)))
 
-        m_p = np.multiply(self.Mu[user], self.Mi[pos])
-        m_n = np.multiply(self.Mu[user], self.Mi[neg])
+        for us_, d_loss_, p, n in zip(user, d_loss, pos, neg):
+            f_p = self.user_item_features[us_][p]
+            f_n = self.user_item_features[us_][n]
 
-        indexes_p = np.array(range(self._n_features))
-        indexes_n = np.array(range(self._n_features))
+            f_p_sp = self.user_item_feature_idxs[us_][p]
+            f_n_sp = self.user_item_feature_idxs[us_][n]
 
-        for us_, mask_pos, mask_neg, d_loss_ in zip(user, m_p, m_n, d_loss):
-            f_p = indexes_p[mask_pos]
-            f_n = indexes_n[mask_neg]
+            p_term = d_loss_ * self.K_sp[us_][f_p_sp] * self._learning_rate
+            n_term = -d_loss_ * self.K_sp[us_][f_n_sp] * self._learning_rate
 
             # updates
-            self.P[us_, f_p] += self._learning_rate * self.Gf[f_p] * self.K[us_][f_p][:, np.newaxis] * d_loss_
-            self.Gf[f_p] += self._learning_rate * self.P[us_, f_p] * self.K[us_][f_p][:, np.newaxis] * d_loss_
-            self.Gb[f_p] += self._learning_rate * self.K[us_][f_p] * d_loss_
+            self.P_sp[us_][f_p_sp] += self.Gf[f_p] * p_term[:, np.newaxis]
+            self.Gf[f_p] += self.P_sp[us_][f_p_sp] * p_term[:, np.newaxis]
+            self.Gb[f_p] += p_term
 
-            self.P[us_, f_n] += self._learning_rate * self.Gf[f_n] * -self.K[us_][f_n][:, np.newaxis] * d_loss_
-            self.Gf[f_n] += self._learning_rate * self.P[us_, f_n] * -self.K[us_][f_n][:, np.newaxis] * d_loss_
-            self.Gb[f_n] += self._learning_rate * -self.K[us_][f_n] * d_loss_
+            self.P_sp[us_][f_n_sp] += self.Gf[f_n] * n_term[:, np.newaxis]
+            self.Gf[f_n] += self.P_sp[us_][f_n_sp] * n_term[:, np.newaxis]
+            self.Gb[f_n] += n_term
 
             loss += d_loss_
         return loss
@@ -130,19 +116,14 @@ class KGFlexModel():
 
         eval_items = list(range(self._n_items))
 
-        selfPu = self.P[user]
-        selfGf = self.Gf
-        selfGb = self.Gb
-        selfKu = self.K[user]
-        selfuser_item_featuresu = self.user_item_features[user]
-        return np.array(
-            [np.sum(
-                (np.sum(
-                    np.multiply(
-                        selfPu[ui], selfGf[ui]),
-                    axis=1) + selfGb[ui]
-                 ) * selfKu[ui]
-            ) for ui in [selfuser_item_featuresu[i] for i in eval_items]])
+        p = self.P_sp[user]
+        gf = self.Gf[self.Mu[user]]
+        gb = self.Gb[self.Mu[user]]
+        k = self.K_sp[user]
+
+        f_interactions = (np.sum(np.multiply(p, gf), axis=1) + gb) * k
+
+        return np.array([np.sum(f_interactions[self.user_item_feature_idxs[user][i]]) for i in eval_items])
 
     def get_user_recs(self, u, mask, k):
         user_id = self._data.public_users.get(u)
@@ -168,9 +149,8 @@ class KGFlexModel():
             '_global_features': self.Gf,
             '_global_bias': self.Gb,
             '_user_feature_mask': self.Mu,
-            'user_feature_mask_along_embedding': self.Me,
-            '_user_feature_embeddings': self.P,
-            '_user_feature_weights': self.K,
+            '_user_feature_embeddings': self.P_sp,
+            '_user_feature_weights': self.K_sp,
             '_item_feature_mask': self.Mi}
         return saving_dict
 
@@ -178,10 +158,9 @@ class KGFlexModel():
         self.Gf = saving_dict['_global_features']
         self.Gb = saving_dict['_global_bias']
         self.Mu = saving_dict['_user_feature_mask']
-        self.Me = saving_dict['user_feature_mask_along_embedding']
-        self.P = saving_dict['_user_feature_embeddings']
-        self.K = saving_dict['_user_feature_weights']
         self.Mi = saving_dict['_item_feature_mask']
+        self.P_sp = saving_dict['_user_feature_embeddings']
+        self.K_sp = saving_dict['_user_feature_weights']
 
     def load_weights(self, path):
         with open(path, "rb") as f:
