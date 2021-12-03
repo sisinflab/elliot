@@ -36,13 +36,13 @@ experiment:
 #    - metric: ExtendedF1
 #      metric_0: Precision
 #      metric_1: Recall
-  gpu: 1 # -1 is not use GPU
+  gpu: -1 # -1 is not use GPU
   models:
     external.CKE:
       meta:
         hyper_max_evals: 1
         hyper_opt_alg: tpe
-        validation_rate: 8
+        validation_rate: 1
         verbose: True
         save_weights: False
         save_recs: False

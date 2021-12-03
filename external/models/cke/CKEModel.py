@@ -89,89 +89,17 @@ class jtup(keras.Model):
                                                       embeddings_regularizer=keras.regularizers.l2(self.l2_lambda))
         self.item_embeddings(0)
 
-        #
-        #
-        #
-        # # transup
-        # self.user_embeddings = keras.layers.Embedding(input_dim=self.user_total, output_dim=self.embedding_size,
-        #                                               embeddings_initializer=initializer,
-        #                                               trainable=True, dtype=tf.float32,
-        #                                               embeddings_regularizer=keras.regularizers.l2(self.l2_lambda))
-        # self.user_embeddings(0)
-        # self.user_embeddings.weights[0] = tf.math.l2_normalize(self.user_embeddings.weights[0])
-        #
-        # self.item_embeddings = keras.layers.Embedding(input_dim=self.item_total, output_dim=self.embedding_size,
-        #                                               embeddings_initializer=initializer,
-        #                                               trainable=True, dtype=tf.float32,
-        #                                               embeddings_regularizer=keras.regularizers.l2(self.l2_lambda))
-        # self.item_embeddings(0)
-        # self.item_embeddings.weights[0] = tf.math.l2_normalize(self.item_embeddings.weights[0])
-        #
-        # self.pref_embeddings = keras.layers.Embedding(input_dim=self.rel_total, output_dim=self.embedding_size,
-        #                                               embeddings_initializer=initializer,
-        #                                               trainable=True, dtype=tf.float32,
-        #                                               embeddings_regularizer=keras.regularizers.l2(self.l2_lambda))
-        # self.pref_embeddings(0)
-        # self.pref_embeddings.weights[0] = tf.math.l2_normalize(self.pref_embeddings.weights[0])
-        #
-        # self.pref_norm_embeddings = keras.layers.Embedding(input_dim=self.rel_total, output_dim=self.embedding_size,
-        #                                                    embeddings_initializer=initializer,
-        #                                                    trainable=True, dtype=tf.float32,
-        #                                                    embeddings_regularizer=keras.regularizers.l2(self.l2_lambda))
-        # self.pref_norm_embeddings(0)
-        # self.pref_norm_embeddings.weights[0] = tf.math.l2_normalize(self.pref_norm_embeddings.weights[0])
-        #
-        # # transh
-        #
-        # ent_embeddings_w = tf.Variable(initial_value=initializer(shape=(self.ent_total, self.embedding_size)))
-        # ent_embeddings_w = tf.concat([tf.math.l2_normalize(ent_embeddings_w[:-1, :]), tf.zeros([1, self.embedding_size])], 0)
-        #
-        # self.ent_embeddings = keras.layers.Embedding(input_dim=self.ent_total, output_dim=self.embedding_size,
-        #                                              weights=[ent_embeddings_w],
-        #                                              trainable=True, dtype=tf.float32,
-        #                                              embeddings_regularizer=keras.regularizers.l2(self.l2_lambda))
-        # self.ent_embeddings(0)
-        #
-        # self.rel_embeddings = keras.layers.Embedding(input_dim=self.rel_total, output_dim=self.embedding_size,
-        #                                              embeddings_initializer=keras.initializers.GlorotNormal(),
-        #                                              trainable=True, dtype=tf.float32,
-        #                                              embeddings_regularizer=keras.regularizers.l2(self.l2_lambda))
-        # self.rel_embeddings(0)
-        # self.rel_embeddings.weights[0] = tf.math.l2_normalize(self.rel_embeddings.weights[0])
-        #
-        # self.norm_embeddings = keras.layers.Embedding(input_dim=self.rel_total, output_dim=self.embedding_size,
-        #                                               embeddings_initializer=keras.initializers.GlorotNormal(),
-        #                                               trainable=True, dtype=tf.float32,
-        #                                               embeddings_regularizer=keras.regularizers.l2(self.l2_lambda))
-        # self.norm_embeddings(0)
-        # self.norm_embeddings.weights[0] = tf.math.l2_normalize(self.norm_embeddings.weights[0])
-
         keys, values = tuple(zip(*self.new_map.items()))
         init = tf.lookup.KeyValueTensorInitializer(keys, values)
         self.paddingItems = tf.lookup.StaticHashTable(
             init,
             default_value=self.ent_total - 1)
-        # self.optimizer = tfa.optimizers.AdamW(learning_rate=self.learning_rate, weight_decay=)
         self.optimizer = tf.optimizers.Adam(self.learning_rate)
-        # self.one = tf.Variable(1.0)
-        # self.zero = tf.Variable(0.0)
+
 
     def get_config(self):
         raise NotImplementedError
 
-    # def convert_function(self, row):
-    #     return tf.math.reduce_mean(self.item_embedding.weights[0][row > 0], axis=0)
-
-    # def paddingItems(self, i_ids):
-    #     # i_ids, pad_index = input
-    #     padded_e_ids = []
-    #     pad_index = self.ent_total-1
-    #     for i_id in i_ids:
-    #         # new_index = self.i_map[i_id]
-    #         # ent_id = self.new_map[new_index][0]
-    #         ent_id = self.new_map[int(i_id)]
-    #         padded_e_ids.append([ent_id] if ent_id != -1 else [pad_index])
-    #     return np.array(padded_e_ids)
 
     @tf.function
     def call(self, inputs, training=None, **kwargs):
@@ -184,7 +112,7 @@ class jtup(keras.Model):
             e_e = self.ent_embeddings(tf.squeeze(e_var))
             ie_e = i_e + e_e
 
-            score = tf.reduce_sum(u_e * ie_e, axis=1)
+            score = tf.reduce_sum(u_e * ie_e, axis=-1)
 
         elif not kwargs['is_rec']:
 
@@ -205,6 +133,7 @@ class jtup(keras.Model):
 
         return score
 
+    @tf.function
     def getPreferences(self, u_e, i_e, use_st_gumbel=False):
         # use item and user embedding to compute preference distribution
         # pre_probs: batch * rel, or batch * item * rel
@@ -218,40 +147,12 @@ class jtup(keras.Model):
 
         return pre_probs, r_e, norm
 
-    # def projection_trans_h(self, original, norm):
-    #     return original - tf.reduce_sum(original * norm, axis=len(original.shape.as_list()) - 1, keepdims=True) * norm
-
+    @tf.function
     def projection_trans_r(self, original, trans_m):
         embedding_size = original.shape[0]
         rel_embedding_size = trans_m.shape[0] // embedding_size
         trans_resh = tf.reshape(trans_m, (embedding_size, rel_embedding_size))
         return tf.tensordot(original, trans_resh, axes=1)
-
-    # def st_gumbel_softmax(self, logits, temperature=1.0):
-    #     eps = 1e-20
-    #     u = tf.random.uniform(tf.shape(logits), dtype=tf.float32)
-    #     gumbel_noise = -tf.math.log(-tf.math.log(u + eps) + eps)
-    #     y = logits + gumbel_noise
-    #     y = self.masked_softmax(logits=y / temperature)
-    #     y_argmax = tf.argmax(y, axis=len(y.shape) - 1)
-    #     y_hard = self.convert_to_one_hot(
-    #         indices=y_argmax,
-    #         num_classes=tf.shape(y)[len(y.shape) - 1])
-    #
-    #     # gumbel_softmax_distribution_ = GumbelSoftmax(1.0, logits=logits, dtype=tf.float32)
-    #     # one_hot = gumbel_softmax_distribution_.convert_to_one_hot(logits)
-    #
-    #     y = tf.stop_gradient(y_hard - y) + y
-    #     return y
-    #
-    # def masked_softmax(self, logits):
-    #     eps = 1e-20
-    #     probs = tf.nn.softmax(logits, axis=len(logits.shape) - 1)
-    #     return probs
-    #
-    # def convert_to_one_hot(self, indices, num_classes):
-    #     one_hot = tf.one_hot(indices, num_classes)
-    #     return one_hot
 
     @tf.function
     def train_step_rec(self, batch, **kwargs):
@@ -307,24 +208,8 @@ class jtup(keras.Model):
             The matrix of predicted values.
         """
         u_ids, i_ids = inputs
-
         score = self.call(inputs=(u_ids, i_ids), training=False, is_rec=True, **kwargs)
 
-        # e_var = self.paddingItems.lookup(tf.squeeze(tf.cast(i_ids, tf.int32)))
-        # u_e = self.user_embeddings(u_ids)
-        # i_e = self.item_embeddings(i_ids)
-        # e_e = self.ent_embeddings(e_var)
-        # ie_e = i_e + e_e
-        #
-        # _, r_e, norm = self.getPreferences(u_e, ie_e)
-        #
-        # proj_u_e = self.projection_trans_h(u_e, norm)
-        # proj_i_e = self.projection_trans_h(ie_e, norm)
-        #
-        # if self.L1_flag:
-        #     score = tf.reduce_sum(tf.abs(proj_u_e + r_e - proj_i_e), -1)
-        # else:
-        #     score = tf.reduce_sum((proj_u_e + r_e - proj_i_e) ** 2, -1)
         return tf.squeeze(score)
 
     @tf.function
