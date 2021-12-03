@@ -16,7 +16,7 @@ experiment:
     simple_metrics: [Recall]
     wilcoxon_test: False
     paired_ttest: False
-  gpu: 0
+  gpu: 1
   external_models_path: ../external/models/__init__.py
   models:
 #    external.DGCF:
@@ -73,6 +73,7 @@ experiment:
       epochs: 400
       batch_size: 256
       factors: 64
+      trainable_edges: False
       node_edge_factors: 64
       weight_size_nodes: (64, 64)
       weight_size_edges: (64, 64)
