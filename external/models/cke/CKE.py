@@ -42,7 +42,7 @@ class CKE(RecMixin, BaseRecommenderModel):
 
         # autoset params
         self._params_list = [
-            ("_l2_lambda", "l2_lambda", "l2",  1e-5, None, None),
+            ("_l2_lambda", "l2_lambda", "l2", 1e-5, None, None),
             ("_embedding_size", "embedding_size", "es", 64, int, None),
             ("_learning_rate", "lr", "lr", 0.001, None, None),
             ("_joint_ratio", "joint_ratio", "jr", 0.7, None, None),
@@ -65,7 +65,8 @@ class CKE(RecMixin, BaseRecommenderModel):
 
         self._epoch_length = max(triple_epoch_length, rating_epoch_length)
         self._sampler = rs.Sampler(self._data.i_train_dict, self._epoch_length)
-        self._triple_sampler = ts.Sampler(self._side.entity_to_idx, self._side.Xs, self._side.Xp, self._side.Xo, self._epoch_length)
+        self._triple_sampler = ts.Sampler(self._side.entity_to_idx, self._side.Xs, self._side.Xp, self._side.Xo,
+                                          self._epoch_length)
 
         self._i_items_set = list(range(self._num_items))
 
@@ -107,7 +108,7 @@ class CKE(RecMixin, BaseRecommenderModel):
                         t.set_postfix({'loss KGC': f'{loss.numpy() / steps:.5f}'})
                         t.update()
 
-            self.evaluate(it, loss/(it + 1))
+            self.evaluate(it, loss / (it + 1))
 
     def get_recommendations(self, k: int = 100):
         predictions_top_k_test = {}

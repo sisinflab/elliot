@@ -77,7 +77,7 @@ def run_experiment(config_path: str = ''):
             model_placeholder = ho.ModelCoordinator(data_test, base.base_namespace, model_base, model_class,
                                                     test_fold_index)
             if isinstance(model_base, tuple):
-                logger.info(f"Tuning begun for {model_class.__name__}\\n")
+                logger.info(f"Tuning begun for {model_class.__name__}\n")
                 trials = Trials()
                 fmin(model_placeholder.objective,
                      space=model_base[1],
@@ -100,7 +100,7 @@ def run_experiment(config_path: str = ''):
                 test_trials.append(trials)
                 logger.info(f"Tuning ended for {model_class.__name__}")
             else:
-                logger.info(f"Training begun for {model_class.__name__}\\n")
+                logger.info(f"Training begun for {model_class.__name__}\n")
                 single = model_placeholder.single()
 
                 ############################################
@@ -113,9 +113,9 @@ def run_experiment(config_path: str = ''):
                 test_results.append(single)
                 logger.info(f"Training ended for {model_class.__name__}")
 
-            logger.info(f"Loss:\\t{best_model_loss}")
-            logger.info(f"Best Model params:\\t{best_model_params}")
-            logger.info(f"Best Model results:\\t{best_model_results}")
+            logger.info(f"Loss:\t{best_model_loss}")
+            logger.info(f"Best Model params:\t{best_model_params}")
+            logger.info(f"Best Model results:\t{best_model_results}")
 
         # Migliore sui test, aggiunta a performance totali
         min_val = np.argmin([i["loss"] for i in test_results])

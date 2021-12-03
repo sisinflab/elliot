@@ -1,5 +1,13 @@
-import numpy as np
-from scipy.sparse import csr_matrix
+"""
+Module description:
+
+"""
+
+__version__ = '0.1'
+__author__ = 'Vito Walter Anelli, Antonio Ferrara, Alberto Carlo Maria Mancino'
+__email__ = 'vitowalter.anelli@poliba.it, antonio.ferrara@poliba.it, alberto.mancino@poliba.it'
+
+
 from tqdm import tqdm
 import pandas as pd
 
@@ -9,7 +17,8 @@ from elliot.recommender.recommender_utils_mixin import RecMixin
 from elliot.dataset.samplers import custom_sampler as cs
 
 from .UserFeatureMapper import UserFeatureMapper
-from .KGFlexModel_SP2 import KGFlexModel
+from .KGFlexModel import KGFlexModel
+
 
 class KGFlex(RecMixin, BaseRecommenderModel):
 
@@ -44,7 +53,7 @@ class KGFlex(RecMixin, BaseRecommenderModel):
         item_features_df['item'] = self._side.triples['uri'].map(uri_to_private)
         item_features_df['f'] = list(zip(self._side.triples['predicate'], self._side.triples['object']))
         item_features_df = item_features_df.dropna().astype({'item': int})
-        self.item_features1 = item_features_df.groupby('item')['f'].apply(set).to_dict()
+        self.item_features_1hop = item_features_df.groupby('item')['f'].apply(set).to_dict()
 
         item_features_df = pd.DataFrame()
         item_features_df['item'] = self._side.second_order_features['uri_x'].map(uri_to_private)
@@ -52,26 +61,26 @@ class KGFlex(RecMixin, BaseRecommenderModel):
             zip(self._side.second_order_features['predicate_x'], self._side.second_order_features['predicate_y'],
                 self._side.second_order_features['object_y']))
         item_features_df = item_features_df.dropna().astype({'item': int})
-        self.item_features2 = item_features_df.groupby('item')['f'].apply(set).to_dict()
+        self.item_features_2hop = item_features_df.groupby('item')['f'].apply(set).to_dict()
 
         # ------------------------------ USER FEATURES ------------------------------
         logger.info('Features info: user features selection...')
         self.user_feature_mapper = UserFeatureMapper(data=self._data,
-                                                     item_features=self.item_features1,
-                                                     item_features2=self.item_features2,
+                                                     item_features=self.item_features_1hop,
+                                                     item_features2=self.item_features_2hop,
                                                      first_order_limit=first_order_limit,
                                                      second_order_limit=second_order_limit)
 
         # ------------------------------ MODEL FEATURES ------------------------------
         logger.info('Features info: features mapping...')
         features = set()
-        users_features = self.user_feature_mapper.users_features
-        for _, f in users_features.items():
+        user_features = self.user_feature_mapper.users_features
+        for _, f in user_features.items():
             features = set.union(features, set(f))
 
-        item_features_selected = {item: set.intersection(set.union(self.item_features1.get(item, set()),
-                                                                   self.item_features2.get(item, set())), features) for
-                                  item in self._data.private_items}
+        item_features_selected = {item: set.intersection(set.union(self.item_features_1hop.get(item, set()),
+                                                                   self.item_features_2hop.get(item, set())), features)
+                                  for item in self._data.private_items}
 
         feature_key_mapping = dict(zip(features, range(len(features))))
 
@@ -83,9 +92,9 @@ class KGFlex(RecMixin, BaseRecommenderModel):
                                   n_items=self._data.num_items,
                                   n_features=len(features),
                                   feature_key_mapping=feature_key_mapping,
-                                  item_features_mapper=item_features_selected,
+                                  item_features=item_features_selected,
                                   embedding_size=embedding,
-                                  users_features=users_features,
+                                  users_features=user_features,
                                   data=self._data)
 
     @property
@@ -120,4 +129,4 @@ class KGFlex(RecMixin, BaseRecommenderModel):
                     loss += self._model.train_step(batch)
                     t.set_postfix({'loss': f'{loss / steps:.5f}'})
                     t.update()
-            #self.evaluate(it, loss)
+            self.evaluate(it, loss)
