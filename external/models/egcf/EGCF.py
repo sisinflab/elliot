@@ -28,6 +28,7 @@ class EGCF(RecMixin, BaseRecommenderModel):
         lr: Learning rate
         epochs: Number of epochs
         factors: Number of latent factors
+        trainable_edges: Whether to train edge embeddings or not
         node_edge_factors: Number of shared latent factors for nodes and edges
         weight_size_nodes: Tuple with number of units for each node embedding propagation layer
         weight_size_edges: Tuple with number of units for each edge embedding propagation layer
@@ -46,6 +47,7 @@ class EGCF(RecMixin, BaseRecommenderModel):
           lr: 0.0005
           epochs: 50
           batch_size: 512
+          trainable_edges: True
           factors: 64
           node_edge_factors: 128
           weight_size_nodes: (64,)
@@ -66,6 +68,7 @@ class EGCF(RecMixin, BaseRecommenderModel):
         self._params_list = [
             ("_learning_rate", "lr", "lr", 0.0005, float, None),
             ("_factors", "factors", "factors", 64, int, None),
+            ("_trainable_edges", "trainable_edges", "trainable_edges", True, bool, None),
             ("_node_edge_factors", "node_edge_factors", "node_edge_factors", 128, int, None),
             ("_weight_size_nodes", "weight_size_nodes", "weight_size_nodes", "(64,)", lambda x: list(make_tuple(x)),
              lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
@@ -125,6 +128,7 @@ class EGCF(RecMixin, BaseRecommenderModel):
             edge_index=self.edge_index,
             node_edge_index=self.node_edge_index,
             edge_edge_index=self.edge_edge_index,
+            trainable_edges=self._trainable_edges,
             random_seed=self._seed
         )
 

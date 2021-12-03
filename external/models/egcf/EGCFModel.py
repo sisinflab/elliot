@@ -33,6 +33,7 @@ class EGCFModel(torch.nn.Module, ABC):
                  edge_index,
                  node_edge_index,
                  edge_edge_index,
+                 trainable_edges,
                  random_seed,
                  name="EGCF",
                  **kwargs
@@ -62,9 +63,14 @@ class EGCFModel(torch.nn.Module, ABC):
         self.Gi = torch.nn.Parameter(
             torch.nn.init.xavier_normal_(torch.empty((self.num_items, self.embed_k))))
         self.Gi.to(self.device)
-        self.Ge = torch.nn.Parameter(
-            torch.tensor(edge_features, dtype=torch.float32)
-        )
+        self.trainable_edges = trainable_edges
+
+        if self.trainable_edges:
+            self.Ge = torch.nn.Parameter(
+                torch.tensor(edge_features, dtype=torch.float32)
+            )
+        else:
+            self.Ge = torch.tensor(edge_features, dtype=torch.float32, device=self.device)
 
         propagation_network_nn_list = [(GCNConv(in_channels=self.embed_k,
                                                 out_channels=self.weight_size_nodes_list[0],
