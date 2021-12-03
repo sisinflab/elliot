@@ -23,7 +23,6 @@ class LightEGCFModel(torch.nn.Module, ABC):
                  num_items,
                  learning_rate,
                  embed_k,
-                 embed_n_e_k,
                  l_w,
                  n_layers,
                  edge_features,
@@ -42,7 +41,6 @@ class LightEGCFModel(torch.nn.Module, ABC):
         self.num_users = num_users
         self.num_items = num_items
         self.embed_k = embed_k
-        self.embed_n_e_k = embed_n_e_k
         self.learning_rate = learning_rate
         self.l_w = l_w
         self.n_layers = n_layers
@@ -78,14 +76,9 @@ class LightEGCFModel(torch.nn.Module, ABC):
         self.propagation_network_ee.to(self.device)
         self.propagation_network_ne = torch_geometric.nn.Sequential('x, edge_index', propagation_network_ne_list)
         self.propagation_network_ne.to(self.device)
-        self.projection_layer_nodes = torch.nn.Sequential(
-            OrderedDict([('feat_proj_nodes', torch.nn.Linear(in_features=self.embed_k,
-                                                             out_features=self.embed_n_e_k)),
-                         ('relu', torch.nn.ReLU())]))
-        self.projection_layer_nodes.to(self.device)
         self.projection_layer_edges = torch.nn.Sequential(
             OrderedDict([('feat_proj_edges', torch.nn.Linear(in_features=self.Ge.shape[1],
-                                                             out_features=self.embed_n_e_k)),
+                                                             out_features=self.embed_k)),
                          ('relu', torch.nn.ReLU())]))
         self.projection_layer_edges.to(self.device)
 
@@ -95,13 +88,11 @@ class LightEGCFModel(torch.nn.Module, ABC):
 
     def propagate_embeddings(self, evaluate=False):
         node_node_embeddings = torch.cat((self.Gu.to(self.device), self.Gi.to(self.device)), 0)
-        edge_edge_embeddings = self.Ge
 
-        # we project node and edge embeddings into the same latent space for the node-edge propagation network
-        node_node_embeddings_projected = self.projection_layer_nodes(node_node_embeddings.to(self.device))
-        edge_edge_embeddings_projected = self.projection_layer_edges(edge_edge_embeddings.to(self.device))
-        node_edge_embeddings = torch.cat((node_node_embeddings_projected.to(self.device),
-                                          edge_edge_embeddings_projected.to(self.device)), 0)
+        # we project edge embeddings into the same latent space as node embeddings
+        edge_edge_embeddings = self.projection_layer_edges(self.Ge.to(self.device))
+        node_edge_embeddings = torch.cat((node_node_embeddings.to(self.device),
+                                          edge_edge_embeddings.to(self.device)), 0)
 
         for layer in range(self.n_layers):
             if not evaluate:
@@ -138,8 +129,8 @@ class LightEGCFModel(torch.nn.Module, ABC):
                 torch.split(node_edge_embeddings, [self.num_users + self.num_items,
                                                    node_edge_embeddings.shape[0] - (self.num_users + self.num_items)],
                             0)
-            node_node_embeddings = torch.cat((node_node_embeddings, node_edge_node_embeddings), dim=1)
-            edge_edge_embeddings = torch.cat((edge_edge_embeddings, node_edge_edge_embeddings), dim=1)
+            node_node_embeddings = torch.add(node_node_embeddings, node_edge_node_embeddings)
+            edge_edge_embeddings = torch.add(edge_edge_embeddings, node_edge_edge_embeddings)
             node_edge_embeddings = torch.cat((node_node_embeddings.to(self.device),
                                               edge_edge_embeddings.to(self.device)), 0)
         if evaluate:
@@ -174,8 +165,6 @@ class LightEGCFModel(torch.nn.Module, ABC):
         reg_loss = self.l_w * (torch.norm(self.Gu, 2) +
                                torch.norm(self.Gi, 2) +
                                torch.norm(self.Ge, 2) +
-                               torch.stack([torch.norm(value, 2) for value in self.projection_layer_nodes.parameters()],
-                                           dim=0).sum(dim=0) +
                                torch.stack([torch.norm(value, 2) for value in self.projection_layer_edges.parameters()],
                                            dim=0).sum(dim=0)) * 2
         loss += reg_loss

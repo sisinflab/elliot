@@ -31,7 +31,6 @@ experiment:
       epochs: 1000
       factors: 64
       batch_size: 256
-      node_edge_factors: 128
       l_w: [ 10e-5, 10e-3, 10e-1, 10 ]
       n_layers: [ 2, 3 ]
       early_stopping:

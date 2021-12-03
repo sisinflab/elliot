@@ -26,7 +26,6 @@ class LightEGCF(RecMixin, BaseRecommenderModel):
         lr: Learning rate
         epochs: Number of epochs
         factors: Number of latent factors
-        node_edge_factors: Number of shared latent factors for nodes and edges
         n_layers: Number of stacked propagation layers
         batch_size: Batch size
         l_w: Regularization coefficient
@@ -44,7 +43,6 @@ class LightEGCF(RecMixin, BaseRecommenderModel):
           batch_size: 512
           n_layers: 2
           factors: 64
-          node_edge_factors: 128
           l_w: 0.1
     """
 
@@ -61,7 +59,6 @@ class LightEGCF(RecMixin, BaseRecommenderModel):
             ("_learning_rate", "lr", "lr", 0.0005, float, None),
             ("_factors", "factors", "factors", 64, int, None),
             ("_n_layers", "n_layers", "n_layers", 2, int, None),
-            ("_node_edge_factors", "node_edge_factors", "node_edge_factors", 128, int, None),
             ("_l_w", "l_w", "l_w", 0.01, float, None),
             ("_loader", "loader", "loader", 'InteractionsTextualAttributes', str, None)
         ]
@@ -101,7 +98,6 @@ class LightEGCF(RecMixin, BaseRecommenderModel):
             num_items=self._num_items,
             learning_rate=self._learning_rate,
             embed_k=self._factors,
-            embed_n_e_k=self._node_edge_factors,
             l_w=self._l_w,
             n_layers=self._n_layers,
             edge_features=self._side_edge_textual.object.get_all_features(),
