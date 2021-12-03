@@ -19,25 +19,6 @@ experiment:
   gpu: 0
   external_models_path: ../external/models/__init__.py
   models:
-    external.LightEGCF:
-      meta:
-        validation_rate: 1
-        verbose: True
-        save_weights: False
-        save_recs: True
-        validation_metric: Recall
-        restore: False
-      lr: [ 0.0001, 0.001 ]
-      epochs: 1000
-      factors: 64
-      batch_size: 256
-      l_w: [ 10e-5, 10e-3, 10e-1, 10 ]
-      n_layers: [ 2, 3 ]
-      early_stopping:
-        patience: 50
-        monitor: Recall@20
-        mode: auto
-        verbose: True
 #    external.DGCF:
 #      meta:
 #        validation_rate: 1
