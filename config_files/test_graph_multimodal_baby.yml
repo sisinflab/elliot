@@ -77,7 +77,7 @@ experiment:
       weight_size_nodes: (64, 64)
       weight_size_edges: (64, 64)
       weight_size_nodes_edges: (64, 64)
-      l_w: [ 10e-5, 10e-3, 10e-1, 10 ]
+      l_w: [10e-5, 10e-3, 10e-1, 10]
       early_stopping:
         patience: 50
         monitor: Recall@20
