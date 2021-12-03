@@ -28,7 +28,6 @@ class KGFlexModel():
                  users_features,
                  **kwargs):
 
-
         self._data = data
         self._learning_rate = learning_rate
         self._n_users = data.num_users
@@ -42,15 +41,16 @@ class KGFlexModel():
         self.Gf = np.random.randn(n_features, embedding_size) / 10
         self.Gb = np.random.randn(n_features) / 10
 
-        # Personal features embeddings
         # users features mask
-        self.Mu = np.zeros(shape=(self._n_users, n_features))
+        self.Mu = np.zeros(shape=(self._n_users, n_features)).astype(bool)
         for u, f in users_features.items():
-            self.Mu[u][list(map(feature_key_mapping.get, f))] = 1
-        self.Mu = self.Mu.astype(bool)
+            self.Mu[u][list(map(feature_key_mapping.get, f))] = True
 
-        # users features mask along embedding axis
-        self.Me = np.repeat(self.Mu[:, :, np.newaxis], embedding_size, axis=2)
+        # item features mask
+        self.Mi = np.zeros(shape=(self._n_items, n_features)).astype(np.bool)
+        for i, row in enumerate(self.Mi):
+            self.Mi[i][list(map(feature_key_mapping.get, item_features_mapper[i]))] = True
+
         # initialize users features vectors
         self.P = np.zeros((self._n_users, n_features, embedding_size))
         self.P[self.Me] = np.random.randn(*self.P[self.Me].shape) / 10
@@ -61,29 +61,32 @@ class KGFlexModel():
             for feature in users_features[u].keys():
                 self.K[u][feature_key_mapping[feature]] = users_features[u][feature]
 
-        # item features mask
-        self.Mi = np.zeros(shape=(self._n_items, n_features))
-        for item, features in item_features_mapper.items():
-            for f in features:
-                key = feature_key_mapping.get(f)
-                if key:
-                    self.Mi[item][key] = 1
-        self.Mi = self.Mi.astype(bool)
+        # mapping global features indexing into user personal feature indexing
+        self.u_ft_idx = {u: dict(zip(map(feature_key_mapping.get, uf_), range(len(uf_)))) for u, uf_ in
+                        tqdm(users_features.items(), desc='user personal features mapping', total=len(users_features))}
 
         self.P_sp = {u: np.random.randn(len(users_features[u]), self._embedding_size) / 10 for u in
                      tqdm(range(self._n_users))}
-        self.u_f_i = {u: list(zip(list(map(feature_key_mapping.get, users_features[u].keys())), range(0, len(users_features[u])))) for u in tqdm(range(self._n_users))}
+
+        self.K_sp = {u: np.array([ig for ig in fs.values()]) for u, fs in
+                     tqdm(users_features.items(), desc='User-feature weights')}
+
+        a = {u: {i: map(feature_key_mapping.get, set.intersection(set(fu), fi)) for i, fi in
+                 item_features_mapper.items()} for u, fu in tqdm(users_features.items())}
+
         # self.K_sp = {u: }
         # dict(zip(list(map(feature_key_mapping.get, users_features[0].keys())), range(len(users_features[0]))))
 
+        # a = {u: {i: list(map(self.u_ft_idx.get, f)) for i, f in its.items()} for u, its in tqdm(self.user_item_features.items())}
+
         # user item features
-        self.user_item_features = dict()
         self._n_features_range = np.array(range(self._n_features))
-        for u in tqdm(range(self._n_users), desc='user-item features'):
-            u_i = dict()
-            for i in range(self._n_items):
-                u_i[i] = self._n_features_range[np.multiply(self.Mu[u], self.Mi[i])]
-            self.user_item_features[u] = u_i
+        self.user_item_features = {u: {i: self._n_features_range[np.multiply(mu, mi)] for i, mi in enumerate(self.Mi)}
+                                   for u, mu in tqdm(enumerate(self.Mu), desc='user-item features')}
+
+        user_item_features_idxs = {u: {i: list(map(self.u_ft_idx[u].get, f)) for i, f in its.items()} for u, its in
+                                   tqdm(self.user_item_features.items(), desc='user-item features indexed')}
+
 
     def __call__(self, *inputs):
 

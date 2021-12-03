@@ -69,8 +69,8 @@ class KGFlex(RecMixin, BaseRecommenderModel):
         for _, f in users_features.items():
             features = set.union(features, set(f))
 
-        item_features_selected = {item: set.intersection(set.union(self.item_features1.get(item, {}),
-                                                                   self.item_features2.get(item, {})), features) for
+        item_features_selected = {item: set.intersection(set.union(self.item_features1.get(item, set()),
+                                                                   self.item_features2.get(item, set())), features) for
                                   item in self._data.private_items}
 
         feature_key_mapping = dict(zip(features, range(len(features))))
