@@ -31,7 +31,7 @@ class LightEGCFModel(torch.nn.Module, ABC):
                  node_edge_index,
                  edge_edge_index,
                  random_seed,
-                 name="EGCF",
+                 name="LightEGCF",
                  **kwargs
                  ):
         super().__init__()

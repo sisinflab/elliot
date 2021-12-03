@@ -113,7 +113,7 @@ class LightEGCF(RecMixin, BaseRecommenderModel):
 
     @property
     def name(self):
-        return "EGCF" \
+        return "LightEGCF" \
                + f"_{self.get_base_params_shortcut()}" \
                + f"_{self.get_params_shortcut()}"
 
