@@ -19,7 +19,7 @@ experiment:
   gpu: 0
   external_models_path: ../external/models/__init__.py
   models:
-    external.DGCF:
+    external.LightEGCF:
       meta:
         validation_rate: 1
         verbose: True
@@ -27,21 +27,41 @@ experiment:
         save_recs: True
         validation_metric: Recall
         restore: False
-      lr: [0.0001, 0.005]
-      epochs: 400
-      batch_size: 512
+      lr: [ 0.0001, 0.001 ]
+      epochs: 1000
       factors: 64
-      l_w_bpr: [10e-3, 10e-5]
-      l_w_ind: [10e-3, 10e-5]
-      ind_batch_size: 512
-      n_layers: [2, 3]
-      intents: 4
-      routing_iterations: 2
+      batch_size: 256
+      node_edge_factors: 128
+      l_w: [ 10e-5, 10e-3, 10e-1, 10 ]
+      n_layers: [ 2, 3 ]
       early_stopping:
         patience: 50
         monitor: Recall@20
         mode: auto
         verbose: True
+#    external.DGCF:
+#      meta:
+#        validation_rate: 1
+#        verbose: True
+#        save_weights: False
+#        save_recs: True
+#        validation_metric: Recall
+#        restore: False
+#      lr: [0.0001, 0.005]
+#      epochs: 400
+#      batch_size: 512
+#      factors: 64
+#      l_w_bpr: [10e-3, 10e-5]
+#      l_w_ind: [10e-3, 10e-5]
+#      ind_batch_size: 512
+#      n_layers: [2, 3]
+#      intents: 4
+#      routing_iterations: 2
+#      early_stopping:
+#        patience: 50
+#        monitor: Recall@20
+#        mode: auto
+#        verbose: True
 #    external.LGACN:
 #      meta:
 #        validation_rate: 1
