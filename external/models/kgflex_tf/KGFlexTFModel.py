@@ -44,7 +44,7 @@ class KGFlexTFModel(keras.Model):
         self.G = tf.Variable(self.initializer(shape=[self.num_features, self._factors]), name='G', dtype=tf.float32)
         self.C = user_item_features
 
-        self.optimizer = tf.optimizers.Adagrad(learning_rate)
+        self.optimizer = tf.optimizers.Adam(learning_rate)
 
     @tf.function
     def call(self, inputs, training=None, mask=None):
