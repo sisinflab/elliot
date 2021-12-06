@@ -17,6 +17,16 @@ from .KGFlexTFModel import KGFlexTFModel
 # mp.set_start_method('fork')
 
 
+def uif_worker(us_f, its_f, mapping):
+    uif = []
+    lengths = []
+    for it_f in its_f:
+        s = set.intersection(set(map(lambda x: mapping[x], us_f)), it_f)
+        lengths.append(len(s))
+        uif.extend(list(s))
+    return tf.RaggedTensor.from_row_lengths(uif, lengths)
+
+
 def user_item_feature_getter(private_users, users_features, item_features, feature_key_mapping):
     user_item_features = []
 
@@ -108,19 +118,19 @@ class KGFlexTF(RecMixin, BaseRecommenderModel):
             common = set.intersection(set(feature_key_mapping.keys()), v)
             item_features.append(set(map(lambda x: feature_key_mapping[x], common)))
 
-        # def uif_args():
-        #     return ((users_features[u],
-        #              item_features,
-        #              feature_key_mapping) for u in self._data.private_users.keys())
+        def uif_args():
+            return ((users_features[u],
+                     item_features,
+                     feature_key_mapping) for u in self._data.private_users.keys())
+
+        arguments = uif_args()
+        with mp.Pool(processes=mp.cpu_count()) as pool:
+            user_item_features = pool.starmap(uif_worker, tqdm(arguments, total=len(self._data.private_users.keys()),
+                                                               desc='User-Item Features'))
+
+        # user_item_features = user_item_feature_getter(self._data.private_users, users_features, item_features,
+        #                                               feature_key_mapping)
         #
-        # arguments = uif_args()
-        # with mp.Pool(processes=mp.cpu_count()) as pool:
-        #     user_item_features = pool.starmap(uif_worker, tqdm(arguments, total=len(self._data.private_users.keys()),
-        #                                                        desc='User-Item Features'))
-
-        user_item_features = user_item_feature_getter(self._data.private_users, users_features, item_features,
-                                                      feature_key_mapping)
-
         user_item_features = tf.ragged.stack(user_item_features)
 
         print('FATTO!')
