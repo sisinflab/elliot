@@ -30,7 +30,7 @@ experiment:
       meta:
         verbose: True
         validation_rate: 5
-        save_recs: False
+        save_recs: True
         save_weights: False
         restore: False
         hyper_max_evals: 10
