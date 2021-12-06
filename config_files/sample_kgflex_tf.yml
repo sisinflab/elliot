@@ -3,7 +3,7 @@ experiment:
   data_config:
     strategy: dataset
     dataset_path: ../data/{0}/dataset.tsv
-    #test_path: ../data/{0}/testset.tsv
+    # test_path: ../data/{0}/testset.tsv
     side_information:
       - dataloader: KGFlexLoader
         mapping: ../data/{0}/mapping.tsv
@@ -19,7 +19,7 @@ experiment:
         strategy: random_subsampling
         test_ratio: 0.2
   top_k: 10
-  gpu: 0
+  # gpu: 0
   external_models_path: ../external/models/__init__.py
   evaluation:
     cutoffs: [10]
