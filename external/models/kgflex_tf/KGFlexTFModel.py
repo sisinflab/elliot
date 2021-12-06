@@ -3,8 +3,8 @@ Module description:
 """
 
 __version__ = '0.1'
-__author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta'
-__email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
+__author__ = 'Antonio Ferrara'
+__email__ = 'antonio.ferrara@poliba.it'
 
 import os
 import numpy as np
@@ -36,27 +36,27 @@ class KGFlexTFModel(keras.Model):
         self.initializer = tf.initializers.RandomNormal(stddev=0.1)
 
         self.K = user_feature_weights
+        self.B = tf.Variable(self.initializer(shape=[self.num_features]), name='B', dtype=tf.float32)
         self.H = tf.Variable(self.initializer(shape=[self.num_users, self._factors]), name='H', dtype=tf.float32)
         self.G = tf.Variable(self.initializer(shape=[self.num_features, self._factors]), name='G', dtype=tf.float32)
         self.C = user_item_features
 
-        self.loss = keras.losses.MeanSquaredError()
         self.optimizer = tf.optimizers.Adam(learning_rate)
 
-    #@tf.function
+    @tf.function
     def call(self, inputs, training=None, mask=None):
         user, item = inputs
         h_u = tf.squeeze(tf.nn.embedding_lookup(self.H, user))
         z_u = h_u @ tf.transpose(self.G)  # num_features x 1
         k_u = tf.squeeze(tf.nn.embedding_lookup(self.K, user))  # num_features x 1
-        a_u = k_u * z_u
-        ui_pairs = tf.stack(tf.squeeze([user, item]), axis=-1)
+        a_u = k_u * (tf.add(z_u, self.B))
+        ui_pairs = tf.stack([tf.squeeze(user), tf.squeeze(item)], axis=-1)
         features = tf.gather_nd(self.C, ui_pairs)
         x_ui = tf.reduce_sum(tf.gather(a_u, features, batch_dims=1), axis=-1)
 
         return x_ui
 
-    #@tf.function
+    @tf.function
     def train_step(self, batch):
         user, pos, neg = batch
         with tf.GradientTape() as tape:
@@ -81,8 +81,7 @@ class KGFlexTFModel(keras.Model):
 
         return loss
 
-
-    #@tf.function
+    @tf.function
     def predict(self, inputs, training=False, **kwargs):
         """
         Get full predictions on the whole users/items matrix.
@@ -92,11 +91,7 @@ class KGFlexTFModel(keras.Model):
         output = self.call(inputs=inputs, training=training)
         return output
 
-    #@tf.function
-    def compute_feature_matrices(self):
-        Z = self.H @ tf.transpose(self.G)
-        return self.K * Z
-
+    @tf.function
     def get_all_recs(self):
         Z = self.H @ tf.transpose(self.G)
         A = self.K * Z
@@ -110,16 +105,3 @@ class KGFlexTFModel(keras.Model):
             user_map[u]: list(map(lambda x: (item_map.get(x[0]), x[1]), zip(*map(lambda x: x.numpy(), top[::-1])))) for
             u, top in enumerate(zip(*tf.nn.top_k(tf.where(mask, predictions, -np.inf), k=k)))}
         return predictions_top_k
-
-    #@tf.function
-    def get_user_recs(self, user, A):
-        """
-        Get full predictions on the whole users/items matrix.
-        Returns:
-            The matrix of predicted values.
-        """
-        return tf.reduce_sum(tf.gather(tf.gather(A, user), tf.gather(self.C, user)), axis=-1)
-
-    #@tf.function
-    def get_top_k(self, preds, train_mask, k=100):
-        return tf.nn.top_k(tf.where(train_mask, preds, -np.inf), k=k, sorted=True)
