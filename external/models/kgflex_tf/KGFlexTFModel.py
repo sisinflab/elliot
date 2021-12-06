@@ -24,6 +24,7 @@ class KGFlexTFModel(keras.Model):
                  num_features,
                  factors=10,
                  learning_rate=0.01,
+                 l_w=0.1, l_b=0.001,
                  name="KGFlex_TF",
                  **kwargs):
         super().__init__(name=name, **kwargs)
@@ -32,6 +33,8 @@ class KGFlexTFModel(keras.Model):
         self.num_items = num_items
         self.num_features = num_features
         self._factors = factors
+        self._l_w = l_w
+        self._l_b = l_b
 
         self.initializer = tf.initializers.RandomNormal(stddev=0.1)
 
@@ -41,7 +44,7 @@ class KGFlexTFModel(keras.Model):
         self.G = tf.Variable(self.initializer(shape=[self.num_features, self._factors]), name='G', dtype=tf.float32)
         self.C = user_item_features
 
-        self.optimizer = tf.optimizers.Adam(learning_rate)
+        self.optimizer = tf.optimizers.Adagrad(learning_rate)
 
     @tf.function
     def call(self, inputs, training=None, mask=None):
@@ -67,11 +70,10 @@ class KGFlexTFModel(keras.Model):
             difference = tf.clip_by_value(xu_pos - xu_neg, -80.0, 1e8)
             loss = tf.reduce_sum(tf.nn.softplus(-difference))
             # Regularization Component
-            # reg_loss = self._l_w * tf.reduce_sum([tf.nn.l2_loss(gamma_u),
-            #                                      tf.nn.l2_loss(gamma_pos),
-            #                                      tf.nn.l2_loss(gamma_neg)]) \
-            #            + self._l_b * tf.nn.l2_loss(beta_pos) \
-            #            + self._l_b * tf.nn.l2_loss(beta_neg) / 10
+            # reg_loss = self._l_w * tf.reduce_sum([tf.nn.l2_loss(self.H),
+            #                                      tf.nn.l2_loss(self.G)]) \
+            #            + self._l_b * tf.nn.l2_loss(self.B)
+            #            # + self._l_b * tf.nn.l2_loss(beta_neg) / 10
 
             # Loss to be optimized
             # loss += reg_loss
