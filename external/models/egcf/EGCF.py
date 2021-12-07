@@ -29,7 +29,7 @@ class EGCF(RecMixin, BaseRecommenderModel):
         epochs: Number of epochs
         factors: Number of latent factors
         trainable_edges: Whether to train edge embeddings or not
-        weight_size_node_edge: Tuple with number of units for each node edge propagation layer
+        weight_size_projection_node_edge: Tuple with number of units for each node edge propagation layer
         weight_size_nodes: Tuple with number of units for each node embedding propagation layer
         weight_size_edges: Tuple with number of units for each edge embedding propagation layer
         weight_size_nodes_edges: Tuple with number of units for each node-edge embedding propagation layer
@@ -49,7 +49,7 @@ class EGCF(RecMixin, BaseRecommenderModel):
           batch_size: 512
           trainable_edges: True
           factors: 64
-          weight_size_node_edge: (128, 64)
+          weight_size_projection_node_edge: (64, 64)
           weight_size_nodes: (64,)
           weight_size_edges: (64,)
           weight_size_nodes_edges: (64,)
