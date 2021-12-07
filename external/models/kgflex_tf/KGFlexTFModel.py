@@ -48,7 +48,7 @@ class KGFlexTFModel(keras.Model):
 
         self.optimizer = tf.optimizers.Adam(learning_rate)
 
-    @tf.function
+    #@tf.function
     def call(self, inputs, training=None, mask=None):
         user, item = inputs
         h_u = tf.squeeze(tf.nn.embedding_lookup(self.H, user))
@@ -97,13 +97,13 @@ class KGFlexTFModel(keras.Model):
         output = self.call(inputs=inputs, training=training)
         return output
 
-    @tf.function
+    #@tf.function
     def get_all_recs(self):
         Z = self.H @ tf.transpose(self.G)
         Z_plus_bias = tf.add(Z, self.F_B)
         A = self.K * Z_plus_bias
-        predictions = tf.add(tf.add(tf.reduce_sum(tf.gather(A, self.C, batch_dims=1), axis=-1).to_tensor(), self.U_B),
-                             self.I_B)
+        predictions = tf.add(tf.add(tf.reduce_sum(tf.gather(A, self.C, batch_dims=1), axis=-1).to_tensor(),
+                                    tf.reshape(self.U_B, [-1, 1])), self.I_B)
         return predictions
 
     def get_all_topks(self, predictions, mask, k, user_map, item_map):
