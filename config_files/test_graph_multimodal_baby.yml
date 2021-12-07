@@ -74,7 +74,7 @@ experiment:
       batch_size: 256
       factors: 64
       trainable_edges: False
-      node_edge_factors: 64
+      weight_size_projection_node_edge: (64, 64)
       weight_size_nodes: (64, 64)
       weight_size_edges: (64, 64)
       weight_size_nodes_edges: (64, 64)

@@ -29,7 +29,7 @@ class EGCF(RecMixin, BaseRecommenderModel):
         epochs: Number of epochs
         factors: Number of latent factors
         trainable_edges: Whether to train edge embeddings or not
-        node_edge_factors: Number of shared latent factors for nodes and edges
+        weight_size_node_edge: Tuple with number of units for each node edge propagation layer
         weight_size_nodes: Tuple with number of units for each node embedding propagation layer
         weight_size_edges: Tuple with number of units for each edge embedding propagation layer
         weight_size_nodes_edges: Tuple with number of units for each node-edge embedding propagation layer
@@ -49,7 +49,7 @@ class EGCF(RecMixin, BaseRecommenderModel):
           batch_size: 512
           trainable_edges: True
           factors: 64
-          node_edge_factors: 128
+          weight_size_node_edge: (128, 64)
           weight_size_nodes: (64,)
           weight_size_edges: (64,)
           weight_size_nodes_edges: (64,)
@@ -69,7 +69,9 @@ class EGCF(RecMixin, BaseRecommenderModel):
             ("_learning_rate", "lr", "lr", 0.0005, float, None),
             ("_factors", "factors", "factors", 64, int, None),
             ("_trainable_edges", "trainable_edges", "trainable_edges", True, bool, None),
-            ("_node_edge_factors", "node_edge_factors", "node_edge_factors", 128, int, None),
+            ("_weight_size_projection_node_edge", "weight_size_projection_node_edge", "weight_size_projection_node_edge", "(64,)",
+             lambda x: list(make_tuple(x)),
+             lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
             ("_weight_size_nodes", "weight_size_nodes", "weight_size_nodes", "(64,)", lambda x: list(make_tuple(x)),
              lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
             ("_weight_size_edges", "weight_size_edges", "weight_size_edges", "(64,)", lambda x: list(make_tuple(x)),
@@ -118,7 +120,7 @@ class EGCF(RecMixin, BaseRecommenderModel):
             num_items=self._num_items,
             learning_rate=self._learning_rate,
             embed_k=self._factors,
-            embed_n_e_k=self._node_edge_factors,
+            weight_size_projection_node_edge=self._weight_size_projection_node_edge,
             l_w=self._l_w,
             weight_size_nodes=self._weight_size_nodes,
             weight_size_edges=self._weight_size_edges,
