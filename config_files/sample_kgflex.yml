@@ -35,10 +35,10 @@ experiment:
         save_weights: True
         restore: False
       seed: 42
-      lr: [0.1, 0.01, 0.001]
+      lr: [0.005]
       epochs: 200
-      batch_size: 128
-      embedding: [3,5,10]
-      first_order_limit: [100,10,50]
-      second_order_limit: [100,10,50]
+      batch_size: 64
+      embedding: [10]
+      first_order_limit: [10, 100, 200]
+      second_order_limit: [10, 100]
       loader: KGFlexLoader

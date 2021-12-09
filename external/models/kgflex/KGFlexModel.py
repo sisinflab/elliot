@@ -80,7 +80,6 @@ class KGFlexModel():
 
     def train_step(self, batch):
 
-        loss = 0.0
         user, pos, neg = batch
         user = user[:, 0]
         pos = pos[:, 0]
@@ -88,7 +87,9 @@ class KGFlexModel():
         x_p = self(user, pos)
         x_n = self(user, neg)
         x_pn = np.subtract(x_p, x_n)
-        d_loss = (1 / (1 + np.exp(x_pn)))
+        e = np.exp(-x_pn)
+        loss = np.sum(1 + e)
+        d_loss = e / (1 + e)
 
         for us_, d_loss_, p, n in zip(user, d_loss, pos, neg):
             f_p = self.user_item_features[us_][p]
@@ -109,7 +110,6 @@ class KGFlexModel():
             self.Gf[f_n] += self.P_sp[us_][f_n_sp] * n_term[:, np.newaxis]
             self.Gb[f_n] += n_term
 
-            loss += d_loss_
         return loss
 
     def predict(self, user):
