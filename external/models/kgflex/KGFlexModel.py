@@ -13,16 +13,15 @@ import numpy as np
 from tqdm import tqdm
 
 
-class KGFlexModel():
+class KGFlexModel:
     def __init__(self,
                  data,
                  n_features,
                  learning_rate,
                  embedding_size,
-                 users_features,
+                 user_features,
                  item_features,
-                 feature_key_mapping,
-                 **kwargs):
+                 feature_key_mapping):
 
         self._data = data
         self._learning_rate = learning_rate
@@ -39,11 +38,17 @@ class KGFlexModel():
         self.Gb = np.random.randn(n_features) / 10
 
         # PERSONAL FEATURES
+        # personal feature embeddings
+        self.P_sp = {u: np.random.randn(len(user_features[u]), self._embedding_size) / 10
+                     for u in self._users}
+        # personal feature weights
+        self.K_sp = {u: np.array([ig for ig in fs.values()]) for u, fs in user_features.items()}
+
+        # USER FEATURE MAPPING
         # users features mask
         self.Mu = np.zeros(shape=(self._n_users, n_features)).astype(bool)
-        for u, f in users_features.items():
+        for u, f in user_features.items():
             self.Mu[u][list(map(feature_key_mapping.get, f))] = True
-
         # item features mask
         self.Mi = np.zeros(shape=(self._n_items, n_features)).astype(np.bool)
         for i, row in enumerate(self.Mi):
@@ -51,17 +56,11 @@ class KGFlexModel():
 
         # mapping global features indexing into user personal feature indexing
         u_ft_idx = {u: dict(zip(map(feature_key_mapping.get, uf_), range(len(uf_)))) for u, uf_ in
-                    users_features.items()}
-
-        # personal feature embeddings
-        self.P_sp = {u: np.random.randn(len(users_features[u]), self._embedding_size) / 10 for u in
-                     range(self._n_users)}
-
-        # personal feature weights
-        self.K_sp = {u: np.array([ig for ig in fs.values()]) for u, fs in users_features.items()}
+                    user_features.items()}
 
         # user item features
         self._n_features_range = np.array(range(self._n_features))
+
         self.user_item_features = {u: {i: self._n_features_range[np.multiply(mu, mi)] for i, mi in enumerate(self.Mi)}
                                    for u, mu in tqdm(enumerate(self.Mu), desc='user-item features', total=len(self.Mu))}
 
@@ -95,20 +94,24 @@ class KGFlexModel():
             f_p = self.user_item_features[us_][p]
             f_n = self.user_item_features[us_][n]
 
-            f_p_sp = self.user_item_feature_idxs[us_][p]
-            f_n_sp = self.user_item_feature_idxs[us_][n]
+            if len(f_n) > 0:
 
-            p_term = d_loss_ * self.K_sp[us_][f_p_sp] * self._learning_rate
-            n_term = -d_loss_ * self.K_sp[us_][f_n_sp] * self._learning_rate
+                f_p_sp = self.user_item_feature_idxs[us_][p]
+                f_n_sp = self.user_item_feature_idxs[us_][n]
 
-            # updates
-            self.P_sp[us_][f_p_sp] += self.Gf[f_p] * p_term[:, np.newaxis]
-            self.Gf[f_p] += self.P_sp[us_][f_p_sp] * p_term[:, np.newaxis]
-            self.Gb[f_p] += p_term
+                p_term = d_loss_ * self.K_sp[us_][f_p_sp] * self._learning_rate
+                n_term = -d_loss_ * self.K_sp[us_][f_n_sp] * self._learning_rate
 
-            self.P_sp[us_][f_n_sp] += self.Gf[f_n] * n_term[:, np.newaxis]
-            self.Gf[f_n] += self.P_sp[us_][f_n_sp] * n_term[:, np.newaxis]
-            self.Gb[f_n] += n_term
+                # updates
+                self.P_sp[us_][f_p_sp] += self.Gf[f_p] * p_term[:, np.newaxis]
+                self.Gf[f_p] += self.P_sp[us_][f_p_sp] * p_term[:, np.newaxis]
+                self.Gb[f_p] += p_term
+
+                self.P_sp[us_][f_n_sp] += self.Gf[f_n] * n_term[:, np.newaxis]
+                self.Gf[f_n] += self.P_sp[us_][f_n_sp] * n_term[:, np.newaxis]
+                self.Gb[f_n] += n_term
+            else:
+                pass
 
         return loss
 

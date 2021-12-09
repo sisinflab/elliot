@@ -88,13 +88,11 @@ class KGFlex(RecMixin, BaseRecommenderModel):
 
         # ------------------------------ MODEL ------------------------------
         self._model = KGFlexModel(learning_rate=learning_rate,
-                                  n_users=self._data.num_users,
-                                  n_items=self._data.num_items,
                                   n_features=len(features),
                                   feature_key_mapping=feature_key_mapping,
                                   item_features=item_features_selected,
                                   embedding_size=embedding,
-                                  users_features=user_features,
+                                  user_features=user_features,
                                   data=self._data)
 
     @property
