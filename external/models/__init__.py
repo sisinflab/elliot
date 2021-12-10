@@ -13,6 +13,7 @@ from .msap import MSAPMF
 from .AdversarialMF import AdversarialMF
 from .ktup import KTUP
 from .cke import CKE
+from .mkr import MKR
 from .cofm import CoFM
 from .kgflex import KGFlex
 from .kgflex_tf import KGFlexTF

@@ -18,12 +18,12 @@ from elliot.recommender.base_recommender_model import init_charger
 from elliot.recommender.recommender_utils_mixin import RecMixin
 from . import rating_sampler as rs
 from . import triple_sampler as ts
-from .CKEModel import CKEModel
+from .MKRModel import MKRModel
 
 np.random.seed(42)
 
 
-class CKE(RecMixin, BaseRecommenderModel):
+class MKR(RecMixin, BaseRecommenderModel):
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
         """
@@ -44,7 +44,6 @@ class CKE(RecMixin, BaseRecommenderModel):
         self._params_list = [
             ("_l2_lambda", "l2_lambda", "l2", 1e-5, None, None),
             ("_embedding_size", "embedding_size", "es", 64, int, None),
-            ("_rel_embedding_size", "rel_embedding_size", "res", 64, int, None),
             ("_learning_rate", "lr", "lr", 0.001, None, None),
             ("_joint_ratio", "joint_ratio", "jr", 0.7, None, None),
             ("_L1", "L1_flag", "l1", True, None, None),
@@ -69,19 +68,25 @@ class CKE(RecMixin, BaseRecommenderModel):
         self._triple_sampler = ts.Sampler(self._side.entity_to_idx, self._side.Xs, self._side.Xp, self._side.Xo,
                                           self._epoch_length)
 
+        # TODO:
+        self.low_layers = 2
+        self.high_layers = 5
+
         self._i_items_set = list(range(self._num_items))
 
         new_map = defaultdict(lambda: -1)
         new_map.update({self._data.public_items[i]: idx for i, idx in self._side.public_items_entitiesidx.items()})
         ######################################
 
-        self._model = CKEModel(self._learning_rate, self._L1, self._l2_lambda, self._embedding_size,
-                               self._rel_embedding_size, self._data.num_users, self._data.num_items,
-                               len(self._side.entity_set), len(self._side.predicate_set), new_map)
+        self._model = MKRModel(self._learning_rate, self._L1, self._l2_lambda, self._embedding_size,
+                               self.low_layers,
+                               self.high_layers,
+                               self._data.num_users, self._data.num_items, len(self._side.entity_set),
+                               len(self._side.predicate_set), new_map)
 
     @property
     def name(self):
-        return "CKE" \
+        return "kTUP" \
                + "_e:" + str(self._epochs) \
                + "_bs:" + str(self._batch_size) \
                + f"_{self.get_params_shortcut()}"
