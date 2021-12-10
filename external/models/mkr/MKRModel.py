@@ -107,6 +107,8 @@ class MKRModel(keras.Model):
                activation=actv,
                kernel_initializer=initializer)) for _ in range(self.H)]
 
+
+
     def get_config(self):
         raise NotImplementedError
 
@@ -114,9 +116,8 @@ class MKRModel(keras.Model):
     def call(self, inputs, training=None, **kwargs):
 
         print()
-        u_e = self.usr_embeddings(0)
-        self.user_mlp2(tf.expand_dims(u_e, axis=0))
-
+        u_e = tf.expand_dims(self.usr_embeddings(0), axis=0)
+        self.user_mlp(u_e)
 
         if kwargs['is_rec']:
             u_ids, i_ids = inputs
