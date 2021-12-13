@@ -142,28 +142,40 @@ class HRDRModel(tf.keras.Model, ABC):
     @tf.function
     def call(self, inputs, training=None):
         user, item, user_ratings, item_ratings, user_reviews, item_reviews, = inputs
-        xu = self.user_projection_rating_network(user_ratings)
-        xi = self.item_projection_rating_network(item_ratings)
+        xu = self.user_projection_rating_network(user_ratings, training)
+        xi = self.item_projection_rating_network(item_ratings, training)
         ou = self.user_review_cnn_network(user_reviews)
         oi = self.item_review_cnn_network(item_reviews)
-        qru = self.user_review_attention_network(xu)
-        qri = self.item_review_attention_network(xi)
+        qru = self.user_review_attention_network(xu, training)
+        qri = self.item_review_attention_network(xi, training)
         au = tf.multiply(ou, qru)
         ai = tf.multiply(oi, qri)
+        au_norm = tf.nn.softmax(au)
+        ai_norm = tf.nn.softmax(ai)
+        ou = tf.reduce_sum(tf.multiply(ou, au_norm))
+        oi = tf.reduce_sum(tf.multiply(oi, ai_norm))
+        ou = self.user_final_representation_network(ou, training)
+        oi = self.item_final_representation_network(oi, training)
+        u = tf.nn.embedding_lookup(self.Gu, user)
+        i = tf.nn.embedding_lookup(self.Gi, item)
+        bu = tf.nn.embedding_lookup(self.Bu, user)
+        bi = tf.nn.embedding_lookup(self.Bi, item)
+        pu = tf.concat([xu, ou, u])
+        qi = tf.concat([xi, oi, i])
+        rui = tf.matmul(self.W1, tf.multiply(pu, qi)) + bu + bi + self.Mu
 
-        rui = 0.0
-
-        return rui
+        return self.sigmoid(rui), u, i, bu, bi
 
     @tf.function
-    def predict(self, start, stop):
-        return self.Bi + tf.matmul(self.Gu[start:stop], self.Gi, transpose_b=True)
+    def predict(self, inputs):
+        rui, _, _, _, _ = self(inputs, training=False)
+        return rui
 
     @tf.function
     def train_step(self, batch):
         with tf.GradientTape() as t:
             xui, gamma_u, gamma_i, beta_u, beta_i = \
-                self.call(inputs=batch, training=True)
+                self(inputs=batch, training=True)
 
             loss = tf.reduce_sum(tf.square(xui - 1.0))
 
@@ -173,21 +185,21 @@ class HRDRModel(tf.keras.Model, ABC):
                                                  tf.nn.l2_loss(beta_u),
                                                  tf.nn.l2_loss(beta_i)],
                                                 *[tf.nn.l2_loss(layer) for layer in
-                                                  self.user_projection_rating_network.trainable_variables]
-                                                * [tf.nn.l2_loss(layer) for layer in
-                                                    self.item_projection_rating_network.trainable_variables]
-                                                * [tf.nn.l2_loss(layer) for layer in
-                                                    self.user_review_cnn_network.trainable_variables]
-                                                * [tf.nn.l2_loss(layer) for layer in
-                                                    self.item_review_cnn_network.trainable_variables]
-                                                * [tf.nn.l2_loss(layer) for layer in
-                                                    self.user_review_attention_network.trainable_variables]
-                                                * [tf.nn.l2_loss(layer) for layer in
-                                                    self.item_review_attention_network.trainable_variables]
-                                                * [tf.nn.l2_loss(layer) for layer in
-                                                    self.user_final_representation_network.trainable_variables]
-                                                * [tf.nn.l2_loss(layer) for layer in
-                                                    self.item_final_representation_network.trainable_variables])
+                                                  self.user_projection_rating_network.trainable_variables],
+                                                *[tf.nn.l2_loss(layer) for layer in
+                                                  self.item_projection_rating_network.trainable_variables],
+                                                *[tf.nn.l2_loss(layer) for layer in
+                                                  self.user_review_cnn_network.trainable_variables],
+                                                *[tf.nn.l2_loss(layer) for layer in
+                                                  self.item_review_cnn_network.trainable_variables],
+                                                *[tf.nn.l2_loss(layer) for layer in
+                                                  self.user_review_attention_network.trainable_variables],
+                                                *[tf.nn.l2_loss(layer) for layer in
+                                                  self.item_review_attention_network.trainable_variables],
+                                                *[tf.nn.l2_loss(layer) for layer in
+                                                  self.user_final_representation_network.trainable_variables],
+                                                *[tf.nn.l2_loss(layer) for layer in
+                                                  self.item_final_representation_network.trainable_variables])
 
             # Loss to be optimized
             loss += reg_loss

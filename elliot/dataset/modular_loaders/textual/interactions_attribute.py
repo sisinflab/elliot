@@ -34,6 +34,7 @@ class InteractionsTextualAttributes(AbstractLoader):
         ns.__name__ = "InteractionsTextualAttributes"
         ns.object = self
         ns.textual_feature_folder_path = self.interactions_feature_folder_path
+        ns.interactions_path = self.interactions_path
 
         ns.user_mapping = self.user_mapping
         ns.item_mapping = self.item_mapping
