@@ -35,6 +35,6 @@ experiment:
       epochs: 20
       batch_size: 16
       embedding: [1,5,100]
-      first_order_limit: [100, 200, 400, 600]
-      second_order_limit: [0, 10, 100, 200]
+      first_order_limit: [3]
+      second_order_limit: [3]
       loader: KGINLoader

@@ -11,7 +11,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import Sequential
-from tensorflow.keras.layers import Dense
+from tensorflow.keras.layers import Dense, Layer, Input
 
 
 class MKRModel(keras.Model):
@@ -47,14 +47,22 @@ class MKRModel(keras.Model):
         self.rel_total = relation_total
         self.is_pretrained = False
 
+        self.rec_loss = tf.keras.losses.BinaryCrossentropy()
+
         # store item to item-entity to (entity, item)
         self.new_map = new_map
 
-        print()
         self.init_embeddings()
         self.init_MLPs()
+        self.init_CrossCompress()
 
-        print()
+        keys, values = tuple(zip(*self.new_map.items()))
+        init = tf.lookup.KeyValueTensorInitializer(keys, values)
+        self.paddingItems = tf.lookup.StaticHashTable(
+            init,
+            default_value=self.ent_total - 1)
+
+        self.optimizer = tf.optimizers.Adam(self.learning_rate)
 
     def init_embeddings(self):
 
@@ -81,7 +89,7 @@ class MKRModel(keras.Model):
         self.usr_embeddings(0)
 
         self.itm_embeddings = keras.layers.Embedding(input_dim=self.item_total, output_dim=self.embedding_size,
-                                                     embeddings_initializer=keras.initializers.GlorotNormal(),
+                                                     embeddings_initializer=initializer,
                                                      trainable=False, dtype=tf.float32,
                                                      embeddings_regularizer=keras.regularizers.l2(self.l2_lambda))
         self.itm_embeddings(0)
@@ -92,22 +100,34 @@ class MKRModel(keras.Model):
         actv = 'sigmoid'
 
         # TODO: dropout
-        self.user_mlp = keras.Sequential()
+        self.user_mlp = Sequential()
         [self.user_mlp.add(Dense(self.embedding_size,
-               activation=actv,
-               kernel_initializer=initializer)) for _ in range(self.L)]
+                                 activation=actv,
+                                 kernel_initializer=initializer)) for _ in range(self.L)]
+        self.user_mlp.build((None, self.embedding_size))
 
-        self.tail_mlp = keras.Sequential()
+        self.tail_mlp = Sequential()
         [self.tail_mlp.add(Dense(self.embedding_size,
-               activation=actv,
-               kernel_initializer=initializer)) for _ in range(self.L)]
+                                 activation=actv,
+                                 kernel_initializer=initializer)) for _ in range(self.L)]
+        self.tail_mlp.build((None, self.embedding_size))
 
-        self.kge_mlp = keras.Sequential()
-        [self.kge_mlp.add(Dense(self.embedding_size,
-               activation=actv,
-               kernel_initializer=initializer)) for _ in range(self.H)]
+        self.kge_mlp = Sequential()
+        [self.kge_mlp.add(Dense(self.embedding_size*2,
+                                activation=actv,
+                                kernel_initializer=initializer)) for _ in range(self.H)]
+        self.kge_mlp.build((None, self.embedding_size*2))
 
+    def init_CrossCompress(self):
+        emb = self.embedding_size
 
+        item_input = Input((emb, 1))
+        ent_input = Input((emb, 1))
+
+        x = CrossCompress(self.embedding_size)([item_input, ent_input])
+        for _ in range(self.L - 1):
+            x = CrossCompress(self.embedding_size)(x)
+        self.cc = keras.Model([item_input, ent_input], x)
 
     def get_config(self):
         raise NotImplementedError
@@ -115,36 +135,37 @@ class MKRModel(keras.Model):
     # @tf.function
     def call(self, inputs, training=None, **kwargs):
 
-        print()
-        u_e = tf.expand_dims(self.usr_embeddings(0), axis=0)
-        self.user_mlp(u_e)
-
         if kwargs['is_rec']:
             u_ids, i_ids = inputs
-            e_var = self.paddingItems.lookup(tf.squeeze(tf.cast(i_ids, tf.int32)))
-            u_e = self.user_embeddings(tf.squeeze(u_ids))
-            i_e = self.item_embeddings(tf.squeeze(i_ids))
-            e_e = self.ent_embeddings(tf.squeeze(e_var))
-            ie_e = i_e + e_e
 
-            score = tf.reduce_sum(u_e * ie_e, axis=-1)
+            # lookup embeddings
+            u_e = self.usr_embeddings(tf.squeeze(u_ids))
+            i_e = self.itm_embeddings(tf.squeeze(i_ids))
+            e_var = self.paddingItems.lookup(tf.squeeze(tf.cast(i_ids, tf.int32)))
+            e_e = tf.expand_dims(self.ent_embeddings(e_var), axis=-1)
+
+            # compute embeddings
+            u_e = self.user_mlp(u_e)
+            i_e, e_e = self.cc([i_e, e_e])
+            i_e = tf.squeeze(i_e)
+            score = tf.math.sigmoid(tf.reduce_sum(u_e * i_e, axis=1))
 
         elif not kwargs['is_rec']:
 
-            inputs = 0, 0, 0
-            h, t, r = inputs
-            h_e = self.ent_embeddings(h)
-            t_e = self.ent_embeddings(t)
-            r_e = self.rel_embeddings(r)
-            proj_e = self.proj_matices(r)
+            h, t, r = inputs[0], inputs[1], inputs[2]
+            h = h[0]
+            t = t[0]
+            r = r[0]
 
-            proj_h_e = self.projection_trans_r(h_e, proj_e)
-            proj_t_e = self.projection_trans_r(t_e, proj_e)
+            h_e = self.ent_embeddings(tf.squeeze(h))
+            t_e = self.ent_embeddings(tf.squeeze(t))
+            r_e = self.ent_embeddings(tf.squeeze(r))
 
-            if self.L1_flag:
-                score = tf.reduce_sum(tf.abs(proj_h_e + r_e - proj_t_e), -1)
-            else:
-                score = tf.reduce_sum((proj_h_e + r_e - proj_t_e) ** 2, -1)
+            h_e = self.cc.
+            # if self.L1_flag:
+            #     score = tf.reduce_sum(tf.abs(proj_h_e + r_e - proj_t_e), -1)
+            # else:
+            #     score = tf.reduce_sum((proj_h_e + r_e - proj_t_e) ** 2, -1)
 
         return score
 
@@ -171,21 +192,18 @@ class MKRModel(keras.Model):
 
     # @tf.function
     def train_step_rec(self, batch, **kwargs):
-
         with tf.GradientTape() as tape:
-            user, pos, neg = batch
+            user, item, rating = batch
 
-            pos_score = self.call(inputs=(user, pos), training=True, **kwargs)
-            neg_score = self.call(inputs=(user, neg), training=True, **kwargs)
+            score = self.call(inputs=(user, item), training=True, **kwargs)
+            loss = self.rec_loss(rating, score)
 
-            losses = self.bprLoss(pos_score, neg_score)
-            # losses += self.orthogonalLoss(self.pref_embeddings.weights[0], self.pref_norm_embeddings.weights[0])
-
-        grads = tape.gradient(losses, self.trainable_weights)
-        grads, _ = tf.clip_by_global_norm(grads, 5)  # fix clipping value
-        self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
-
-        return losses
+        user_mlp_grads, cc_grads = tape.gradient(loss, [self.user_mlp.trainable_weights, self.cc.trainable_weights])
+        user_mlp_grads, _ = tf.clip_by_global_norm(user_mlp_grads, 5)
+        cc_grads, _ = tf.clip_by_global_norm(cc_grads, 5)
+        self.optimizer.apply_gradients(zip(user_mlp_grads, self.user_mlp.trainable_weights))
+        self.optimizer.apply_gradients(zip(cc_grads, self.cc.trainable_weights))
+        return loss
 
     # @tf.function
     def train_step_kg(self, batch, **kwargs):
@@ -251,3 +269,33 @@ class MKRModel(keras.Model):
     def marginLoss(self, pos, neg, margin):
         zero_tensor = tf.zeros(len(pos))
         return tf.reduce_sum(tf.math.maximum(pos - neg + margin, zero_tensor))
+
+
+class CrossCompress(Layer):
+
+    def __init__(self, embedding_dim, **kwargs):
+        super(CrossCompress, self).__init__(**kwargs)
+        self.embedding_dim = embedding_dim
+
+    def build(self, input_shape):
+        w_initializer = tf.initializers.GlorotUniform()
+        b_initializer = tf.initializers.Zeros()
+        self.w_vv = tf.Variable(w_initializer(shape=(self.embedding_dim, 1)), trainable=True, name='w_vv')
+        self.w_ve = tf.Variable(w_initializer(shape=(self.embedding_dim, 1)), trainable=True, name='w_ve')
+        self.w_ev = tf.Variable(w_initializer(shape=(self.embedding_dim, 1)), trainable=True, name='w_ev')
+        self.w_ee = tf.Variable(w_initializer(shape=(self.embedding_dim, 1)), trainable=True, name='w_ee')
+        self.bias_v = tf.Variable(b_initializer(shape=(self.embedding_dim, 1)), trainable=True, name='b_v')
+        self.bias_e = tf.Variable(b_initializer(shape=(self.embedding_dim, 1)), trainable=True, name='b_e')
+        super(CrossCompress, self).build(input_shape)
+
+    def call(self, input_data, **kwargs):
+        item_embedding, entity_embedding = input_data
+        entity_embedding = tf.transpose(entity_embedding, perm=[0, 2, 1])
+        cross_matrix = tf.matmul(item_embedding, entity_embedding)
+        cross_matrixT = tf.transpose(cross_matrix, perm=[0, 2, 1])
+        item_embedding = tf.matmul(cross_matrix, self.w_vv) + tf.matmul(cross_matrixT, self.w_ev) + self.bias_v
+        entity_embedding = tf.matmul(cross_matrix, self.w_ve) + tf.matmul(cross_matrixT, self.w_ee) + self.bias_e
+        return [item_embedding, entity_embedding]
+
+    def compute_output_shape(self, input_shape):
+        return input_shape

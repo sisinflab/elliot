@@ -16,7 +16,7 @@ from tqdm import tqdm
 from elliot.recommender import BaseRecommenderModel
 from elliot.recommender.base_recommender_model import init_charger
 from elliot.recommender.recommender_utils_mixin import RecMixin
-from . import rating_sampler as rs
+from . import shuffle_sampler as rs
 from . import triple_sampler as ts
 from .MKRModel import MKRModel
 
@@ -50,7 +50,11 @@ class MKR(RecMixin, BaseRecommenderModel):
             ("_norm_lambda", "norm_lambda", "nl", 1, None, None),
             ("_kg_lambda", "kg_lambda", "kgl", 1, None, None),
             ("_use_st_gumbel", "use_st_gumbel", "gum", False, None, None),
-            ("_loader", "loader", "load", "KGRec", None, None)
+            ("_m", "m", "m", 1, int, None),
+            ("_loader", "loader", "load", "KGRec", None, None),
+            ("_low_layers", "low_layers", "low_layers", 2, int, None),
+            ("_high_layers", "high_layers", "high_layers", 5, int, None),
+
         ]
         self.autoset_params()
         self._step_to_switch = self._joint_ratio * 10
@@ -60,17 +64,14 @@ class MKR(RecMixin, BaseRecommenderModel):
         if self._batch_size < 1:
             self._batch_size = self._data.num_users
 
-        triple_epoch_length = math.ceil(float(len(self._side.Xs)) / (1 - self._joint_ratio))
-        rating_epoch_length = math.ceil(float(self._data.transactions) / self._joint_ratio)
-
+        #triple_epoch_length = math.ceil(float(len(self._side.Xs)) / (1 - self._joint_ratio))
+        triple_epoch_length = 1
+        rating_epoch_length = math.ceil(self._data.transactions)
         self._epoch_length = max(triple_epoch_length, rating_epoch_length)
-        self._sampler = rs.Sampler(self._data.i_train_dict, self._epoch_length)
+
+        self._sampler = rs.Sampler(self._data.i_train_dict, self._m, self._data.transactions, self._seed)
         self._triple_sampler = ts.Sampler(self._side.entity_to_idx, self._side.Xs, self._side.Xp, self._side.Xo,
                                           self._epoch_length)
-
-        # TODO:
-        self.low_layers = 2
-        self.high_layers = 5
 
         self._i_items_set = list(range(self._num_items))
 
@@ -79,8 +80,8 @@ class MKR(RecMixin, BaseRecommenderModel):
         ######################################
 
         self._model = MKRModel(self._learning_rate, self._L1, self._l2_lambda, self._embedding_size,
-                               self.low_layers,
-                               self.high_layers,
+                               self._low_layers,
+                               self._high_layers,
                                self._data.num_users, self._data.num_items, len(self._side.entity_set),
                                len(self._side.predicate_set), new_map)
 
@@ -99,20 +100,33 @@ class MKR(RecMixin, BaseRecommenderModel):
             loss = 0
             steps = 0
 
-            if it % 10 < self._step_to_switch:
-                with tqdm(total=int(self._epoch_length // self._batch_size), disable=not self._verbose) as t:
-                    for batch in self._sampler.step(self._batch_size):
-                        steps += 1
-                        loss += self._model.train_step_rec(batch, is_rec=True)
-                        t.set_postfix({'loss REC': f'{loss.numpy() / steps:.5f}'})
-                        t.update()
-            else:
-                with tqdm(total=int(self._epoch_length // self._batch_size), disable=not self._verbose) as t:
-                    for batch in self._triple_sampler.step(self._batch_size):
-                        steps += 1
-                        loss += self._model.train_step_kg(batch, is_rec=False, kg_lambda=self._kg_lambda)
-                        t.set_postfix({'loss KGC': f'{loss.numpy() / steps:.5f}'})
-                        t.update()
+            with tqdm(total=int(self._epoch_length // self._batch_size), disable=not self._verbose) as t:
+                for batch in self._triple_sampler.step(self._batch_size):
+
+                    self._model.call(batch, is_rec=False)
+
+                    # steps += 1
+                    # loss += self._model.train_step_kg(batch, is_rec=False, kg_lambda=self._kg_lambda)
+                    # t.set_postfix({'loss KGC': f'{loss.numpy() / steps:.5f}'})
+                    # t.update()
+
+            with tqdm(total=int(self._epoch_length // self._batch_size), disable=not self._verbose) as t:
+                for batch in self._sampler.step(self._batch_size):
+                    steps += 1
+                    loss += self._model.train_step_rec(batch, is_rec=True)
+                    t.set_postfix({'loss REC': f'{loss.numpy() / steps:.5f}'})
+                    t.update()
+
+            with tqdm(total=int(self._epoch_length // self._batch_size), disable=not self._verbose) as t:
+                for batch in self._triple_sampler.step(self._batch_size):
+
+                    h, r, t = batch[0][0], batch[0][1], batch[0][2]
+
+
+                    # steps += 1
+                    # loss += self._model.train_step_kg(batch, is_rec=False, kg_lambda=self._kg_lambda)
+                    # t.set_postfix({'loss KGC': f'{loss.numpy() / steps:.5f}'})
+                    # t.update()
 
             self.evaluate(it, loss / (it + 1))
 

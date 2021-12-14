@@ -94,7 +94,7 @@ class CKE(RecMixin, BaseRecommenderModel):
             loss = 0
             steps = 0
 
-            if it % 10 < self._step_to_switch:
+            if (it % 10) < self._step_to_switch:
                 with tqdm(total=int(self._epoch_length // self._batch_size), disable=not self._verbose) as t:
                     for batch in self._sampler.step(self._batch_size):
                         steps += 1
