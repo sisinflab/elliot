@@ -13,7 +13,7 @@ from .latent_factor_models import BPRMF, BPRMF_batch, WRMF, PureSVD, MF, FunkSVD
     FFM, BPRSlim, Slim, CML, FISM, SVDpp, MF2020, iALS
 from .unpersonalized import Random, MostPop
 from .autoencoders import MultiDAE, MultiVAE, EASER
-from .knowledge_aware import KaHFM, KaHFMBatch, KaHFMEmbeddings
+from .knowledge_aware import KaHFM, KaHFMBatch, KaHFMEmbeddings, KGIN
 from .graph_based import NGCF, LightGCN, RP3beta
 from .visual_recommenders import VBPR, DeepStyle, ACF, DVBPR, VNPR
 from .knn import ItemKNN, UserKNN, AttributeItemKNN, AttributeUserKNN

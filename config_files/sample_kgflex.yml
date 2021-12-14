@@ -1,21 +1,17 @@
 experiment:
-  dataset: yahoo
+  dataset: last-fm
   data_config:
     strategy: dataset
-    dataset_path: ../data/{0}/dataset.tsv
+    dataset_path: ../data/{0}/dataset.txt
 #    strategy: fixed
-#    train_path: ../data/{0}/trainingset.tsv
-#    test_path: ../data/{0}/testset.tsv
-    side_information:
-      - dataloader: KGFlexLoader
-        mapping: ../data/{0}/mapping.tsv
-        kg_train: ../data/{0}/kg_train.tsv
-        second_hop: ../data/{0}/kg_train_2hop.tsv
-        properties: ../data/{0}/properties.conf
-        additive: True
-  prefiltering:
-    strategy: iterative_k_core
-    core: 5
+#    train_path: ../data/{0}/train.txt
+#    test_path: ../data/{0}/test.txt
+#    side_information:
+#      - dataloader: KGINLoader
+#        attributes: ../data/{0}/kg_final.txt
+#  prefiltering:
+#    strategy: iterative_k_core
+#    core: 5
   splitting:
     test_splitting:
       strategy: random_subsampling
@@ -27,7 +23,7 @@ experiment:
     cutoffs: [10]
     simple_metrics: [nDCGRendle2020, nDCG, HR, Precision, Recall, MAP, MRR, ItemCoverage, UserCoverage, NumRetrieved, UserCoverage, Gini, SEntropy, EFD, EPC]
   models:
-    external.KGFlex:
+    KGIN:
       meta:
         verbose: True
         validation_rate: 10
@@ -41,4 +37,4 @@ experiment:
       embedding: [1,5,100]
       first_order_limit: [100, 200, 400, 600]
       second_order_limit: [0, 10, 100, 200]
-      loader: KGFlexLoader
+      loader: KGINLoader
