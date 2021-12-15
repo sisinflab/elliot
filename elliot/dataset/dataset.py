@@ -85,8 +85,9 @@ class DataSetLoader(LoaderCoordinator):
         elif config.data_config.strategy == "hierarchy":
             self.tuple_list = self.read_splitting(config.data_config.root_folder, column_names=self.column_names)
 
-            self.tuple_list, self.side_information = self.coordinate_information(self.tuple_list, sides=config.data_config.side_information,
-                                                                                     logger=self.logger)
+            self.tuple_list, self.side_information = self.coordinate_information(self.tuple_list,
+                                                                                 sides=config.data_config.side_information,
+                                                                                 logger=self.logger)
 
         elif config.data_config.strategy == "dataset":
             self.logger.info("There will be the splitting")
@@ -129,14 +130,17 @@ class DataSetLoader(LoaderCoordinator):
         for dirs in os.listdir(folder_path):
             for test_dir in dirs:
                 test_ = pd.read_csv(os.sep.join([folder_path, test_dir, "test.tsv"]), sep="\t", names=self.column_names)
-                val_dirs = [os.sep.join([folder_path, test_dir, val_dir]) for val_dir in os.listdir(os.sep.join([folder_path, test_dir])) if os.path.isdir(os.sep.join([folder_path, test_dir, val_dir]))]
+                val_dirs = [os.sep.join([folder_path, test_dir, val_dir]) for val_dir in
+                            os.listdir(os.sep.join([folder_path, test_dir])) if
+                            os.path.isdir(os.sep.join([folder_path, test_dir, val_dir]))]
                 val_list = []
                 for val_dir in val_dirs:
                     train_ = pd.read_csv(os.sep.join([val_dir, "train.tsv"]), sep="\t", names=self.column_names)
                     val_ = pd.read_csv(os.sep.join([val_dir, "val.tsv"]), sep="\t", names=self.column_names)
                     val_list.append((train_, val_))
                 if not val_list:
-                    val_list = pd.read_csv(os.sep.join([folder_path, test_dir, "train.tsv"]), sep="\t", names=self.column_names)
+                    val_list = pd.read_csv(os.sep.join([folder_path, test_dir, "train.tsv"]), sep="\t",
+                                           names=self.column_names)
                 tuple_list.append((val_list, test_))
 
         return tuple_list
@@ -150,13 +154,14 @@ class DataSetLoader(LoaderCoordinator):
                 val_list = []
                 for p2, (train, val) in enumerate(train_val):
                     self.logger.info(f"Test Fold {p1} - Validation Fold {p2}")
-                    single_dataobject = DataSet(self.config, (train,val,test), self.side_information, self.args, self.kwargs)
+                    single_dataobject = DataSet(self.config, (train, val, test), self.side_information, self.args,
+                                                self.kwargs)
                     val_list.append(single_dataobject)
                 data_list.append(val_list)
             else:
                 self.logger.info(f"Test Fold {p1}")
                 single_dataobject = DataSet(self.config, (train_val, test), self.side_information, self.args,
-                                                              self.kwargs)
+                                            self.kwargs)
                 data_list.append([single_dataobject])
         return data_list
 
@@ -174,6 +179,7 @@ class DataSetLoader(LoaderCoordinator):
 
         return data_list
 
+
 class DataSet(AbstractDataset):
     """
     Load train and test dataset
@@ -186,13 +192,14 @@ class DataSet(AbstractDataset):
         :param path_test_data: relative path for test file
         """
         self.logger = logging.get_logger(self.__class__.__name__, pylog.CRITICAL if config.config_test else
-                                         pylog.DEBUG)
+        pylog.DEBUG)
         self.config = config
         self.args = args
         self.kwargs = kwargs
 
         if self.config.align_side_with_train == True:
-            self.side_information = self.align_with_training(train=data_tuple[0], side_information_data=side_information_data)
+            self.side_information = self.align_with_training(train=data_tuple[0],
+                                                             side_information_data=side_information_data)
         else:
             self.side_information = side_information_data
 
@@ -205,8 +212,9 @@ class DataSet(AbstractDataset):
         self.transactions = sum(len(v) for v in self.train_dict.values())
 
         sparsity = 1 - (self.transactions / (self.num_users * self.num_items))
-        self.logger.info(f"Statistics\tUsers:\t{self.num_users}\tItems:\t{self.num_items}\tTransactions:\t{self.transactions}\t"
-                         f"Sparsity:\t{sparsity}")
+        self.logger.info(
+            f"Statistics\tUsers:\t{self.num_users}\tItems:\t{self.num_items}\tTransactions:\t{self.transactions}\t"
+            f"Sparsity:\t{sparsity}")
 
         self.private_users = {p: u for p, u in enumerate(self.users)}
         self.public_users = {v: k for k, v in self.private_users.items()}
@@ -214,7 +222,7 @@ class DataSet(AbstractDataset):
         self.public_items = {v: k for k, v in self.private_items.items()}
 
         self.i_train_dict = {self.public_users[user]: {self.public_items[i]: v for i, v in items.items()}
-                                for user, items in self.train_dict.items()}
+                             for user, items in self.train_dict.items()}
 
         self.sp_i_train = self.build_sparse()
         self.sp_i_train_ratings = self.build_sparse_ratings()
@@ -234,7 +242,8 @@ class DataSet(AbstractDataset):
             if hasattr(config, "negative_sampling"):
                 val_neg_samples, test_neg_samples = NegativeSampler.sample(config, self.public_users, self.public_items,
                                                                            self.private_users, self.private_items,
-                                                                           self.sp_i_train, self.val_dict, self.test_dict)
+                                                                           self.sp_i_train, self.val_dict,
+                                                                           self.test_dict)
                 sp_i_val = self.to_bool_sparse(self.val_dict)
                 sp_i_test = self.to_bool_sparse(self.test_dict)
                 val_candidate_items = val_neg_samples + sp_i_val
@@ -243,6 +252,13 @@ class DataSet(AbstractDataset):
                 self.test_mask = np.where((test_candidate_items.toarray() == True), True, False)
 
         self.allunrated_mask = np.where((self.sp_i_train.toarray() == 0), True, False)
+
+    def build_items_neighbour(self):
+        row, col = self.sp_i_train.nonzero()
+        edge_index = np.array([row, col])
+        iu_dict = {i: edge_index[0, iu].tolist() for i, iu in
+                   enumerate(list((edge_index[1] == i).nonzero()[0] for i in list(self.private_items.keys())))}
+        return iu_dict
 
     def dataframe_to_dict(self, data):
         "Conversion to Dictionary"
@@ -291,8 +307,10 @@ class DataSet(AbstractDataset):
 
     def align_with_training(self, train, side_information_data):
         """Alignment with training"""
+
         def equal(a, b, c):
             return len(a) == len(b) == len(c)
+
         train_dict = self.dataframe_to_dict(train)
         users = set(train_dict.keys())
         items = set({k for a in train_dict.values() for k in a.keys()})

@@ -51,7 +51,7 @@ class ModelCoordinator(object):
         self.logger.info("Hyperparameter tuning exploration:")
         for (k, v) in sampled_namespace.__dict__.items():
             model_params.__setattr__(k, v)
-            self.logger.info(f"{k} set to {model_params.__getattribute__(k)}")
+            self.logger.info(f"Exploration for {k}. Value extracted: {model_params.__getattribute__(k)}")
 
         losses = []
         results = []

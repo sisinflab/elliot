@@ -1,14 +1,14 @@
 experiment:
   version: 0.3.1
-  dataset: cat_dbpedia_movielens_1m
+  dataset: cat_dbpedia_movielens_1m_v030.yml
   data_config:
     strategy: dataset
-    dataset_path: ../data/cat_dbpedia_movielens_1m/dataset.tsv
+    dataset_path: ../data/cat_dbpedia_movielens_1m_v030/dataset.tsv
     side_information:
       - dataloader: ChainedKG
-        map: ../data/cat_dbpedia_movielens_1m/map.tsv
-        features: ../data/cat_dbpedia_movielens_1m/features.tsv
-        properties: ../data/cat_dbpedia_movielens_1m/properties.conf
+        map: ../data/cat_dbpedia_movielens_1m_v030/map.tsv
+        features: ../data/cat_dbpedia_movielens_1m_v030/features.tsv
+        properties: ../data/cat_dbpedia_movielens_1m_v030/properties.conf
 #  prefiltering:
 #    strategy: user_average # Not applied in the paper experiments
   splitting:

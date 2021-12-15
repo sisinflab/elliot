@@ -23,18 +23,17 @@ _rstate = np.random.RandomState(42)
 here = path.abspath(path.dirname(__file__))
 
 print(u'''
-__/\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\___/\\\\\\\\\\\\______/\\\\\\\\\\\\_________________________________________        
- _\\/\\\\\\///////////___\\////\\\\\\_____\\////\\\\\\_________________________________________       
-  _\\/\\\\\\_________________\\/\\\\\\________\\/\\\\\\______/\\\\\\_____________________/\\\\\\______      
-   _\\/\\\\\\\\\\\\\\\\\\\\\\_________\\/\\\\\\________\\/\\\\\\_____\\///_______/\\\\\\\\\\______/\\\\\\\\\\\\\\\\\\\\\\_     
-    _\\/\\\\\\///////__________\\/\\\\\\________\\/\\\\\\______/\\\\\\____/\\\\\\///\\\\\\___\\////\\\\\\////__    
-     _\\/\\\\\\_________________\\/\\\\\\________\\/\\\\\\_____\\/\\\\\\___/\\\\\\__\\//\\\\\\_____\\/\\\\\\______   
-      _\\/\\\\\\_________________\\/\\\\\\________\\/\\\\\\_____\\/\\\\\\__\\//\\\\\\__/\\\\\\______\\/\\\\\\_/\\\\__  
-       _\\/\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\___/\\\\\\\\\\\\\\\\\\___/\\\\\\\\\\\\\\\\\\__\\/\\\\\\___\\///\\\\\\\\\\/_______\\//\\\\\\\\\\___ 
-        _\\///////////////___\\/////////___\\/////////___\\///______\\/////__________\\/////____''')
 
-print(f'Version Number: {__version__}')
-
+  /\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\   /\\\\\\\\\\\\     /\\\\\\\\\\\\                         ''' + f'Version: {__version__}' + '''                              
+  \\/\\\\\\///////////   \\////\\\\\\    \\////\\\\\\                                            
+   \\/\\\\\\                 \\/\\\\\\        \\/\\\\\\      /\\\\\\                     /\\\\\\       
+    \\/\\\\\\\\\\\\\\\\\\\\\\         \\/\\\\\\        \\/\\\\\\     \\///       /\\\\\\\\\\      /\\\\\\\\\\\\\\\\\\\\\\     
+     \\/\\\\\\///////          \\/\\\\\\        \\/\\\\\\      /\\\\\\    /\\\\\\///\\\\\\   \\////\\\\\\////     
+      \\/\\\\\\                 \\/\\\\\\        \\/\\\\\\     \\/\\\\\\   /\\\\\\  \\//\\\\\\     \\/\\\\\\    
+       \\/\\\\\\                 \\/\\\\\\        \\/\\\\\\     \\/\\\\\\  \\//\\\\\\  /\\\\\\      \\/\\\\\\ /\\\\   
+        \\/\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\   /\\\\\\\\\\\\\\\\\\   /\\\\\\\\\\\\\\\\\\  \\/\\\\\\   \\///\\\\\\\\\\/       \\//\\\\\\\\\\  
+         \\///////////////   \\/////////   \\/////////   \\///      \\/////          \\/////    
+         ''')
 
 def run_experiment(config_path: str = ''):
     builder = NameSpaceBuilder(config_path, here, path.abspath(path.dirname(config_path)))
@@ -68,6 +67,7 @@ def run_experiment(config_path: str = ''):
                 spec = importlib.util.spec_from_file_location("external",
                                                               path.relpath(base.base_namespace.external_models_path))
                 external = importlib.util.module_from_spec(spec)
+                external.backend = base.base_namespace.backend
                 sys.modules[spec.name] = external
                 spec.loader.exec_module(external)
                 model_class = getattr(importlib.import_module("external"), key.split(".", 1)[1])
@@ -77,7 +77,7 @@ def run_experiment(config_path: str = ''):
             model_placeholder = ho.ModelCoordinator(data_test, base.base_namespace, model_base, model_class,
                                                     test_fold_index)
             if isinstance(model_base, tuple):
-                logger.info(f"Tuning begun for {model_class.__name__}\\n")
+                logger.info(f"Tuning begun for {model_class.__name__}\n")
                 trials = Trials()
                 fmin(model_placeholder.objective,
                      space=model_base[1],
@@ -100,7 +100,7 @@ def run_experiment(config_path: str = ''):
                 test_trials.append(trials)
                 logger.info(f"Tuning ended for {model_class.__name__}")
             else:
-                logger.info(f"Training begun for {model_class.__name__}\\n")
+                logger.info(f"Training begun for {model_class.__name__}\n")
                 single = model_placeholder.single()
 
                 ############################################
@@ -113,9 +113,9 @@ def run_experiment(config_path: str = ''):
                 test_results.append(single)
                 logger.info(f"Training ended for {model_class.__name__}")
 
-            logger.info(f"Loss:\\t{best_model_loss}")
-            logger.info(f"Best Model params:\\t{best_model_params}")
-            logger.info(f"Best Model results:\\t{best_model_results}")
+            logger.info(f"Loss:\t{best_model_loss}")
+            logger.info(f"Best Model params:\t{best_model_params}")
+            logger.info(f"Best Model results:\t{best_model_results}")
 
         # Migliore sui test, aggiunta a performance totali
         min_val = np.argmin([i["loss"] for i in test_results])

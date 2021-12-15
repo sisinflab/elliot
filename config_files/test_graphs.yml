@@ -1,0 +1,70 @@
+experiment:
+  data_config:
+    strategy: dataset
+    dataset_path: ../data/{0}/dataset.tsv
+  binarize: True
+  splitting:
+    validation_splitting:
+      strategy: temporal_hold_out
+      test_ratio: 0.1
+    test_splitting:
+      strategy: temporal_hold_out
+      test_ratio: 0.2
+  dataset: movielens_1m
+  top_k: 50
+  evaluation:
+    cutoffs: [5, 10, 20, 50]
+    simple_metrics: [HR, nDCG, Precision, Recall, EFD, EPC, ItemCoverage, Gini, PopREO, PopRSP, ARP]
+  gpu: 0
+  external_models_path: ../external/models/__init__.py
+  models:
+    Random:
+      meta:
+        save_recs: False
+    MostPop:
+      meta:
+        verbose: True
+        save_recs: False
+    MultiVAE:
+      meta:
+        hyper_max_evals: 20
+        hyper_opt_alg: tpe
+        save_recs: False
+        verbose: True
+      lr: [loguniform, -11.512925464970229, 0]
+      epochs: 200
+      batch_size: [ 128, 256, 512 ]
+      intermediate_dim: 600
+      latent_dim: 200
+      dropout_pkeep: 0.5
+      reg_lambda: [loguniform, -11.512925464970229, 0]
+    external.NGCF:
+      meta:
+        validation_rate: 50
+        verbose: True
+        save_weights: False
+        save_recs: False
+        validation_metric: nDCG
+        restore: False
+      lr: [0.0001, 0.0005, 0.001, 0.005]
+      epochs: 400
+      factors: 64
+      batch_size: 1024
+      l_w: [10e-5, 10e-4, 10e-3, 10e-2, 10e-1, 1, 10, 10e+2]
+      weight_size: [(64,64,64), (64,32,16)]
+      node_dropout: [(0,0,0), (0.2,0.2,0.2), (0.4,0.4,0.4), (0.6,0.6,0.6), (0.8,0.8,0.8)]
+      message_dropout: [(0,0,0), (0.2,0.2,0.2), (0.4,0.4,0.4), (0.6,0.6,0.6), (0.8,0.8,0.8)]
+    external.LightGCN:
+      meta:
+        validation_rate: 50
+        verbose: True
+        save_weights: False
+        save_recs: False
+        validation_metric: nDCG
+        restore: False
+      lr: [0.0001, 0.0005, 0.001, 0.005]
+      epochs: 400
+      factors: 64
+      batch_size: 1024
+      l_w: [10e-5, 10e-4, 10e-3, 10e-2, 10e-1, 1, 10, 10e+2]
+      n_layers: 3

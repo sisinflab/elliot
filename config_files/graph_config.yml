@@ -1,0 +1,118 @@
+experiment:
+  data_config:
+    strategy: dataset
+    dataset_path: ../data/{0}/dataset.tsv
+  splitting:
+    validation_splitting:
+      strategy: random_subsampling
+      leave_n_out: 1
+    test_splitting:
+      strategy: random_subsampling
+      leave_n_out: 1
+  dataset: movielens_1m
+  top_k: 100
+  evaluation:
+    simple_metrics: [HR, nDCG, Precision]
+    relevance_threshold: 1
+  gpu: 0
+  external_models_path: ../external/models/__init__.py
+  models:
+#    external.NGCF:
+#      meta:
+#        validation_rate: 1
+#        verbose: True
+#        save_weights: False
+#        save_recs: False
+#        validation_metric: nDCG
+#        restore: False
+#      lr: 0.0005
+#      epochs: 10
+#      factors: 64
+#      batch_size: 1024
+#      l_w: 0.1
+#      weight_size: (64,32,32)
+#      node_dropout: (0.1,0,0)
+#      message_dropout: (0.1,0,0)
+#    external.LightGCN:
+#      meta:
+#        validation_rate: 1
+#        verbose: True
+#        save_weights: False
+#        save_recs: False
+#        validation_metric: nDCG
+#        restore: False
+#      lr: 0.001
+#      epochs: 10
+#      factors: 64
+#      batch_size: 1024
+#      l_w: 0.0001
+#      n_layers: 3
+#    external.PinSage:
+#      meta:
+#        validation_rate: 1
+#        verbose: True
+#        save_weights: False
+#        save_recs: False
+#        validation_metric: nDCG
+#        restore: False
+#      lr: 0.0005
+#      epochs: 50
+#      batch_size: 1024
+#      factors: 64
+#      l_w: 0.1
+#      message_weight_size: (64,32,32)
+#      convolution_weight_size: (64,32,32)
+#      out_weight_size: (64,32)
+#      t_top_nodes: 10
+#      delta: 0.5
+#    external.GAT:
+#      meta:
+#        validation_rate: 1
+#        verbose: True
+#        save_weights: False
+#        save_recs: False
+#        validation_metric: nDCG
+#        restore: False
+#      lr: 0.0005
+#      epochs: 50
+#      batch_size: 1024
+#      factors: 64
+#      l_w: 0.1
+#      weight_size: (64,)
+#      heads: (4,)
+#      message_dropout: (0.1,)
+#    external.GCMC: # Must run on RAM, otherwise out-of-memory error
+#      meta:
+#        validation_rate: 1
+#        verbose: True
+#        save_weights: False
+#        save_recs: False
+#        validation_metric: nDCG
+#        restore: False
+#      lr: 0.0005
+#      epochs: 50
+#      batch_size: 512
+#      factors: 256
+#      l_w: 0.1
+#      convolutional_layer_size: (128,64)
+#      dense_layer_size: (32,16)
+#      node_dropout: ()
+#      dense_layer_dropout: (0.1,0)
+    external.DisenGCN:
+      meta:
+        validation_rate: 1
+        verbose: True
+        save_weights: False
+        save_recs: False
+        validation_metric: nDCG
+        restore: False
+      lr: 0.0005
+      epochs: 50
+      batch_size: 1
+      factors: 64
+      l_w: 0.1
+      weight_size: (64,32,16)
+      message_dropout: (0.1,0,0)
+      disen_k: (16,8,4)
+      temperature: 10
+      routing_iterations: 5

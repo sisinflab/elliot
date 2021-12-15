@@ -10,6 +10,7 @@ Summary
 .. autosummary::
 
     AMF.AMF.AMF
+    MSAPMF.MSAPMF.MSAPMF
     AMR.AMR.AMR
 
 AMF
@@ -17,6 +18,13 @@ AMF
 
 .. module:: elliot.recommender.adversarial.AMF.AMF
 .. autoclass:: AMF
+    :show-inheritance:
+
+MSAPMF
+~~~~~~~~~~~~~~~~
+
+.. module:: elliot.recommender.adversarial.MSAPMF.MSAPMF
+.. autoclass:: MSAPMF
     :show-inheritance:
 
 AMR
