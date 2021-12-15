@@ -1,14 +1,14 @@
 experiment:
   dataset: last-fm
   data_config:
-    strategy: dataset
-    dataset_path: ../data/{0}/dataset.txt
-#    strategy: fixed
-#    train_path: ../data/{0}/train.txt
-#    test_path: ../data/{0}/test.txt
-#    side_information:
-#      - dataloader: KGINLoader
-#        attributes: ../data/{0}/kg_final.txt
+#    strategy: dataset
+#    dataset_path: ../data/{0}/dataset.txt
+    strategy: fixed
+    train_path: ../data/{0}/train.txt
+    test_path: ../data/{0}/test.txt
+    side_information:
+      - dataloader: KGINLoader
+        attributes: ../data/{0}/kg_final.txt
 #  prefiltering:
 #    strategy: iterative_k_core
 #    core: 5

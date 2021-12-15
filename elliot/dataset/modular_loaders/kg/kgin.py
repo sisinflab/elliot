@@ -26,11 +26,7 @@ class KGINLoader(AbstractLoader):
         ns = SimpleNamespace()
         ns.__name__ = "KGINLoader"
         ns.object = self
-        ns.feature_map = self.map_
-        ns.features = list({f for i in self.items for f in ns.feature_map[i]})
-        ns.nfeatures = len(ns.features)
-        ns.private_features = {p: f for p, f in enumerate(ns.features)}
-        ns.public_features = {v: k for k, v in ns.private_features.items()}
+        ns.__dict__.update(self.__dict__)
         return ns
 
     def read_triplets(self, file_name):
