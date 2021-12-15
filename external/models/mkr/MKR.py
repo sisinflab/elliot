@@ -64,14 +64,21 @@ class MKR(RecMixin, BaseRecommenderModel):
         if self._batch_size < 1:
             self._batch_size = self._data.num_users
 
-        #triple_epoch_length = math.ceil(float(len(self._side.Xs)) / (1 - self._joint_ratio))
         triple_epoch_length = 1
         rating_epoch_length = math.ceil(self._data.transactions)
         self._epoch_length = max(triple_epoch_length, rating_epoch_length)
 
         self._sampler = rs.Sampler(self._data.i_train_dict, self._m, self._data.transactions, self._seed)
-        self._triple_sampler = ts.Sampler(self._side.entity_to_idx, self._side.Xs, self._side.Xp, self._side.Xo,
-                                          self._epoch_length)
+
+
+
+        ######################################################################################################
+        ######################################################################################################
+        self._triple_sampler = ts.Sampler(item_entity=self._side.public_items_entitiesidx, entity_to_idx=self._side.entity_to_idx, Xs=self._side.Xs, Xp=self._side.Xp, Xo=self._side.Xo, seed=self._seed)
+        ######################################################################################################
+        ######################################################################################################
+
+
 
         self._i_items_set = list(range(self._num_items))
 
@@ -79,11 +86,7 @@ class MKR(RecMixin, BaseRecommenderModel):
         new_map.update({self._data.public_items[i]: idx for i, idx in self._side.public_items_entitiesidx.items()})
         ######################################
 
-        self._model = MKRModel(self._learning_rate, self._L1, self._l2_lambda, self._embedding_size,
-                               self._low_layers,
-                               self._high_layers,
-                               self._data.num_users, self._data.num_items, len(self._side.entity_set),
-                               len(self._side.predicate_set), new_map)
+        self._model = MKRModel(self._learning_rate, self._L1, self._l2_lambda, self._embedding_size, self._low_layers, self._high_layers, self._data.num_users, self._data.num_items, len(self._side.entity_set), len(self._side.predicate_set), new_map)
 
     @property
     def name(self):
@@ -116,10 +119,8 @@ class MKR(RecMixin, BaseRecommenderModel):
                     loss += self._model.train_step_rec(batch, is_rec=True)
                     t.set_postfix({'loss REC': f'{loss.numpy() / steps:.5f}'})
                     t.update()
-
             with tqdm(total=int(self._epoch_length // self._batch_size), disable=not self._verbose) as t:
                 for batch in self._triple_sampler.step(self._batch_size):
-
                     h, r, t = batch[0][0], batch[0][1], batch[0][2]
 
 

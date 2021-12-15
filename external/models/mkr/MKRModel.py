@@ -161,7 +161,7 @@ class MKRModel(keras.Model):
             t_e = self.ent_embeddings(tf.squeeze(t))
             r_e = self.ent_embeddings(tf.squeeze(r))
 
-            h_e = self.cc.
+            # h_e = self.cc.
             # if self.L1_flag:
             #     score = tf.reduce_sum(tf.abs(proj_h_e + r_e - proj_t_e), -1)
             # else:

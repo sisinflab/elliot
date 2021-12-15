@@ -8,48 +8,49 @@ __author__ = 'Vito Walter Anelli, Claudio Pomo, Alberto Carlo Maria Mancino'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, alberto.mancino@poliba.it'
 
 import random
-
 import numpy as np
 
 
 class Sampler:
-    def __init__(self, entity_to_idx, Xs, Xp, Xo, events
-                 ):
-        random.seed(42)
-        self.events = events
+    def __init__(self, item_entity, entity_to_idx, Xs, Xp, Xo, seed):
+        random.seed(seed)
         self.Xs, self.Xp, self.Xo = Xs, Xp, Xo
-        # self.headDict = {(p, o): s for s, p, o in zip(Xs, Xp, Xo)}
-        # self.tailDict = {(s, p): o for s, p, o in zip(Xs, Xp, Xo)}
         self.headDict = {}
         self.tailDict = {}
         for s, p, o in zip(Xs, Xp, Xo):
             self.headDict.setdefault((p, o), []).append(s)
             self.tailDict.setdefault((s, p), []).append(o)
         self.entity_total = list(range(len(entity_to_idx)))
+        self.triples_idx = list(range(len(self.Xs)))
+        self.entity_item = {e: i for i, e in item_entity.items()}
+        print('debug')
+
 
     def step(self, batch_size: int):
-        ntriples = len(self.Xs)
-        # shuffled_list = random.sample(range(ntriples), self.events)
-        shuffled_list = [random.choice(range(ntriples)) for _ in range(self.events)]
+        s, p, o = [], [], []
+        sn, pn, on = [], [], []
 
-        for start_idx in range(0, self.events, batch_size):
-            end_idx = min(start_idx + batch_size, self.events)
-            ph, pr, pt = self.Xs[shuffled_list[start_idx:end_idx]], self.Xp[shuffled_list[start_idx:end_idx]], self.Xo[shuffled_list[start_idx:end_idx]]
-            nh, nr, nt = self.getTrainTripleBatch(zip(ph, pr, pt))
-            yield ph, pr, pt, nh, nr, nt
+        for _ in range(batch_size):
+            idx = random.choice(self.triples_idx)
+            idxn = random.choice(self.triples_idx)
+            s.append(self.Xs[idx])
+            p.append(self.Xp[idx])
+            o.append(self.Xo[idx])
+
+            sn_, pn_, on_ = self.corrupt_tail_filter((self.Xs[idxn], self.Xp[idxn], self.Xo[idxn]))
+            sn.append(sn_)
+            pn.append(pn_)
+            on.append(on_)
+
+        return s, p, o, sn, pn, on
 
     def getTrainTripleBatch(self, triple_batch):
         negTripleList = [self.corrupt_head_filter(triple) if random.random() < 0.5
                          else self.corrupt_tail_filter(triple) for triple in
                          triple_batch]
-        # yield u, pi, ni, each list contains batch size ids,
-        # ph, pt, pr = getTripleElements(triple_batch)
         nh, nr, nt = zip(*negTripleList)
         return np.array(nh, dtype=np.int32), np.array(nr, dtype=np.int32), np.array(nt, dtype=np.int32)
 
-    # Change the head of a triple randomly,
-    # with checking whether it is a false negative sample.
-    # If it is, regenerate.
     def corrupt_head_filter(self, triple):
         while True:
             newHead = random.choice(self.entity_total)
@@ -59,12 +60,6 @@ class Sampler:
                 rt = (triple[1], triple[2])
                 if newHead in self.headDict[rt]:
                     continue
-                # for head_dict in headDicts:
-                #     if tr in head_dict and newHead in head_dict[tr]:
-                #         has_exist = True
-                #         break
-                # if has_exist:
-                #     continue
                 else:
                     break
             else:
@@ -80,12 +75,6 @@ class Sampler:
                 hr = (triple[0], triple[1])
                 if newTail in self.tailDict[hr]:
                     continue
-                # for head_dict in headDicts:
-                #     if tr in head_dict and newHead in head_dict[tr]:
-                #         has_exist = True
-                #         break
-                # if has_exist:
-                #     continue
                 else:
                     break
             else:
