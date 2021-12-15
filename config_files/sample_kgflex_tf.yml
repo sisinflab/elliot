@@ -43,6 +43,6 @@ experiment:
       # batch_size: 128
       embedding: 128
       # embedding: 256
-      first_order_limit: 200
-      second_order_limit: 200
+      first_order_limit: 5
+      second_order_limit: 5
       loader: KGFlexLoader

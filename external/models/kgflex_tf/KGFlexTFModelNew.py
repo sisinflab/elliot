@@ -39,7 +39,8 @@ class KGFlexTFModel(keras.Model):
         self.initializer = tf.initializers.RandomNormal(stddev=0.1)
 
         self.K = user_feature_weights
-        self.F_B = tf.Variable(self.initializer(shape=[self.num_features]), name='F_B', dtype=tf.float32)
+        # self.F_B = tf.Variable(self.initializer(shape=[self.num_features]), name='F_B', dtype=tf.float32)
+        self.G_B = tf.Variable(self.initializer(shape=[]), name='G_B', dtype=tf.float32)
         self.I_B = tf.Variable(self.initializer(shape=[self.num_items]), name='I_B', dtype=tf.float32)
         self.U_B = tf.Variable(self.initializer(shape=[self.num_users]), name='U_B', dtype=tf.float32)
         self.H = tf.Variable(self.initializer(shape=[self.num_users, self._factors]), name='H', dtype=tf.float32)
@@ -54,9 +55,10 @@ class KGFlexTFModel(keras.Model):
         h_u = tf.squeeze(tf.nn.embedding_lookup(self.H, user))
         z_u = h_u @ tf.transpose(self.G)  # num_features x 1
         k_u = tf.squeeze(tf.nn.embedding_lookup(self.K, user))  # num_features x 1
-        a_u = k_u * (tf.add(z_u, self.F_B))
-        ui_pairs = tf.stack([tf.squeeze(user), tf.squeeze(item)], axis=-1)
-        features = tf.gather_nd(self.C, ui_pairs)
+        # a_u = k_u * (tf.add(z_u, self.F_B))
+        a_u = k_u * z_u # fine parte collaborativa 1 x f
+        # ui_pairs = tf.stack([tf.squeeze(user), tf.squeeze(item)], axis=-1)
+        features = tf.gather_nd(self.C, item)
         # u_b = tf.squeeze(tf.nn.embedding_lookup(self.U_B, user))
         # i_b = tf.squeeze(tf.nn.embedding_lookup(self.I_B, item))
         # x_ui = tf.add(tf.add(tf.reduce_sum(tf.gather(a_u, features, batch_dims=1), axis=-1), u_b), i_b)
