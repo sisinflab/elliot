@@ -260,7 +260,7 @@ class DataSet(AbstractDataset):
                    enumerate(list((edge_index[1] == i).nonzero()[0] for i in list(self.private_items.keys())))}
         return iu_dict
 
-        def dataframe_to_dict(self, data):
+    def dataframe_to_dict(self, data):
         users = list(data['userId'].unique())
 
         "Conversion to Dictionary"
