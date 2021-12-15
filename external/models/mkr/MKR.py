@@ -68,22 +68,14 @@ class MKR(RecMixin, BaseRecommenderModel):
         rating_epoch_length = math.ceil(self._data.transactions)
         self._epoch_length = max(triple_epoch_length, rating_epoch_length)
 
+        private_items_entitiesidx = defaultdict(lambda: -1)
+        private_items_entitiesidx.update({self._data.public_items[i]: idx for i, idx in self._side.public_items_entitiesidx.items()})
+
         self._sampler = rs.Sampler(self._data.i_train_dict, self._m, self._data.transactions, self._seed)
-
-
-
-        ######################################################################################################
-        ######################################################################################################
-        self._triple_sampler = ts.Sampler(item_entity=self._side.public_items_entitiesidx, entity_to_idx=self._side.entity_to_idx, Xs=self._side.Xs, Xp=self._side.Xp, Xo=self._side.Xo, seed=self._seed)
-        ######################################################################################################
-        ######################################################################################################
-
-
+        self._triple_sampler = ts.Sampler(item_entity=private_items_entitiesidx, entity_to_idx=self._side.entity_to_idx, Xs=self._side.Xs, Xp=self._side.Xp, Xo=self._side.Xo, seed=self._seed)
 
         self._i_items_set = list(range(self._num_items))
 
-        new_map = defaultdict(lambda: -1)
-        new_map.update({self._data.public_items[i]: idx for i, idx in self._side.public_items_entitiesidx.items()})
         ######################################
 
         self._model = MKRModel(self._learning_rate, self._L1, self._l2_lambda, self._embedding_size, self._low_layers, self._high_layers, self._data.num_users, self._data.num_items, len(self._side.entity_set), len(self._side.predicate_set), new_map)
@@ -104,9 +96,9 @@ class MKR(RecMixin, BaseRecommenderModel):
             steps = 0
 
             with tqdm(total=int(self._epoch_length // self._batch_size), disable=not self._verbose) as t:
-                for batch in self._triple_sampler.step(self._batch_size):
+                batch = self._triple_sampler.step(self._batch_size)
 
-                    self._model.call(batch, is_rec=False)
+                self._model.call(batch, is_rec=False)
 
                     # steps += 1
                     # loss += self._model.train_step_kg(batch, is_rec=False, kg_lambda=self._kg_lambda)
@@ -120,10 +112,8 @@ class MKR(RecMixin, BaseRecommenderModel):
                     t.set_postfix({'loss REC': f'{loss.numpy() / steps:.5f}'})
                     t.update()
             with tqdm(total=int(self._epoch_length // self._batch_size), disable=not self._verbose) as t:
-                for batch in self._triple_sampler.step(self._batch_size):
-                    h, r, t = batch[0][0], batch[0][1], batch[0][2]
-
-
+                for triples in self._triple_sampler.step(self._batch_size):
+                    pass
                     # steps += 1
                     # loss += self._model.train_step_kg(batch, is_rec=False, kg_lambda=self._kg_lambda)
                     # t.set_postfix({'loss KGC': f'{loss.numpy() / steps:.5f}'})
