@@ -1,22 +1,41 @@
-Proxy Model
+Evaluation of recommendation files
 ======================
 
-Elliot offers a lot of metrics to evaluate system's performance. Could be happen that during the experiment we forgot to
-involve some metrics or we have to compare the recommendations' model with respect to other baselines. Elliot provides
-a facilities to restore old recommendations and use them for the overall evaluation of the running experiment.
+Sometimes, the practitioner could need to evaluate an already computed recommendation file.
+Either we forgot to involve some metrics or we want to compare our models with external baselines, Elliot provides
+a facility to restore recommendation files and use them for the overall evaluation of the running experiment.
 
-This is a sample config file with a proxy model restoring specific recommendations
+This is a sample config file with a proxy model restoring a recommendation file:
 
 .. code:: yaml
 
     experiment:
         ...
-        model:
-            external.ProxyRecommender:
-            path: path/to/recs/of/specific/model.tsv
+        models:
+            ProxyRecommender:
+                path: path/to/recs/of/specific/model.tsv
             ItemKNN:
                 ...
 
 
-``external.ProxyRecommender`` is a fake recommender model which is able to restore old recommendation and prepare all
-inner data structures to support evaluation like Elliot expects
+``ProxyRecommender`` is a fake recommender model which is able to restore old recommendation and prepare all
+inner data structures to support Elliot evaluation pipeline.
+
+Additionally, Elliot provides the practitioners with a facility to evaluate all the recommendation files stored in a folder.
+
+This is a sample config file to restore recommendation files from a folder:
+
+.. code:: yaml
+
+    experiment:
+        ...
+        models:
+            RecommendationFolder:
+                folder: path/to/recs/folder
+            ItemKNN:
+                ...
+
+
+``RecommendationFolder`` is a fake recommendation model that restores all the recommendation files found in the target ``folder`` and prepare all
+inner data structures to support Elliot evaluation pipeline.
+

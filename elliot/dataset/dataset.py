@@ -261,20 +261,12 @@ class DataSet(AbstractDataset):
         return iu_dict
 
     def dataframe_to_dict(self, data):
-        users = list(data['userId'].unique())
-
         "Conversion to Dictionary"
-        ratings = {}
-        for u in users:
-            sel_ = data[data['userId'] == u]
-            ratings[u] = dict(zip(sel_['itemId'], sel_['rating']))
+        ratings = {k: f.groupby('itemId')['rating'].apply(float).to_dict() for k, f in data.groupby('userId')}
         return ratings
 
     def build_dict(self, dataframe, users):
-        ratings = {}
-        for u in users:
-            sel_ = dataframe[dataframe['userId'] == u]
-            ratings[u] = dict(zip(sel_['itemId'], sel_['rating']))
+        ratings = {k: f.groupby('itemId')['rating'].apply(float).to_dict() for k, f in dataframe.groupby('userId') if k in users}
         return ratings
 
     def build_sparse(self):
