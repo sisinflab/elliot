@@ -26,7 +26,6 @@ class Sampler:
         self.entity_total = list(range(len(entity_to_idx)))
         self.triples_idx = list(range(len(self.triples)))
         self.entity_item = {e: i for i, e in item_entity.items()}
-        print('debug')
 
     def step(self, batch_size: int):
         s, p, o, i = [], [], [], []
@@ -48,7 +47,7 @@ class Sampler:
             on.append(on_)
             ii.append(self.entity_item[sn_])
 
-        return s, p, o, sn, pn, on
+        return s, p, o, i, sn, pn, on, ii
 
     def getTrainTripleBatch(self, triple_batch):
         negTripleList = [self.corrupt_head_filter(triple) if random.random() < 0.5

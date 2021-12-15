@@ -78,7 +78,7 @@ class MKR(RecMixin, BaseRecommenderModel):
 
         ######################################
 
-        self._model = MKRModel(self._learning_rate, self._L1, self._l2_lambda, self._embedding_size, self._low_layers, self._high_layers, self._data.num_users, self._data.num_items, len(self._side.entity_set), len(self._side.predicate_set), new_map)
+        self._model = MKRModel(self._learning_rate, self._L1, self._l2_lambda, self._embedding_size, self._low_layers, self._high_layers, self._data.num_users, self._data.num_items, len(self._side.entity_set), len(self._side.predicate_set), private_items_entitiesidx)
 
     @property
     def name(self):
@@ -97,13 +97,11 @@ class MKR(RecMixin, BaseRecommenderModel):
 
             with tqdm(total=int(self._epoch_length // self._batch_size), disable=not self._verbose) as t:
                 batch = self._triple_sampler.step(self._batch_size)
-
                 self._model.call(batch, is_rec=False)
-
-                    # steps += 1
-                    # loss += self._model.train_step_kg(batch, is_rec=False, kg_lambda=self._kg_lambda)
-                    # t.set_postfix({'loss KGC': f'{loss.numpy() / steps:.5f}'})
-                    # t.update()
+                # steps += 1
+                # loss += self._model.train_step_kg(batch, is_rec=False, kg_lambda=self._kg_lambda)
+                # t.set_postfix({'loss KGC': f'{loss.numpy() / steps:.5f}'})
+                # t.update()
 
             with tqdm(total=int(self._epoch_length // self._batch_size), disable=not self._verbose) as t:
                 for batch in self._sampler.step(self._batch_size):
