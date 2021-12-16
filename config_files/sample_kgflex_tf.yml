@@ -13,7 +13,7 @@ experiment:
         additive: True
   prefiltering:
     strategy: iterative_k_core
-    core: 10
+    core: 5
   splitting:
     test_splitting:
         strategy: random_subsampling
@@ -36,13 +36,13 @@ experiment:
         hyper_max_evals: 10
         hyper_opt_alg: tpe
       seed: 42
-      lr: 0.00054
+      lr: 0.0001
       # lr: 0.001
       epochs: 50
       batch_size: 64
       # batch_size: 128
       embedding: 128
       # embedding: 256
-      first_order_limit: 5
-      second_order_limit: 5
+      first_order_limit: 100
+      second_order_limit: 100
       loader: KGFlexLoader
