@@ -152,7 +152,7 @@ class MKRModel(keras.Model):
 
         elif not kwargs['is_rec']:
 
-            h, t, r = inputs[0], inputs[1], inputs[2]
+            h, p, t, v, hn, pn, tn, vn = inputs
             h = h[0]
             t = t[0]
             r = r[0]
