@@ -105,8 +105,8 @@ class KGFlexTFModel(keras.Model):
         A = self.K * Z_plus_bias
         # predictions = tf.add(tf.add(tf.reduce_sum(tf.gather(A, self.C, batch_dims=1), axis=-1).to_tensor(),
         #                             tf.reshape(self.U_B, [-1, 1])), self.I_B)
-        predictions = tf.reduce_sum(tf.gather(A, tf.ragged.stack([self.C] * self.num_users), batch_dims=1), axis=-1).to_tensor()
-
+        # predictions = tf.reduce_sum(tf.gather(A, tf.ragged.stack([self.C] * self.num_users), batch_dims=1), axis=-1).to_tensor()
+        predictions = tf.reduce_sum(tf.gather(A, self.C, batch_dims=1), axis=-1).to_tensor()
         return predictions
 
     def get_all_topks(self, predictions, mask, k, user_map, item_map):
