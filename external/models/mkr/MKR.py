@@ -52,8 +52,8 @@ class MKR(RecMixin, BaseRecommenderModel):
             ("_use_st_gumbel", "use_st_gumbel", "gum", False, None, None),
             ("_m", "m", "m", 1, int, None),
             ("_loader", "loader", "load", "KGRec", None, None),
-            ("_low_layers", "low_layers", "low_layers", 2, int, None),
-            ("_high_layers", "high_layers", "high_layers", 5, int, None),
+            ("_low_layers", "low_layers", "low_layers", 1, int, None),
+            ("_high_layers", "high_layers", "high_layers", 1, int, None),
 
         ]
         self.autoset_params()
@@ -72,11 +72,9 @@ class MKR(RecMixin, BaseRecommenderModel):
         private_items_entitiesidx.update({self._data.public_items[i]: idx for i, idx in self._side.public_items_entitiesidx.items()})
 
         self._sampler = rs.Sampler(self._data.i_train_dict, self._m, self._data.transactions, self._seed)
-        self._triple_sampler = ts.Sampler(item_entity=private_items_entitiesidx, entity_to_idx=self._side.entity_to_idx, Xs=self._side.Xs, Xp=self._side.Xp, Xo=self._side.Xo, seed=self._seed)
+        self._triple_sampler = ts.Sampler(item_entity=private_items_entitiesidx, entity_to_idx=self._side.entity_to_idx, Xs=self._side.Xs, Xp=self._side.Xp, Xo=self._side.Xo, neg_per_pos=2, seed=self._seed)
 
         self._i_items_set = list(range(self._num_items))
-
-        ######################################
 
         self._model = MKRModel(self._learning_rate, self._L1, self._l2_lambda, self._embedding_size, self._low_layers, self._high_layers, self._data.num_users, self._data.num_items, len(self._side.entity_set), len(self._side.predicate_set), private_items_entitiesidx)
 
@@ -96,33 +94,24 @@ class MKR(RecMixin, BaseRecommenderModel):
             steps = 0
 
             with tqdm(total=int(self._epoch_length // self._batch_size), disable=not self._verbose) as t:
-                batch = self._triple_sampler.step(self._batch_size)
-                self._model.call(batch, is_rec=False)
-                # steps += 1
-                # loss += self._model.train_step_kg(batch, is_rec=False, kg_lambda=self._kg_lambda)
-                # t.set_postfix({'loss KGC': f'{loss.numpy() / steps:.5f}'})
-                # t.update()
-
-            with tqdm(total=int(self._epoch_length // self._batch_size), disable=not self._verbose) as t:
                 for batch in self._sampler.step(self._batch_size):
                     steps += 1
                     loss += self._model.train_step_rec(batch, is_rec=True)
                     t.set_postfix({'loss REC': f'{loss.numpy() / steps:.5f}'})
                     t.update()
-            with tqdm(total=int(self._epoch_length // self._batch_size), disable=not self._verbose) as t:
-                for triples in self._triple_sampler.step(self._batch_size):
-                    pass
-                    # steps += 1
-                    # loss += self._model.train_step_kg(batch, is_rec=False, kg_lambda=self._kg_lambda)
-                    # t.set_postfix({'loss KGC': f'{loss.numpy() / steps:.5f}'})
-                    # t.update()
+            with tqdm(total=1, disable=not self._verbose) as t:
+                batch = self._triple_sampler.step(self._batch_size)
+                steps += 1
+                loss += self._model.train_step_kg(batch, is_rec=False)
+                t.set_postfix({'loss KGC': f'{loss.numpy() / steps:.5f}'})
+                t.update(self._batch_size)
 
             self.evaluate(it, loss / (it + 1))
 
     def get_recommendations(self, k: int = 100):
         predictions_top_k_test = {}
         predictions_top_k_val = {}
-        for index, offset in enumerate(range(0, self._num_users, self._batch_size)):
+        for index, offset in tqdm(enumerate(range(0, self._num_users, self._batch_size))):
             offset_stop = min(offset + self._batch_size, self._num_users)
             predictions = self._model.get_recs(
                 (

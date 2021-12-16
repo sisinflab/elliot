@@ -12,6 +12,7 @@ import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import Sequential
 from tensorflow.keras.layers import Dense, Layer, Input
+from tqdm import tqdm
 
 
 class MKRModel(keras.Model):
@@ -106,17 +107,20 @@ class MKRModel(keras.Model):
                                  kernel_initializer=initializer)) for _ in range(self.L)]
         self.user_mlp.build((None, self.embedding_size))
 
-        self.tail_mlp = Sequential()
-        [self.tail_mlp.add(Dense(self.embedding_size,
-                                 activation=actv,
-                                 kernel_initializer=initializer)) for _ in range(self.L)]
-        self.tail_mlp.build((None, self.embedding_size))
+        self.rel_mlp = Sequential()
+        [self.rel_mlp.add(Dense(self.embedding_size,
+                                activation=actv,
+                                kernel_initializer=initializer)) for _ in range(self.L)]
+        self.rel_mlp.build((None, self.embedding_size))
 
         self.kge_mlp = Sequential()
-        [self.kge_mlp.add(Dense(self.embedding_size*2,
+        [self.kge_mlp.add(Dense(self.embedding_size * 2,
                                 activation=actv,
-                                kernel_initializer=initializer)) for _ in range(self.H)]
-        self.kge_mlp.build((None, self.embedding_size*2))
+                                kernel_initializer=initializer)) for _ in range(self.H - 1)]
+        self.kge_mlp.add(Dense(self.embedding_size,
+                               activation=actv,
+                               kernel_initializer=initializer))
+        self.kge_mlp.build((None, self.embedding_size * 2))
 
     def init_CrossCompress(self):
         emb = self.embedding_size
@@ -135,6 +139,8 @@ class MKRModel(keras.Model):
     # @tf.function
     def call(self, inputs, training=None, **kwargs):
 
+        score = 0
+
         if kwargs['is_rec']:
             u_ids, i_ids = inputs
 
@@ -146,26 +152,27 @@ class MKRModel(keras.Model):
 
             # compute embeddings
             u_e = self.user_mlp(u_e)
-            i_e, e_e = self.cc([i_e, e_e])
+            i_e, _ = self.cc([i_e, e_e])
             i_e = tf.squeeze(i_e)
             score = tf.math.sigmoid(tf.reduce_sum(u_e * i_e, axis=1))
 
         elif not kwargs['is_rec']:
 
-            h, p, t, v, hn, pn, tn, vn = inputs
-            h = h[0]
-            t = t[0]
-            r = r[0]
+            h, r, t, v, pn = inputs
 
             h_e = self.ent_embeddings(tf.squeeze(h))
-            t_e = self.ent_embeddings(tf.squeeze(t))
-            r_e = self.ent_embeddings(tf.squeeze(r))
+            v_e = self.itm_embeddings(tf.squeeze(v))
+            _, h_e = self.cc([v_e, h_e])
+            h_e = tf.squeeze(h_e)
 
-            # h_e = self.cc.
-            # if self.L1_flag:
-            #     score = tf.reduce_sum(tf.abs(proj_h_e + r_e - proj_t_e), -1)
-            # else:
-            #     score = tf.reduce_sum((proj_h_e + r_e - proj_t_e) ** 2, -1)
+            r_e = self.rel_embeddings(tf.squeeze(r))
+            r_e = self.rel_mlp(r_e)
+
+            hr_e = tf.concat([h_e, r_e], axis=1)
+            t_pred = self.kge_mlp(hr_e)
+
+            t_e = self.ent_embeddings(tf.squeeze(t))
+            score = tf.sigmoid(tf.reduce_sum((t_e * t_pred), axis=1)) * pn
 
         return score
 
@@ -208,24 +215,20 @@ class MKRModel(keras.Model):
     # @tf.function
     def train_step_kg(self, batch, **kwargs):
         with tf.GradientTape() as tape:
-            ph, pr, pt, nh, nr, nt = batch
+            scores = self.call(inputs=batch, training=True, **kwargs)
+            loss = tf.reduce_sum(scores)
 
-            pos_score = self.call(inputs=(ph, pt, pr), training=True, **kwargs)
-            neg_score = self.call(inputs=(nh, nt, nr), training=True, **kwargs)
+        rel_mlp_grads, kge_mlp_grads, cc_grads = tape.gradient(loss, [self.rel_mlp.trainable_weights,
+                                                                      self.kge_mlp.trainable_weights,
+                                                                      self.cc.trainable_weights])
+        rel_mlp_grads, _ = tf.clip_by_global_norm(rel_mlp_grads, 5)
+        kge_mlp_grads, _ = tf.clip_by_global_norm(kge_mlp_grads, 5)
+        cc_grads, _ = tf.clip_by_global_norm(cc_grads, 5)
 
-            losses = self.marginLoss(pos_score, neg_score, 1)  # fix margin loss value
-            ent_embeddings = self.ent_embeddings(tf.concat([ph, pt, nh, nt], 0))
-            rel_embeddings = self.rel_embeddings(tf.concat([pr, nr], 0))
-            norm_embeddings = self.norm_embeddings(tf.concat([pr, nr], 0))
-            losses += self.orthogonalLoss(rel_embeddings, norm_embeddings)
-            losses += self.normLoss(ent_embeddings) + self.normLoss(rel_embeddings)
-            losses = kwargs['kg_lambda'] * losses
-
-        grads = tape.gradient(losses, self.trainable_weights)
-        grads, _ = tf.clip_by_global_norm(grads, 1)  # fix clipping value
-        self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
-
-        return losses
+        self.optimizer.apply_gradients(zip(rel_mlp_grads, self.rel_mlp.trainable_weights))
+        self.optimizer.apply_gradients(zip(kge_mlp_grads, self.kge_mlp.trainable_weights))
+        self.optimizer.apply_gradients(zip(cc_grads, self.cc.trainable_weights))
+        return loss
 
     # @tf.function
     def predict(self, inputs, training=False, **kwargs):
@@ -240,10 +243,18 @@ class MKRModel(keras.Model):
         Returns:
             The matrix of predicted values.
         """
-        u_ids, i_ids = inputs
-        score = self.call(inputs=(u_ids, i_ids), training=False, is_rec=True, **kwargs)
+        # u_ids = [u for u_ in inputs[0] for u in u_]
+        # i_ids = [i for i_ in inputs[1] for i in i_]
+        # recs = []
+        # for i in inputs:
+        #     recs.append(self.call(inputs=(i[0], i[1]), training=False, is_rec=True, **kwargs))
 
-        return tf.squeeze(score)
+        recs = []
+        for u_, i_ in zip(inputs[0], inputs[1]):
+            recs.append(self.call(inputs=(u_, i_), training=False, is_rec=True, **kwargs))
+        recs = np.array(recs)
+
+        return recs
 
     # @tf.function
     def get_top_k(self, preds, train_mask, k=100):

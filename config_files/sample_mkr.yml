@@ -42,13 +42,13 @@ experiment:
       meta:
         hyper_max_evals: 1
         hyper_opt_alg: tpe
-        validation_rate: 10
+        validation_rate: 1
         verbose: True
         save_weights: False
         save_recs: False
 #        restore: True
       learning_rate: 0.1
-      embedding_size: 5
+      embedding_size: 8
       l2_lambda: 0.0
       epochs: 10
       batch_size: 600
