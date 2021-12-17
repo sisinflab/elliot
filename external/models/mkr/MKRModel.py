@@ -59,9 +59,7 @@ class MKRModel(keras.Model):
 
         keys, values = tuple(zip(*self.new_map.items()))
         init = tf.lookup.KeyValueTensorInitializer(keys, values)
-        self.paddingItems = tf.lookup.StaticHashTable(
-            init,
-            default_value=self.ent_total - 1)
+        self.paddingItems = tf.lookup.StaticHashTable(init, default_value=self.ent_total - 1)
 
         self.optimizer = tf.optimizers.Adam(self.learning_rate)
 
@@ -206,8 +204,8 @@ class MKRModel(keras.Model):
             loss = self.rec_loss(rating, score)
 
         user_mlp_grads, cc_grads = tape.gradient(loss, [self.user_mlp.trainable_weights, self.cc.trainable_weights])
-        user_mlp_grads, _ = tf.clip_by_global_norm(user_mlp_grads, 5)
-        cc_grads, _ = tf.clip_by_global_norm(cc_grads, 5)
+        # user_mlp_grads, _ = tf.clip_by_global_norm(user_mlp_grads, 5)
+        # cc_grads, _ = tf.clip_by_global_norm(cc_grads, 5)
         self.optimizer.apply_gradients(zip(user_mlp_grads, self.user_mlp.trainable_weights))
         self.optimizer.apply_gradients(zip(cc_grads, self.cc.trainable_weights))
         return loss
@@ -256,18 +254,18 @@ class MKRModel(keras.Model):
         loss = - tf.math.log_sigmoid(target * (pos - neg))
         return tf.reduce_mean(loss)
 
-    # @tf.function
+    @tf.function
     def orthogonalLoss(self, rel_embeddings, norm_embeddings):
         return tf.reduce_sum(
             tf.reduce_sum(norm_embeddings * rel_embeddings, axis=-1, keepdims=True) ** 2 /
             tf.reduce_sum(rel_embeddings ** 2, axis=-1, keepdims=True))
 
-    # @tf.function
+    @tf.function
     def normLoss(self, embeddings, dim=-1):
         norm = tf.reduce_sum(embeddings ** 2, axis=dim, keepdims=True)
         return tf.reduce_sum(tf.math.maximum(norm - self.one, self.zero))
 
-    # @tf.function
+    @tf.function
     def marginLoss(self, pos, neg, margin):
         zero_tensor = tf.zeros(len(pos))
         return tf.reduce_sum(tf.math.maximum(pos - neg + margin, zero_tensor))

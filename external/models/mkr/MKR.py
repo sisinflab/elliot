@@ -43,22 +43,20 @@ class MKR(RecMixin, BaseRecommenderModel):
 
         # autoset params
         self._params_list = [
-            ("_l2_lambda", "l2_lambda", "l2", 1e-5, None, None),
             ("_embedding_size", "embedding_size", "es", 64, int, None),
             ("_learning_rate", "lr", "lr", 0.001, None, None),
-            ("_joint_ratio", "joint_ratio", "jr", 0.7, None, None),
             ("_L1", "L1_flag", "l1", True, None, None),
+            ("_l2_lambda", "l2_lambda", "l2", 1e-5, None, None),
             ("_norm_lambda", "norm_lambda", "nl", 1, None, None),
             ("_kg_lambda", "kg_lambda", "kgl", 1, None, None),
-            ("_use_st_gumbel", "use_st_gumbel", "gum", False, None, None),
             ("_m", "m", "m", 1, int, None),
+            ("_mkg", "m_kg", "m_kg", 1, int, None),
             ("_loader", "loader", "load", "KGRec", None, None),
             ("_low_layers", "low_layers", "low_layers", 1, int, None),
             ("_high_layers", "high_layers", "high_layers", 1, int, None),
-
+            ("_batch_size_kg", "batch_size_kg", "batch_size_kg", 64, int, None),
         ]
         self.autoset_params()
-        self._step_to_switch = self._joint_ratio * 10
         self._side = getattr(self._data.side_information, self._loader, None)
 
         self._iteration = 0
@@ -69,19 +67,25 @@ class MKR(RecMixin, BaseRecommenderModel):
         rating_epoch_length = math.ceil(self._data.transactions)
         self._epoch_length = max(triple_epoch_length, rating_epoch_length)
 
+        # map private items with their entities
         private_items_entitiesidx = defaultdict(lambda: -1)
-        private_items_entitiesidx.update({self._data.public_items[i]: idx for i, idx in self._side.public_items_entitiesidx.items()})
+        private_items_entitiesidx.update(
+            {self._data.public_items[i]: idx for i, idx in self._side.public_items_entitiesidx.items()})
 
         self._sampler = rs.Sampler(self._data.i_train_dict, self._m, self._data.transactions, self._seed)
-        self._triple_sampler = ts.Sampler(item_entity=private_items_entitiesidx, entity_to_idx=self._side.entity_to_idx, Xs=self._side.Xs, Xp=self._side.Xp, Xo=self._side.Xo, neg_per_pos=2, seed=self._seed)
+        self._triple_sampler = ts.Sampler(item_entity=private_items_entitiesidx, entity_to_idx=self._side.entity_to_idx,
+                                          Xs=self._side.Xs, Xp=self._side.Xp, Xo=self._side.Xo, neg_per_pos=self._mkg,
+                                          seed=self._seed)
 
         self._i_items_set = list(range(self._num_items))
 
-        self._model = MKRModel(self._learning_rate, self._L1, self._l2_lambda, self._embedding_size, self._low_layers, self._high_layers, self._data.num_users, self._data.num_items, len(self._side.entity_set), len(self._side.predicate_set), private_items_entitiesidx)
+        self._model = MKRModel(self._learning_rate, self._L1, self._l2_lambda, self._embedding_size, self._low_layers,
+                               self._high_layers, self._data.num_users, self._data.num_items,
+                               len(self._side.entity_set), len(self._side.predicate_set), private_items_entitiesidx)
 
     @property
     def name(self):
-        return "kTUP" \
+        return "kMKR" \
                + "_e:" + str(self._epochs) \
                + "_bs:" + str(self._batch_size) \
                + f"_{self.get_params_shortcut()}"
@@ -100,12 +104,12 @@ class MKR(RecMixin, BaseRecommenderModel):
                     loss += self._model.train_step_rec(batch, is_rec=True)
                     t.set_postfix({'loss REC': f'{loss.numpy() / steps:.5f}'})
                     t.update()
-            with tqdm(total=1, disable=not self._verbose) as t:
                 batch = self._triple_sampler.step(self._batch_size)
                 steps += 1
                 loss += self._model.train_step_kg(batch, is_rec=False)
                 t.set_postfix({'loss KGC': f'{loss.numpy() / steps:.5f}'})
                 t.update(self._batch_size)
+
             self.evaluate(it, loss / (it + 1))
 
     def get_recommendations(self, k: int = 100):
