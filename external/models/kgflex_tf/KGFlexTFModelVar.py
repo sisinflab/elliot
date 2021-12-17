@@ -98,7 +98,7 @@ class KGFlexTFModel(keras.Model):
         output = self.call(inputs=inputs, training=training)
         return output
 
-    @tf.function
+    # @tf.function
     def get_all_recs(self):
         Z = self.H @ tf.transpose(self.G)
         Z_plus_bias = tf.add(Z, self.F_B)
