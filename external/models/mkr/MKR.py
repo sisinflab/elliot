@@ -11,6 +11,7 @@ import math
 from collections import defaultdict
 
 import numpy as np
+import tensorflow as tf
 from tqdm import tqdm
 
 from elliot.recommender import BaseRecommenderModel
@@ -105,20 +106,20 @@ class MKR(RecMixin, BaseRecommenderModel):
                 loss += self._model.train_step_kg(batch, is_rec=False)
                 t.set_postfix({'loss KGC': f'{loss.numpy() / steps:.5f}'})
                 t.update(self._batch_size)
-
             self.evaluate(it, loss / (it + 1))
 
     def get_recommendations(self, k: int = 100):
         predictions_top_k_test = {}
         predictions_top_k_val = {}
-        for index, offset in tqdm(enumerate(range(0, self._num_users, self._batch_size))):
+        for index, offset in enumerate(range(0, self._num_users, self._batch_size)):
             offset_stop = min(offset + self._batch_size, self._num_users)
+            usr = np.repeat(np.array(list(range(offset, offset_stop)))[:, None], repeats=self._num_items, axis=1)
+            itm = np.array([self._i_items_set for _ in range(offset, offset_stop)])
+            shape = usr.shape
             predictions = self._model.get_recs(
-                (
-                    np.repeat(np.array(list(range(offset, offset_stop)))[:, None], repeats=self._num_items, axis=1),
-                    np.array([self._i_items_set for _ in range(offset, offset_stop)])
-                )
+                (tf.reshape(usr, -1), tf.reshape(itm, -1),)
             )
+            predictions = tf.reshape(predictions, shape)
             recs_val, recs_test = self.process_protocol(k, predictions, offset, offset_stop)
 
             predictions_top_k_val.update(recs_val)

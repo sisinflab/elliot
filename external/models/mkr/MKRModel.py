@@ -176,7 +176,7 @@ class MKRModel(keras.Model):
 
         return score
 
-    # @tf.function
+    @tf.function
     def getPreferences(self, u_e, i_e, use_st_gumbel=False):
         # use item and user embedding to compute preference distribution
         # pre_probs: batch * rel, or batch * item * rel
@@ -190,14 +190,14 @@ class MKRModel(keras.Model):
 
         return pre_probs, r_e, norm
 
-    # @tf.function
+    @tf.function
     def projection_trans_r(self, original, trans_m):
         embedding_size = original.shape[0]
         rel_embedding_size = trans_m.shape[0] // embedding_size
         trans_resh = tf.reshape(trans_m, (embedding_size, rel_embedding_size))
         return tf.tensordot(original, trans_resh, axes=1)
 
-    # @tf.function
+    @tf.function
     def train_step_rec(self, batch, **kwargs):
         with tf.GradientTape() as tape:
             user, item, rating = batch
@@ -212,7 +212,7 @@ class MKRModel(keras.Model):
         self.optimizer.apply_gradients(zip(cc_grads, self.cc.trainable_weights))
         return loss
 
-    # @tf.function
+    @tf.function
     def train_step_kg(self, batch, **kwargs):
         with tf.GradientTape() as tape:
             scores = self.call(inputs=batch, training=True, **kwargs)
@@ -230,12 +230,12 @@ class MKRModel(keras.Model):
         self.optimizer.apply_gradients(zip(cc_grads, self.cc.trainable_weights))
         return loss
 
-    # @tf.function
+    @tf.function
     def predict(self, inputs, training=False, **kwargs):
         score = self.call(inputs=inputs, training=training, is_rec=True)
         return score
 
-    # @tf.function
+    @tf.function
     def get_recs(self, inputs, training=False, **kwargs):
         """
         Get full predictions on the whole users/items matrix.
@@ -243,20 +243,11 @@ class MKRModel(keras.Model):
         Returns:
             The matrix of predicted values.
         """
-        # u_ids = [u for u_ in inputs[0] for u in u_]
-        # i_ids = [i for i_ in inputs[1] for i in i_]
-        # recs = []
-        # for i in inputs:
-        #     recs.append(self.call(inputs=(i[0], i[1]), training=False, is_rec=True, **kwargs))
+        u_ids = inputs[0]
+        i_ids = inputs[1]
+        return self.call(inputs=(u_ids, i_ids), training=False, is_rec=True, **kwargs)
 
-        recs = []
-        for u_, i_ in zip(inputs[0], inputs[1]):
-            recs.append(self.call(inputs=(u_, i_), training=False, is_rec=True, **kwargs))
-        recs = np.array(recs)
-
-        return recs
-
-    # @tf.function
+    @tf.function
     def get_top_k(self, preds, train_mask, k=100):
         return tf.nn.top_k(tf.where(train_mask, preds, -np.inf), k=k, sorted=True)
 
