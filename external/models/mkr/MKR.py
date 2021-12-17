@@ -50,7 +50,7 @@ class MKR(RecMixin, BaseRecommenderModel):
             ("_norm_lambda", "norm_lambda", "nl", 1, None, None),
             ("_kg_lambda", "kg_lambda", "kgl", 1, None, None),
             ("_m", "m", "m", 1, int, None),
-            ("_mkg", "m_kg", "m_kg", 1, int, None),
+            ("_mkge", "m_kge", "m_kge", 1, int, None),
             ("_loader", "loader", "load", "KGRec", None, None),
             ("_low_layers", "low_layers", "low_layers", 1, int, None),
             ("_high_layers", "high_layers", "high_layers", 1, int, None),
@@ -74,7 +74,7 @@ class MKR(RecMixin, BaseRecommenderModel):
 
         self._sampler = rs.Sampler(self._data.i_train_dict, self._m, self._data.transactions, self._seed)
         self._triple_sampler = ts.Sampler(item_entity=private_items_entitiesidx, entity_to_idx=self._side.entity_to_idx,
-                                          Xs=self._side.Xs, Xp=self._side.Xp, Xo=self._side.Xo, neg_per_pos=self._mkg,
+                                          Xs=self._side.Xs, Xp=self._side.Xp, Xo=self._side.Xo, neg_per_pos=self._mkge,
                                           seed=self._seed)
 
         self._i_items_set = list(range(self._num_items))

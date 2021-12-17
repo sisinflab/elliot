@@ -12,7 +12,6 @@ import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import Sequential
 from tensorflow.keras.layers import Dense, Layer, Input
-from tqdm import tqdm
 
 
 class MKRModel(keras.Model):
@@ -29,7 +28,7 @@ class MKRModel(keras.Model):
                  item_total,
                  entity_total,
                  relation_total,
-                 new_map,
+                 private_items_entitiesidx,
                  name="mkr",
                  **kwargs):
         super().__init__(name=name, **kwargs)
@@ -51,13 +50,13 @@ class MKRModel(keras.Model):
         self.rec_loss = tf.keras.losses.BinaryCrossentropy()
 
         # store item to item-entity to (entity, item)
-        self.new_map = new_map
+        self.private_items_entitiesidx = private_items_entitiesidx
 
         self.init_embeddings()
         self.init_MLPs()
         self.init_CrossCompress()
 
-        keys, values = tuple(zip(*self.new_map.items()))
+        keys, values = tuple(zip(*self.private_items_entitiesidx.items()))
         init = tf.lookup.KeyValueTensorInitializer(keys, values)
         self.paddingItems = tf.lookup.StaticHashTable(init, default_value=self.ent_total - 1)
 
@@ -135,7 +134,7 @@ class MKRModel(keras.Model):
         raise NotImplementedError
 
     # @tf.function
-    def call(self, inputs, training=None, **kwargs):
+    def call(self, inputs, **kwargs):
 
         score = 0
 
@@ -175,27 +174,6 @@ class MKRModel(keras.Model):
         return score
 
     @tf.function
-    def getPreferences(self, u_e, i_e, use_st_gumbel=False):
-        # use item and user embedding to compute preference distribution
-        # pre_probs: batch * rel, or batch * item * rel
-        pre_probs = tf.matmul(u_e + i_e,
-                              tf.transpose(self.pref_embeddings.weights[0] + self.rel_embeddings.weights[0])) / 2
-        if use_st_gumbel:
-            pre_probs = self.st_gumbel_softmax(pre_probs)
-
-        r_e = tf.matmul(pre_probs, self.pref_embeddings.weights[0] + self.rel_embeddings.weights[0]) / 2
-        norm = tf.matmul(pre_probs, self.pref_norm_embeddings.weights[0] + self.norm_embeddings.weights[0]) / 2
-
-        return pre_probs, r_e, norm
-
-    @tf.function
-    def projection_trans_r(self, original, trans_m):
-        embedding_size = original.shape[0]
-        rel_embedding_size = trans_m.shape[0] // embedding_size
-        trans_resh = tf.reshape(trans_m, (embedding_size, rel_embedding_size))
-        return tf.tensordot(original, trans_resh, axes=1)
-
-    @tf.function
     def train_step_rec(self, batch, **kwargs):
         with tf.GradientTape() as tape:
             user, item, rating = batch
@@ -204,8 +182,8 @@ class MKRModel(keras.Model):
             loss = self.rec_loss(rating, score)
 
         user_mlp_grads, cc_grads = tape.gradient(loss, [self.user_mlp.trainable_weights, self.cc.trainable_weights])
-        # user_mlp_grads, _ = tf.clip_by_global_norm(user_mlp_grads, 5)
-        # cc_grads, _ = tf.clip_by_global_norm(cc_grads, 5)
+        user_mlp_grads, _ = tf.clip_by_global_norm(user_mlp_grads, 5)
+        cc_grads, _ = tf.clip_by_global_norm(cc_grads, 5)
         self.optimizer.apply_gradients(zip(user_mlp_grads, self.user_mlp.trainable_weights))
         self.optimizer.apply_gradients(zip(cc_grads, self.cc.trainable_weights))
         return loss
@@ -248,27 +226,6 @@ class MKRModel(keras.Model):
     @tf.function
     def get_top_k(self, preds, train_mask, k=100):
         return tf.nn.top_k(tf.where(train_mask, preds, -np.inf), k=k, sorted=True)
-
-    # @tf.function
-    def bprLoss(self, pos, neg, target=1.0):
-        loss = - tf.math.log_sigmoid(target * (pos - neg))
-        return tf.reduce_mean(loss)
-
-    @tf.function
-    def orthogonalLoss(self, rel_embeddings, norm_embeddings):
-        return tf.reduce_sum(
-            tf.reduce_sum(norm_embeddings * rel_embeddings, axis=-1, keepdims=True) ** 2 /
-            tf.reduce_sum(rel_embeddings ** 2, axis=-1, keepdims=True))
-
-    @tf.function
-    def normLoss(self, embeddings, dim=-1):
-        norm = tf.reduce_sum(embeddings ** 2, axis=dim, keepdims=True)
-        return tf.reduce_sum(tf.math.maximum(norm - self.one, self.zero))
-
-    @tf.function
-    def marginLoss(self, pos, neg, margin):
-        zero_tensor = tf.zeros(len(pos))
-        return tf.reduce_sum(tf.math.maximum(pos - neg + margin, zero_tensor))
 
 
 class CrossCompress(Layer):
