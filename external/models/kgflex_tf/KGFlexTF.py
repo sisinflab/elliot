@@ -9,8 +9,8 @@ import tensorflow as tf
 from elliot.recommender import BaseRecommenderModel
 from elliot.recommender.base_recommender_model import init_charger
 from elliot.recommender.recommender_utils_mixin import RecMixin
-from elliot.dataset.samplers import custom_sampler as cs
 
+from . import custom_sampler as cs
 from .UserFeatureMapper import UserFeatureMapper
 from .KGFlexTFModelNew import KGFlexTFModel
 from .tfidf_utils import TFIDF
@@ -136,31 +136,31 @@ class KGFlexTF(RecMixin, BaseRecommenderModel):
         self.tfidf_obj = TFIDF(item_features)
         self.tfidf = self.tfidf_obj.tfidf()
 
-        M = np.zeros((self._data.num_items, len(features)))
+        M = np.zeros((self._data.num_items, len(feature_key_mapping)))
         for i in self.tfidf:
             M[tuple([i] * len(self.tfidf[i])), tuple(self.tfidf[i].keys())] = list(self.tfidf[i].values())
 
-        def uif_args():
-            return ((users_features[u],
-                     item_features,
-                     feature_key_mapping) for u in self._data.private_users.keys())
-
-        arguments = uif_args()
-        with mp.Pool(processes=mp.cpu_count()) as pool:
-            user_item_features = pool.starmap(uif_worker, tqdm(arguments, total=len(self._data.private_users.keys()),
-                                                               desc='User-Item Features'))
-
-        user_item_features = tf.ragged.stack(user_item_features)
+        # def uif_args():
+        #     return ((users_features[u],
+        #              item_features,
+        #              feature_key_mapping) for u in self._data.private_users.keys())
+        #
+        # arguments = uif_args()
+        # with mp.Pool(processes=mp.cpu_count()) as pool:
+        #     user_item_features = pool.starmap(uif_worker, tqdm(arguments, total=len(self._data.private_users.keys()),
+        #                                                        desc='User-Item Features'))
+        #
+        # user_item_features = tf.ragged.stack(user_item_features)
 
         print('FATTO!')
 
-        self._sampler = cs.Sampler(self._data.i_train_dict)
+        self._sampler = cs.Sampler(self._data.i_train_dict, m=5)
 
         # ------------------------------ MODEL ------------------------------
         self._model = KGFlexTFModel(num_users=self._data.num_users,
                                     num_items=self._data.num_items,
                                     user_feature_weights=user_feature_weights,
-                                    user_item_features=user_item_features,
+                                    user_item_features=M,
                                     num_features=len(feature_key_mapping),
                                     factors=self._embedding,
                                     learning_rate=self._lr)
@@ -185,10 +185,11 @@ class KGFlexTF(RecMixin, BaseRecommenderModel):
         for it in self.iterate(self._epochs):
             loss = 0
             steps = 0
-            with tqdm(total=int(self._data.transactions // self._batch_size), disable=not self._verbose) as t:
-                for batch in self._sampler.step(self._data.transactions, self._batch_size):
+            # TODO: Sistemare 1 + 1 con self._m + 1
+            with tqdm(total=int(self._data.transactions * (5 + 1) // self._batch_size), disable=not self._verbose) as t:
+                for batch in self._sampler.step(self._batch_size):
                     steps += 1
-                    loss += self._model.train_step(batch)
+                    loss += self._model.train_step(batch).numpy()
                     t.set_postfix({'loss': f'{loss / steps:.5f}'})
                     t.update()
             self.evaluate(it, loss)

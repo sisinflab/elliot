@@ -126,10 +126,10 @@ def features_entropy(pos_counter, neg_counter, counter):
         ig = info_gain(pos_counter[positive_feature], neg_counter[positive_feature], counter)
         if ig > 0:
             attribute_entropies[positive_feature] = ig
-    for negative_feature in neg_counter:
-        ig = info_gain(pos_counter[negative_feature], neg_counter[negative_feature], counter)
-        if ig > 0:
-            attribute_entropies[negative_feature] = ig
+    # for negative_feature in neg_counter:
+    #     ig = info_gain(pos_counter[negative_feature], neg_counter[negative_feature], counter)
+    #     if ig > 0:
+    #         attribute_entropies[negative_feature] = ig
 
 
     return OrderedDict(sorted(attribute_entropies.items(), key=itemgetter(1, 0), reverse=True))
