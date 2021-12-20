@@ -10,7 +10,8 @@ from elliot.recommender import BaseRecommenderModel
 from elliot.recommender.base_recommender_model import init_charger
 from elliot.recommender.recommender_utils_mixin import RecMixin
 
-from . import custom_sampler as cs
+from elliot.dataset.samplers import custom_sampler as cs
+
 from .UserFeatureMapper import UserFeatureMapper
 from .KGFlexTFModelNew import KGFlexTFModel
 from .tfidf_utils import TFIDF
@@ -126,12 +127,14 @@ class KGFlexTF(RecMixin, BaseRecommenderModel):
         for i in range(self._data.num_items):
             features = self.item_features[i]
             common = set.intersection(set(feature_key_mapping.keys()), features)
-            # item_features[i] = list(map(lambda x: feature_key_mapping[x], common))
             item_features[i] = list(map(lambda x: feature_key_mapping[x], common))
+            # item_features.append(list(map(lambda x: feature_key_mapping[x], common)))
 
         # for k, v in self.item_features.items():
         #     common = set.intersection(set(feature_key_mapping.keys()), v)
         #     item_features[k] = list(map(lambda x: feature_key_mapping[x], common))
+
+        # RIMETTERE DA QUI PER TFIDF
 
         self.tfidf_obj = TFIDF(item_features)
         self.tfidf = self.tfidf_obj.tfidf()
@@ -154,7 +157,7 @@ class KGFlexTF(RecMixin, BaseRecommenderModel):
 
         print('FATTO!')
 
-        self._sampler = cs.Sampler(self._data.i_train_dict, m=5)
+        self._sampler = cs.Sampler(self._data.i_train_dict)
 
         # ------------------------------ MODEL ------------------------------
         self._model = KGFlexTFModel(num_users=self._data.num_users,
@@ -185,11 +188,10 @@ class KGFlexTF(RecMixin, BaseRecommenderModel):
         for it in self.iterate(self._epochs):
             loss = 0
             steps = 0
-            # TODO: Sistemare 1 + 1 con self._m + 1
-            with tqdm(total=int(self._data.transactions * (5 + 1) // self._batch_size), disable=not self._verbose) as t:
-                for batch in self._sampler.step(self._batch_size):
+            with tqdm(total=int(self._data.transactions // self._batch_size), disable=not self._verbose) as t:
+                for batch in self._sampler.step(self._data.transactions, self._batch_size):
                     steps += 1
-                    loss += self._model.train_step(batch).numpy()
+                    loss += self._model.train_step(batch)
                     t.set_postfix({'loss': f'{loss / steps:.5f}'})
                     t.update()
             self.evaluate(it, loss)

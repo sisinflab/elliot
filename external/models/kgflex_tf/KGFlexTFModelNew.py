@@ -40,12 +40,13 @@ class KGFlexTFModel(keras.Model):
 
         self.K = user_feature_weights
         self.glob_B = tf.Variable(self.initializer(shape=[]), name='glob_B', dtype=tf.float32)
-        # self.F_B = tf.Variable(self.initializer(shape=[self.num_features]), name='F_B', dtype=tf.float32)
+        self.F_B = tf.Variable(self.initializer(shape=[self.num_features]), name='F_B', dtype=tf.float32)
         self.I_B = tf.Variable(self.initializer(shape=[self.num_items]), name='I_B', dtype=tf.float32)
         self.U_B = tf.Variable(self.initializer(shape=[self.num_users]), name='U_B', dtype=tf.float32)
         self.H = tf.Variable(self.initializer(shape=[self.num_users, self._factors]), name='H', dtype=tf.float32)
         self.G = tf.Variable(self.initializer(shape=[self.num_features, self._factors]), name='G', dtype=tf.float32)
         self.C = tf.constant(user_item_features, dtype=tf.float32)
+        # self.C = user_item_features
 
         self.sigmoid = keras.activations.sigmoid
         self.loss = keras.losses.BinaryCrossentropy()
@@ -58,8 +59,8 @@ class KGFlexTFModel(keras.Model):
         h_u = tf.squeeze(tf.gather(self.H, user))
         z_u = h_u @ tf.transpose(self.G)  # num_features x 1
         k_u = tf.squeeze(tf.gather(self.K, user))  # num_features x 1
-        # a_u = k_u * (tf.add(z_u, self.F_B))
-        a_u = k_u * z_u
+        a_u = k_u * (tf.add(z_u, self.F_B))
+        # a_u = k_u * z_u
         # ui_pairs = tf.stack([tf.squeeze(user), tf.squeeze(item)], axis=-1)
         # features = tf.gather_nd(self.C, ui_pairs)
         # u_b = tf.squeeze(tf.nn.embedding_lookup(self.U_B, user))
@@ -67,28 +68,32 @@ class KGFlexTFModel(keras.Model):
         # x_ui = tf.add(tf.add(tf.reduce_sum(tf.gather(a_u, features, batch_dims=1), axis=-1), u_b), i_b)
         # x_ui = tf.reduce_sum(tf.gather(a_u, features, batch_dims=1), axis=-1)
         c_i = tf.squeeze(tf.gather(self.C, item))
-        b_u = tf.squeeze(tf.gather(self.U_B, user))
-        b_i = tf.squeeze(tf.gather(self.I_B, item))
-        x_ui = self.sigmoid(tf.reduce_sum(a_u * c_i, axis=-1) + b_u + b_i + self.glob_B)
+        # b_u = tf.squeeze(tf.gather(self.U_B, user))
+        # b_i = tf.squeeze(tf.gather(self.I_B, item))
+        # CON TFIDF
+        x_ui = tf.reduce_sum(a_u * c_i, axis=-1) # + b_u + b_i + self.glob_B
+        # x_ui = self.sigmoid(tf.reduce_sum(tf.gather(a_u, features, batch_dims=1), axis=-1) + b_u + b_i + self.glob_B)
 
-        return x_ui
+        return x_ui, z_u
 
     @tf.function
     def train_step(self, batch):
-        user, pos, label = batch
+        user, pos, neg = batch
         with tf.GradientTape() as tape:
             # Clean Inference
-            output = self(inputs=(user, pos), training=True)
-            loss = self.loss(label, output)
+            xu_pos, reg_pos = self(inputs=(user, pos), training=True)
+            xu_neg, reg_neg = self(inputs=(user, neg), training=True)
+
+            difference = tf.clip_by_value(xu_pos - xu_neg, -80.0, 1e8)
+            loss = tf.reduce_sum(tf.nn.softplus(-difference))
 
             # Regularization Component
-            # reg_loss = self._l_w * tf.reduce_sum([tf.nn.l2_loss(self.H),
-            #                                      tf.nn.l2_loss(self.G)]) \
-            #            + self._l_b * tf.nn.l2_loss(self.B)
-            #            # + self._l_b * tf.nn.l2_loss(beta_neg) / 10
+            reg_loss = self._l_w * tf.reduce_sum([tf.nn.l2_loss(reg_pos), tf.nn.l2_loss(reg_neg)])
+                       # + self._l_b * tf.nn.l2_loss(self.B)
+                       # + self._l_b * tf.nn.l2_loss(beta_neg) / 10
 
             # Loss to be optimized
-            # loss += reg_loss
+            loss += reg_loss
 
         grads = tape.gradient(loss, self.trainable_weights)
         self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
@@ -105,16 +110,21 @@ class KGFlexTFModel(keras.Model):
         output = self.call(inputs=inputs, training=training)
         return output
 
-    @tf.function
+    # @tf.function
     def get_all_recs(self):
         Z = self.H @ tf.transpose(self.G)
-        # Z_plus_bias = tf.add(Z, self.F_B)
-        A = self.K * Z
+        Z_plus_bias = tf.add(Z, self.F_B)
+        A = self.K * Z_plus_bias
         # predictions = tf.add(tf.add(tf.reduce_sum(tf.gather(A, self.C, batch_dims=1), axis=-1).to_tensor(),
         #                             tf.reshape(self.U_B, [-1, 1])), self.I_B)
         # predictions = tf.reduce_sum(tf.gather(A, tf.ragged.stack([self.C] * self.num_users), batch_dims=1), axis=-1).to_tensor()
         # predictions = tf.reduce_sum(A @ self.C, axis=-1).to_tensor()
-        predictions = self.sigmoid(tf.add(tf.add(A @ tf.transpose(self.C), tf.reshape(self.U_B, [-1, 1])), self.I_B))
+        # CON TFIDF
+        predictions = A @ tf.transpose(self.C)
+
+        # predictions = tf.add(tf.add(A @ tf.transpose(self.C), tf.reshape(self.U_B, [-1, 1])), self.I_B) + self.glob_B
+        # predictions = self.sigmoid(tf.add(tf.add(tf.reduce_sum(tf.gather(A, self.C, batch_dims=1), axis=-1).to_tensor(),
+        #                                          tf.reshape(self.U_B, [-1, 1])), self.I_B) + self.glob_B)
         return predictions
 
     def get_all_topks(self, predictions, mask, k, user_map, item_map):
