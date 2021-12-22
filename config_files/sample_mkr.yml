@@ -47,18 +47,16 @@ experiment:
         save_weights: False
         save_recs: False
 #        restore: True
-      learning_rate: 0.01
+      learning_rate: 0.5
       embedding_size: 8
-      l2_lambda: 0.0
+      l2_lambda: 0.000001
       epochs: 100
-      joint_ratio: 0.1
-      use_st_gumbel: False
       low_layers: 3
       high_layers: 3
       m: 4
       m_kge: 4
-      batch_size: 600
-      batch_size_kg: 600
+      batch_size: 512
+      batch_size_kg: 128
       early_stopping:
         patience: 5
         monitor: nDCG@10

@@ -106,7 +106,10 @@ class MKR(RecMixin, BaseRecommenderModel):
                     t.update()
                 batch = self._triple_sampler.step(self._batch_size)
                 steps += 1
-                loss += self._model.train_step_kg(batch, is_rec=False)
+                print(f'\nLoss RS: {loss.numpy() / steps:.5f}')
+                loss_kg = self._model.train_step_kg(batch, is_rec=False)
+                print(f'\nLoss RS: {loss_kg.numpy() / steps:.5f}')
+                loss += loss_kg
                 t.set_postfix({'loss KGC': f'{loss.numpy() / steps:.5f}'})
                 t.update(self._batch_size)
 

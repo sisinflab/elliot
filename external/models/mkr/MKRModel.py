@@ -11,7 +11,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import Sequential
-from tensorflow.keras.layers import Dense, Layer, Input
+from tensorflow.keras.layers import Dense, Layer, Input, Dropout
 
 
 class MKRModel(keras.Model):
@@ -34,6 +34,8 @@ class MKRModel(keras.Model):
         super().__init__(name=name, **kwargs)
         tf.random.set_seed(42)
 
+        self.dropout_prob = 0.2
+
         self.learning_rate = learning_rate
         self.L1_flag = L1_flag
         self.l2_lambda = l2_lambda
@@ -47,7 +49,7 @@ class MKRModel(keras.Model):
         self.rel_total = relation_total
         self.is_pretrained = False
 
-        self.rec_loss = tf.keras.losses.BinaryCrossentropy()
+        self.rs_loss = tf.keras.losses.BinaryCrossentropy()
 
         # store item to item-entity to (entity, item)
         self.private_items_entitiesidx = private_items_entitiesidx
@@ -60,7 +62,8 @@ class MKRModel(keras.Model):
         init = tf.lookup.KeyValueTensorInitializer(keys, values)
         self.paddingItems = tf.lookup.StaticHashTable(init, default_value=self.ent_total - 1)
 
-        self.optimizer = tf.optimizers.Adam(self.learning_rate)
+        self.optimizer_rs = tf.optimizers.Adam(self.learning_rate)
+        self.optimizer_kge = tf.optimizers.Adam(self.learning_rate)
 
     def init_embeddings(self):
 
@@ -74,7 +77,7 @@ class MKRModel(keras.Model):
         self.ent_embeddings(0)
 
         self.rel_embeddings = keras.layers.Embedding(input_dim=self.rel_total, output_dim=self.embedding_size,
-                                                     embeddings_initializer=keras.initializers.GlorotNormal(),
+                                                     embeddings_initializer=initializer,
                                                      trainable=False, dtype=tf.float32,
                                                      embeddings_regularizer=keras.regularizers.l2(self.l2_lambda))
         self.rel_embeddings(0)
@@ -97,26 +100,30 @@ class MKRModel(keras.Model):
         initializer = 'GlorotNormalV2'
         actv = 'sigmoid'
 
-        # TODO: dropout
+        # low depth MLPs
         self.user_mlp = Sequential()
-        [self.user_mlp.add(Dense(self.embedding_size,
-                                 activation=actv,
-                                 kernel_initializer=initializer)) for _ in range(self.L)]
-        self.user_mlp.build((None, self.embedding_size))
-
         self.rel_mlp = Sequential()
-        [self.rel_mlp.add(Dense(self.embedding_size,
-                                activation=actv,
-                                kernel_initializer=initializer)) for _ in range(self.L)]
+
+        for _ in range(self.L):
+            # user mlp
+            self.user_mlp.add(Dropout(self.dropout_prob))
+            self.user_mlp.add(Dense(self.embedding_size, activation=actv, kernel_initializer=initializer))
+
+            # rel mlp
+            self.rel_mlp.add(Dropout(self.dropout_prob))
+            self.rel_mlp.add(Dense(self.embedding_size, activation=actv, kernel_initializer=initializer))
+
+        self.user_mlp.build((None, self.embedding_size))
         self.rel_mlp.build((None, self.embedding_size))
 
+        # high depth MLPs
         self.kge_mlp = Sequential()
-        [self.kge_mlp.add(Dense(self.embedding_size * 2,
-                                activation=actv,
-                                kernel_initializer=initializer)) for _ in range(self.H - 1)]
-        self.kge_mlp.add(Dense(self.embedding_size,
-                               activation=actv,
-                               kernel_initializer=initializer))
+
+        for _ in range(self.H - 1):
+            # kge mlp
+            self.rel_mlp.add(Dropout(self.dropout_prob))
+            self.kge_mlp.add(Dense(self.embedding_size * 2, activation=actv, kernel_initializer=initializer))
+        self.kge_mlp.add(Dense(self.embedding_size, activation=actv, kernel_initializer=initializer))
         self.kge_mlp.build((None, self.embedding_size * 2))
 
     def init_CrossCompress(self):
@@ -153,6 +160,8 @@ class MKRModel(keras.Model):
             i_e = tf.squeeze(i_e)
             score = tf.math.sigmoid(tf.reduce_sum(u_e * i_e, axis=1))
 
+            return score, u_e, i_e
+
         elif not kwargs['is_rec']:
 
             h, r, t, v, pn = inputs
@@ -177,18 +186,17 @@ class MKRModel(keras.Model):
     def train_step_rec(self, batch, **kwargs):
         with tf.GradientTape() as tape:
             user, item, rating = batch
-
-            score = self.call(inputs=(user, item), training=True, **kwargs)
-            loss = self.rec_loss(rating, score)
+            score, u_e, i_e = self.call(inputs=(user, item), training=True, **kwargs)
+            loss = self.rec_loss(rating, score, u_e, i_e)
 
         user_mlp_grads, cc_grads = tape.gradient(loss, [self.user_mlp.trainable_weights, self.cc.trainable_weights])
         user_mlp_grads, _ = tf.clip_by_global_norm(user_mlp_grads, 5)
         cc_grads, _ = tf.clip_by_global_norm(cc_grads, 5)
-        self.optimizer.apply_gradients(zip(user_mlp_grads, self.user_mlp.trainable_weights))
-        self.optimizer.apply_gradients(zip(cc_grads, self.cc.trainable_weights))
+        self.optimizer_rs.apply_gradients(zip(user_mlp_grads, self.user_mlp.trainable_weights))
+        self.optimizer_rs.apply_gradients(zip(cc_grads, self.cc.trainable_weights))
         return loss
 
-    @tf.function
+    # @tf.function
     def train_step_kg(self, batch, **kwargs):
         with tf.GradientTape() as tape:
             scores = self.call(inputs=batch, training=True, **kwargs)
@@ -201,18 +209,18 @@ class MKRModel(keras.Model):
         kge_mlp_grads, _ = tf.clip_by_global_norm(kge_mlp_grads, 5)
         cc_grads, _ = tf.clip_by_global_norm(cc_grads, 5)
 
-        self.optimizer.apply_gradients(zip(rel_mlp_grads, self.rel_mlp.trainable_weights))
-        self.optimizer.apply_gradients(zip(kge_mlp_grads, self.kge_mlp.trainable_weights))
-        self.optimizer.apply_gradients(zip(cc_grads, self.cc.trainable_weights))
+        self.optimizer_kge.apply_gradients(zip(rel_mlp_grads, self.rel_mlp.trainable_weights))
+        self.optimizer_kge.apply_gradients(zip(kge_mlp_grads, self.kge_mlp.trainable_weights))
+        self.optimizer_kge.apply_gradients(zip(cc_grads, self.cc.trainable_weights))
         return loss
 
     @tf.function
     def predict(self, inputs, training=False, **kwargs):
-        score = self.call(inputs=inputs, training=training, is_rec=True)
+        score = self.call(inputs=inputs, training=training, is_rec=True)[0]
         return score
 
     @tf.function
-    def get_recs(self, inputs, training=False, **kwargs):
+    def get_recs(self, inputs, **kwargs):
         """
         Get full predictions on the whole users/items matrix.
 
@@ -221,12 +229,14 @@ class MKRModel(keras.Model):
         """
         u_ids = inputs[0]
         i_ids = inputs[1]
-        return self.call(inputs=(u_ids, i_ids), training=False, is_rec=True, **kwargs)
+        return self.call(inputs=(u_ids, i_ids), training=False, is_rec=True, **kwargs)[0]
 
     @tf.function
     def get_top_k(self, preds, train_mask, k=100):
         return tf.nn.top_k(tf.where(train_mask, preds, -np.inf), k=k, sorted=True)
 
+    def rec_loss(self, rating, score, usr_emb, itm_emb):
+        return self.rs_loss(rating, score) + (tf.nn.l2_loss(usr_emb) + tf.nn.l2_loss(itm_emb))*self.l2_lambda
 
 class CrossCompress(Layer):
 
