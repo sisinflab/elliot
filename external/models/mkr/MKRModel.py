@@ -11,7 +11,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import Sequential
-from tensorflow.keras.layers import Dense
+from tensorflow.keras.layers import Dense, Layer, Input, Dropout
 
 
 class MKRModel(keras.Model):
@@ -28,11 +28,13 @@ class MKRModel(keras.Model):
                  item_total,
                  entity_total,
                  relation_total,
-                 new_map,
+                 private_items_entitiesidx,
                  name="mkr",
                  **kwargs):
         super().__init__(name=name, **kwargs)
         tf.random.set_seed(42)
+
+        self.dropout_prob = 0.2
 
         self.learning_rate = learning_rate
         self.L1_flag = L1_flag
@@ -47,14 +49,21 @@ class MKRModel(keras.Model):
         self.rel_total = relation_total
         self.is_pretrained = False
 
-        # store item to item-entity to (entity, item)
-        self.new_map = new_map
+        self.rs_loss = tf.keras.losses.BinaryCrossentropy()
 
-        print()
+        # store item to item-entity to (entity, item)
+        self.private_items_entitiesidx = private_items_entitiesidx
+
         self.init_embeddings()
         self.init_MLPs()
+        self.init_CrossCompress()
 
-        print()
+        keys, values = tuple(zip(*self.private_items_entitiesidx.items()))
+        init = tf.lookup.KeyValueTensorInitializer(keys, values)
+        self.paddingItems = tf.lookup.StaticHashTable(init, default_value=self.ent_total - 1)
+
+        self.optimizer_rs = tf.optimizers.Adam(self.learning_rate)
+        self.optimizer_kge = tf.optimizers.Adam(self.learning_rate)
 
     def init_embeddings(self):
 
@@ -68,7 +77,7 @@ class MKRModel(keras.Model):
         self.ent_embeddings(0)
 
         self.rel_embeddings = keras.layers.Embedding(input_dim=self.rel_total, output_dim=self.embedding_size,
-                                                     embeddings_initializer=keras.initializers.GlorotNormal(),
+                                                     embeddings_initializer=initializer,
                                                      trainable=False, dtype=tf.float32,
                                                      embeddings_regularizer=keras.regularizers.l2(self.l2_lambda))
         self.rel_embeddings(0)
@@ -81,7 +90,7 @@ class MKRModel(keras.Model):
         self.usr_embeddings(0)
 
         self.itm_embeddings = keras.layers.Embedding(input_dim=self.item_total, output_dim=self.embedding_size,
-                                                     embeddings_initializer=keras.initializers.GlorotNormal(),
+                                                     embeddings_initializer=initializer,
                                                      trainable=False, dtype=tf.float32,
                                                      embeddings_regularizer=keras.regularizers.l2(self.l2_lambda))
         self.itm_embeddings(0)
@@ -91,163 +100,169 @@ class MKRModel(keras.Model):
         initializer = 'GlorotNormalV2'
         actv = 'sigmoid'
 
-        # TODO: dropout
-        self.user_mlp = keras.Sequential()
-        [self.user_mlp.add(Dense(self.embedding_size,
-               activation=actv,
-               kernel_initializer=initializer)) for _ in range(self.L)]
+        # low depth MLPs
+        self.user_mlp = Sequential()
+        self.rel_mlp = Sequential()
 
-        self.tail_mlp = keras.Sequential()
-        [self.tail_mlp.add(Dense(self.embedding_size,
-               activation=actv,
-               kernel_initializer=initializer)) for _ in range(self.L)]
+        for _ in range(self.L):
+            # user mlp
+            self.user_mlp.add(Dropout(self.dropout_prob))
+            self.user_mlp.add(Dense(self.embedding_size, activation=actv, kernel_initializer=initializer))
 
-        self.kge_mlp = keras.Sequential()
-        [self.kge_mlp.add(Dense(self.embedding_size,
-               activation=actv,
-               kernel_initializer=initializer)) for _ in range(self.H)]
+            # rel mlp
+            self.rel_mlp.add(Dropout(self.dropout_prob))
+            self.rel_mlp.add(Dense(self.embedding_size, activation=actv, kernel_initializer=initializer))
 
+        self.user_mlp.build((None, self.embedding_size))
+        self.rel_mlp.build((None, self.embedding_size))
 
+        # high depth MLPs
+        self.kge_mlp = Sequential()
+
+        for _ in range(self.H - 1):
+            # kge mlp
+            self.rel_mlp.add(Dropout(self.dropout_prob))
+            self.kge_mlp.add(Dense(self.embedding_size * 2, activation=actv, kernel_initializer=initializer))
+        self.kge_mlp.add(Dense(self.embedding_size, activation=actv, kernel_initializer=initializer))
+        self.kge_mlp.build((None, self.embedding_size * 2))
+
+    def init_CrossCompress(self):
+        emb = self.embedding_size
+
+        item_input = Input((emb, 1))
+        ent_input = Input((emb, 1))
+
+        x = CrossCompress(self.embedding_size)([item_input, ent_input])
+        for _ in range(self.L - 1):
+            x = CrossCompress(self.embedding_size)(x)
+        self.cc = keras.Model([item_input, ent_input], x)
 
     def get_config(self):
         raise NotImplementedError
 
     # @tf.function
-    def call(self, inputs, training=None, **kwargs):
+    def call(self, inputs, **kwargs):
 
-        print()
-        u_e = tf.expand_dims(self.usr_embeddings(0), axis=0)
-        self.user_mlp(u_e)
+        score = 0
 
         if kwargs['is_rec']:
             u_ids, i_ids = inputs
-            e_var = self.paddingItems.lookup(tf.squeeze(tf.cast(i_ids, tf.int32)))
-            u_e = self.user_embeddings(tf.squeeze(u_ids))
-            i_e = self.item_embeddings(tf.squeeze(i_ids))
-            e_e = self.ent_embeddings(tf.squeeze(e_var))
-            ie_e = i_e + e_e
 
-            score = tf.reduce_sum(u_e * ie_e, axis=-1)
+            # lookup embeddings
+            u_e = self.usr_embeddings(tf.squeeze(u_ids))
+            i_e = self.itm_embeddings(tf.squeeze(i_ids))
+            e_var = self.paddingItems.lookup(tf.squeeze(tf.cast(i_ids, tf.int32)))
+            e_e = tf.expand_dims(self.ent_embeddings(e_var), axis=-1)
+
+            # compute embeddings
+            u_e = self.user_mlp(u_e)
+            i_e, _ = self.cc([i_e, e_e])
+            i_e = tf.squeeze(i_e)
+            score = tf.math.sigmoid(tf.reduce_sum(u_e * i_e, axis=1))
+
+            return score, u_e, i_e
 
         elif not kwargs['is_rec']:
 
-            inputs = 0, 0, 0
-            h, t, r = inputs
-            h_e = self.ent_embeddings(h)
-            t_e = self.ent_embeddings(t)
-            r_e = self.rel_embeddings(r)
-            proj_e = self.proj_matices(r)
+            h, r, t, v, pn = inputs
 
-            proj_h_e = self.projection_trans_r(h_e, proj_e)
-            proj_t_e = self.projection_trans_r(t_e, proj_e)
+            h_e = self.ent_embeddings(tf.squeeze(h))
+            v_e = self.itm_embeddings(tf.squeeze(v))
+            _, h_e = self.cc([v_e, h_e])
+            h_e = tf.squeeze(h_e)
 
-            if self.L1_flag:
-                score = tf.reduce_sum(tf.abs(proj_h_e + r_e - proj_t_e), -1)
-            else:
-                score = tf.reduce_sum((proj_h_e + r_e - proj_t_e) ** 2, -1)
+            r_e = self.rel_embeddings(tf.squeeze(r))
+            r_e = self.rel_mlp(r_e)
+
+            hr_e = tf.concat([h_e, r_e], axis=1)
+            t_pred = self.kge_mlp(hr_e)
+
+            t_e = self.ent_embeddings(tf.squeeze(t))
+            score = tf.sigmoid(tf.reduce_sum((t_e * t_pred), axis=1)) * pn
 
         return score
 
-    # @tf.function
-    def getPreferences(self, u_e, i_e, use_st_gumbel=False):
-        # use item and user embedding to compute preference distribution
-        # pre_probs: batch * rel, or batch * item * rel
-        pre_probs = tf.matmul(u_e + i_e,
-                              tf.transpose(self.pref_embeddings.weights[0] + self.rel_embeddings.weights[0])) / 2
-        if use_st_gumbel:
-            pre_probs = self.st_gumbel_softmax(pre_probs)
-
-        r_e = tf.matmul(pre_probs, self.pref_embeddings.weights[0] + self.rel_embeddings.weights[0]) / 2
-        norm = tf.matmul(pre_probs, self.pref_norm_embeddings.weights[0] + self.norm_embeddings.weights[0]) / 2
-
-        return pre_probs, r_e, norm
-
-    # @tf.function
-    def projection_trans_r(self, original, trans_m):
-        embedding_size = original.shape[0]
-        rel_embedding_size = trans_m.shape[0] // embedding_size
-        trans_resh = tf.reshape(trans_m, (embedding_size, rel_embedding_size))
-        return tf.tensordot(original, trans_resh, axes=1)
-
-    # @tf.function
+    @tf.function
     def train_step_rec(self, batch, **kwargs):
-
         with tf.GradientTape() as tape:
-            user, pos, neg = batch
+            user, item, rating = batch
+            score, u_e, i_e = self.call(inputs=(user, item), training=True, **kwargs)
+            loss = self.rec_loss(rating, score, u_e, i_e)
 
-            pos_score = self.call(inputs=(user, pos), training=True, **kwargs)
-            neg_score = self.call(inputs=(user, neg), training=True, **kwargs)
-
-            losses = self.bprLoss(pos_score, neg_score)
-            # losses += self.orthogonalLoss(self.pref_embeddings.weights[0], self.pref_norm_embeddings.weights[0])
-
-        grads = tape.gradient(losses, self.trainable_weights)
-        grads, _ = tf.clip_by_global_norm(grads, 5)  # fix clipping value
-        self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
-
-        return losses
+        user_mlp_grads, cc_grads = tape.gradient(loss, [self.user_mlp.trainable_weights, self.cc.trainable_weights])
+        user_mlp_grads, _ = tf.clip_by_global_norm(user_mlp_grads, 5)
+        cc_grads, _ = tf.clip_by_global_norm(cc_grads, 5)
+        self.optimizer_rs.apply_gradients(zip(user_mlp_grads, self.user_mlp.trainable_weights))
+        self.optimizer_rs.apply_gradients(zip(cc_grads, self.cc.trainable_weights))
+        return loss
 
     # @tf.function
     def train_step_kg(self, batch, **kwargs):
         with tf.GradientTape() as tape:
-            ph, pr, pt, nh, nr, nt = batch
+            scores = self.call(inputs=batch, training=True, **kwargs)
+            loss = tf.reduce_sum(scores)
 
-            pos_score = self.call(inputs=(ph, pt, pr), training=True, **kwargs)
-            neg_score = self.call(inputs=(nh, nt, nr), training=True, **kwargs)
+        rel_mlp_grads, kge_mlp_grads, cc_grads = tape.gradient(loss, [self.rel_mlp.trainable_weights,
+                                                                      self.kge_mlp.trainable_weights,
+                                                                      self.cc.trainable_weights])
+        rel_mlp_grads, _ = tf.clip_by_global_norm(rel_mlp_grads, 5)
+        kge_mlp_grads, _ = tf.clip_by_global_norm(kge_mlp_grads, 5)
+        cc_grads, _ = tf.clip_by_global_norm(cc_grads, 5)
 
-            losses = self.marginLoss(pos_score, neg_score, 1)  # fix margin loss value
-            ent_embeddings = self.ent_embeddings(tf.concat([ph, pt, nh, nt], 0))
-            rel_embeddings = self.rel_embeddings(tf.concat([pr, nr], 0))
-            norm_embeddings = self.norm_embeddings(tf.concat([pr, nr], 0))
-            losses += self.orthogonalLoss(rel_embeddings, norm_embeddings)
-            losses += self.normLoss(ent_embeddings) + self.normLoss(rel_embeddings)
-            losses = kwargs['kg_lambda'] * losses
+        self.optimizer_kge.apply_gradients(zip(rel_mlp_grads, self.rel_mlp.trainable_weights))
+        self.optimizer_kge.apply_gradients(zip(kge_mlp_grads, self.kge_mlp.trainable_weights))
+        self.optimizer_kge.apply_gradients(zip(cc_grads, self.cc.trainable_weights))
+        return loss
 
-        grads = tape.gradient(losses, self.trainable_weights)
-        grads, _ = tf.clip_by_global_norm(grads, 1)  # fix clipping value
-        self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
-
-        return losses
-
-    # @tf.function
+    @tf.function
     def predict(self, inputs, training=False, **kwargs):
-        score = self.call(inputs=inputs, training=training, is_rec=True)
+        score = self.call(inputs=inputs, training=training, is_rec=True)[0]
         return score
 
-    # @tf.function
-    def get_recs(self, inputs, training=False, **kwargs):
+    @tf.function
+    def get_recs(self, inputs, **kwargs):
         """
         Get full predictions on the whole users/items matrix.
 
         Returns:
             The matrix of predicted values.
         """
-        u_ids, i_ids = inputs
-        score = self.call(inputs=(u_ids, i_ids), training=False, is_rec=True, **kwargs)
+        u_ids = inputs[0]
+        i_ids = inputs[1]
+        return self.call(inputs=(u_ids, i_ids), training=False, is_rec=True, **kwargs)[0]
 
-        return tf.squeeze(score)
-
-    # @tf.function
+    @tf.function
     def get_top_k(self, preds, train_mask, k=100):
         return tf.nn.top_k(tf.where(train_mask, preds, -np.inf), k=k, sorted=True)
 
-    # @tf.function
-    def bprLoss(self, pos, neg, target=1.0):
-        loss = - tf.math.log_sigmoid(target * (pos - neg))
-        return tf.reduce_mean(loss)
+    def rec_loss(self, rating, score, usr_emb, itm_emb):
+        return self.rs_loss(rating, score) + (tf.nn.l2_loss(usr_emb) + tf.nn.l2_loss(itm_emb))*self.l2_lambda
 
-    # @tf.function
-    def orthogonalLoss(self, rel_embeddings, norm_embeddings):
-        return tf.reduce_sum(
-            tf.reduce_sum(norm_embeddings * rel_embeddings, axis=-1, keepdims=True) ** 2 /
-            tf.reduce_sum(rel_embeddings ** 2, axis=-1, keepdims=True))
+class CrossCompress(Layer):
 
-    # @tf.function
-    def normLoss(self, embeddings, dim=-1):
-        norm = tf.reduce_sum(embeddings ** 2, axis=dim, keepdims=True)
-        return tf.reduce_sum(tf.math.maximum(norm - self.one, self.zero))
+    def __init__(self, embedding_dim, **kwargs):
+        super(CrossCompress, self).__init__(**kwargs)
+        self.embedding_dim = embedding_dim
 
-    # @tf.function
-    def marginLoss(self, pos, neg, margin):
-        zero_tensor = tf.zeros(len(pos))
-        return tf.reduce_sum(tf.math.maximum(pos - neg + margin, zero_tensor))
+    def build(self, input_shape):
+        w_initializer = tf.initializers.GlorotUniform()
+        b_initializer = tf.initializers.Zeros()
+        self.w_vv = tf.Variable(w_initializer(shape=(self.embedding_dim, 1)), trainable=True, name='w_vv')
+        self.w_ve = tf.Variable(w_initializer(shape=(self.embedding_dim, 1)), trainable=True, name='w_ve')
+        self.w_ev = tf.Variable(w_initializer(shape=(self.embedding_dim, 1)), trainable=True, name='w_ev')
+        self.w_ee = tf.Variable(w_initializer(shape=(self.embedding_dim, 1)), trainable=True, name='w_ee')
+        self.bias_v = tf.Variable(b_initializer(shape=(self.embedding_dim, 1)), trainable=True, name='b_v')
+        self.bias_e = tf.Variable(b_initializer(shape=(self.embedding_dim, 1)), trainable=True, name='b_e')
+        super(CrossCompress, self).build(input_shape)
+
+    def call(self, input_data, **kwargs):
+        item_embedding, entity_embedding = input_data
+        entity_embedding = tf.transpose(entity_embedding, perm=[0, 2, 1])
+        cross_matrix = tf.matmul(item_embedding, entity_embedding)
+        cross_matrixT = tf.transpose(cross_matrix, perm=[0, 2, 1])
+        item_embedding = tf.matmul(cross_matrix, self.w_vv) + tf.matmul(cross_matrixT, self.w_ev) + self.bias_v
+        entity_embedding = tf.matmul(cross_matrix, self.w_ve) + tf.matmul(cross_matrixT, self.w_ee) + self.bias_e
+        return [item_embedding, entity_embedding]
+
+    def compute_output_shape(self, input_shape):
+        return input_shape

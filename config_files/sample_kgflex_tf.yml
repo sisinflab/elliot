@@ -3,7 +3,7 @@ experiment:
   data_config:
     strategy: dataset
     dataset_path: ../data/{0}/dataset.tsv
-    # test_path: ../data/{0}/testset.tsv
+    # test_path: ../data/{0}/test-5core.tsv
     side_information:
       - dataloader: KGFlexLoader
         mapping: ../data/{0}/mapping.tsv
@@ -15,6 +15,8 @@ experiment:
     strategy: iterative_k_core
     core: 10
   splitting:
+    # save_on_disk: False
+    # save_folder: ../data/{0}/5-core/
     test_splitting:
         strategy: random_subsampling
         test_ratio: 0.2
@@ -29,20 +31,20 @@ experiment:
     external.KGFlexTF:
       meta:
         verbose: True
-        validation_rate: 5
+        validation_rate: 1
         save_recs: True
         save_weights: False
         restore: False
         hyper_max_evals: 10
         hyper_opt_alg: tpe
       seed: 42
-      lr: [loguniform, -11.512925464970229, 0]
+      lr: 0.01
       # lr: 0.001
       epochs: 50
-      batch_size: [8, 16, 32, 64, 128, 256]
+      batch_size: 64
       # batch_size: 128
-      embedding: [64, 128, 256]
+      embedding: 128
       # embedding: 256
-      first_order_limit: [100, 200, 300]
-      second_order_limit: [100, 200, 300]
+      first_order_limit: 300
+      second_order_limit: 200
       loader: KGFlexLoader

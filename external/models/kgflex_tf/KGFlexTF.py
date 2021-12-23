@@ -9,10 +9,12 @@ import tensorflow as tf
 from elliot.recommender import BaseRecommenderModel
 from elliot.recommender.base_recommender_model import init_charger
 from elliot.recommender.recommender_utils_mixin import RecMixin
+
 from elliot.dataset.samplers import custom_sampler as cs
 
 from .UserFeatureMapper import UserFeatureMapper
-from .KGFlexTFModel import KGFlexTFModel
+from .KGFlexTFModelNew import KGFlexTFModel
+from .tfidf_utils import TFIDF
 
 # mp.set_start_method('fork')
 
@@ -78,25 +80,31 @@ class KGFlexTF(RecMixin, BaseRecommenderModel):
         # ------------------------------ ITEM FEATURES ------------------------------
         print('importing items features')
 
-        uri_to_private = {v: self._data.public_items[k] for k, v in self._side.mapping.items()}
+        uri_to_private = {self._side.mapping[i]: p for i, p in self._data.public_items.items()}
 
-        item_features_df = pd.DataFrame()
-        item_features_df['item'] = self._side.triples['uri'].map(uri_to_private)
-        item_features_df['f'] = list(zip(self._side.triples['predicate'], self._side.triples['object']))
-        self.item_features = item_features_df.groupby('item')['f'].apply(set).to_dict()
+        item_features_df1 = pd.DataFrame()
+        item_features_df1['item'] = self._side.triples['uri'].map(uri_to_private)
+        item_features_df1['f'] = list(zip(self._side.triples['predicate'], self._side.triples['object']))
+        item_features_df1 = item_features_df1.dropna()
+        self.item_features1 = item_features_df1.groupby('item')['f'].apply(set).to_dict()
 
-        item_features_df = pd.DataFrame()
-        item_features_df['item'] = self._side.second_order_features['uri_x'].map(uri_to_private)
-        item_features_df['f'] = list(
+        item_features_df2 = pd.DataFrame()
+        item_features_df2['item'] = self._side.second_order_features['uri_x'].map(uri_to_private)
+        item_features_df2['f'] = list(
             zip(self._side.second_order_features['predicate_x'], self._side.second_order_features['predicate_y'],
                 self._side.second_order_features['object_y']))
-        self.item_features2 = item_features_df.groupby('item')['f'].apply(set).to_dict()
+        item_features_df2 = item_features_df2.dropna()
+        self.item_features2 = item_features_df2.groupby('item')['f'].apply(set).to_dict()
+
+        self.item_features = pd.concat([item_features_df1, item_features_df2]).groupby('item')['f'].apply(set).to_dict()
+
+
 
         print('finito tutto')
 
         # ------------------------------ USER FEATURES ------------------------------
         self.user_feature_mapper = UserFeatureMapper(data=self._data,
-                                                     item_features=self.item_features,
+                                                     item_features=self.item_features1,
                                                      item_features2=self.item_features2,
                                                      first_order_limit=first_order_limit,
                                                      second_order_limit=second_order_limit)
@@ -110,30 +118,42 @@ class KGFlexTF(RecMixin, BaseRecommenderModel):
 
         feature_key_mapping = dict(zip(list(features), range(len(features))))
 
-        self.logger.info('FEATURES INFO: {} features found'.format(len(features)))
+        self.logger.info('FEATURES INFO: {} features found'.format(len(feature_key_mapping)))
 
         user_feature_weights = tf.constant(
             [[users_features[u].get(f, 0) for f in features] for u in self._data.private_users])
 
-        item_features = []
-        for _, v in self.item_features.items():
-            common = set.intersection(set(feature_key_mapping.keys()), v)
-            item_features.append(set(map(lambda x: feature_key_mapping[x], common)))
+        item_features = dict()
+        for i in range(self._data.num_items):
+            features = self.item_features[i]
+            common = set.intersection(set(feature_key_mapping.keys()), features)
+            item_features[i] = list(map(lambda x: feature_key_mapping[x], common))
+            # item_features.append(list(map(lambda x: feature_key_mapping[x], common)))
 
-        def uif_args():
-            return ((users_features[u],
-                     item_features,
-                     feature_key_mapping) for u in self._data.private_users.keys())
+        # for k, v in self.item_features.items():
+        #     common = set.intersection(set(feature_key_mapping.keys()), v)
+        #     item_features[k] = list(map(lambda x: feature_key_mapping[x], common))
 
-        arguments = uif_args()
-        with mp.Pool(processes=mp.cpu_count()) as pool:
-            user_item_features = pool.starmap(uif_worker, tqdm(arguments, total=len(self._data.private_users.keys()),
-                                                               desc='User-Item Features'))
+        # RIMETTERE DA QUI PER TFIDF
 
-        # user_item_features = user_item_feature_getter(self._data.private_users, users_features, item_features,
-        #                                               feature_key_mapping)
+        self.tfidf_obj = TFIDF(item_features)
+        self.tfidf = self.tfidf_obj.tfidf()
+
+        M = np.zeros((self._data.num_items, len(feature_key_mapping)))
+        for i in self.tfidf:
+            M[tuple([i] * len(self.tfidf[i])), tuple(self.tfidf[i].keys())] = list(self.tfidf[i].values())
+
+        # def uif_args():
+        #     return ((users_features[u],
+        #              item_features,
+        #              feature_key_mapping) for u in self._data.private_users.keys())
         #
-        user_item_features = tf.ragged.stack(user_item_features)
+        # arguments = uif_args()
+        # with mp.Pool(processes=mp.cpu_count()) as pool:
+        #     user_item_features = pool.starmap(uif_worker, tqdm(arguments, total=len(self._data.private_users.keys()),
+        #                                                        desc='User-Item Features'))
+        #
+        # user_item_features = tf.ragged.stack(user_item_features)
 
         print('FATTO!')
 
@@ -143,7 +163,7 @@ class KGFlexTF(RecMixin, BaseRecommenderModel):
         self._model = KGFlexTFModel(num_users=self._data.num_users,
                                     num_items=self._data.num_items,
                                     user_feature_weights=user_feature_weights,
-                                    user_item_features=user_item_features,
+                                    user_item_features=M,
                                     num_features=len(feature_key_mapping),
                                     factors=self._embedding,
                                     learning_rate=self._lr)

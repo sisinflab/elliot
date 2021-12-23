@@ -10,3 +10,4 @@ from elliot.dataset.modular_loaders.textual.interactions_attribute import Intera
 from elliot.dataset.modular_loaders.textual.words_attribute import WordsTextualAttributes
 from elliot.dataset.modular_loaders.kg.kgrec import KGRec
 from elliot.dataset.modular_loaders.kg.kgflex import KGFlexLoader
+from elliot.dataset.modular_loaders.kg.kgin import KGINLoader

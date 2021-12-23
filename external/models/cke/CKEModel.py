@@ -50,7 +50,6 @@ class CKEModel(keras.Model):
                                                      embeddings_initializer=initializer, trainable=True,
                                                      dtype=tf.float32,
                                                      embeddings_regularizer=keras.regularizers.l2(self.l2_lambda))
-
         self.ent_embeddings(0)
 
         self.rel_embeddings = keras.layers.Embedding(input_dim=self.rel_total, output_dim=self.rel_embedding_size,
@@ -105,7 +104,6 @@ class CKEModel(keras.Model):
 
         elif not kwargs['is_rec']:
 
-            inputs = 0, 0, 0
             h, t, r = inputs
             h_e = self.ent_embeddings(h)
             t_e = self.ent_embeddings(t)

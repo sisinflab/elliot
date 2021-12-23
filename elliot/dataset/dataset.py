@@ -264,17 +264,19 @@ class DataSet(AbstractDataset):
         users = list(data['userId'].unique())
 
         "Conversion to Dictionary"
-        ratings = {}
-        for u in users:
-            sel_ = data[data['userId'] == u]
-            ratings[u] = dict(zip(sel_['itemId'], sel_['rating']))
+        ratings = data.set_index('userId')[['itemId', 'rating']].apply(lambda x: (x['itemId'], float(x['rating'])), 1)\
+            .groupby(level=0).agg(lambda x: dict(x.values)).to_dict()
+        # for u in users:
+        #     sel_ = data[data['userId'] == u]
+        #     ratings[u] = dict(zip(sel_['itemId'], sel_['rating']))
         return ratings
 
     def build_dict(self, dataframe, users):
-        ratings = {}
-        for u in users:
-            sel_ = dataframe[dataframe['userId'] == u]
-            ratings[u] = dict(zip(sel_['itemId'], sel_['rating']))
+        ratings = dataframe.set_index('userId')[['itemId', 'rating']].apply(lambda x: (x['itemId'], float(x['rating'])), 1)\
+            .groupby(level=0).agg(lambda x: dict(x.values)).to_dict()
+        # for u in users:
+        #     sel_ = dataframe[dataframe['userId'] == u]
+        #     ratings[u] = dict(zip(sel_['itemId'], sel_['rating']))
         return ratings
 
     def build_sparse(self):

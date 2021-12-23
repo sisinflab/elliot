@@ -6,7 +6,9 @@
 
 [Docs]: https://elliot.readthedocs.io/en/latest/
 
-[Paper]: https://arxiv.org/abs/2103.02590
+[Paper]: https://doi.org/10.1145/3404835.3463245
+
+### A NEW VERSION OF [ELLIOT(v0.3.1) IS OUT](https://github.com/sisinflab/elliot/releases/)
 
 Elliot is a comprehensive recommendation framework that analyzes the recommendation problem from the researcher's perspective.
 It conducts a whole experiment, from dataset loading to results gathering.
@@ -24,6 +26,44 @@ baselines providing intra-model statistics, computes metrics spanning from accur
 and conducts statistical analysis (Wilcoxon and Paired t-test).
 
 Elliot aims to keep the entire experiment reproducible and put the user in control of the framework.
+
+We did our best to put all the bibliographic information of the methods, techniques, and metrics available in Elliot to give the right credits to their authors. Please, remember to cite them when you use Elliot in your research.
+
+Actually, the same holds also for Elliot :-) If you find Elliot useful for your research or development, remember to cite the following [paper](https://doi.org/10.1145/3404835.3463245):
+
+```
+@inproceedings{DBLP:conf/sigir/AnelliBFMMPDN21,
+  author    = {Vito Walter Anelli and
+               Alejandro Bellog{\'{\i}}n and
+               Antonio Ferrara and
+               Daniele Malitesta and
+               Felice Antonio Merra and
+               Claudio Pomo and
+               Francesco Maria Donini and
+               Tommaso Di Noia},
+  editor    = {Fernando Diaz and
+               Chirag Shah and
+               Torsten Suel and
+               Pablo Castells and
+               Rosie Jones and
+               Tetsuya Sakai},
+  title     = {Elliot: {A} Comprehensive and Rigorous Framework for Reproducible
+               Recommender Systems Evaluation},
+  booktitle = {{SIGIR} '21: The 44th International {ACM} {SIGIR} Conference on Research
+               and Development in Information Retrieval, Virtual Event, Canada, July
+               11-15, 2021},
+  pages     = {2405--2414},
+  publisher = {{ACM}},
+  year      = {2021},
+  url       = {https://doi.org/10.1145/3404835.3463245},
+  doi       = {10.1145/3404835.3463245},
+  timestamp = {Thu, 15 Jul 2021 15:30:48 +0200},
+  biburl    = {https://dblp.org/rec/conf/sigir/AnelliBFMMPDN21.bib},
+  bibsource = {dblp computer science bibliography, https://dblp.org}
+}
+
+```
+
 
 ## Installation
 Elliot works with the following operating systems:
@@ -126,29 +166,6 @@ Reference Elliot in your blogs, papers, and articles.
 
 Talk about Elliot on social media with the hashtag **#elliotrs**.
 
-## Cite
-
-If you find Elliot useful for your research or development, please cite the following [paper](https://arxiv.org/abs/2103.02590):
-
-```
-
-@article{DBLP:journals/corr/abs-2103-02590,
-  author    = {Vito Walter Anelli and
-               Alejandro Bellog{\'{\i}}n and
-               Antonio Ferrara and
-               Daniele Malitesta and
-               Felice Antonio Merra and
-               Claudio Pomo and
-               Francesco M. Donini and
-               Tommaso Di Noia},
-  title     = {Elliot: a Comprehensive and Rigorous Framework for Reproducible Recommender
-               Systems Evaluation},
-  journal   = {CoRR},
-  volume    = {abs/2103.02590},
-  year      = {2021}
-}
-
-```
 
 ## The Team
 Elliot is developed by

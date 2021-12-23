@@ -42,7 +42,7 @@ experiment:
       meta:
         hyper_max_evals: 1
         hyper_opt_alg: tpe
-        validation_rate: 1
+        validation_rate: 8
         verbose: True
         save_weights: False
         save_recs: False
@@ -51,7 +51,7 @@ experiment:
       embedding_size: 100
       l2_lambda: 0.0
       epochs: 771
-      batch_size: 200
+      batch_size: 1000
       joint_ratio: 0.7
       use_st_gumbel: False
       early_stopping:
@@ -60,19 +60,3 @@ experiment:
         mode: auto
         verbose: True
       # 40 epoche di early stopping
-#    MultiVAE:
-#      meta:
-#        hyper_max_evals: 20
-#        hyper_opt_alg: tpe
-#        validation_rate: 1
-#        verbose: False
-#        save_weights: False
-#        save_recs: False
-##        restore: True
-#      lr: [loguniform, -10, -1]
-#      epochs: 10
-#      intermediate_dim: [uniform,50,300]
-#      latent_dim: [uniform,50,300]
-#      batch_size: -1
-#      dropout_pkeep: 1
-#      reg_lambda: [0, 0.01]
