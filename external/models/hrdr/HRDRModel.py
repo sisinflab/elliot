@@ -17,9 +17,11 @@ class HRDRModel(tf.keras.Model, ABC):
     def __init__(self,
                  num_users,
                  num_items,
+                 batch_size,
                  learning_rate,
                  embed_k,
                  l_w,
+                 vocabulary_features,
                  user_projection_rating,
                  item_projection_rating,
                  user_review_cnn,
@@ -38,6 +40,7 @@ class HRDRModel(tf.keras.Model, ABC):
 
         self.num_users = num_users
         self.num_items = num_items
+        self.batch_size = batch_size
         self.embed_k = embed_k
         self.learning_rate = learning_rate
         self.l_w = l_w
@@ -53,11 +56,14 @@ class HRDRModel(tf.keras.Model, ABC):
 
         self.initializer = tf.initializers.GlorotUniform()
 
-        self.Gu = tf.Variable(self.initializer(shape=[self._num_users, self._factors]), name='Gu', dtype=tf.float32)
-        self.Gi = tf.Variable(self.initializer(shape=[self._num_items, self._factors]), name='Gi', dtype=tf.float32)
-        self.Bu = tf.Variable(tf.zeros(self._num_users), name='Bu', dtype=tf.float32)
-        self.Bi = tf.Variable(tf.zeros(self._num_items), name='Bi', dtype=tf.float32)
+        self.Gu = tf.Variable(self.initializer(shape=[self.num_users, self.embed_k]), name='Gu', dtype=tf.float32)
+        self.Gi = tf.Variable(self.initializer(shape=[self.num_items, self.embed_k]), name='Gi', dtype=tf.float32)
+        self.Bu = tf.Variable(tf.zeros(self.num_users), name='Bu', dtype=tf.float32)
+        self.Bi = tf.Variable(tf.zeros(self.num_items), name='Bi', dtype=tf.float32)
         self.Mu = tf.Variable(tf.zeros(1), name='Mu', dtype=tf.float32)
+        self.V = tf.convert_to_tensor(vocabulary_features, dtype=tf.float32)
+
+        self.textual_words_feature_shape = self.V.shape[-1]
 
         # mlp for user and item ratings
         self.user_projection_rating_network = tf.keras.Sequential()
@@ -85,21 +91,29 @@ class HRDRModel(tf.keras.Model, ABC):
 
         # cnn for user and item reviews
         self.user_review_cnn_network = tf.keras.Sequential()
-        for layer in range(len(self.user_review_cnn)):
-            self.user_review_cnn_network.add(tf.keras.layers.Conv2D(
+        self.user_review_cnn_network.add(tf.keras.layers.Conv1D(
+            filters=self.user_review_cnn[0],
+            kernel_size=3,
+            activation='relu',
+            input_shape=[None, self.textual_words_feature_shape]))
+        for layer in range(1, len(self.user_review_cnn)):
+            self.user_review_cnn_network.add(tf.keras.layers.Conv1D(
                 filters=self.user_review_cnn[layer],
-                kernel_size=[3, 3],
+                kernel_size=3,
                 activation='relu'
             ))
-        self.user_review_cnn_network.add(tf.keras.layers.GlobalMaxPool2D())
         self.item_review_cnn_network = tf.keras.Sequential()
+        self.item_review_cnn_network.add(tf.keras.layers.Conv1D(
+            filters=self.item_review_cnn[0],
+            kernel_size=3,
+            activation='relu',
+            input_shape=[None, self.textual_words_feature_shape]))
         for layer in range(len(self.item_review_cnn)):
-            self.item_review_cnn_network.add(tf.keras.layers.Conv2D(
-                filters=self.item_review_cnn[layer + 1],
-                kernel_size=[3, 3],
+            self.item_review_cnn_network.add(tf.keras.layers.Conv1D(
+                filters=self.item_review_cnn[layer],
+                kernel_size=3,
                 activation='relu'
             ))
-        self.item_review_cnn_network.append(tf.keras.layers.GlobalMaxPool2D())
 
         # attention network for user and item reviews
         self.user_review_attention_network = tf.keras.Sequential()
@@ -132,37 +146,61 @@ class HRDRModel(tf.keras.Model, ABC):
         # user and item projection matrix for final prediction
         self.W1 = tf.Variable(self.initializer(shape=[1,
                                                       self.user_projection_rating[-1] + self.embed_k +
-                                                      self.user_final_representation_network_list[-1]]), name='W1',
+                                                      self.item_final_representation[-1]]), name='W1',
                               dtype=tf.float32)
 
         self.sigmoid = tf.keras.layers.Activation(tf.nn.sigmoid)
 
-        self.optimizer = tf.optimizers.Adam(self._learning_rate)
+        self.optimizer = tf.optimizers.Adam(self.learning_rate)
 
     @tf.function
     def call(self, inputs, training=None):
-        user, item, user_ratings, item_ratings, user_reviews, item_reviews, = inputs
+        user, item, _, user_ratings, item_ratings, user_reviews, item_reviews = inputs
         xu = self.user_projection_rating_network(user_ratings, training)
         xi = self.item_projection_rating_network(item_ratings, training)
-        ou = self.user_review_cnn_network(user_reviews)
-        oi = self.item_review_cnn_network(item_reviews)
+        user_reviews_features = tf.nn.embedding_lookup(self.V, user_reviews)
+        item_reviews_features = tf.nn.embedding_lookup(self.V, item_reviews)
+        ou_flat = tf.reduce_max(self.user_review_cnn_network(user_reviews_features.flat_values), axis=1)
+        oi_flat = tf.reduce_max(self.item_review_cnn_network(item_reviews_features.flat_values), axis=1)
+        ou = tf.RaggedTensor.from_nested_row_lengths(
+            ou_flat,
+            user_reviews.nested_row_lengths()
+        )
+        oi = tf.RaggedTensor.from_nested_row_lengths(
+            oi_flat,
+            item_reviews.nested_row_lengths()
+        )
         qru = self.user_review_attention_network(xu, training)
         qri = self.item_review_attention_network(xi, training)
-        au = tf.multiply(ou, qru)
-        ai = tf.multiply(oi, qri)
-        au_norm = tf.nn.softmax(au)
-        ai_norm = tf.nn.softmax(ai)
-        ou = tf.reduce_sum(tf.multiply(ou, au_norm))
-        oi = tf.reduce_sum(tf.multiply(oi, ai_norm))
+        au = tf.reduce_sum(tf.multiply(ou, qru), axis=-1)
+        ai = tf.reduce_sum(tf.multiply(oi, qri), axis=-1)
+        au_norm = tf.map_fn(tf.nn.softmax, au, parallel_iterations=self.batch_size)
+        ai_norm = tf.map_fn(tf.nn.softmax, ai, parallel_iterations=self.batch_size)
+        ou_flat = tf.multiply(ou.flat_values, tf.expand_dims(au_norm.flat_values, -1))
+        oi_flat = tf.multiply(oi.flat_values, tf.expand_dims(ai_norm.flat_values, -1))
+        ou = tf.RaggedTensor.from_nested_row_lengths(
+            ou_flat,
+            user_reviews.nested_row_lengths()
+        )
+        oi = tf.RaggedTensor.from_nested_row_lengths(
+            oi_flat,
+            item_reviews.nested_row_lengths()
+        )
+        ou = tf.map_fn(lambda x: tf.reduce_sum(x, 0), ou,
+                       fn_output_signature=tf.TensorSpec([self.user_review_attention[-1]]),
+                       parallel_iterations=self.batch_size)
+        oi = tf.map_fn(lambda x: tf.reduce_sum(x, 0), oi,
+                       fn_output_signature=tf.TensorSpec([self.item_review_attention[-1]]),
+                       parallel_iterations=self.batch_size)
         ou = self.user_final_representation_network(ou, training)
         oi = self.item_final_representation_network(oi, training)
         u = tf.nn.embedding_lookup(self.Gu, user)
         i = tf.nn.embedding_lookup(self.Gi, item)
         bu = tf.nn.embedding_lookup(self.Bu, user)
         bi = tf.nn.embedding_lookup(self.Bi, item)
-        pu = tf.concat([xu, ou, u])
-        qi = tf.concat([xi, oi, i])
-        rui = tf.matmul(self.W1, tf.multiply(pu, qi)) + bu + bi + self.Mu
+        pu = tf.concat([tf.squeeze(xu), tf.squeeze(ou), u], axis=1)
+        qi = tf.concat([tf.squeeze(xi), tf.squeeze(oi), i], axis=1)
+        rui = tf.squeeze(tf.matmul(self.W1, tf.multiply(pu, qi), transpose_b=True), axis=0) + bu + bi + self.Mu
 
         return self.sigmoid(rui), u, i, bu, bi
 
@@ -173,33 +211,34 @@ class HRDRModel(tf.keras.Model, ABC):
 
     @tf.function
     def train_step(self, batch):
+        u, i, r, _, _, _, _ = batch
         with tf.GradientTape() as t:
             xui, gamma_u, gamma_i, beta_u, beta_i = \
                 self(inputs=batch, training=True)
 
-            loss = tf.reduce_sum(tf.square(xui - 1.0))
+            loss = tf.reduce_sum(tf.square(xui - r))
 
             # Regularization Component
             reg_loss = self.l_w * tf.reduce_sum([tf.nn.l2_loss(gamma_u),
                                                  tf.nn.l2_loss(gamma_i),
                                                  tf.nn.l2_loss(beta_u),
-                                                 tf.nn.l2_loss(beta_i)],
-                                                *[tf.nn.l2_loss(layer) for layer in
-                                                  self.user_projection_rating_network.trainable_variables],
-                                                *[tf.nn.l2_loss(layer) for layer in
-                                                  self.item_projection_rating_network.trainable_variables],
-                                                *[tf.nn.l2_loss(layer) for layer in
-                                                  self.user_review_cnn_network.trainable_variables],
-                                                *[tf.nn.l2_loss(layer) for layer in
-                                                  self.item_review_cnn_network.trainable_variables],
-                                                *[tf.nn.l2_loss(layer) for layer in
-                                                  self.user_review_attention_network.trainable_variables],
-                                                *[tf.nn.l2_loss(layer) for layer in
-                                                  self.item_review_attention_network.trainable_variables],
-                                                *[tf.nn.l2_loss(layer) for layer in
-                                                  self.user_final_representation_network.trainable_variables],
-                                                *[tf.nn.l2_loss(layer) for layer in
-                                                  self.item_final_representation_network.trainable_variables])
+                                                 tf.nn.l2_loss(beta_i),
+                                                 *[tf.nn.l2_loss(layer) for layer in
+                                                   self.user_projection_rating_network.trainable_variables],
+                                                 *[tf.nn.l2_loss(layer) for layer in
+                                                   self.item_projection_rating_network.trainable_variables],
+                                                 *[tf.nn.l2_loss(layer) for layer in
+                                                   self.user_review_cnn_network.trainable_variables],
+                                                 *[tf.nn.l2_loss(layer) for layer in
+                                                   self.item_review_cnn_network.trainable_variables],
+                                                 *[tf.nn.l2_loss(layer) for layer in
+                                                   self.user_review_attention_network.trainable_variables],
+                                                 *[tf.nn.l2_loss(layer) for layer in
+                                                   self.item_review_attention_network.trainable_variables],
+                                                 *[tf.nn.l2_loss(layer) for layer in
+                                                   self.user_final_representation_network.trainable_variables],
+                                                 *[tf.nn.l2_loss(layer) for layer in
+                                                   self.item_final_representation_network.trainable_variables]])
 
             # Loss to be optimized
             loss += reg_loss
@@ -232,6 +271,8 @@ class HRDRModel(tf.keras.Model, ABC):
                                                    *self.item_review_attention_network.trainable_variables,
                                                    *self.user_final_representation_network.trainable_variables,
                                                    *self.item_final_representation_network.trainable_variables]))
+
+        return loss
 
     @tf.function
     def get_top_k(self, preds, train_mask, k=100):

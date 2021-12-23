@@ -1,14 +1,14 @@
 experiment:
-  backend: pytorch
+  backend: tensorflow
   data_config:
     strategy: fixed
     train_path: ../data/{0}/trainingset.tsv
     validation_path: ../data/{0}/validationset.tsv
     test_path: ../data/{0}/testset.tsv
     side_information:
-      - dataloader: InteractionsTextualAttributes
-        interactions_features: ../data/{0}/original/text_features_all-mpnet-base-v2/
-        interactions: ../data/{0}/interactions.tsv
+      - dataloader: WordsTextualAttributes
+        vocabulary_features: ../data/{0}/original/text_words_features_word2vec-google-news-300.npy
+        train_reviews_tokens: ../data/{0}/train_reviews_tokens.tsv
   dataset: amazon_baby
   top_k: 50
   evaluation:
@@ -61,29 +61,52 @@ experiment:
 #        monitor: Recall@20
 #        mode: auto
 #        verbose: True
-    external.EGCF:
+    external.HRDR:
       meta:
         validation_rate: 1
         verbose: True
-        save_weights: False
+        save_weights: True
         save_recs: True
         validation_metric: Recall
         restore: False
-      lr: [ 0.0001, 0.005 ]
-      epochs: 400
-      batch_size: 256
+      batch_eval: 64
+      lr: 0.0005
+      epochs: 50
+      batch_size: 2
       factors: 64
-      trainable_edges: False
-      weight_size_projection_node_edge: (64, 64)
-      weight_size_nodes: (64, 64)
-      weight_size_edges: (64, 64)
-      weight_size_nodes_edges: (64, 64)
-      l_w: [10e-5, 10e-3, 10e-1, 10]
-      early_stopping:
-        patience: 50
-        monitor: Recall@20
-        mode: auto
-        verbose: True
+      l_w: 0.1
+      u_proj_rating: (64,)
+      i_proj_rating: (64,)
+      u_rev_cnn: (64,)
+      i_rev_cnn: (64,)
+      u_rev_att: (64,)
+      i_rev_att: (64,)
+      u_fin_rep: (64,)
+      i_fin_rep: (64,)
+      dropout: 0.5
+#    external.EGCF:
+#      meta:
+#        validation_rate: 1
+#        verbose: True
+#        save_weights: True
+#        save_recs: True
+#        validation_metric: Recall
+#        restore: True
+#      lr: [ 0.0001, 0.005 ]
+#      epochs: 400
+#      batch_size: 256
+#      factors: 64
+#      trainable_edges: False
+#      weight_size_projection_node_edge: (64, 64)
+#      weight_size_nodes: (64, 64)
+#      weight_size_edges: (64, 64)
+#      weight_size_nodes_edges: (64, 64)
+#      l_w: [10e-5, 10e-3, 10e-1, 10]
+#      early_stopping:
+#        patience: 50
+#        monitor: Recall@20
+#        mode: auto
+#        verbose: True
 #    external.NGCF:
 #      meta:
 #        validation_rate: 1

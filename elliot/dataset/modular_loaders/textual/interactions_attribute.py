@@ -52,7 +52,7 @@ class InteractionsTextualAttributes(AbstractLoader):
             users = users.union(all_interactions[0].unique().tolist())
             items = items.union(all_interactions[1].unique().tolist())
             self.interactions_features_shape = np.load(os.path.join(self.interactions_feature_folder_path,
-                                                                    interactions_folder[0])).shape[0]
+                                                                    interactions_folder[0])).shape
         if users:
             self.user_mapping = {user: val for val, user in enumerate(users)}
         if items:
