@@ -9,12 +9,14 @@ def import_model_by_backend(tensorflow_cmd, pytorch_cmd):
 
 
 from .most_popular import MostPop
+from .Proxy import ProxyRecommender
 from .msap import MSAPMF
 from .AdversarialMF import AdversarialMF
 from .ktup import KTUP
 from .cke import CKE
 from .mkr import MKR
 from .cofm import CoFM
+from .convmf import ConvMF
 from .kgflex import KGFlex
 from .kgflex_tf import KGFlexTF
 from .convmf import ConvMF

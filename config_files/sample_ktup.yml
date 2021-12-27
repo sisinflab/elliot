@@ -15,6 +15,7 @@ experiment:
         kg_train: ../data/{0}/kg_train.tsv
         kg_dev: ../data/{0}/kg_valid.tsv
         kg_test: ../data/{0}/kg_test.tsv
+  binarize: True
 #  splitting:
 ##    save_on_disk: True
 ##    save_folder: ../data/{0}/splitting/
@@ -29,7 +30,7 @@ experiment:
   evaluation:
     cutoffs: [10]
     simple_metrics: [nDCG, Recall, HR]
-    relevance_threshold: 3
+    relevance_threshold: 0
 #    paired_ttest: True
 #    wilcoxon_test: True
 #    complex_metrics:
@@ -38,27 +39,27 @@ experiment:
 #      metric_1: Recall
   gpu: 1 # -1 is not use GPU
   models:
-    external.KTUP:
-      meta:
-        hyper_max_evals: 1
-        hyper_opt_alg: tpe
-        validation_rate: 8
-        verbose: True
-        save_weights: False
-        save_recs: False
-#        restore: True
-      learning_rate: 0.001
-      embedding_size: 100
-      l2_lambda: 0.0
-      epochs: 771
-      batch_size: 200
-      joint_ratio: 0.7
-      use_st_gumbel: False
-      early_stopping:
-        patience: 5
-        monitor: nDCG@10
-        mode: auto
-        verbose: True
+#    external.KTUP:
+#      meta:
+#        hyper_max_evals: 1
+#        hyper_opt_alg: tpe
+#        validation_rate: 8
+#        verbose: True
+#        save_weights: False
+#        save_recs: False
+##        restore: True
+#      learning_rate: 0.001
+#      embedding_size: 100
+#      l2_lambda: 0.0
+#      epochs: 771
+#      batch_size: 200
+#      joint_ratio: 0.7
+#      use_st_gumbel: False
+#      early_stopping:
+#        patience: 5
+#        monitor: nDCG@10
+#        mode: auto
+#        verbose: True
       # 40 epoche di early stopping
 #    MultiVAE:
 #      meta:
@@ -76,3 +77,23 @@ experiment:
 #      batch_size: -1
 #      dropout_pkeep: 1
 #      reg_lambda: [0, 0.01]
+    external.CoFM:
+      meta:
+        hyper_max_evals: 1
+        hyper_opt_alg: tpe
+        validation_rate: 8
+        verbose: True
+        save_weights: False
+        save_recs: False
+      learning_rate: 0.001
+      embedding_size: 100
+      l2_lambda: 0.0
+      epochs: 771
+      batch_size: 200
+      joint_ratio: 0.7
+      use_st_gumbel: False
+      early_stopping:
+        patience: 5
+        monitor: nDCG@10
+        mode: auto
+        verbose: True

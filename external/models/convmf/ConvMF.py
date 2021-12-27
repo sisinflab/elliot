@@ -7,6 +7,7 @@ __version__ = '0.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
+
 import math
 from collections import defaultdict
 
@@ -30,33 +31,44 @@ class ConvMF(RecMixin, BaseRecommenderModel):
 
         # autoset params
         self._params_list = [
-            ("_lambda_u", "l_u", "lu", 1e-5, None, None),
-            ("_lambda_i", "l_i", "li", 1e-5, None, None),
-            ("_drop_out_rate", "drop_out", "dor", 0.2, None, None),
-            ("_max_len", "max_length", "max_len", 300, int, None),
-            ("_embedding_size", "embedding_size", "es", 200, int, None),
-            ("_factors_dim", "factors_dim", "fs", 50, int, None),
-            ("_kernel_per_ws", "kernel_per_ws", "k_ws", 100, None, None),
-            ("_loader", "loader", "load", "TextualAttributeSequence", None, None)
+            ("_l2_lambda", "l2_lambda", "l2", 1e-5, None, None),
+            ("_embedding_size", "embedding_size", "es", 64, int, None),
+            ("_learning_rate", "lr", "lr", 0.001, None, None),
+            ("_joint_ratio", "joint_ratio", "jr", 0.7, None, None),
+            ("_L1", "L1_flag", "l1", True, None, None),
+            ("_norm_lambda", "norm_lambda", "nl", 1, None, None),
+            ("_kg_lambda", "kg_lambda", "kgl", 1, None, None),
+            ("_use_st_gumbel", "use_st_gumbel", "gum", False, None, None),
+            ("_loader", "loader", "load", "KGRec", None, None)
         ]
         self.autoset_params()
+        self._step_to_switch = self._joint_ratio * 10
         self._side = getattr(self._data.side_information, self._loader, None)
-        vocab_size = len(self._side.textual_features['X_vocab']) + 1
-        CNN_X = self._side.textual_features['X_sequence']
 
         self._iteration = 0
         if self._batch_size < 1:
             self._batch_size = self._data.num_users
 
-        self._sp_i_train_ratings = self._data.sp_i_train_ratings
+        triple_epoch_length = math.ceil(float(len(self._side.Xs)) / (1 - self._joint_ratio))
+        rating_epoch_length = math.ceil(float(self._data.transactions) / self._joint_ratio)
 
-        self._model = convMF(self._lambda_u, self._lambda_i, self._embedding_size, self._factors_dim,
-                             self._kernel_per_ws, self._drop_out_rate, self._epochs, self._sp_i_train_ratings,
-                             vocab_size, self._max_len, CNN_X, self._seed)
+        self._epoch_length = max(triple_epoch_length, rating_epoch_length)
+        self._sampler = rs.Sampler(self._data.i_train_dict, self._epoch_length)
+        self._triple_sampler = ts.Sampler(self._side.entity_to_idx, self._side.Xs, self._side.Xp, self._side.Xo,
+                                          self._epoch_length)
+
+        self._i_items_set = list(range(self._num_items))
+
+        ######################################
+        new_map = defaultdict(lambda: -1)
+        new_map.update({self._data.public_items[i]: idx for i, idx in self._side.public_items_entitiesidx.items()})
+        self._model = cofm(self._learning_rate, self._L1, self._l2_lambda, self._norm_lambda, False, self._embedding_size,
+                           self._data.num_users, self._data.num_items, len(self._side.entity_set),
+                           len(self._side.predicate_set), new_map)
 
     @property
     def name(self):
-        return "ConvMF" \
+        return "CoFM" \
                + "_e:" + str(self._epochs) \
                + "_bs:" + str(self._batch_size) \
                + f"_{self.get_params_shortcut()}"
@@ -84,7 +96,7 @@ class ConvMF(RecMixin, BaseRecommenderModel):
                         t.set_postfix({'loss KGC': f'{loss.numpy() / steps:.5f}'})
                         t.update()
 
-            self.evaluate(it, loss / (it + 1))
+            self.evaluate(it, loss/(it + 1))
 
     def get_recommendations(self, k: int = 100):
         predictions_top_k_test = {}
