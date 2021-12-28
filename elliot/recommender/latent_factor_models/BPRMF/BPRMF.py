@@ -91,15 +91,15 @@ class BPRMF(RecMixin, BaseRecommenderModel):
         self._sampler = cs.Sampler(self._data.i_train_dict)
 
     def get_recommendations(self, k: int = 10):
-        predictions_top_k_val = {}
-        predictions_top_k_test = {}
+        predictions = self._model.get_all_recs()
 
-        recs_val, recs_test = self.process_protocol(k)
-
-        predictions_top_k_val.update(recs_val)
-        predictions_top_k_test.update(recs_test)
-
-        return predictions_top_k_val, predictions_top_k_test
+        return self._model.get_all_topks(self.get_candidate_mask(validation=True), k,
+                                         self._data.private_users,
+                                         self._data.private_items, predictions) \
+                   if hasattr(self._data, "val_dict") \
+                   else {}, self._model.get_all_topks(self.get_candidate_mask(), k,
+                                                      self._data.private_users,
+                                                      self._data.private_items, predictions)
 
     def get_single_recommendation(self, mask, k, *args):
         return {u: self._model.get_user_predictions(u, mask, k) for u in self._ratings.keys()}

@@ -67,6 +67,22 @@ class MFModel(object):
         return self._global_bias + self._item_bias[item] \
                + self._user_factors[user] @ self._item_factors[item]
 
+    def get_all_recs(self):
+        predictions = self._item_bias + self._user_factors @ self._item_factors.T
+        return predictions
+
+    def get_all_topks(self, mask, k, user_map, item_map, predictions):
+        masking = np.where(mask, predictions, -np.inf)
+        partial_index = np.argpartition(masking, -k, axis=1)[:, -k:]
+        masking_partition = np.take_along_axis(masking, partial_index, axis=1)
+        masking_partition_index = masking_partition.argsort(axis=1)[:, ::-1]
+        partial_index = np.take_along_axis(partial_index, masking_partition_index, axis=1)
+        masking_partition = np.take_along_axis(masking_partition, masking_partition_index, axis=1)
+        predictions_top_k = {
+            user_map[u]: list(map(lambda x: (item_map.get(x[0]), x[1]), zip(*map(lambda x: x, top)))) for
+            u, top in enumerate(zip(*(partial_index.tolist(), masking_partition.tolist())))}
+        return predictions_top_k
+
     def get_user_predictions(self, user_id, mask, top_k=10):
         user_id = self._public_users.get(user_id)
         b = self._item_bias + self._user_factors[user_id] @ self._item_factors.T
