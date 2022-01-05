@@ -21,6 +21,7 @@ from .kgflex import KGFlex
 from .kgflex_tf import KGFlexTF
 from .convmf import ConvMF
 from .hrdr import HRDR
+from .KaVAE import KaVAE
 
 import sys
 for _backend in sys.modules["external"].backend:

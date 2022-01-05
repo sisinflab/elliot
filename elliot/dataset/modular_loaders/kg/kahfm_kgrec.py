@@ -8,17 +8,16 @@ import pandas as pd
 from elliot.dataset.modular_loaders.abstract_loader import AbstractLoader
 
 
-class KGFlexLoader(AbstractLoader):
+class KAHFMLoader(AbstractLoader):
     def __init__(self, users: t.Set, items: t.Set, ns: SimpleNamespace, logger: object):
         self.logger = logger
         self.mapping_path = getattr(ns, "mapping", None)
         self.train_path = getattr(ns, "kg_train", None)
         self.dev_path = getattr(ns, "kg_dev", None)
         self.test_path = getattr(ns, "kg_test", None)
-        self.second_hop_path = getattr(ns, "second_hop", None)
         self.properties_file = getattr(ns, "properties", None)
         self.additive = getattr(ns, "additive", True)
-        self.threshold = getattr(ns, "threshold", 10)
+        self.threshold = getattr(ns, "threshold", 1.0)
         self.users = users
         self.items = items
 
@@ -37,42 +36,21 @@ class KGFlexLoader(AbstractLoader):
         self.triples = pd.concat([train_triples, self.dev_triples, self.test_triples])
         del train_triples, self.dev_triples, self.test_triples
 
-        self.second_hop = pd.DataFrame(columns=['uri', 'predicate', 'object'])\
-            .astype(dtype={'uri': str, 'predicate': str, 'object': str})
-        if self.second_hop_path:
-            self.second_hop = pd.read_csv(self.second_hop_path, sep='\t', names=['uri', 'predicate', 'object'],
-                                    dtype={'uri': str, 'predicate': str, 'object': str})
-
         if self.properties:
             if self.additive:
                 self.triples = self.triples[self.triples["predicate"].isin(self.properties)]
-                self.second_hop = self.second_hop[self.second_hop["predicate"].isin(self.properties)]
             else:
                 self.triples = self.triples[~self.triples["predicate"].isin(self.properties)]
-                self.second_hop = self.second_hop[~self.second_hop["predicate"].isin(self.properties)]
 
-        # COMPUTE FEATURES
-        occurrences_per_feature = self.triples.groupby(['predicate', 'object']).size().to_dict()
-        keep_set = {f for f, occ in occurrences_per_feature.items() if occ > self.threshold}
+        self.filter_triples()
 
-        second_order_features = self.triples.merge(self.second_hop, left_on='object', right_on='uri', how='left')
-        second_order_features = second_order_features[second_order_features['uri_y'].notna()]
-        occurrences_per_feature_2 = second_order_features.groupby(['predicate_x', 'predicate_y', 'object_y']) \
-            .size().to_dict()
-        keep_set2 = {f for f, occ in occurrences_per_feature_2.items() if occ > self.threshold}
-
-        self.triples = self.triples[
-            self.triples[['predicate', 'object']].set_index(['predicate', 'object']).index.map(
-                lambda f: f in keep_set)].astype(str)
-
-        self.second_order_features = second_order_features[second_order_features[
-            ['predicate_x', 'predicate_y', 'object_y']].set_index(['predicate_x', 'predicate_y', 'object_y'])
-            .index.map(lambda f: f in keep_set2)].astype(str)
-        #self.second_order_features = self.second_order_features.drop(['object_x', 'uri_y'], axis=1)
-        self.second_order_features = self.second_order_features.drop(['uri_y'], axis=1)
-
-        possible_items = [str(uri) for uri in self.triples["uri"].unique()]
-        self.mapping = {k: v for k, v in self.mapping.items() if v in possible_items}
+        # # Filter items
+        # self.triples = self.triples[self.triples["uri"].isin(self.mapping.values())]
+        # # Filtering for missing values from https://doi.org/10.1007/978-3-030-30793-6_3 and https://doi.org/10.1145/2254129.2254168
+        # n_mapped_subjects = self.triples["uri"].nunique()
+        # self.triples = self.triples.groupby(['predicate', 'object']).filter(lambda x: (1 - len(x) / n_mapped_subjects) <= self.threshold).astype(str)
+        # mapped_items = [str(uri) for uri in self.triples["uri"].unique()]
+        # self.mapping = {k: v for k, v in self.mapping.items() if v in mapped_items}
         self.items = self.items & set(self.mapping.keys())
 
     def get_mapped(self):
@@ -81,21 +59,43 @@ class KGFlexLoader(AbstractLoader):
     def filter(self, users, items):
         self.users = self.users & users
         self.mapping = {k: v for k, v in self.mapping.items() if k in items}
-        self.items = {i for i in self.items if i in self.mapping.keys()}
+
+        self.filter_triples()
+
+        self.items = self.items & set(self.mapping.keys())
 
     def create_namespace(self):
         ns = SimpleNamespace()
-        ns.__name__ = "KGFlexLoader"
+        ns.__name__ = "KAHFMLoader"
+
+        # Compute features
+        inverted_mapping = {v: k for k, v in self.mapping.items()}
+        feature_list = list(self.triples.groupby(['predicate', 'object']).indices.keys())
+        self.logger.info(f"Final KAHFM Features:\t{len(feature_list)}\tMapped items:\t{len(self.items)}")
+
+        feature_index = {k: p for p, k in enumerate(feature_list)}
+        self.triples["idxfeature"] = self.triples[['predicate', 'object']].set_index(['predicate', 'object']).index.map(
+            feature_index)
+
+        self.feature_map = self.triples.groupby("uri")["idxfeature"].apply(list).to_dict()
+        self.feature_map = {inverted_mapping[k]: v for k, v in self.feature_map.items() if
+                            k in inverted_mapping.keys()}
+
+        self.features = list(set(feature_index.values()))
+        self.private_features = {p: f for p, f in enumerate(self.features)}
+        self.public_features = {v: k for k, v in self.private_features.items()}
+
         ns.object = self
         ns.__dict__.update(self.__dict__)
         return ns
 
     def load_properties(self, properties_file):
         properties = []
-        with open(properties_file) as file:
-            for line in file:
-                if line[0] != '#':
-                    properties.append(line.rstrip("\n"))
+        if properties_file:
+            with open(properties_file) as file:
+                for line in file:
+                    if line[0] != '#':
+                        properties.append(line.rstrip("\n"))
         return properties
 
     def read_triples(self, path: str) -> t.List[t.Tuple[str, str, str]]:
@@ -128,3 +128,13 @@ class KGFlexLoader(AbstractLoader):
                 line = line.rstrip("\n").split(separator)
                 map[int(line[0])] = line[1]
         return map
+
+    def filter_triples(self):
+        # Filter triples
+        self.triples = self.triples[self.triples["uri"].isin(self.mapping.values())]
+        n_mapped_subjects = self.triples["uri"].nunique()
+        self.triples = self.triples.groupby(['predicate', 'object']).filter(
+            lambda x: (1 - len(x) / n_mapped_subjects) <= self.threshold).astype(str)
+        mapped_items = [str(uri) for uri in self.triples["uri"].unique()]
+        self.logger.info(f"Filtering operation: KAHFM Mapped items:\t{len(self.items)}")
+        self.mapping = {k: v for k, v in self.mapping.items() if v in mapped_items}
