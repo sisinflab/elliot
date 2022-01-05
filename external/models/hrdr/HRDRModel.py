@@ -211,7 +211,7 @@ class HRDRModel(tf.keras.Model, ABC):
 
     @tf.function
     def train_step(self, batch):
-        u, i, r, _, _, _, _ = batch
+        _, _, r, _, _, _, _ = batch
         with tf.GradientTape() as t:
             xui, gamma_u, gamma_i, beta_u, beta_i = \
                 self(inputs=batch, training=True)

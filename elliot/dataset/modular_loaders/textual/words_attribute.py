@@ -50,7 +50,7 @@ class WordsTextualAttributes(AbstractLoader):
         items = set()
         if self.vocabulary_features_path and self.train_reviews_tokens_path:
             self.all_reviews_tokens = pd.read_csv(self.train_reviews_tokens_path, sep='\t')
-            self.all_reviews_tokens['TOKENS_POSITION'] = self.all_reviews_tokens['TOKENS_POSITION'].apply(
+            self.all_reviews_tokens['tokens_position'] = self.all_reviews_tokens['tokens_position'].apply(
                 lambda x: literal_eval(x))
             users = users.union(self.all_reviews_tokens['USER_ID'].unique().tolist())
             items = items.union(self.all_reviews_tokens['ITEM_ID'].unique().tolist())

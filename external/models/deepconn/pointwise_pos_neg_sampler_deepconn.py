@@ -13,7 +13,8 @@ import tensorflow as tf
 
 
 class Sampler:
-    def __init__(self, ui_dict, iu_dict, private_users, private_items, train_reviews_tokens, epochs, pad_index):
+    def __init__(self, ui_dict, private_users, private_items, train_reviews_tokens, epochs, u_kernel_size,
+                 i_kernel_size, pad_index):
         np.random.seed(42)
         random.seed(42)
         self._ui_dict = ui_dict
@@ -23,12 +24,12 @@ class Sampler:
         self._nitems = len(self._items)
         self._ui_dict = {u: list(set(ui_dict[u])) for u in ui_dict}
         self._lui_dict = {u: len(v) for u, v in self._ui_dict.items()}
-        self._iu_dict = iu_dict
         self._train_reviews_tokens = train_reviews_tokens
-        self._max_tokens = int(self._train_reviews_tokens['num_tokens'].max())
         self._private_users = private_users
         self._private_items = private_items
         self._epochs = epochs
+        self._u_kernel_size = u_kernel_size
+        self._i_kernel_size = i_kernel_size
         self._pad_index = pad_index
 
     def step(self, events: int, batch_size: int):
@@ -36,7 +37,6 @@ class Sampler:
         n_users = self._nusers
         n_items = self._nitems
         ui_dict = self._ui_dict
-        iu_dict = self._iu_dict
         lui_dict = self._lui_dict
 
         actual_inter = (events // batch_size) * batch_size * self._epochs
@@ -58,27 +58,21 @@ class Sampler:
                 while i in u_pos:
                     i = r_int(n_items)
 
-            i_pos = iu_dict[i]
-
-            # get user ratings and item ratings
-            u_ratings = np.zeros((1, self._nitems))
-            i_ratings = np.zeros((1, self._nusers))
-            u_ratings[0, u_pos] = 1.0
-            i_ratings[0, i_pos] = 1.0
-
             # get user review and item review tokens
             u_review_tokens = \
                 self._train_reviews_tokens[self._train_reviews_tokens['USER_ID'] == self._private_users[u]][
                     'tokens_position'].tolist()
-            u_review_tokens = [sublist + ([self._pad_index] * (self._max_tokens - len(sublist))) for sublist in
-                               u_review_tokens]
+            u_review_tokens = [sublist + ([self._pad_index] * (self._u_kernel_size - len(sublist))) if len(
+                sublist) < self._u_kernel_size else sublist for sublist in u_review_tokens]
+            u_review_tokens = [int(item) for sublist in u_review_tokens for item in sublist]
             i_review_tokens = \
                 self._train_reviews_tokens[self._train_reviews_tokens['ITEM_ID'] == self._private_items[i]][
                     'tokens_position'].tolist()
-            i_review_tokens = [sublist + ([self._pad_index] * (self._max_tokens - len(sublist))) for sublist in
-                               i_review_tokens]
+            i_review_tokens = [sublist + ([self._pad_index] * (self._i_kernel_size - len(sublist))) if len(
+                sublist) < self._i_kernel_size else sublist for sublist in i_review_tokens]
+            i_review_tokens = [int(item) for sublist in i_review_tokens for item in sublist]
 
-            return u, i, float(b), u_ratings, i_ratings, u_review_tokens, i_review_tokens
+            return u, i, float(b), u_review_tokens, i_review_tokens
 
         for ep in range(self._epochs):
             for _ in range(events):
@@ -95,48 +89,38 @@ class Sampler:
                 tf.TensorSpec(shape=(), dtype=tf.int32),
                 tf.TensorSpec(shape=(), dtype=tf.int32),
                 tf.TensorSpec(shape=(), dtype=tf.float32),
-                tf.TensorSpec(shape=(1, self._nitems), dtype=tf.float32),
-                tf.TensorSpec(shape=(1, self._nusers), dtype=tf.float32),
-                tf.TensorSpec(shape=(None, self._max_tokens), dtype=tf.int32),
-                tf.TensorSpec(shape=(None, self._max_tokens), dtype=tf.int32),
+                tf.TensorSpec(shape=(None,), dtype=tf.int32),
+                tf.TensorSpec(shape=(None,), dtype=tf.int32),
             ),
             args=(events, batch_size)
         )
-        data = data.map(lambda a, b, c, d, e, f, g: (a, b, c, d, e, tf.expand_dims(f, 0), tf.expand_dims(g, 0)))
+        data = data.map(lambda a, b, c, d, e: (a, b, c, tf.expand_dims(d, 0), tf.expand_dims(e, 0)))
         data = data.map(
-            lambda a, b, c, d, e, f, g: (a, b, c, d, e, tf.RaggedTensor.from_tensor(f), tf.RaggedTensor.from_tensor(g)))
+            lambda a, b, c, d, e: (a, b, c, tf.RaggedTensor.from_tensor(d), tf.RaggedTensor.from_tensor(e)))
         data = data.batch(batch_size=batch_size)
         data = data.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
-        data = data.map(lambda a, b, c, d, e, f, g: (a, b, c, d, e, tf.squeeze(f, 1), tf.squeeze(g, 1)))
+        data = data.map(lambda a, b, c, d, e: (a, b, c, tf.squeeze(d, 1), tf.squeeze(e, 1)))
 
         return data
 
     def step_eval(self, user):
         n_items = self._nitems
-        ui_dict = self._ui_dict
-        iu_dict = self._iu_dict
 
         def sample(u, i):
-            u_pos = ui_dict[u]
-            i_pos = iu_dict[i]
-
-            u_ratings = np.zeros((1, self._nitems))
-            i_ratings = np.zeros((1, self._nusers))
-            u_ratings[0, u_pos] = 1.0
-            i_ratings[0, i_pos] = 1.0
-
             u_review_tokens = \
                 self._train_reviews_tokens[self._train_reviews_tokens['USER_ID'] == self._private_users[u]][
                     'tokens_position'].tolist()
-            u_review_tokens = [sublist + ([self._pad_index] * (self._max_tokens - len(sublist))) for sublist in
-                               u_review_tokens]
+            u_review_tokens = [sublist + ([self._pad_index] * (self._u_kernel_size - len(sublist))) if len(
+                sublist) < self._u_kernel_size else sublist for sublist in u_review_tokens]
+            u_review_tokens = [int(it) for sublist in u_review_tokens for it in sublist]
             i_review_tokens = \
                 self._train_reviews_tokens[self._train_reviews_tokens['ITEM_ID'] == self._private_items[i]][
                     'tokens_position'].tolist()
-            i_review_tokens = [sublist + ([self._pad_index] * (self._max_tokens - len(sublist))) for sublist in
-                               i_review_tokens]
+            i_review_tokens = [sublist + ([self._pad_index] * (self._i_kernel_size - len(sublist))) if len(
+                sublist) < self._i_kernel_size else sublist for sublist in i_review_tokens]
+            i_review_tokens = [int(it) for sublist in i_review_tokens for it in sublist]
 
-            return u, i, 1.0, u_ratings, i_ratings, u_review_tokens, i_review_tokens
+            return u, i, 1.0, u_review_tokens, i_review_tokens
 
         for item in range(n_items):
             yield sample(user, item)
@@ -148,18 +132,16 @@ class Sampler:
                 tf.TensorSpec(shape=(), dtype=tf.int32),
                 tf.TensorSpec(shape=(), dtype=tf.int32),
                 tf.TensorSpec(shape=(), dtype=tf.float32),
-                tf.TensorSpec(shape=(1, self._nitems), dtype=tf.float32),
-                tf.TensorSpec(shape=(1, self._nusers), dtype=tf.float32),
-                tf.TensorSpec(shape=(None, self._max_tokens), dtype=tf.int32),
-                tf.TensorSpec(shape=(None, self._max_tokens), dtype=tf.int32),
+                tf.TensorSpec(shape=(None,), dtype=tf.int32),
+                tf.TensorSpec(shape=(None,), dtype=tf.int32),
             ),
             args=(user,)
         )
-        data = data.map(lambda a, b, c, d, e, f, g: (a, b, c, d, e, tf.expand_dims(f, 0), tf.expand_dims(g, 0)))
+        data = data.map(lambda a, b, c, d, e: (a, b, c, tf.expand_dims(d, 0), tf.expand_dims(e, 0)))
         data = data.map(
-            lambda a, b, c, d, e, f, g: (a, b, c, d, e, tf.RaggedTensor.from_tensor(f), tf.RaggedTensor.from_tensor(g)))
+            lambda a, b, c, d, e: (a, b, c, tf.RaggedTensor.from_tensor(d), tf.RaggedTensor.from_tensor(e)))
         data = data.batch(batch_size=batch_size)
         data = data.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
-        data = data.map(lambda a, b, c, d, e, f, g: (a, b, c, d, e, tf.squeeze(f, 1), tf.squeeze(g, 1)))
+        data = data.map(lambda a, b, c, d, e: (a, b, c, tf.squeeze(d, 1), tf.squeeze(e, 1)))
 
         return data
