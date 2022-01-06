@@ -58,7 +58,21 @@ class Sampler:
                 while i in u_pos:
                     i = r_int(n_items)
 
-            return u, i, float(b)
+            # get user review and item review tokens
+            u_review_tokens = \
+                self._train_reviews_tokens[self._train_reviews_tokens['USER_ID'] == self._private_users[u]][
+                    'tokens_position'].tolist()
+            u_review_tokens = [sublist + ([self._pad_index] * (self._u_kernel_size - len(sublist))) if len(
+                sublist) < self._u_kernel_size else sublist for sublist in u_review_tokens]
+            u_review_tokens = [int(item) for sublist in u_review_tokens for item in sublist]
+            i_review_tokens = \
+                self._train_reviews_tokens[self._train_reviews_tokens['ITEM_ID'] == self._private_items[i]][
+                    'tokens_position'].tolist()
+            i_review_tokens = [sublist + ([self._pad_index] * (self._i_kernel_size - len(sublist))) if len(
+                sublist) < self._i_kernel_size else sublist for sublist in i_review_tokens]
+            i_review_tokens = [int(item) for sublist in i_review_tokens for item in sublist]
+
+            return u, i, float(b), u_review_tokens, i_review_tokens
 
         for ep in range(self._epochs):
             for _ in range(events):
@@ -68,41 +82,18 @@ class Sampler:
                 else:
                     counter_inter += 1
 
-    def review_tokens(self, u, i, b):
-        u_review_tokens = \
-            self._train_reviews_tokens[self._train_reviews_tokens['USER_ID'] == self._private_users[u.numpy()]][
-                'tokens_position'].tolist()
-        u_review_tokens = [sublist + ([self._pad_index] * (self._u_kernel_size - len(sublist))) if len(
-            sublist) < self._u_kernel_size else sublist for sublist in u_review_tokens]
-        u_review_tokens = [int(item) for sublist in u_review_tokens for item in sublist]
-        i_review_tokens = \
-            self._train_reviews_tokens[self._train_reviews_tokens['ITEM_ID'] == self._private_items[i.numpy()]][
-                'tokens_position'].tolist()
-        i_review_tokens = [sublist + ([self._pad_index] * (self._i_kernel_size - len(sublist))) if len(
-            sublist) < self._i_kernel_size else sublist for sublist in i_review_tokens]
-        i_review_tokens = [int(item) for sublist in i_review_tokens for item in sublist]
-
-        return u.numpy(), i.numpy(), b.numpy(), u_review_tokens, i_review_tokens
-
     def pipeline(self, events, batch_size):
-        def load_func(u, i, b):
-            out = tf.py_function(
-                self.review_tokens,
-                (u, i, b,),
-                (np.int32, np.int32, np.float32, np.int32, np.int32)
-            )
-            return out
-
         data = tf.data.Dataset.from_generator(
             generator=self.step,
             output_signature=(
                 tf.TensorSpec(shape=(), dtype=tf.int32),
                 tf.TensorSpec(shape=(), dtype=tf.int32),
-                tf.TensorSpec(shape=(), dtype=tf.float32)
+                tf.TensorSpec(shape=(), dtype=tf.float32),
+                tf.TensorSpec(shape=(None,), dtype=tf.int32),
+                tf.TensorSpec(shape=(None,), dtype=tf.int32),
             ),
             args=(events, batch_size)
         )
-        data = data.map(load_func, num_parallel_calls=tf.data.AUTOTUNE)
         data = data.map(lambda a, b, c, d, e: (a, b, c, tf.expand_dims(d, 0), tf.expand_dims(e, 0)),
                         num_parallel_calls=tf.data.AUTOTUNE)
         data = data.map(
