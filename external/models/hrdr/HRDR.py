@@ -159,13 +159,15 @@ class HRDR(RecMixin, BaseRecommenderModel):
         with tqdm(total=int(self._data.transactions // self._batch_size), disable=not self._verbose) as t:
             for batch in self._next_batch:
                 steps += 1
-                loss += self._model.train_step(batch)
-                t.set_postfix({'loss': f'{loss.numpy() / steps:.5f}'})
+                # loss += self._model.train_step(batch)
+                # t.set_postfix({'loss': f'{loss.numpy() / steps:.5f}'})
+                t.set_postfix({'loss': f'{loss / steps:.5f}'})
                 t.update()
 
                 if steps == self._data.transactions // self._batch_size:
                     t.reset()
-                    self.evaluate(it, loss.numpy() / steps)
+                    # self.evaluate(it, loss.numpy() / steps)
+                    self.evaluate(it, loss / steps)
                     it += 1
                     steps = 0
                     loss = 0
