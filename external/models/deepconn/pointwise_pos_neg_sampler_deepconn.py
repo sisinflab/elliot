@@ -94,12 +94,15 @@ class Sampler:
             ),
             args=(events, batch_size)
         )
-        data = data.map(lambda a, b, c, d, e: (a, b, c, tf.expand_dims(d, 0), tf.expand_dims(e, 0)))
+        data = data.map(lambda a, b, c, d, e: (a, b, c, tf.expand_dims(d, 0), tf.expand_dims(e, 0)),
+                        num_parallel_calls=tf.data.AUTOTUNE)
         data = data.map(
-            lambda a, b, c, d, e: (a, b, c, tf.RaggedTensor.from_tensor(d), tf.RaggedTensor.from_tensor(e)))
+            lambda a, b, c, d, e: (a, b, c, tf.RaggedTensor.from_tensor(d), tf.RaggedTensor.from_tensor(e)),
+            num_parallel_calls=tf.data.AUTOTUNE)
         data = data.batch(batch_size=batch_size)
-        data = data.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
-        data = data.map(lambda a, b, c, d, e: (a, b, c, tf.squeeze(d, 1), tf.squeeze(e, 1)))
+        data = data.prefetch(buffer_size=tf.data.AUTOTUNE)
+        data = data.map(lambda a, b, c, d, e: (a, b, c, tf.squeeze(d, 1), tf.squeeze(e, 1)),
+                        num_parallel_calls=tf.data.AUTOTUNE)
 
         return data
 
@@ -137,11 +140,14 @@ class Sampler:
             ),
             args=(user,)
         )
-        data = data.map(lambda a, b, c, d, e: (a, b, c, tf.expand_dims(d, 0), tf.expand_dims(e, 0)))
+        data = data.map(lambda a, b, c, d, e: (a, b, c, tf.expand_dims(d, 0), tf.expand_dims(e, 0)),
+                        num_parallel_calls=tf.data.AUTOTUNE)
         data = data.map(
-            lambda a, b, c, d, e: (a, b, c, tf.RaggedTensor.from_tensor(d), tf.RaggedTensor.from_tensor(e)))
+            lambda a, b, c, d, e: (a, b, c, tf.RaggedTensor.from_tensor(d), tf.RaggedTensor.from_tensor(e)),
+            num_parallel_calls=tf.data.AUTOTUNE)
         data = data.batch(batch_size=batch_size)
-        data = data.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
-        data = data.map(lambda a, b, c, d, e: (a, b, c, tf.squeeze(d, 1), tf.squeeze(e, 1)))
+        data = data.prefetch(buffer_size=tf.data.AUTOTUNE)
+        data = data.map(lambda a, b, c, d, e: (a, b, c, tf.squeeze(d, 1), tf.squeeze(e, 1)),
+                        num_parallel_calls=tf.data.AUTOTUNE)
 
         return data
