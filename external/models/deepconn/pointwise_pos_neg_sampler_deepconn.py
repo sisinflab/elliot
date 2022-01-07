@@ -25,6 +25,7 @@ class Sampler:
         self._ui_dict = {u: list(set(ui_dict[u])) for u in ui_dict}
         self._lui_dict = {u: len(v) for u, v in self._ui_dict.items()}
         self._train_reviews_tokens = train_reviews_tokens
+        self._train_reviews_tokens['tokens_position'] = self._train_reviews_tokens['tokens_position'].astype('int32')
         self._private_users = private_users
         self._private_items = private_items
         self._epochs = epochs
@@ -58,7 +59,7 @@ class Sampler:
                 while i in u_pos:
                     i = r_int(n_items)
 
-            # get user review and item review tokens
+            # get user review and item reviews
             u_review_tokens = \
                 self._train_reviews_tokens[self._train_reviews_tokens['USER_ID'] == self._private_users[u]][
                     'tokens_position'].tolist()
