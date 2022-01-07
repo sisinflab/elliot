@@ -112,9 +112,11 @@ class EGCF(RecMixin, BaseRecommenderModel):
                                        1, np.argwhere(self.node_edge_index[0] == nodes_connected_to_e[0])].tolist() + \
                                    self.node_edge_index[
                                        1, np.argwhere(self.node_edge_index[0] == nodes_connected_to_e[1])].tolist()
-            edges_connected_to_e = [ee[0] for ee in edges_connected_to_e if ee[0] != e]
-            for ee in edges_connected_to_e:
-                list_edges_edges.append([e, ee])
+            # edges_connected_to_e = [ee[0] for ee in edges_connected_to_e if ee[0] != e]
+            edges_connected_to_e = np.array(edges_connected_to_e)[np.squeeze(np.argwhere(edges_connected_to_e[:, 0] != 1)), 0].tolist()
+            list_edges_edges += list(map(list, zip([e] * len(edges_connected_to_e), edges_connected_to_e)))
+            # for ee in edges_connected_to_e:
+            #     list_edges_edges.append([e, ee])
 
         self.edge_edge_index = np.array(list_edges_edges).transpose()
         self.edge_edge_index -= np.min(self.edge_edge_index)
