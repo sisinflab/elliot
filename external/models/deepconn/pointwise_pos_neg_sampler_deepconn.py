@@ -89,8 +89,8 @@ class Sampler:
                 tf.TensorSpec(shape=(), dtype=tf.int32),
                 tf.TensorSpec(shape=(), dtype=tf.int32),
                 tf.TensorSpec(shape=(), dtype=tf.float32),
-                tf.TensorSpec(shape=(1, None), dtype=tf.string),
-                tf.TensorSpec(shape=(1, None), dtype=tf.string),
+                tf.TensorSpec(shape=(None,), dtype=tf.string),
+                tf.TensorSpec(shape=(None,), dtype=tf.string),
             ),
             args=(events, batch_size)
         )
