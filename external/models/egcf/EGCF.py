@@ -12,6 +12,9 @@ import numpy as np
 import torch
 import os
 
+from multiprocessing import Pool
+from multiprocessing import cpu_count
+
 from ast import literal_eval as make_tuple
 from elliot.utils.write import store_recommendation
 
@@ -102,21 +105,35 @@ class EGCF(RecMixin, BaseRecommenderModel):
 
         self.node_edge_index = np.array(list_nodes_edges).transpose()
         print('End of creation for the node-edge graph')
-
-        list_edges_edges = []
-
         print('Starting creation of edge-edge graph')
-        for e in set(self.node_edge_index[1]):
+
+        def for_each_edge(e):
             nodes_connected_to_e = self.node_edge_index[0, np.argwhere(self.node_edge_index[1] == e)][:, 0].tolist()
             edges_connected_to_e = self.node_edge_index[
                                        1, np.argwhere(self.node_edge_index[0] == nodes_connected_to_e[0])].tolist() + \
                                    self.node_edge_index[
                                        1, np.argwhere(self.node_edge_index[0] == nodes_connected_to_e[1])].tolist()
-            # edges_connected_to_e = [ee[0] for ee in edges_connected_to_e if ee[0] != e]
             edges_connected_to_e = np.array(edges_connected_to_e)[edges_connected_to_e != e].tolist()
-            list_edges_edges += list(map(list, zip([e] * len(edges_connected_to_e), edges_connected_to_e)))
-            # for ee in edges_connected_to_e:
-            #     list_edges_edges.append([e, ee])
+            return list(map(list, zip([e] * len(edges_connected_to_e), edges_connected_to_e)))
+
+        pool = Pool(cpu_count() - 1)
+        list_edges_edges = pool.map(for_each_edge, set(self.node_edge_index[1]))
+        list_edges_edges = [item for sublist in list_edges_edges for item in sublist]
+        pool.close()
+        pool.join()
+
+        # list_edges_edges = []
+        # for e in set(self.node_edge_index[1]):
+        #     nodes_connected_to_e = self.node_edge_index[0, np.argwhere(self.node_edge_index[1] == e)][:, 0].tolist()
+        #     edges_connected_to_e = self.node_edge_index[
+        #                                1, np.argwhere(self.node_edge_index[0] == nodes_connected_to_e[0])].tolist() + \
+        #                            self.node_edge_index[
+        #                                1, np.argwhere(self.node_edge_index[0] == nodes_connected_to_e[1])].tolist()
+        #     # edges_connected_to_e = [ee[0] for ee in edges_connected_to_e if ee[0] != e]
+        #     edges_connected_to_e = np.array(edges_connected_to_e)[edges_connected_to_e != e].tolist()
+        #     list_edges_edges += list(map(list, zip([e] * len(edges_connected_to_e), edges_connected_to_e)))
+        #     # for ee in edges_connected_to_e:
+        #     #     list_edges_edges.append([e, ee])
 
         self.edge_edge_index = np.array(list_edges_edges).transpose()
         self.edge_edge_index -= np.min(self.edge_edge_index)
