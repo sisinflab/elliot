@@ -64,13 +64,13 @@ class Sampler:
                     'tokens_position'].tolist()
             # u_review_tokens = [sublist + ([self._pad_index] * (self._u_kernel_size - len(sublist))) if len(
             #     sublist) < self._u_kernel_size else sublist for sublist in u_review_tokens]
-            u_review_tokens = [int(item) for sublist in u_review_tokens for item in sublist]
+            # u_review_tokens = [int(item) for sublist in u_review_tokens for item in sublist]
             i_review_tokens = \
                 self._train_reviews_tokens[self._train_reviews_tokens['ITEM_ID'] == self._private_items[i]][
                     'tokens_position'].tolist()
             # i_review_tokens = [sublist + ([self._pad_index] * (self._i_kernel_size - len(sublist))) if len(
             #     sublist) < self._i_kernel_size else sublist for sublist in i_review_tokens]
-            i_review_tokens = [int(item) for sublist in i_review_tokens for item in sublist]
+            # i_review_tokens = [int(item) for sublist in i_review_tokens for item in sublist]
 
             return u, i, float(b), u_review_tokens, i_review_tokens
 
