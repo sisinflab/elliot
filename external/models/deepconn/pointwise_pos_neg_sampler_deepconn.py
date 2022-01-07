@@ -25,7 +25,6 @@ class Sampler:
         self._ui_dict = {u: list(set(ui_dict[u])) for u in ui_dict}
         self._lui_dict = {u: len(v) for u, v in self._ui_dict.items()}
         self._train_reviews_tokens = train_reviews_tokens
-        self._train_reviews_tokens['tokens_position'] = self._train_reviews_tokens['tokens_position'].astype('int32')
         self._private_users = private_users
         self._private_items = private_items
         self._epochs = epochs
@@ -90,8 +89,8 @@ class Sampler:
                 tf.TensorSpec(shape=(), dtype=tf.int32),
                 tf.TensorSpec(shape=(), dtype=tf.int32),
                 tf.TensorSpec(shape=(), dtype=tf.float32),
-                tf.TensorSpec(shape=(None, None), dtype=tf.int32),
-                tf.TensorSpec(shape=(None, None), dtype=tf.int32),
+                tf.TensorSpec(shape=(None,), dtype=tf.string),
+                tf.TensorSpec(shape=(None,), dtype=tf.string),
             ),
             args=(events, batch_size)
         )
