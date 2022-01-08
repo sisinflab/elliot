@@ -13,7 +13,7 @@ import tensorflow as tf
 
 
 class Sampler:
-    def __init__(self, ui_dict, private_users, private_items, train_reviews_tokens, epochs, u_kernel_size,
+    def __init__(self, ui_dict, public_users, public_items, users_tokens, items_tokens, epochs, u_kernel_size,
                  i_kernel_size, pad_index):
         np.random.seed(42)
         random.seed(42)
@@ -24,9 +24,10 @@ class Sampler:
         self._nitems = len(self._items)
         self._ui_dict = {u: list(set(ui_dict[u])) for u in ui_dict}
         self._lui_dict = {u: len(v) for u, v in self._ui_dict.items()}
-        self._train_reviews_tokens = train_reviews_tokens
-        self._private_users = private_users
-        self._private_items = private_items
+        self._public_users = public_users
+        self._public_items = public_items
+        self._users_tokens = {self._public_users[u]: v for u, v in users_tokens.items()}
+        self._items_tokens = {self._public_items[i]: v for i, v in items_tokens.items()}
         self._epochs = epochs
         self._u_kernel_size = u_kernel_size
         self._i_kernel_size = i_kernel_size
@@ -38,6 +39,11 @@ class Sampler:
         n_items = self._nitems
         ui_dict = self._ui_dict
         lui_dict = self._lui_dict
+        users_tokens = self._users_tokens
+        items_tokens = self._items_tokens
+        pad_index = self._pad_index
+        u_kernel_size = self._u_kernel_size
+        i_kernel_size = self._i_kernel_size
 
         actual_inter = (events // batch_size) * batch_size * self._epochs
 
@@ -59,18 +65,10 @@ class Sampler:
                     i = r_int(n_items)
 
             # get user review and item reviews
-            u_review_tokens = \
-                self._train_reviews_tokens[self._train_reviews_tokens['USER_ID'] == self._private_users[u]][
-                    'tokens_position'].tolist()
-            u_review_tokens = [sublist + ([self._pad_index] * (self._u_kernel_size - len(sublist))) if len(
-                sublist) < self._u_kernel_size else sublist for sublist in u_review_tokens]
-            u_review_tokens = [int(item) for sublist in u_review_tokens for item in sublist]
-            i_review_tokens = \
-                self._train_reviews_tokens[self._train_reviews_tokens['ITEM_ID'] == self._private_items[i]][
-                    'tokens_position'].tolist()
-            i_review_tokens = [sublist + ([self._pad_index] * (self._i_kernel_size - len(sublist))) if len(
-                sublist) < self._i_kernel_size else sublist for sublist in i_review_tokens]
-            i_review_tokens = [int(item) for sublist in i_review_tokens for item in sublist]
+            u_review_tokens = users_tokens[u]
+            u_review_tokens += ([pad_index] * (u_kernel_size - len(u_review_tokens)))
+            i_review_tokens = items_tokens[i]
+            i_review_tokens += ([pad_index] * (i_kernel_size - len(i_review_tokens)))
 
             return u, i, float(b), u_review_tokens, i_review_tokens
 
@@ -99,7 +97,7 @@ class Sampler:
         data = data.map(
             lambda a, b, c, d, e: (a, b, c, tf.RaggedTensor.from_tensor(d), tf.RaggedTensor.from_tensor(e)),
             num_parallel_calls=tf.data.AUTOTUNE)
-        data = data.batch(batch_size=batch_size)
+        data = data.batch(batch_size=batch_size, num_parallel_calls=tf.data.AUTOTUNE)
         data = data.prefetch(buffer_size=tf.data.AUTOTUNE)
         data = data.map(lambda a, b, c, d, e: (a, b, c, tf.squeeze(d, 1), tf.squeeze(e, 1)),
                         num_parallel_calls=tf.data.AUTOTUNE)
@@ -111,17 +109,15 @@ class Sampler:
 
         def sample(u, i):
             u_review_tokens = \
-                self._train_reviews_tokens[self._train_reviews_tokens['USER_ID'] == self._private_users[u]][
-                    'tokens_position'].tolist()
-            u_review_tokens = [sublist + ([self._pad_index] * (self._u_kernel_size - len(sublist))) if len(
-                sublist) < self._u_kernel_size else sublist for sublist in u_review_tokens]
-            u_review_tokens = [int(it) for sublist in u_review_tokens for it in sublist]
+                list(map(int, ' '.join(
+                    self._train_reviews_tokens[self._train_reviews_tokens['USER_ID'] == self._private_users[u]][
+                        'tokens_position'].tolist()).split(' ')))
+            u_review_tokens += ([self._pad_index] * (self._u_kernel_size - len(u_review_tokens)))
             i_review_tokens = \
-                self._train_reviews_tokens[self._train_reviews_tokens['ITEM_ID'] == self._private_items[i]][
-                    'tokens_position'].tolist()
-            i_review_tokens = [sublist + ([self._pad_index] * (self._i_kernel_size - len(sublist))) if len(
-                sublist) < self._i_kernel_size else sublist for sublist in i_review_tokens]
-            i_review_tokens = [int(it) for sublist in i_review_tokens for it in sublist]
+                list(map(int, ' '.join(
+                    self._train_reviews_tokens[self._train_reviews_tokens['ITEM_ID'] == self._private_items[i]][
+                        'tokens_position'].tolist()).split(' ')))
+            i_review_tokens += ([self._pad_index] * (self._i_kernel_size - len(i_review_tokens)))
 
             return u, i, 1.0, u_review_tokens, i_review_tokens
 

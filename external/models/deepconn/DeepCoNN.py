@@ -93,9 +93,10 @@ class DeepCoNN(RecMixin, BaseRecommenderModel):
         self._pad_index = self._interactions_textual.object.word_features.shape[0] - 1
 
         self._sampler = Sampler(self._data.i_train_dict,
-                                self._data.private_users,
-                                self._data.private_items,
-                                self._interactions_textual.object.all_reviews_tokens,
+                                self._data.public_users,
+                                self._data.public_items,
+                                self._interactions_textual.object.users_tokens,
+                                self._interactions_textual.object.items_tokens,
                                 self._epochs,
                                 min(self._u_rev_cnn_kernel),
                                 min(self._i_rev_cnn_kernel),

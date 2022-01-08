@@ -1,7 +1,6 @@
 import typing as t
-import pandas as pd
 import numpy as np
-from ast import literal_eval
+import json
 from types import SimpleNamespace
 
 from elliot.dataset.modular_loaders.abstract_loader import AbstractLoader
@@ -11,13 +10,15 @@ class WordsTextualAttributes(AbstractLoader):
     def __init__(self, users: t.Set, items: t.Set, ns: SimpleNamespace, logger: object):
         self.logger = logger
         self.vocabulary_features_path = getattr(ns, "vocabulary_features", None)
-        self.train_reviews_tokens_path = getattr(ns, "train_reviews_tokens", None)
+        self.users_tokens_path = getattr(ns, "users_tokens", None)
+        self.items_tokens_path = getattr(ns, "items_tokens", None)
 
         self.item_mapping = {}
         self.user_mapping = {}
         self.word_feature_shape = None
         self.word_features = None
-        self.all_reviews_tokens = None
+        self.users_tokens = None
+        self.items_tokens = None
 
         inner_users, inner_items = self.check_interactions_in_folder()
 
@@ -36,7 +37,8 @@ class WordsTextualAttributes(AbstractLoader):
         ns.__name__ = "WordsTextualAttributes"
         ns.object = self
         ns.vocabulary_features_path = self.vocabulary_features_path
-        ns.train_reviews_tokens_path = self.train_reviews_tokens_path
+        ns.users_tokens_path = self.users_tokens_path
+        ns.items_tokens_path = self.items_tokens_path
 
         ns.user_mapping = self.user_mapping
         ns.item_mapping = self.item_mapping
@@ -48,12 +50,15 @@ class WordsTextualAttributes(AbstractLoader):
     def check_interactions_in_folder(self) -> (t.Set[int], t.Set[int]):
         users = set()
         items = set()
-        if self.vocabulary_features_path and self.train_reviews_tokens_path:
-            self.all_reviews_tokens = pd.read_csv(self.train_reviews_tokens_path, sep='\t')
-            self.all_reviews_tokens['tokens_position'] = self.all_reviews_tokens['tokens_position'].apply(
-                lambda x: literal_eval(x))
-            users = users.union(self.all_reviews_tokens['USER_ID'].unique().tolist())
-            items = items.union(self.all_reviews_tokens['ITEM_ID'].unique().tolist())
+        if self.vocabulary_features_path and self.users_tokens_path and self.items_tokens_path:
+            with open(self.users_tokens_path, "r") as f:
+                self.users_tokens = json.load(f)
+                self.users_tokens = {int(k): v for k, v in self.users_tokens.items()}
+            with open(self.items_tokens_path, "r") as f:
+                self.items_tokens = json.load(f)
+                self.items_tokens = {int(k): v for k, v in self.items_tokens.items()}
+            users = users.union(list(self.users_tokens.keys()))
+            items = items.union(list(self.items_tokens.keys()))
             self.word_features = np.load(self.vocabulary_features_path)
             self.word_feature_shape = self.word_features.shape
         if users:
