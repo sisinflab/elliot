@@ -65,12 +65,12 @@ class Sampler:
                     i = r_int(n_items)
 
             # get user review and item reviews
-            u_review_tokens = users_tokens[u]
-            u_review_tokens += ([pad_index] * (u_kernel_size - len(u_review_tokens)))
-            i_review_tokens = items_tokens[i]
-            i_review_tokens += ([pad_index] * (i_kernel_size - len(i_review_tokens)))
+            # u_review_tokens = users_tokens[u]
+            # u_review_tokens += ([pad_index] * (u_kernel_size - len(u_review_tokens)))
+            # i_review_tokens = items_tokens[i]
+            # i_review_tokens += ([pad_index] * (i_kernel_size - len(i_review_tokens)))
 
-            return u, i, float(b), u_review_tokens, i_review_tokens
+            return u, i, float(b), ui_dict[r_int(n_users)], ui_dict[r_int(n_users)]
 
         for ep in range(self._epochs):
             for _ in range(events):
@@ -106,18 +106,17 @@ class Sampler:
 
     def step_eval(self, user):
         n_items = self._nitems
+        users_tokens = self._users_tokens
+        items_tokens = self._items_tokens
+        pad_index = self._pad_index
+        u_kernel_size = self._u_kernel_size
+        i_kernel_size = self._i_kernel_size
 
         def sample(u, i):
-            u_review_tokens = \
-                list(map(int, ' '.join(
-                    self._train_reviews_tokens[self._train_reviews_tokens['USER_ID'] == self._private_users[u]][
-                        'tokens_position'].tolist()).split(' ')))
-            u_review_tokens += ([self._pad_index] * (self._u_kernel_size - len(u_review_tokens)))
-            i_review_tokens = \
-                list(map(int, ' '.join(
-                    self._train_reviews_tokens[self._train_reviews_tokens['ITEM_ID'] == self._private_items[i]][
-                        'tokens_position'].tolist()).split(' ')))
-            i_review_tokens += ([self._pad_index] * (self._i_kernel_size - len(i_review_tokens)))
+            u_review_tokens = users_tokens[u]
+            u_review_tokens += ([pad_index] * (u_kernel_size - len(u_review_tokens)))
+            i_review_tokens = items_tokens[i]
+            i_review_tokens += ([pad_index] * (i_kernel_size - len(i_review_tokens)))
 
             return u, i, 1.0, u_review_tokens, i_review_tokens
 
