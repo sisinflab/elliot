@@ -72,5 +72,7 @@ class Sampler:
             return u, i, 1.0, u_review_tokens, i_review_tokens
 
         for batch_start in range(0, n_items, batch_eval):
-            yield map(np.array,
-                      zip(*[sample(user, item) for item in range(batch_start, min(batch_start + batch_eval, n_items))]))
+            user, item, bit, u_t, i_t = map(np.array,
+                                            zip(*[sample(user, item) for item in
+                                                  range(batch_start, min(batch_start + batch_eval, n_items))]))
+            yield user, item, bit, u_t, i_t
