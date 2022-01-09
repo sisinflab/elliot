@@ -59,3 +59,18 @@ class Sampler:
             user, item, bit, u_t, i_t = map(np.array, zip(*[sample() for _ in
                                                             range(batch_start, min(batch_start + batch_size, events))]))
             yield user, item, bit.astype('float32'), u_t, i_t
+
+    def step_eval(self, user, batch_eval):
+        n_items = self._nitems
+        users_tokens = self._users_tokens
+        items_tokens = self._items_tokens
+
+        def sample(u, i):
+            u_review_tokens = users_tokens[u]
+            i_review_tokens = items_tokens[i]
+
+            return u, i, 1.0, u_review_tokens, i_review_tokens
+
+        for batch_start in range(0, n_items, batch_eval):
+            yield map(np.array,
+                      zip(*[sample(user, item) for item in range(batch_start, min(batch_start + batch_eval, n_items))]))

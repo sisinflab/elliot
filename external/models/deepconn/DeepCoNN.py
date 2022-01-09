@@ -133,7 +133,7 @@ class DeepCoNN(RecMixin, BaseRecommenderModel):
                     t.set_postfix({'loss': f'{loss / steps:.5f}'})
                     t.update()
 
-            # self.evaluate(it, loss / (it + 1))
+            self.evaluate(it, loss / (it + 1))
 
     def get_recommendations(self, k: int = 100):
         predictions_top_k_test = {}
@@ -141,7 +141,7 @@ class DeepCoNN(RecMixin, BaseRecommenderModel):
         for user in range(self._num_users):
             predictions = np.empty((1, self._num_items))
             start_index = 0
-            for batch in self._sampler.pipeline_eval(user, self._batch_eval):
+            for batch in self._sampler.step_eval(user, self._batch_eval):
                 u, i, rating, u_review_tokens, i_review_tokens = batch
                 end_index = start_index + u.shape[0]
                 predictions[0, start_index:end_index] = self._model.predict(batch)
