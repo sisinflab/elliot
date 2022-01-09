@@ -65,14 +65,17 @@ class Sampler:
         users_tokens = self._users_tokens
         items_tokens = self._items_tokens
 
-        def sample(u, i):
-            u_review_tokens = users_tokens[u]
+        def sample(i):
+            u_review_tokens = users_tokens[user]
             i_review_tokens = items_tokens[i]
 
-            return u, i, 1.0, u_review_tokens, i_review_tokens
+            return user, i, 1.0, u_review_tokens, i_review_tokens
 
         for batch_start in range(0, n_items, batch_eval):
-            user, item, bit, u_t, i_t = map(np.array,
-                                            zip(*[sample(user, item) for item in
-                                                  range(batch_start, min(batch_start + batch_eval, n_items))]))
-            yield user, item, bit, u_t, i_t
+            user_batch, item_batch, bit_batch, u_t_batch, i_t_batch = map(np.array,
+                                                                          zip(*[sample(item_in_batch) for item_in_batch
+                                                                                in
+                                                                                range(batch_start,
+                                                                                      min(batch_start + batch_eval,
+                                                                                          n_items))]))
+            yield user_batch, item_batch, bit_batch, u_t_batch, i_t_batch
