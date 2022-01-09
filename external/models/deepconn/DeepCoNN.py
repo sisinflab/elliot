@@ -10,7 +10,7 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malite
 from ast import literal_eval as make_tuple
 
 from tqdm import tqdm
-from .pointwise_pos_neg_sampler_deepconn import Sampler
+from .pointwise_pos_neg_sampler import Sampler
 from elliot.recommender import BaseRecommenderModel
 from elliot.recommender.base_recommender_model import init_charger
 from elliot.recommender.recommender_utils_mixin import RecMixin
@@ -96,13 +96,7 @@ class DeepCoNN(RecMixin, BaseRecommenderModel):
                                 self._data.public_users,
                                 self._data.public_items,
                                 self._interactions_textual.object.users_tokens,
-                                self._interactions_textual.object.items_tokens,
-                                self._epochs,
-                                min(self._u_rev_cnn_kernel),
-                                min(self._i_rev_cnn_kernel),
-                                self._pad_index)
-
-        self._next_batch = self._sampler.pipeline(self._data.transactions, self._batch_size)
+                                self._interactions_textual.object.items_tokens)
 
         self._model = DeepCoNNModel(
             num_users=self._num_users,
@@ -129,24 +123,17 @@ class DeepCoNN(RecMixin, BaseRecommenderModel):
         if self._restore:
             return self.restore_weights()
 
-        loss = 0
-        steps = 0
-        it = 0
-        with tqdm(total=int(self._data.transactions // self._batch_size), disable=not self._verbose) as t:
-            for batch in self._next_batch:
-                steps += 1
-                # loss += self._model.train_step(batch)
-                # t.set_postfix({'loss': f'{loss.numpy() / steps:.5f}'})
-                t.set_postfix({'loss': f'{loss / steps:.5f}'})
-                t.update()
+        for it in self.iterate(self._epochs):
+            loss = 0
+            steps = 0
+            with tqdm(total=int(self._data.transactions // self._batch_size), disable=not self._verbose) as t:
+                for batch in self._sampler.step(self._data.transactions, self._batch_size):
+                    steps += 1
+                    loss += self._model.train_step(batch)
+                    t.set_postfix({'loss': f'{loss / steps:.5f}'})
+                    t.update()
 
-                if steps == self._data.transactions // self._batch_size:
-                    t.reset()
-                    # self.evaluate(it, loss.numpy() / steps)
-                    self.evaluate(it, loss / steps)
-                    it += 1
-                    steps = 0
-                    loss = 0
+            # self.evaluate(it, loss / (it + 1))
 
     def get_recommendations(self, k: int = 100):
         predictions_top_k_test = {}

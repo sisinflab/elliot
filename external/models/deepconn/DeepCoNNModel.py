@@ -102,44 +102,24 @@ class DeepCoNNModel(tf.keras.Model, ABC):
 
     @tf.function
     def call(self, inputs, training=True):
-
-        def conv(x, w, b):
-            x = tf.expand_dims(tf.expand_dims(x, 0), -1)
-            return tf.squeeze(
-                tf.reduce_max(tf.nn.conv2d(input=x, filters=w, strides=[1, 1, 1, 1], padding='VALID') + b, axis=1),
-                axis=0
-            )
-
         user, item, _, user_reviews, item_reviews = inputs
-        user_reviews_features = tf.nn.embedding_lookup(self.V, user_reviews)
-        item_reviews_features = tf.nn.embedding_lookup(self.V, item_reviews)
+        user_reviews_features = tf.expand_dims(tf.nn.embedding_lookup(self.V, user_reviews), -1)
+        item_reviews_features = tf.expand_dims(tf.nn.embedding_lookup(self.V, item_reviews), -1)
 
         out_users = []
         for layer in range(len(self.user_review_cnn_network)):
-            out = tf.map_fn(
-                lambda x: conv(x, self.user_review_cnn_network[layer][0], self.user_review_cnn_network[layer][1]),
-                user_reviews_features,
-                fn_output_signature=tf.TensorSpec(
-                    shape=[1, self.user_review_cnn_features[layer]],
-                    dtype=tf.float32
-                ),
-                parallel_iterations=user.shape[0]
-            )
+            out = tf.reduce_max(
+                tf.nn.conv2d(input=user_reviews_features, filters=self.user_review_cnn_network[layer][0],
+                             strides=[1, 1, 1, 1], padding='VALID') + self.user_review_cnn_network[layer][1], axis=1)
             out_users.append(out)
         out_users = tf.reshape(tf.concat(out_users, axis=1), [user.shape[0], -1])
         out_users = self.dropout(self.user_fully_connected(out_users))
 
         out_items = []
         for layer in range(len(self.item_review_cnn_network)):
-            out = tf.map_fn(
-                lambda x: conv(x, self.item_review_cnn_network[layer][0], self.item_review_cnn_network[layer][1]),
-                item_reviews_features,
-                fn_output_signature=tf.TensorSpec(
-                    shape=[1, self.item_review_cnn_features[layer]],
-                    dtype=tf.float32
-                ),
-                parallel_iterations=user.shape[0]
-            )
+            out = tf.reduce_max(
+                tf.nn.conv2d(input=item_reviews_features, filters=self.item_review_cnn_network[layer][0],
+                             strides=[1, 1, 1, 1], padding='VALID') + self.item_review_cnn_network[layer][1], axis=1)
             out_items.append(out)
         out_items = tf.reshape(tf.concat(out_items, axis=1), [user.shape[0], -1])
         out_items = self.dropout(self.item_fully_connected(out_items), training=training)

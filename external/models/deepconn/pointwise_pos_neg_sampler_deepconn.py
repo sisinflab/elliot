@@ -65,12 +65,12 @@ class Sampler:
                     i = r_int(n_items)
 
             # get user review and item reviews
-            # u_review_tokens = users_tokens[u]
-            # u_review_tokens += ([pad_index] * (u_kernel_size - len(u_review_tokens)))
-            # i_review_tokens = items_tokens[i]
-            # i_review_tokens += ([pad_index] * (i_kernel_size - len(i_review_tokens)))
+            u_review_tokens = users_tokens[u]
+            u_review_tokens += ([pad_index] * (u_kernel_size - len(u_review_tokens)))
+            i_review_tokens = items_tokens[i]
+            i_review_tokens += ([pad_index] * (i_kernel_size - len(i_review_tokens)))
 
-            return u, i, float(b), ui_dict[r_int(n_users)], ui_dict[r_int(n_users)]
+            return u, i, float(b), u_review_tokens, i_review_tokens
 
         for ep in range(self._epochs):
             for _ in range(events):
