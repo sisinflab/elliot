@@ -145,51 +145,16 @@ class DeepCoNNModel(tf.keras.Model, ABC):
         _, _, r, _, _ = batch
         with tf.GradientTape() as t:
             xui = self(inputs=batch, training=True)
-            loss = tf.reduce_sum(tf.square(xui - r))
+            loss = tf.reduce_mean(tf.square(xui - r))
 
             # Regularization Component
-            reg_loss = self.l_w * tf.reduce_sum([*[tf.nn.l2_loss(layer[0]) for layer in
-                                                   self.user_review_cnn_network],
-                                                 *[tf.nn.l2_loss(layer[1]) for layer in
-                                                   self.user_review_cnn_network],
-                                                 *[tf.nn.l2_loss(layer[0]) for layer in
-                                                   self.item_review_cnn_network],
-                                                 *[tf.nn.l2_loss(layer[1]) for layer in
-                                                   self.item_review_cnn_network],
-                                                 *[tf.nn.l2_loss(layer) for layer in
-                                                   self.user_fully_connected.trainable_variables],
-                                                 *[tf.nn.l2_loss(layer) for layer in
-                                                   self.item_fully_connected.trainable_variables],
-                                                 *[tf.nn.l2_loss(layer) for layer in
-                                                   self.fm_fully_connected.trainable_variables],
-                                                 tf.nn.l2_loss(self.W),
-                                                 tf.nn.l2_loss(self.B)])
+            reg_loss = self.l_w * tf.reduce_sum([tf.nn.l2_loss(variable) for variable in self.trainable_variables])
 
             # Loss to be optimized
             loss += reg_loss
 
-        grads = t.gradient(loss, [
-            *[layer[0] for layer in self.user_review_cnn_network],
-            *[layer[1] for layer in self.user_review_cnn_network],
-            *[layer[0] for layer in self.item_review_cnn_network],
-            *[layer[1] for layer in self.item_review_cnn_network],
-            *self.user_fully_connected.trainable_variables,
-            *self.item_fully_connected.trainable_variables,
-            *self.fm_fully_connected.trainable_variables,
-            self.W,
-            self.B
-        ])
-        self.optimizer.apply_gradients(zip(grads, [
-            *[layer[0] for layer in self.user_review_cnn_network],
-            *[layer[1] for layer in self.user_review_cnn_network],
-            *[layer[0] for layer in self.item_review_cnn_network],
-            *[layer[1] for layer in self.item_review_cnn_network],
-            *self.user_fully_connected.trainable_variables,
-            *self.item_fully_connected.trainable_variables,
-            *self.fm_fully_connected.trainable_variables,
-            self.W,
-            self.B
-        ]))
+        grads = t.gradient(loss, self.trainable_variables)
+        self.optimizer.apply_gradients(zip(grads, self.trainable_variables))
 
         return loss
 
