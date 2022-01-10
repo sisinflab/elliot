@@ -150,7 +150,7 @@ class DeepCoNN(RecMixin, BaseRecommenderModel):
                 stop_batch = min(start_batch + self._batch_eval, self._num_users)
                 user_reviews = list(
                     itemgetter(*list(range(start_batch, stop_batch)))(users_tokens))
-                out_users[start_batch: stop_batch] = self._model.conv_users(user_reviews)
+                out_users[start_batch: stop_batch] = self._model.conv_users(np.array(user_reviews))
                 t.update()
         self.logger.info('Convolutions for all users is complete!')
 
@@ -160,7 +160,7 @@ class DeepCoNN(RecMixin, BaseRecommenderModel):
                 stop_batch = min(start_batch + self._batch_eval, self._num_items)
                 item_reviews = list(
                     itemgetter(*list(range(start_batch, stop_batch)))(items_tokens))
-                out_items[start_batch: stop_batch] = self._model.conv_users(item_reviews)
+                out_items[start_batch: stop_batch] = self._model.conv_users(np.array(item_reviews))
                 t.update()
         self.logger.info('Convolutions for all items is complete!')
 
