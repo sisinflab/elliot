@@ -130,7 +130,7 @@ class DeepCoNNModel(tf.keras.Model, ABC):
 
         return out_items
 
-    # @tf.function
+    @tf.function
     def call(self, inputs, training=True):
         user, item, _, user_reviews, item_reviews = inputs
         user_reviews_features = tf.nn.embedding_lookup(self.V, user_reviews)
@@ -175,9 +175,9 @@ class DeepCoNNModel(tf.keras.Model, ABC):
         out_inter = tf.constant(0.5) * (out_1 - out_2)
         out_lin = self.fm_fully_connected(out)
         rui = tf.squeeze(self.sigmoid(self.B + out_inter + out_lin))
-        return rui
+        return tf.reshape(rui, [out_users.shape[0], out_items.shape[0]])
 
-    # @tf.function
+    @tf.function
     def train_step(self, batch):
         _, _, r, _, _ = batch
         with tf.GradientTape() as t:

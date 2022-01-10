@@ -158,7 +158,7 @@ class DeepCoNN(RecMixin, BaseRecommenderModel):
             predictions = np.empty((offset_stop - offset, self._num_items))
             user_reviews = list(
                 itemgetter(*list(range(offset, offset_stop)))(users_tokens))
-            out_users = self._model.conv_users(np.array(user_reviews))
+            out_users = self._model.conv_users(np.array(user_reviews, dtype=np.int64))
             with tqdm(total=int(self._num_items // self._batch_eval), disable=not self._verbose) as t:
                 for item_index, item_offset in enumerate(range(0, self._num_items, self._batch_eval)):
                     item_offset_stop = min(item_offset + self._batch_eval, self._num_items)
