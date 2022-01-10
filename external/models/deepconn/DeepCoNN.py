@@ -138,8 +138,8 @@ class DeepCoNN(RecMixin, BaseRecommenderModel):
         predictions_top_k_test = {}
         predictions_top_k_val = {}
 
-        users_tokens = self._interactions_textual.object.users_tokens
-        items_tokens = self._interactions_textual.object.items_tokens
+        users_tokens = self._sampler.users_tokens
+        items_tokens = self._sampler.items_tokens
 
         out_users = np.empty((self._num_users, self._latent_size))
         out_items = np.empty((self._num_items, self._latent_size))
@@ -160,7 +160,7 @@ class DeepCoNN(RecMixin, BaseRecommenderModel):
                 stop_batch = min(start_batch + self._batch_eval, self._num_items)
                 item_reviews = list(
                     itemgetter(*list(range(start_batch, stop_batch)))(items_tokens))
-                out_items[start_batch: stop_batch] = self._model.conv_users(np.array(item_reviews))
+                out_items[start_batch: stop_batch] = self._model.conv_items(np.array(item_reviews))
                 t.update()
         self.logger.info('Convolutions for all items is complete!')
 
