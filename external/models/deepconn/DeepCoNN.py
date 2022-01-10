@@ -126,12 +126,12 @@ class DeepCoNN(RecMixin, BaseRecommenderModel):
         for it in self.iterate(self._epochs):
             loss = 0
             steps = 0
-            # with tqdm(total=int(self._data.transactions // self._batch_size), disable=not self._verbose) as t:
-            #     for batch in self._sampler.step(self._data.transactions, self._batch_size):
-            #         steps += 1
-            #         loss += self._model.train_step(batch)
-            #         t.set_postfix({'loss': f'{loss / steps:.5f}'})
-            #         t.update()
+            with tqdm(total=int(self._data.transactions // self._batch_size), disable=not self._verbose) as t:
+                for batch in self._sampler.step(self._data.transactions, self._batch_size):
+                    steps += 1
+                    loss += self._model.train_step(batch)
+                    t.set_postfix({'loss': f'{loss / steps:.5f}'})
+                    t.update()
 
             self.evaluate(it, loss / (it + 1))
 
@@ -149,7 +149,7 @@ class DeepCoNN(RecMixin, BaseRecommenderModel):
                 stop_batch = min(start_batch + self._batch_eval, self._num_items)
                 item_reviews = list(
                     itemgetter(*list(range(start_batch, stop_batch)))(items_tokens))
-                out_items[start_batch: stop_batch] = self._model.conv_items(tf.Variable(item_reviews, dtype=tf.int32))
+                out_items[start_batch: stop_batch] = self._model.conv_items(np.array(item_reviews, dtype=np.int64))
                 t.update()
         self.logger.info('Convolutions for all items is complete!')
 
