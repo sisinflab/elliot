@@ -167,7 +167,8 @@ class DeepCoNNModel(tf.keras.Model, ABC):
 
     @tf.function
     def predict(self, out_users, out_items):
-        out = tf.concat([out_users, out_items], axis=-1) # qui devo capire come fare
+        out = tf.concat([tf.repeat(out_users, repeats=out_items.shape[0], axis=0),
+                         tf.tile(out_items, multiples=tf.constant([out_users.shape[0], 1], tf.int32))], axis=-1)
         out_1 = tf.reduce_sum(tf.math.pow(tf.matmul(out, self.W), 2), 1, keepdims=True)
         out_2 = tf.reduce_sum(tf.matmul(tf.math.pow(out, 2), tf.math.pow(self.W, 2)), 1, keepdims=True)
 

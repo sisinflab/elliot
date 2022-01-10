@@ -18,6 +18,7 @@ from elliot.recommender.recommender_utils_mixin import RecMixin
 from .DeepCoNNModel import DeepCoNNModel
 
 import numpy as np
+import tensorflow as tf
 
 
 class DeepCoNN(RecMixin, BaseRecommenderModel):
@@ -141,20 +142,8 @@ class DeepCoNN(RecMixin, BaseRecommenderModel):
         users_tokens = self._sampler.users_tokens
         items_tokens = self._sampler.items_tokens
 
-        out_users = np.empty((self._num_users, self._latent_size))
-        out_items = np.empty((self._num_items, self._latent_size))
-
-        self.logger.info('Starting convolutions for all users...')
-        with tqdm(total=int(self._num_users // self._batch_eval), disable=not self._verbose) as t:
-            for start_batch in range(0, self._num_users, self._batch_eval):
-                stop_batch = min(start_batch + self._batch_eval, self._num_users)
-                user_reviews = list(
-                    itemgetter(*list(range(start_batch, stop_batch)))(users_tokens))
-                out_users[start_batch: stop_batch] = self._model.conv_users(np.array(user_reviews))
-                t.update()
-        self.logger.info('Convolutions for all users is complete!')
-
         self.logger.info('Starting convolutions for all items...')
+        out_items = np.empty((self._num_items, self._latent_size))
         with tqdm(total=int(self._num_items // self._batch_eval), disable=not self._verbose) as t:
             for start_batch in range(0, self._num_items, self._batch_eval):
                 stop_batch = min(start_batch + self._batch_eval, self._num_items)
@@ -164,10 +153,21 @@ class DeepCoNN(RecMixin, BaseRecommenderModel):
                 t.update()
         self.logger.info('Convolutions for all items is complete!')
 
-        # for index, offset in enumerate(range(0, self._num_users, self._batch_eval)):
-        #     offset_stop = min(offset + self._batch_eval, self._num_users)
-        #     predictions = self._model.predict(out_users[offset: offset_stop], out_items)
-        #     recs_val, recs_test = self.process_protocol(k, predictions, offset, offset_stop)
-        #     predictions_top_k_val.update(recs_val)
-        #     predictions_top_k_test.update(recs_test)
+        for index, offset in enumerate(range(0, self._num_users, self._batch_eval)):
+            offset_stop = min(offset + self._batch_eval, self._num_users)
+            predictions = np.empty((offset_stop - offset, self._num_items))
+            user_reviews = list(
+                itemgetter(*list(range(offset, offset_stop)))(users_tokens))
+            out_users = self._model.conv_users(np.array(user_reviews))
+            with tqdm(total=int(self._num_items // self._batch_eval), disable=not self._verbose) as t:
+                for item_index, item_offset in enumerate(range(0, self._num_items, self._batch_eval)):
+                    item_offset_stop = min(item_offset + self._batch_eval, self._num_items)
+                    p = self._model.predict(out_users,
+                                            tf.Variable(out_items[item_index * self._batch_eval:item_offset_stop],
+                                                        dtype=tf.float32))
+                    predictions[:(offset_stop - offset), item_index * self._batch_eval:item_offset_stop] = p
+                    t.update()
+            recs_val, recs_test = self.process_protocol(k, predictions, offset, offset_stop)
+            predictions_top_k_val.update(recs_val)
+            predictions_top_k_test.update(recs_test)
         return predictions_top_k_val, predictions_top_k_test
