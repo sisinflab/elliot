@@ -8,6 +8,7 @@ __author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malitesta@poliba.it'
 
 from ast import literal_eval as make_tuple
+from operator import itemgetter
 
 from tqdm import tqdm
 from .pointwise_pos_neg_sampler import Sampler
@@ -62,8 +63,6 @@ class DeepCoNN(RecMixin, BaseRecommenderModel):
 
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
-
-        iu_dict = data.build_items_neighbour()
 
         if self._batch_size < 1:
             self._batch_size = self._num_users
@@ -126,27 +125,46 @@ class DeepCoNN(RecMixin, BaseRecommenderModel):
         for it in self.iterate(self._epochs):
             loss = 0
             steps = 0
-            with tqdm(total=int(self._data.transactions // self._batch_size), disable=not self._verbose) as t:
-                for batch in self._sampler.step(self._data.transactions, self._batch_size):
-                    steps += 1
-                    loss += self._model.train_step(batch)
-                    t.set_postfix({'loss': f'{loss / steps:.5f}'})
-                    t.update()
+            # with tqdm(total=int(self._data.transactions // self._batch_size), disable=not self._verbose) as t:
+            #     for batch in self._sampler.step(self._data.transactions, self._batch_size):
+            #         steps += 1
+            #         loss += self._model.train_step(batch)
+            #         t.set_postfix({'loss': f'{loss / steps:.5f}'})
+            #         t.update()
 
             self.evaluate(it, loss / (it + 1))
 
     def get_recommendations(self, k: int = 100):
         predictions_top_k_test = {}
         predictions_top_k_val = {}
-        for user in range(self._num_users):
-            predictions = np.empty((1, self._num_items))
-            start_index = 0
-            for batch in self._sampler.step_eval(user, self._batch_eval):
-                u, i, rating, u_review_tokens, i_review_tokens = batch
-                end_index = start_index + u.shape[0]
-                predictions[0, start_index:end_index] = self._model.predict(batch)
-                start_index += u.shape[0]
-            recs_val, recs_test = self.process_protocol(k, predictions, user, user + 1)
-            predictions_top_k_val.update(recs_val)
-            predictions_top_k_test.update(recs_test)
+
+        out_users = np.empty((self._num_users, self._latent_size))
+        out_items = np.empty((self._num_items, self._latent_size))
+
+        self.logger.info('Starting convolutions for all users...')
+        with tqdm(total=int(self._num_users // self._batch_eval), disable=not self._verbose) as t:
+            for start_batch in range(0, self._num_users, self._batch_eval):
+                stop_batch = min(start_batch + self._batch_eval, self._num_users)
+                user_reviews = list(
+                    itemgetter(*list(range(start_batch, stop_batch)))(self._interactions_textual.object.users_tokens))
+                out_users[start_batch: stop_batch] = self._model.conv_users(user_reviews)
+                t.update()
+        self.logger.info('Convolutions for all users is complete!')
+
+        self.logger.info('Starting convolutions for all items...')
+        with tqdm(total=int(self._num_items // self._batch_eval), disable=not self._verbose) as t:
+            for start_batch in range(0, self._num_items, self._batch_eval):
+                stop_batch = min(start_batch + self._batch_eval, self._num_items)
+                item_reviews = list(
+                    itemgetter(*list(range(start_batch, stop_batch)))(self._interactions_textual.object.items_tokens))
+                out_items[start_batch: stop_batch] = self._model.conv_users(item_reviews)
+                t.update()
+        self.logger.info('Convolutions for all items is complete!')
+
+        # for index, offset in enumerate(range(0, self._num_users, self._batch_size)):
+        #     offset_stop = min(offset + self._batch_size, self._num_users)
+        #     predictions = self._model.predict(out_users[offset: offset_stop], out_items)
+        #     recs_val, recs_test = self.process_protocol(k, predictions, offset, offset_stop)
+        #     predictions_top_k_val.update(recs_val)
+        #     predictions_top_k_test.update(recs_test)
         return predictions_top_k_val, predictions_top_k_test

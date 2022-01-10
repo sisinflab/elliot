@@ -44,7 +44,7 @@ class DeepCoNNModel(tf.keras.Model, ABC):
         self.latent_size = latent_size
         self.dropout_rate = dropout_rate
 
-        self.V = tf.convert_to_tensor(vocabulary_features, dtype=tf.float32)
+        self.V = tf.expand_dims(tf.convert_to_tensor(vocabulary_features, dtype=tf.float32), -1)
 
         self.textual_words_feature_shape = self.V.shape[-1]
 
@@ -101,10 +101,40 @@ class DeepCoNNModel(tf.keras.Model, ABC):
         self.optimizer = tf.optimizers.RMSprop(self.learning_rate)
 
     @tf.function
+    def conv_users(self, user_reviews):
+        user_reviews_features = tf.nn.embedding_lookup(self.V, user_reviews)
+
+        out_users = []
+        for layer in range(len(self.user_review_cnn_network)):
+            out = tf.reduce_max(
+                tf.nn.conv2d(input=user_reviews_features, filters=self.user_review_cnn_network[layer][0],
+                             strides=[1, 1, 1, 1], padding='VALID') + self.user_review_cnn_network[layer][1], axis=1)
+            out_users.append(out)
+        out_users = tf.reshape(tf.concat(out_users, axis=1), [user_reviews.shape[0], -1])
+        out_users = self.user_fully_connected(out_users)
+
+        return out_users
+
+    @tf.function
+    def conv_items(self, item_reviews):
+        item_reviews_features = tf.nn.embedding_lookup(self.V, item_reviews)
+
+        out_items = []
+        for layer in range(len(self.item_review_cnn_network)):
+            out = tf.reduce_max(
+                tf.nn.conv2d(input=item_reviews_features, filters=self.item_review_cnn_network[layer][0],
+                             strides=[1, 1, 1, 1], padding='VALID') + self.item_review_cnn_network[layer][1], axis=1)
+            out_items.append(out)
+        out_items = tf.reshape(tf.concat(out_items, axis=1), [item_reviews.shape[0], -1])
+        out_items = self.user_fully_connected(out_items)
+
+        return out_items
+
+    @tf.function
     def call(self, inputs, training=True):
         user, item, _, user_reviews, item_reviews = inputs
-        user_reviews_features = tf.expand_dims(tf.nn.embedding_lookup(self.V, user_reviews), -1)
-        item_reviews_features = tf.expand_dims(tf.nn.embedding_lookup(self.V, item_reviews), -1)
+        user_reviews_features = tf.nn.embedding_lookup(self.V, user_reviews)
+        item_reviews_features = tf.nn.embedding_lookup(self.V, item_reviews)
 
         out_users = []
         for layer in range(len(self.user_review_cnn_network)):
@@ -113,7 +143,7 @@ class DeepCoNNModel(tf.keras.Model, ABC):
                              strides=[1, 1, 1, 1], padding='VALID') + self.user_review_cnn_network[layer][1], axis=1)
             out_users.append(out)
         out_users = tf.reshape(tf.concat(out_users, axis=1), [user.shape[0], -1])
-        out_users = self.dropout(self.user_fully_connected(out_users))
+        out_users = self.dropout(self.user_fully_connected(out_users), training=training)
 
         out_items = []
         for layer in range(len(self.item_review_cnn_network)):
@@ -136,8 +166,14 @@ class DeepCoNNModel(tf.keras.Model, ABC):
         return out_final
 
     @tf.function
-    def predict(self, inputs):
-        rui = self(inputs, training=False)
+    def predict(self, out_users, out_items):
+        out = tf.concat([out_users, out_items], axis=-1) # qui devo capire come fare
+        out_1 = tf.reduce_sum(tf.math.pow(tf.matmul(out, self.W), 2), 1, keepdims=True)
+        out_2 = tf.reduce_sum(tf.matmul(tf.math.pow(out, 2), tf.math.pow(self.W, 2)), 1, keepdims=True)
+
+        out_inter = tf.constant(0.5) * (out_1 - out_2)
+        out_lin = self.fm_fully_connected(out)
+        rui = tf.squeeze(self.sigmoid(self.B + out_inter + out_lin))
         return rui
 
     @tf.function
