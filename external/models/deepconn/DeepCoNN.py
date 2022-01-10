@@ -141,13 +141,11 @@ class DeepCoNN(RecMixin, BaseRecommenderModel):
         for user in range(self._num_users):
             predictions = np.empty((1, self._num_items))
             start_index = 0
-            with tqdm(total=int(self._num_items // self._batch_eval), disable=not self._verbose) as t:
-                for batch in self._sampler.step_eval(user, self._batch_eval):
-                    u, i, rating, u_review_tokens, i_review_tokens = batch
-                    end_index = start_index + u.shape[0]
-                    predictions[0, start_index:end_index] = self._model.predict(batch)
-                    start_index += u.shape[0]
-                    t.update()
+            for batch in self._sampler.step_eval(user, self._batch_eval):
+                u, i, rating, u_review_tokens, i_review_tokens = batch
+                end_index = start_index + u.shape[0]
+                predictions[0, start_index:end_index] = self._model.predict(batch)
+                start_index += u.shape[0]
             recs_val, recs_test = self.process_protocol(k, predictions, user, user + 1)
             predictions_top_k_val.update(recs_val)
             predictions_top_k_test.update(recs_test)
