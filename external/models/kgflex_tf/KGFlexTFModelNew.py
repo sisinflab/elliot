@@ -38,11 +38,11 @@ class KGFlexTFModel(keras.Model):
 
         self.initializer = tf.initializers.RandomNormal(stddev=0.1)
 
-        self.K = user_feature_weights
+        self.K = tf.constant(user_feature_weights, dtype=tf.float32)
         self.glob_B = tf.Variable(self.initializer(shape=[]), name='glob_B', dtype=tf.float32)
         self.F_B = tf.Variable(self.initializer(shape=[self.num_features]), name='F_B', dtype=tf.float32)
         self.I_B = tf.Variable(self.initializer(shape=[self.num_items]), name='I_B', dtype=tf.float32)
-        self.U_B = tf.Variable(self.initializer(shape=[self.num_users]), name='U_B', dtype=tf.float32)
+        # self.U_B = tf.Variable(self.initializer(shape=[self.num_users]), name='U_B', dtype=tf.float32)
         self.H = tf.Variable(self.initializer(shape=[self.num_users, self._factors]), name='H', dtype=tf.float32)
         self.G = tf.Variable(self.initializer(shape=[self.num_features, self._factors]), name='G', dtype=tf.float32)
         self.C = tf.constant(user_item_features, dtype=tf.float32)
@@ -69,9 +69,9 @@ class KGFlexTFModel(keras.Model):
         # x_ui = tf.reduce_sum(tf.gather(a_u, features, batch_dims=1), axis=-1)
         c_i = tf.squeeze(tf.gather(self.C, item))
         # b_u = tf.squeeze(tf.gather(self.U_B, user))
-        # b_i = tf.squeeze(tf.gather(self.I_B, item))
+        b_i = tf.squeeze(tf.gather(self.I_B, item))
         # CON TFIDF
-        x_ui = tf.reduce_sum(a_u * c_i, axis=-1) # + b_u + b_i + self.glob_B
+        x_ui = tf.reduce_sum(a_u * c_i, axis=-1) + b_i + self.glob_B
         # x_ui = self.sigmoid(tf.reduce_sum(tf.gather(a_u, features, batch_dims=1), axis=-1) + b_u + b_i + self.glob_B)
 
         return x_ui, z_u
@@ -120,7 +120,7 @@ class KGFlexTFModel(keras.Model):
         # predictions = tf.reduce_sum(tf.gather(A, tf.ragged.stack([self.C] * self.num_users), batch_dims=1), axis=-1).to_tensor()
         # predictions = tf.reduce_sum(A @ self.C, axis=-1).to_tensor()
         # CON TFIDF
-        predictions = A @ tf.transpose(self.C)
+        predictions = tf.add(A @ tf.transpose(self.C), self.I_B) + self.glob_B
 
         # predictions = tf.add(tf.add(A @ tf.transpose(self.C), tf.reshape(self.U_B, [-1, 1])), self.I_B) + self.glob_B
         # predictions = self.sigmoid(tf.add(tf.add(tf.reduce_sum(tf.gather(A, self.C, batch_dims=1), axis=-1).to_tensor(),

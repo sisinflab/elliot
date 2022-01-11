@@ -48,7 +48,7 @@ class KGFlexTFModel(keras.Model):
 
         self.optimizer = tf.optimizers.Adam(learning_rate)
 
-    #@tf.function
+    @tf.function
     def call(self, inputs, training=None, mask=None):
         user, item = inputs
         h_u = tf.squeeze(tf.nn.embedding_lookup(self.H, user))
@@ -58,9 +58,9 @@ class KGFlexTFModel(keras.Model):
         ui_pairs = tf.stack([tf.squeeze(user), tf.squeeze(item)], axis=-1)
         features = tf.gather_nd(self.C, ui_pairs)
         # u_b = tf.squeeze(tf.nn.embedding_lookup(self.U_B, user))
-        # i_b = tf.squeeze(tf.nn.embedding_lookup(self.I_B, item))
+        i_b = tf.squeeze(tf.nn.embedding_lookup(self.I_B, item))
         # x_ui = tf.add(tf.add(tf.reduce_sum(tf.gather(a_u, features, batch_dims=1), axis=-1), u_b), i_b)
-        x_ui = tf.reduce_sum(tf.gather(a_u, features, batch_dims=1), axis=-1)
+        x_ui = tf.add(tf.reduce_sum(tf.gather(a_u, features, batch_dims=1), axis=-1), i_b)
 
         return x_ui
 
@@ -98,14 +98,13 @@ class KGFlexTFModel(keras.Model):
         output = self.call(inputs=inputs, training=training)
         return output
 
-    #@tf.function
+    @tf.function
     def get_all_recs(self):
         Z = self.H @ tf.transpose(self.G)
-        # Z_plus_bias = tf.add(Z, self.F_B)
-        A = self.K * Z
-        # predictions = tf.add(tf.add(tf.reduce_sum(tf.gather(A, self.C, batch_dims=1), axis=-1).to_tensor(),
-        #                             tf.reshape(self.U_B, [-1, 1])), self.I_B)
-        predictions = tf.reduce_sum(tf.gather(A, self.C, batch_dims=1), axis=-1).to_tensor()
+        Z_plus_bias = tf.add(Z, self.F_B)
+        A = self.K * Z_plus_bias
+        predictions = tf.add(tf.reduce_sum(tf.gather(A, self.C, batch_dims=1), axis=-1).to_tensor(), self.I_B)
+        # predictions = tf.reduce_sum(tf.gather(A, self.C, batch_dims=1), axis=-1).to_tensor()
 
         return predictions
 
