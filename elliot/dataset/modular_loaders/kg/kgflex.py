@@ -97,10 +97,11 @@ class KGFlexLoader(AbstractLoader):
 
     def load_properties(self, properties_file):
         properties = []
-        with open(properties_file) as file:
-            for line in file:
-                if line[0] != '#':
-                    properties.append(line.rstrip("\n"))
+        if properties_file:
+            with open(properties_file) as file:
+                for line in file:
+                    if line[0] != '#':
+                        properties.append(line.rstrip("\n"))
         return properties
 
     def read_triples(self, path: str) -> t.List[t.Tuple[str, str, str]]:
