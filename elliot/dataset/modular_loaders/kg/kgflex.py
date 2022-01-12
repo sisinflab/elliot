@@ -65,11 +65,16 @@ class KGFlexLoader(AbstractLoader):
             self.triples[['predicate', 'object']].set_index(['predicate', 'object']).index.map(
                 lambda f: f in keep_set)].astype(str)
 
-        self.second_order_features = second_order_features[second_order_features[
-            ['predicate_x', 'predicate_y', 'object_y']].set_index(['predicate_x', 'predicate_y', 'object_y'])
-            .index.map(lambda f: f in keep_set2)].astype(str)
-        #self.second_order_features = self.second_order_features.drop(['object_x', 'uri_y'], axis=1)
-        self.second_order_features = self.second_order_features.drop(['uri_y'], axis=1)
+        if len(second_order_features > 0):
+            self.second_order_features = second_order_features[second_order_features[
+                ['predicate_x', 'predicate_y', 'object_y']].set_index(['predicate_x', 'predicate_y', 'object_y'])
+                .index.map(lambda f: f in keep_set2)].astype(str)
+            #self.second_order_features = self.second_order_features.drop(['object_x', 'uri_y'], axis=1)
+            self.second_order_features = self.second_order_features.drop(['uri_y'], axis=1)
+        else:
+            self.second_order_features = pd.DataFrame(
+                columns=['uri_x', 'predicate_x', 'object_x', 'predicate_y', 'object_y']).astype(
+                dtype={'uri_x': str, 'predicate_x': str, 'object_x': str, 'predicate_y': str, 'object_y': str})
 
         possible_items = [str(uri) for uri in self.triples["uri"].unique()]
         self.mapping = {k: v for k, v in self.mapping.items() if v in possible_items}

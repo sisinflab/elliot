@@ -16,16 +16,17 @@ import torch.nn.functional as F
 from torch_scatter import scatter_mean
 
 
-class Aggregator(nn.Module):
+class Aggregator:
     """
     Relational Path-aware Convolution Network
     """
     def __init__(self, n_users, n_factors):
-        super(Aggregator, self).__init__()
+        super().__init__()
         self.n_users = n_users
         self.n_factors = n_factors
 
-    def forward(self, entity_emb, user_emb, latent_emb,
+    @tf.function
+    def call(self, entity_emb, user_emb, latent_emb,
                 edge_index, edge_type, interact_mat,
                 weight, disen_weight_att):
 
@@ -36,24 +37,24 @@ class Aggregator(nn.Module):
 
         """KG aggregate"""
         head, tail = edge_index
-        edge_relation_emb = weight[edge_type - 1]  # exclude interact, remap [1, n_relations) to [0, n_relations-1)
-        neigh_relation_emb = entity_emb[tail] * edge_relation_emb  # [-1, channel]
+        edge_relation_emb = tf.gather(weight, edge_type - 1)  # exclude interact, remap [1, n_relations) to [0, n_relations-1)
+        neigh_relation_emb = tf.gather(entity_emb, tail) * edge_relation_emb  # [-1, channel]
         entity_agg = scatter_mean(src=neigh_relation_emb, index=head, dim_size=n_entities, dim=0)
 
         """cul user->latent factor attention"""
-        score_ = torch.mm(user_emb, latent_emb.t())
-        score = nn.Softmax(dim=1)(score_).unsqueeze(-1)  # [n_users, n_factors, 1]
+        score_ = tf.matmul(user_emb, tf.transpose(latent_emb))
+        score = tf.expand_dims(tf.nn.softmax(score_, axis=1), axis=-1)  # [n_users, n_factors, 1]
 
         """user aggregate"""
-        user_agg = torch.sparse.mm(interact_mat, entity_emb)  # [n_users, channel]
-        disen_weight = torch.mm(nn.Softmax(dim=-1)(disen_weight_att),
-                                weight).expand(n_users, n_factors, channel)
-        user_agg = user_agg * (disen_weight * score).sum(dim=1) + user_agg  # [n_users, channel]
+        user_agg = tf.matmul(interact_mat, entity_emb, a_is_sparse=True, b_is_sparse=True)  # [n_users, channel]
+        disen_weight = tf.broadcast_to(tf.matmul(tf.nn.softmax(disen_weight_att, axis=1),
+                                weight), [n_users, n_factors, channel])
+        user_agg = user_agg * tf.reduce_sum((disen_weight * score), axis=1) + user_agg  # [n_users, channel]
 
         return entity_agg, user_agg
 
 
-class GraphConv(nn.Module):
+class GraphConv:
     """
     Graph Convolutional Network
     """
@@ -62,7 +63,9 @@ class GraphConv(nn.Module):
                  ind, node_dropout_rate=0.5, mess_dropout_rate=0.1):
         super(GraphConv, self).__init__()
 
-        self.convs = nn.ModuleList()    # TODO: Che cazz ie?
+        # self.convs = nn.ModuleList()    # TODO: Che cazz ie?
+        # TODO: Controlla che la sosituzione con una lista semplice sia efficace in TF
+        self.convs = []
         self.interact_mat = interact_mat
         self.n_relations = n_relations
         self.n_users = n_users
@@ -177,7 +180,7 @@ class GraphConv(nn.Module):
         user_res_emb = user_emb  # [n_users, channel]
         cor = self._cul_cor()
         for i in range(len(self.convs)):
-            entity_emb, user_emb = self.convs[i](entity_emb, user_emb, latent_emb,
+            entity_emb, user_emb = self.convs[i].call(entity_emb, user_emb, latent_emb,
                                                  edge_index, edge_type, interact_mat,
                                                  self.weight, self.disen_weight_att)
 
@@ -185,12 +188,12 @@ class GraphConv(nn.Module):
             if mess_dropout:
                 entity_emb = self.dropout(entity_emb)
                 user_emb = self.dropout(user_emb)
-            entity_emb = F.normalize(entity_emb)
-            user_emb = F.normalize(user_emb)
+            entity_emb = tf.linalg.normalize(entity_emb)
+            user_emb = tf.linalg.normalize(user_emb)
 
             """result emb"""
-            entity_res_emb = torch.add(entity_res_emb, entity_emb)
-            user_res_emb = torch.add(user_res_emb, user_emb)
+            entity_res_emb = tf.add(entity_res_emb, entity_emb)
+            user_res_emb = tf.add(user_res_emb, user_emb)
 
         return entity_res_emb, user_res_emb, cor
 
@@ -203,7 +206,7 @@ class KGINModel(keras.Model):
                  learning_rate=0.001,
                  l_w=0, l_b=0,
                  random_seed=42,
-                 name="NNBPRMF",
+                 name="KGINModel",
                  **kwargs):
         super().__init__(name=name, **kwargs)
 
@@ -233,15 +236,16 @@ class KGINModel(keras.Model):
 
     def _get_indices(self, X):
         coo = X.tocoo()
-        return torch.LongTensor([coo.row, coo.col]).t()  # [-1, 2]
+        return tf.transpose(tf.constant([coo.row, coo.col], dtype=tf.int32))  # [-1, 2]
 
     def _get_edges(self, graph):
-        graph_tensor = torch.tensor(list(graph.edges))  # [-1, 3]
+        graph_tensor = tf.constant(list(graph.edges))  # [-1, 3]
         index = graph_tensor[:, :-1]  # [-1, 2]
         type = graph_tensor[:, -1]  # [-1, 1]
-        return index.t().long().to(self.device), type.long().to(self.device)
+        return tf.cast(tf.transpose(index), dtype=tf.int32), tf.cast(type, dtype=tf.int32)
 
-    def forward(self, batch=None):
+    @tf.function
+    def call(self, batch=None):
         user = batch['users']
         pos_item = batch['pos_items']
         neg_item = batch['neg_items']
@@ -250,28 +254,54 @@ class KGINModel(keras.Model):
         item_emb = self.all_embed[self.n_users:, :]
         # entity_gcn_emb: [n_entity, channel]
         # user_gcn_emb: [n_users, channel]
-        entity_gcn_emb, user_gcn_emb, cor = self.gcn(user_emb,
-                                                     item_emb,
-                                                     self.latent_emb,
-                                                     self.edge_index,
-                                                     self.edge_type,
-                                                     self.interact_mat,
-                                                     mess_dropout=self.mess_dropout,
-                                                     node_dropout=self.node_dropout)
+        entity_gcn_emb, user_gcn_emb, cor = self.gcn.call(user_emb,
+                                                          item_emb,
+                                                          self.latent_emb,
+                                                          self.edge_index,
+                                                          self.edge_type,
+                                                          self.interact_mat,
+                                                          mess_dropout=self.mess_dropout,
+                                                          node_dropout=self.node_dropout)
         u_e = user_gcn_emb[user]
         pos_e, neg_e = entity_gcn_emb[pos_item], entity_gcn_emb[neg_item]
         return self.create_bpr_loss(u_e, pos_e, neg_e, cor)
 
+    @tf.function
+    def train_step(self, batch):
+        user, pos, neg = batch
+        with tf.GradientTape() as tape:
+            # Clean Inference
+            xu_pos = self(inputs=(user, pos), training=True)
+            xu_neg = self(inputs=(user, neg), training=True)
+
+            difference = tf.clip_by_value(xu_pos - xu_neg, -80.0, 1e8)
+            loss = tf.reduce_sum(tf.nn.softplus(-difference))
+            # Regularization Component
+            # reg_loss = self._l_w * tf.reduce_sum([tf.nn.l2_loss(self.H),
+            #                                      tf.nn.l2_loss(self.G)]) \
+            #            + self._l_b * tf.nn.l2_loss(self.B)
+            #            # + self._l_b * tf.nn.l2_loss(beta_neg) / 10
+
+            # Loss to be optimized
+            # loss += reg_loss
+
+        grads = tape.gradient(loss, self.trainable_weights)
+        self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
+
+        return loss
+
+
+    @tf.function
     def generate(self):
         user_emb = self.all_embed[:self.n_users, :]
         item_emb = self.all_embed[self.n_users:, :]
-        return self.gcn(user_emb,
-                        item_emb,
-                        self.latent_emb,
-                        self.edge_index,
-                        self.edge_type,
-                        self.interact_mat,
-                        mess_dropout=False, node_dropout=False)[:-1]
+        return self.gcn.call(user_emb,
+                             item_emb,
+                             self.latent_emb,
+                             self.edge_index,
+                             self.edge_type,
+                             self.interact_mat,
+                             mess_dropout=False, node_dropout=False)[:-1]
 
     def rating(self, u_g_embeddings, i_g_embeddings):
         return torch.matmul(u_g_embeddings, i_g_embeddings.t())
