@@ -17,7 +17,9 @@ from enum import Enum
 from elliot.evaluation.statistical_significance import PairedTTest, WilcoxonTest
 
 _eval_results = "test_results"
+_eval_std_results = "test_std_results"
 _eval_statistical_results = "test_statistical_results"
+_eval_results_time = "time"
 
 
 class StatTest(Enum):
@@ -50,6 +52,31 @@ class ResultHandler:
                 f'rec_cutoff_{k}_relthreshold_{self.rel_threshold}_{datetime.now().strftime("%Y_%m_%d_%H_%M_%S")}.tsv'])),
                 sep='\t', index=False)
 
+    def save_best_times(self, output=''):
+        global_results = dict(self.oneshot_recommenders)
+        results = {}
+        for rec in global_results.keys():
+            for result in global_results[rec]:
+                results.update({result['params']['name']: result[_eval_results_time]})
+        info = pd.DataFrame.from_dict(results, orient='index')
+        info.insert(0, 'model', info.index)
+        info.to_csv(os.path.abspath(os.sep.join([output,
+            f'rec_training_time_relthreshold_{self.rel_threshold}_{datetime.now().strftime("%Y_%m_%d_%H_%M_%S")}.tsv'])),
+            sep='\t', index=False)
+
+    def save_best_results_std(self, output=''):
+        global_results = dict(self.oneshot_recommenders)
+        for k in self.ks:
+            results = {}
+            for rec in global_results.keys():
+                for result in global_results[rec]:
+                    results.update({result['params']['name']: result[_eval_std_results][k]})
+            info = pd.DataFrame.from_dict(results, orient='index')
+            info.insert(0, 'model', info.index)
+            info.to_csv(os.path.abspath(os.sep.join([output,
+                f'rec_std_cutoff_{k}_relthreshold_{self.rel_threshold}_{datetime.now().strftime("%Y_%m_%d_%H_%M_%S")}.tsv'])),
+                sep='\t', index=False)
+
     def save_best_results_as_triplets(self, output='../results/'):
         global_results = dict(self.oneshot_recommenders)
         for k in self.ks:
@@ -62,6 +89,20 @@ class ResultHandler:
             triplets = info.set_index("model").stack().reset_index()
             triplets.to_csv(os.path.abspath(os.sep.join([output,
                 f'triplets_rec_cutoff_{k}_relthreshold_{self.rel_threshold}_{datetime.now().strftime("%Y_%m_%d_%H_%M_%S")}.tsv'])),
+                sep='\t', index=False, header=["model", "metric", "value"])
+
+    def save_best_results_std_as_triplets(self, output='../results/'):
+        global_results = dict(self.oneshot_recommenders)
+        for k in self.ks:
+            results = {}
+            for rec in global_results.keys():
+                for result in global_results[rec]:
+                    results.update({result['params']['name']: result[_eval_std_results][k]})
+            info = pd.DataFrame.from_dict(results, orient='index')
+            info.insert(0, 'model', info.index)
+            triplets = info.set_index("model").stack().reset_index()
+            triplets.to_csv(os.path.abspath(os.sep.join([output,
+                f'triplets_rec_std_cutoff_{k}_relthreshold_{self.rel_threshold}_{datetime.now().strftime("%Y_%m_%d_%H_%M_%S")}.tsv'])),
                 sep='\t', index=False, header=["model", "metric", "value"])
 
     def save_best_models(self, output='../results/', default_metric = "nDCG", default_k = [10]):
@@ -141,6 +182,29 @@ class HyperParameterStudy:
                     f'rec_{rec}_cutoff_{k}_relthreshold_{self.rel_threshold}_{datetime.now().strftime("%Y_%m_%d_%H_%M_%S")}.tsv'])),
                     sep='\t', index=False)
 
+    def save_trials_times(self, output='../results/'):
+        for rec, performance in self.trials.items():
+            results = {}
+            for result in performance:
+                results.update({result['params']['name']: result[_eval_results_time]})
+            info = pd.DataFrame.from_dict(results, orient='index')
+            info.insert(0, 'model', info.index)
+            info.to_csv(os.path.abspath(os.sep.join([output,
+                f'rec_train_time_{rec}_relthreshold_{self.rel_threshold}_{datetime.now().strftime("%Y_%m_%d_%H_%M_%S")}.tsv'])),
+                sep='\t', index=False)
+
+    def save_trials_std(self, output='../results/'):
+        for k in self.ks:
+            for rec, performance in self.trials.items():
+                results = {}
+                for result in performance:
+                    results.update({result['params']['name']: result[_eval_std_results][k]})
+                info = pd.DataFrame.from_dict(results, orient='index')
+                info.insert(0, 'model', info.index)
+                info.to_csv(os.path.abspath(os.sep.join([output,
+                    f'rec_std_{rec}_cutoff_{k}_relthreshold_{self.rel_threshold}_{datetime.now().strftime("%Y_%m_%d_%H_%M_%S")}.tsv'])),
+                    sep='\t', index=False)
+
     def save_trials_as_triplets(self, output='../results/'):
         for k in self.ks:
             for rec, performance in self.trials.items():
@@ -152,4 +216,17 @@ class HyperParameterStudy:
                 triplets = info.set_index("model").stack().reset_index()
                 triplets.to_csv(os.path.abspath(os.sep.join([output,
                     f'triplets_rec_{rec}_cutoff_{k}_relthreshold_{self.rel_threshold}_{datetime.now().strftime("%Y_%m_%d_%H_%M_%S")}.tsv'])),
+                    sep='\t', index=False, header=["model", "metric", "value"])
+
+    def save_trials_as_triplets_std(self, output='../results/'):
+        for k in self.ks:
+            for rec, performance in self.trials.items():
+                results = {}
+                for result in performance:
+                    results.update({result['params']['name']: result[_eval_std_results][k]})
+                info = pd.DataFrame.from_dict(results, orient='index')
+                info.insert(0, 'model', info.index)
+                triplets = info.set_index("model").stack().reset_index()
+                triplets.to_csv(os.path.abspath(os.sep.join([output,
+                    f'triplets_rec_std_{rec}_cutoff_{k}_relthreshold_{self.rel_threshold}_{datetime.now().strftime("%Y_%m_%d_%H_%M_%S")}.tsv'])),
                     sep='\t', index=False, header=["model", "metric", "value"])
