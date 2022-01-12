@@ -127,7 +127,11 @@ def run_experiment(config_path: str = ''):
 
     # res_handler.save_results(output=base.base_namespace.path_output_rec_performance)
     hyper_handler.save_trials(output=base.base_namespace.path_output_rec_performance)
+    hyper_handler.save_trials_std(output=base.base_namespace.path_output_rec_performance)
+    hyper_handler.save_trials_times(output=base.base_namespace.path_output_rec_performance)
     res_handler.save_best_results(output=base.base_namespace.path_output_rec_performance)
+    res_handler.save_best_times(output=base.base_namespace.path_output_rec_performance)
+    res_handler.save_best_results_std(output=base.base_namespace.path_output_rec_performance)
     cutoff_k = getattr(base.base_namespace.evaluation, "cutoffs", [base.base_namespace.top_k])
     cutoff_k = cutoff_k if isinstance(cutoff_k, list) else [cutoff_k]
     first_metric = base.base_namespace.evaluation.simple_metrics[
@@ -137,7 +141,9 @@ def run_experiment(config_path: str = ''):
     if hasattr(base.base_namespace,
                "print_results_as_triplets") and base.base_namespace.print_results_as_triplets == True:
         res_handler.save_best_results_as_triplets(output=base.base_namespace.path_output_rec_performance)
+        res_handler.save_best_results_std_as_triplets(output=base.base_namespace.path_output_rec_performance)
         hyper_handler.save_trials_as_triplets(output=base.base_namespace.path_output_rec_performance)
+        hyper_handler.save_trials_as_triplets_std(output=base.base_namespace.path_output_rec_performance)
     if hasattr(base.base_namespace.evaluation, "paired_ttest") and base.base_namespace.evaluation.paired_ttest:
         res_handler.save_best_statistical_results(stat_test=StatTest.PairedTTest,
                                                   output=base.base_namespace.path_output_rec_performance)
