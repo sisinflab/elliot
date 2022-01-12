@@ -19,7 +19,7 @@ class KGINLoader(AbstractLoader):
             # self.items = self.items & set(self.map_.keys())
 
         if self.entities_file is not None:
-            self.entities = set(pd.read_csv(self.entities_file, names=['name', 'id'], header=0, sep=' ')['id'])
+            self.entities = set(pd.read_csv(self.entities_file, names=['name', 'id'], sep=' ')['id'])
 
         self.entity_list = set.difference(self.entities, self.items)
 
