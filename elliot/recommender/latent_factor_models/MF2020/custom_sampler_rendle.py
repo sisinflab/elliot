@@ -52,7 +52,7 @@ class Sampler:
         """
         time_start = time.time()
 
-        def prova(u):
+        def user_training_matrix(u):
             pos_u = self.rating_items[self.idx_start[u]:self.idx_start[u] + self.count[u]]
             neg_u = np.setdiff1d(np.array(self._items), pos_u, assume_unique=True)
             sampled_neg_u = np.random.choice(neg_u, self._m * len(pos_u), replace=True)
@@ -60,7 +60,7 @@ class Sampler:
                 np.c_[pos_u, np.ones(len(pos_u), dtype=int)], np.c_[
                     sampled_neg_u, np.zeros(len(sampled_neg_u), dtype=int)]]]
 
-        training_matrix = np.concatenate([prova(u) for u in self._users])
+        training_matrix = np.concatenate([user_training_matrix(u) for u in self._users])
 
         # r_int = np.random.randint
         # num_items = self._nitems
@@ -99,6 +99,6 @@ class Sampler:
 
         samples_indices = random.sample(range(training_matrix.shape[0]), training_matrix.shape[0])
         training_matrix = training_matrix[samples_indices]
-        print(f"Sampling has taken {round(time.time()-time_start, 2)} seconds")
+        print(f"Sampling has taken {round(time.time() - time_start, 2)} seconds")
         for start in range(0, training_matrix.shape[0], batch_size):
             yield training_matrix[start:min(start + batch_size, training_matrix.shape[0])]
