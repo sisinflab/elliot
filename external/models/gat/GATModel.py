@@ -65,15 +65,15 @@ class GATModel(torch.nn.Module, ABC):
                                                  (torch.nn.ELU(), 'x -> x')]
 
             for layer in range(1, self.n_layers - 1):
-                propagation_network_list.append((GATConv(in_channels=self.weight_size_list[layer],
-                                                        out_channels=self.weight_size_list[layer + 1],
-                                                        heads=self.heads[layer],
-                                                        dropout=self.message_dropout[layer],
-                                                        add_self_loops=False,
-                                                        concat=True), 'x, edge_index -> x'))
+                propagation_network_list.append((GATConv(in_channels=-1,
+                                                         out_channels=self.weight_size_list[layer],
+                                                         heads=self.heads[layer],
+                                                         dropout=self.message_dropout[layer],
+                                                         add_self_loops=False,
+                                                         concat=True), 'x, edge_index -> x'))
                 propagation_network_list.append((torch.nn.ELU(), 'x -> x'))
 
-            propagation_network_list.append((GATConv(in_channels=self.weight_size_list[self.n_layers - 1],
+            propagation_network_list.append((GATConv(in_channels=-1,
                                                     out_channels=self.weight_size_list[self.n_layers],
                                                     heads=self.heads[self.n_layers - 1],
                                                     dropout=self.message_dropout[self.n_layers - 1],
@@ -86,7 +86,7 @@ class GATModel(torch.nn.Module, ABC):
                                                  heads=self.heads[0],
                                                  dropout=self.message_dropout[0],
                                                  add_self_loops=False,
-                                                 concat=True), 'x, edge_index -> x'),
+                                                 concat=False), 'x, edge_index -> x'),
                                                  (torch.nn.Identity(), 'x -> x')]
 
         self.propagation_network = torch_geometric.nn.Sequential('x, edge_index', propagation_network_list)
