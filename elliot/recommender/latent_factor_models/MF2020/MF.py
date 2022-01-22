@@ -66,7 +66,8 @@ class MF2020(RecMixin, BaseRecommenderModel):
         self._sampler = ps.Sampler(self._data.i_train_dict, self._m, self._data.sp_i_train, self._seed)
 
         # This is not a real batch size. Its only purpose is the live visualization of the training
-        self._batch_size = 100000
+        if self._batch_size < 1:
+            self._batch_size = self._data.transactions
 
         self._model = MFModel(self._factors,
                               self._data,

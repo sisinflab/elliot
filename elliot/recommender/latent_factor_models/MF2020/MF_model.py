@@ -4,8 +4,8 @@ Module description:
 """
 
 __version__ = '0.3.1'
-__author__ = 'Vito Walter Anelli, Claudio Pomo'
-__email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
+__author__ = 'Vito Walter Anelli, Claudio Pomo, Antonio Ferrara'
+__email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, antonio.ferrara@poliba.it'
 
 import pickle
 
@@ -78,42 +78,37 @@ class MFModel(object):
         return [(real_indices[item], real_values[item]) for item in local_top_k]
 
     def train_step(self, batch, **kwargs):
-        sum_of_loss = 0
         lr = self._lr
         reg = self._reg
-        for user, item, rating in batch:
-            gb_ = self._global_bias
-            uf_ = self._user_factors[user]
-            if_ = self._item_factors[item]
-            ub_ = self._user_bias[user]
-            ib_ = self._item_bias[item]
 
-            prediction = gb_ + ub_ + ib_ + np.dot(uf_, if_)
-            # prediction = gb_ + ub_ + ib_ + uf_ @ if_
+        gb_ = self._global_bias
+        uf_ = self._user_factors[batch[:, 0]]
+        if_ = self._item_factors[batch[:, 1]]
+        ub_ = self._user_bias[batch[:, 0]]
+        ib_ = self._item_bias[batch[:, 1]]
 
-            if prediction > 0:
-                one_plus_exp_minus_pred = 1.0 + np.exp(-prediction)
-                sigmoid = 1.0 / one_plus_exp_minus_pred
-                this_loss = (np.log(one_plus_exp_minus_pred) +
-                             (1.0 - rating) * prediction)
-            else:
-                exp_pred = np.exp(prediction)
-                sigmoid = exp_pred / (1.0 + exp_pred)
-                this_loss = -rating * prediction + np.log(1.0 + exp_pred)
+        prediction = gb_ + ub_ + ib_ + (uf_ * if_).sum(axis=-1)
 
-            grad = rating - sigmoid
+        exp_pred = np.where(prediction > 0, 1.0 + np.exp(-prediction), np.exp(prediction))
+        sigmoid = np.where(prediction > 0, 1.0 / exp_pred, exp_pred / (1.0 + exp_pred))
 
-            self._user_factors[user] += lr * (grad * if_ - reg * uf_)
-            self._item_factors[item] += lr * (grad * uf_ - reg * if_)
-            self._user_bias[user] += lr * (grad - reg * ub_)
-            self._item_bias[item] += lr * (grad - reg * ib_)
-            self._global_bias += lr * (grad - reg * gb_)
-            sum_of_loss += this_loss
+        rating = batch[:, 2]
+        this_loss = np.where(prediction > 0, np.log(exp_pred) + (1 - rating) * prediction,
+                             -rating * prediction + np.log(1.0 + exp_pred))
 
-        return sum_of_loss
+        grad = rating - sigmoid
+
+        np.add.at(self._user_factors, batch[:, 0], lr * (np.expand_dims(grad, axis=-1) * if_ - reg * uf_))
+        np.add.at(self._item_factors, batch[:, 1], lr * (np.expand_dims(grad, axis=-1) * uf_ - reg * if_))
+        np.add.at(self._user_bias, batch[:, 0], lr * (grad - reg * ub_))
+        np.add.at(self._item_bias, batch[:, 1], lr * (grad - reg * ib_))
+        self._global_bias += lr * (np.sum(grad) - reg * gb_)
+
+        return np.sum(this_loss)
 
     def prepare_predictions(self):
-        self._preds = np.expand_dims(self._user_bias, axis=1) + (self._global_bias + self._item_bias + self._user_factors @ self._item_factors.T)
+        self._preds = np.expand_dims(self._user_bias, axis=1) + (
+                    self._global_bias + self._item_bias + self._user_factors @ self._item_factors.T)
 
     def update_factors(self, user: int, item: int, rating: float):
         uf_ = self._user_factors[user]

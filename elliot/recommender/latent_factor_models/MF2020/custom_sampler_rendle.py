@@ -4,8 +4,8 @@ Module description:
 """
 
 __version__ = '0.3.1'
-__author__ = 'Vito Walter Anelli, Claudio Pomo'
-__email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
+__author__ = 'Vito Walter Anelli, Claudio Pomo, Antonio Ferrara'
+__email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, antonio.ferrara@poliba.it'
 
 import numpy as np
 import random
@@ -16,18 +16,25 @@ class Sampler:
     def __init__(self, indexed_ratings, m, sparse_matrix, seed):
         np.random.seed(seed)
         random.seed(seed)
-        self._sparse = sparse_matrix
-        self._indexed_ratings = indexed_ratings
-        self._users = list(self._indexed_ratings.keys())
+
+        ratings = sparse_matrix.nonzero()
+        self.rating_users = ratings[0]
+        self.rating_items = ratings[1]
+
+        self._users, self.idx_start, self.count = np.unique(self.rating_users, return_counts=True, return_index=True)
+
+        #self._sparse = sparse_matrix
+        # self._indexed_ratings = indexed_ratings
+        # self._users = list(self._indexed_ratings.keys())
         self._nusers = len(self._users)
-        self._items = list({k for a in self._indexed_ratings.values() for k in a.keys()})
+        self._items = np.unique(self.rating_items)
         self._nitems = len(self._items)
-        self._ui_dict = {u: list(set(indexed_ratings[u])) for u in indexed_ratings}
-        self._lui_dict = {u: len(v) for u, v in self._ui_dict.items()}
+        # self._ui_dict = {u: list(set(indexed_ratings[u])) for u in indexed_ratings}
+        # self._lui_dict = {u: len(v) for u, v in self._ui_dict.items()}
         self._m = m
-        self._nonzero = self._sparse.nonzero()
-        self._num_pos_examples = len(self._nonzero[0])
-        self._positive_pairs = list(zip(*self._nonzero, np.ones(len(self._nonzero[0]), dtype=np.int32)))
+        # self._nonzero = self._sparse.nonzero()
+        # self._num_pos_examples = len(self._nonzero[0])
+        # self._positive_pairs = list(zip(*self._nonzero, np.ones(len(self._nonzero[0]), dtype=np.int32)))
 
     def step(self, batch_size):
         """Converts a list of positive pairs into a two class dataset.
@@ -44,42 +51,54 @@ class Sampler:
             uniformly at random.
         """
         time_start = time.time()
-        r_int = np.random.randint
-        num_items = self._nitems
-        num_negatives = self._m
-        num_pos_examples = self._num_pos_examples
-        positive_pairs = self._positive_pairs
 
-        training_matrix = np.empty([num_pos_examples * (1 + num_negatives), 3],
-                                   dtype=np.int32)
-        index = 0
+        def user_training_matrix(u):
+            pos_u = self.rating_items[self.idx_start[u]:self.idx_start[u] + self.count[u]]
+            neg_u = np.setdiff1d(np.array(self._items), pos_u, assume_unique=True)
+            sampled_neg_u = np.random.choice(neg_u, self._m * len(pos_u), replace=True)
+            return np.c_[np.repeat(u, len(pos_u) + len(sampled_neg_u)), np.r_[
+                np.c_[pos_u, np.ones(len(pos_u), dtype=int)], np.c_[
+                    sampled_neg_u, np.zeros(len(sampled_neg_u), dtype=int)]]]
 
-        for pos_index in range(num_pos_examples):
-            u = positive_pairs[pos_index][0]
-            i = positive_pairs[pos_index][1]
+        training_matrix = np.concatenate([user_training_matrix(u) for u in self._users])
 
-            # Treat the rating as a positive training instance
-            training_matrix[index] = [u, i, 1]
-            index += 1
-
-            # Add N negatives by sampling random items.
-            # This code does not enforce that the sampled negatives are not present in
-            # the training data. It is possible that the sampling procedure adds a
-            # negative that is already in the set of positives. It is also possible
-            # that an item is sampled twice. Both cases should be fine.
-            for _ in range(num_negatives):
-                j = r_int(num_items)
-                training_matrix[index] = [u, j, 0]
-                index += 1
-        # neg = set()
-        # for u, i, _ in pos:
-        #     for _ in range(self._m):
-        #         neg.add((u, r_int(n_items), 0))
+        # r_int = np.random.randint
+        # num_items = self._nitems
+        # num_negatives = self._m
+        # num_pos_examples = self._num_pos_examples
+        # positive_pairs = self._positive_pairs
         #
-        # samples = list(pos)
-        # samples += list(neg)
+        # training_matrix = np.empty([num_pos_examples * (1 + num_negatives), 3],
+        #                            dtype=np.int32)
+        # index = 0
+        #
+        # for pos_index in range(num_pos_examples):
+        #     u = positive_pairs[pos_index][0]
+        #     i = positive_pairs[pos_index][1]
+        #
+        #     # Treat the rating as a positive training instance
+        #     training_matrix[index] = [u, i, 1]
+        #     index += 1
+        #
+        #     # Add N negatives by sampling random items.
+        #     # This code does not enforce that the sampled negatives are not present in
+        #     # the training data. It is possible that the sampling procedure adds a
+        #     # negative that is already in the set of positives. It is also possible
+        #     # that an item is sampled twice. Both cases should be fine.
+        #     for _ in range(num_negatives):
+        #         j = r_int(num_items)
+        #         training_matrix[index] = [u, j, 0]
+        #         index += 1
+        # # neg = set()
+        # # for u, i, _ in pos:
+        # #     for _ in range(self._m):
+        # #         neg.add((u, r_int(n_items), 0))
+        # #
+        # # samples = list(pos)
+        # # samples += list(neg)
+
         samples_indices = random.sample(range(training_matrix.shape[0]), training_matrix.shape[0])
         training_matrix = training_matrix[samples_indices]
-        print(f"Sampling has taken {round(time.time()-time_start, 2)} seconds")
+        print(f"Sampling has taken {round(time.time() - time_start, 2)} seconds")
         for start in range(0, training_matrix.shape[0], batch_size):
             yield training_matrix[start:min(start + batch_size, training_matrix.shape[0])]

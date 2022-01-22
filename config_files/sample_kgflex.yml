@@ -4,15 +4,18 @@ experiment:
 #    strategy: dataset
 #    dataset_path: ../data/{0}/dataset.txt
     strategy: fixed
-    train_path: ../data/{0}/train.txt
-    test_path: ../data/{0}/test.txt
+    train_path: ../data/{0}/split/0/train.tsv
+    test_path: ../data/{0}/split/0/test.tsv
     side_information:
       - dataloader: KGINLoader
         attributes: ../data/{0}/kg_final.txt
+        entities: ../data/{0}/entity_list.txt
 #  prefiltering:
 #    strategy: iterative_k_core
 #    core: 5
   splitting:
+#    save_on_disk: True
+#    save_folder: ../data/{0}/split/
     test_splitting:
       strategy: random_subsampling
       test_ratio: 0.2

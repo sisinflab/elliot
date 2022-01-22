@@ -38,13 +38,13 @@ experiment:
         hyper_max_evals: 10
         hyper_opt_alg: tpe
       seed: 42
-      lr: 0.01
+      lr: 0.0005438474900776614
       # lr: 0.001
       epochs: 50
       batch_size: 64
       # batch_size: 128
-      embedding: 128
+      embedding: 64
       # embedding: 256
-      first_order_limit: 300
-      second_order_limit: 200
+      first_order_limit: 50
+      second_order_limit: 50
       loader: KGFlexLoader

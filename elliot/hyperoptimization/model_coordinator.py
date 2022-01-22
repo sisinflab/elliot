@@ -11,6 +11,7 @@ from types import SimpleNamespace
 import typing as t
 import numpy as np
 import logging as pylog
+import time
 
 from elliot.utils import logging
 
@@ -55,28 +56,36 @@ class ModelCoordinator(object):
 
         losses = []
         results = []
+        times = []
         for trainval_index, data_obj in enumerate(self.data_objs):
             self.logger.info(f"Exploration: Hyperparameter exploration number {self.model_config_index+1}")
             self.logger.info(f"Exploration: Test Fold exploration number {self.test_fold_index+1}")
             self.logger.info(f"Exploration: Train-Validation Fold exploration number {trainval_index+1}")
             model = self.model_class(data=data_obj, config=self.base, params=model_params)
+            tic = time.perf_counter()
             model.train()
+            toc = time.perf_counter()
+            times.append(toc-tic)
             losses.append(model.get_loss())
             results.append(model.get_results())
 
         self.model_config_index += 1
 
         loss = np.average(losses)
-        results = self._average_results(results)
+        results_mean = self._average_results(results)
+        results_std = self._std_results(results)
 
         return {
             'loss': loss,
             'status': STATUS_OK,
             'params': model.get_params(),
-            'val_results': {k: result_dict["val_results"] for k, result_dict in results.items()},
+            'val_results': {k: result_dict["val_results"] for k, result_dict in results_mean.items()},
+            'val_std_results': {k: result_dict["val_results"] for k, result_dict in results_std.items()},
             'val_statistical_results': {k: result_dict["val_statistical_results"] for k, result_dict in model.get_results().items()},
-            'test_results': {k: result_dict["test_results"] for k, result_dict in results.items()},
+            'test_results': {k: result_dict["test_results"] for k, result_dict in results_mean.items()},
+            'test_std_results': {k: result_dict["test_results"] for k, result_dict in results_std.items()},
             'test_statistical_results': {k: result_dict["test_statistical_results"] for k, result_dict in model.get_results().items()},
+            'time': times,
             'name': model.name
         }
 
@@ -94,25 +103,33 @@ class ModelCoordinator(object):
 
         losses = []
         results = []
+        times = []
         for trainval_index, data_obj in enumerate(self.data_objs):
             self.logger.info(f"Exploration: Test Fold exploration number {self.test_fold_index+1}")
             self.logger.info(f"Exploration: Train-Validation Fold exploration number {trainval_index+1}")
             model = self.model_class(data=data_obj, config=self.base, params=self.params)
+            tic = time.perf_counter()
             model.train()
+            toc = time.perf_counter()
+            times.append(toc-tic)
             losses.append(model.get_loss())
             results.append(model.get_results())
 
         loss = np.average(losses)
-        results = self._average_results(results)
+        results_mean = self._average_results(results)
+        results_std = self._std_results(results)
 
         return {
             'loss': loss,
             'status': STATUS_OK,
             'params': model.get_params(),
-            'val_results': {k: result_dict["val_results"] for k, result_dict in results.items()},
+            'val_results': {k: result_dict["val_results"] for k, result_dict in results_mean.items()},
+            'val_std_results': {k: result_dict["val_results"] for k, result_dict in results_std.items()},
             'val_statistical_results': {k: result_dict["val_statistical_results"] for k, result_dict in model.get_results().items()},
-            'test_results': {k: result_dict["test_results"] for k, result_dict in results.items()},
+            'test_results': {k: result_dict["test_results"] for k, result_dict in results_mean.items()},
+            'test_std_results': {k: result_dict["test_results"] for k, result_dict in results_std.items()},
             'test_statistical_results': {k: result_dict["test_statistical_results"] for k, result_dict in model.get_results().items()},
+            'time': times,
             'name': model.name
         }
 
@@ -123,6 +140,16 @@ class ModelCoordinator(object):
         metrics = list(results_list[0][ks[0]]["val_results"].keys())
         return {k: {type_: {metric: np.average([fold_result[k][type_][metric]
                                                 for fold_result in results_list])
+                            for metric in metrics}
+                    for type_ in eval_result_types}
+                for k in ks}
+
+    @staticmethod
+    def _std_results(results_list):
+        ks = list(results_list[0].keys())
+        eval_result_types = ["val_results", "test_results"]
+        metrics = list(results_list[0][ks[0]]["val_results"].keys())
+        return {k: {type_: {metric: np.std([fold_result[k][type_][metric] for fold_result in results_list])
                             for metric in metrics}
                     for type_ in eval_result_types}
                 for k in ks}
