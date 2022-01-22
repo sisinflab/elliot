@@ -55,24 +55,39 @@ class GATModel(torch.nn.Module, ABC):
             torch.nn.init.zeros_(torch.empty((self.num_items, self.embed_k))))
         self.Gi.to(self.device)
 
-        propagation_network_list = []
+        if self.n_layers > 1:
+            propagation_network_list = [(GATConv(in_channels=self.embed_k,
+                                                        out_channels=self.weight_size_list[0],
+                                                        heads=self.heads[0],
+                                                        dropout=self.message_dropout[0],
+                                                        add_self_loops=False,
+                                                        concat=True), 'x, edge_index -> x'),
+                                                        (torch.nn.ELU(), 'x -> x')]
 
-        for layer in range(self.n_layers - 1):
-            propagation_network_list.append((GATConv(in_channels=self.weight_size_list[layer],
-                                                     out_channels=self.weight_size_list[layer + 1],
-                                                     heads=self.heads[layer],
-                                                     dropout=self.message_dropout[layer],
-                                                     add_self_loops=False,
-                                                     concat=True), 'x, edge_index -> x'))
-            propagation_network_list.append((torch.nn.ELU(), 'x -> x'))
+            for layer in range(1, self.n_layers - 1):
+                propagation_network_list.append((GATConv(in_channels=self.weight_size_list[layer],
+                                                        out_channels=self.weight_size_list[layer + 1],
+                                                        heads=self.heads[layer],
+                                                        dropout=self.message_dropout[layer],
+                                                        add_self_loops=False,
+                                                        concat=True), 'x, edge_index -> x'))
+                propagation_network_list.append((torch.nn.ELU(), 'x -> x'))
 
-        propagation_network_list.append((GATConv(in_channels=self.weight_size_list[self.n_layers - 1],
-                                                 out_channels=self.weight_size_list[self.n_layers],
-                                                 heads=self.heads[self.n_layers - 1],
-                                                 dropout=self.message_dropout[self.n_layers - 1],
-                                                 add_self_loops=False,
-                                                 concat=False), 'x, edge_index -> x'))
-        propagation_network_list.append((torch.nn.Identity(), 'x -> x'))
+            propagation_network_list.append((GATConv(in_channels=self.weight_size_list[self.n_layers - 1],
+                                                    out_channels=self.weight_size_list[self.n_layers],
+                                                    heads=self.heads[self.n_layers - 1],
+                                                    dropout=self.message_dropout[self.n_layers - 1],
+                                                    add_self_loops=False,
+                                                    concat=False), 'x, edge_index -> x'))
+            propagation_network_list.append((torch.nn.Identity(), 'x -> x'))
+        else:
+            propagation_network_list = [(GATConv(in_channels=self.embed_k,
+                                                        out_channels=self.weight_size_list[0],
+                                                        heads=self.heads[0],
+                                                        dropout=self.message_dropout[0],
+                                                        add_self_loops=False,
+                                                        concat=True), 'x, edge_index -> x'),
+                                                        (torch.nn.Identity(), 'x -> x')]
 
         self.propagation_network = torch_geometric.nn.Sequential('x, edge_index', propagation_network_list)
         self.propagation_network.to(self.device)
@@ -87,6 +102,7 @@ class GATModel(torch.nn.Module, ABC):
             if evaluate:
                 self.propagation_network.eval()
                 with torch.no_grad():
+                    print()
                     current_embeddings = list(
                         self.propagation_network.children()
                     )[layer](current_embeddings.to(self.device), self.edge_index.to(self.device))
