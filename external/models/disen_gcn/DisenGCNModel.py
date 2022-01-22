@@ -91,7 +91,7 @@ class DisenGCNModel(torch.nn.Module, ABC):
         for layer in range(0, self.n_layers * 2, 2):
             zeta_u = list(self.disengcn_network.children())[layer][0](embeddings_zeta_u.to(self.device))
             zeta_i = list(self.disengcn_network.children())[layer][0](embeddings_zeta_i.to(self.device))
-            for t in range(self.routing_iterations):
+            for _ in range(self.routing_iterations):
                 c_u = list(self.disengcn_network.children())[layer][1](zeta_u.to(self.device),
                                                                        current_edge_index_u.to(self.device))[0]
                 c_i = list(self.disengcn_network.children())[layer][1](zeta_i.to(self.device),

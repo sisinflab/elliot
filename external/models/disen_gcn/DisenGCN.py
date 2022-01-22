@@ -32,7 +32,6 @@ class DisenGCN(RecMixin, BaseRecommenderModel):
         lr: Learning rate
         epochs: Number of epochs
         factors: Number of latent factors
-        batch_size: Batch size
         l_w: Regularization coefficient
         weight_size: Tuple with number of units for each embedding propagation layer
         message_dropout: Tuple with dropout rate for each embedding propagation layer
@@ -50,7 +49,6 @@ class DisenGCN(RecMixin, BaseRecommenderModel):
             save_recs: True
           lr: 0.0005
           epochs: 50
-          batch_size: 512
           factors: 64
           l_w: 0.1
           weight_size: (64,)
@@ -64,11 +62,12 @@ class DisenGCN(RecMixin, BaseRecommenderModel):
 
         iu_dict = data.build_items_neighbour()
 
+        print(iu_dict)
+        exit()
+
         self._sampler = Sampler(self._data.i_train_dict,
                                 iu_dict,
                                 self._epochs)
-        if self._batch_size < 1:
-            self._batch_size = self._num_users
 
         ######################################
 
@@ -122,10 +121,10 @@ class DisenGCN(RecMixin, BaseRecommenderModel):
         for it in self.iterate(self._epochs):
             loss = 0
             steps = 0
-            with tqdm(total=int(self._data.transactions // self._batch_size), disable=not self._verbose) as t:
-                for batch in self._sampler.step(self._data.transactions, self._batch_size):
+            with tqdm(total=int(self._data.transactions), disable=not self._verbose) as t:
+                for user_item in self._sampler.step(self._data.transactions):
                     steps += 1
-                    loss += self._model.train_step(batch)
+                    loss += self._model.train_step(user_item)
                     t.set_postfix({'loss': f'{loss / steps:.5f}'})
                     t.update()
 
@@ -134,10 +133,9 @@ class DisenGCN(RecMixin, BaseRecommenderModel):
     def get_recommendations(self, k: int = 100):
         predictions_top_k_test = {}
         predictions_top_k_val = {}
-        for index, offset in enumerate(range(0, self._num_users, self._batch_size)):
-            offset_stop = min(offset + self._batch_size, self._num_users)
-            predictions = self._model.predict(offset, offset_stop)
-            recs_val, recs_test = self.process_protocol(k, predictions, offset, offset_stop)
+        for user in enumerate(range(0, self._num_users)):
+            predictions = self._model.predict(user, user + 1)
+            recs_val, recs_test = self.process_protocol(k, predictions, user, user + 1)
             predictions_top_k_val.update(recs_val)
             predictions_top_k_test.update(recs_test)
         return predictions_top_k_val, predictions_top_k_test
