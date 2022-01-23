@@ -93,7 +93,7 @@ class DisenGCNModel(torch.nn.Module, ABC):
                 current_embeddings = list(self.disengcn_network.children())[layer + 1](current_embeddings.to(self.device))
             else:
                 self.disengcn_network.eval()
-                with torch.no_grad:
+                with torch.no_grad():
                     current_embeddings = list(self.disengcn_network.children())[layer][0](current_embeddings.to(self.device))
                     for _ in range(self.routing_iterations):
                         current_embeddings = list(self.disengcn_network.children())[layer][1](current_embeddings.to(self.device),
