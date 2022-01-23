@@ -123,13 +123,16 @@ class DisenGCNModel(torch.nn.Module, ABC):
 
     def train_step(self, batch):
         gu, gi = self.propagate_embeddings()
+
+        if torch.sum(torch.isnan(gu)):
+            print('NaN in gu!')
+
+        if torch.sum(torch.isnan(gi)):
+            print('NaN in gi!')
+
         user, pos, neg = batch
         xu_pos = self.forward(inputs=(gu[user], gi[pos]))
         xu_neg = self.forward(inputs=(gu[user], gi[neg]))
-
-        if torch.sum(torch.isnan(xu_pos)) or torch.sum(torch.isnan(xu_neg)):
-            print('NaN predictions!')
-            print(user)
 
         difference = torch.clamp(xu_pos - xu_neg, -80.0, 1e8)
         loss = torch.sum(self.softplus(-difference))
