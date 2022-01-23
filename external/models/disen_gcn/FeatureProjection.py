@@ -9,7 +9,7 @@ class FeatureProjection(torch.nn.Module, ABC):
         self.W = torch.nn.Parameter(
             torch.nn.init.xavier_normal_(torch.empty((disen_k, out_channels // disen_k, in_channels))))
         self.b = torch.nn.Parameter(
-            torch.nn.init.xavier_normal_(torch.empty((disen_k, out_channels // disen_k))))
+            torch.nn.init.zeros(torch.empty((disen_k, out_channels // disen_k))))
         self.relu = torch.nn.ReLU()
         self.disen_k = disen_k
 
