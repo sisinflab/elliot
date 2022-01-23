@@ -127,6 +127,10 @@ class DisenGCNModel(torch.nn.Module, ABC):
         xu_pos = self.forward(inputs=(gu[user], gi[pos]))
         xu_neg = self.forward(inputs=(gu[user], gi[neg]))
 
+        if torch.sum(torch.isnan(xu_pos)) or torch.sum(torch.isnan(xu_neg)):
+            print('NaN predictions!')
+            print(user)
+
         difference = torch.clamp(xu_pos - xu_neg, -80.0, 1e8)
         loss = torch.sum(self.softplus(-difference))
         reg_loss = self.l_w * (torch.norm(self.Gu, 2) +
