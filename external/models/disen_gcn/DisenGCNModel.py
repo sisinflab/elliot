@@ -56,10 +56,10 @@ class DisenGCNModel(torch.nn.Module, ABC):
         self.edge_index = torch.tensor(edge_index, dtype=torch.int64)
 
         self.Gu = torch.nn.Parameter(
-            torch.nn.init.zeros_(torch.empty((self.num_users, self.embed_k))))
+            torch.nn.init.xavier_normal_(torch.empty((self.num_users, self.embed_k))))
         self.Gu.to(self.device)
         self.Gi = torch.nn.Parameter(
-            torch.nn.init.zeros_(torch.empty((self.num_items, self.embed_k))))
+            torch.nn.init.xavier_normal_(torch.empty((self.num_items, self.embed_k))))
         self.Gi.to(self.device)
 
         disengcn_network_list = []
@@ -85,9 +85,9 @@ class DisenGCNModel(torch.nn.Module, ABC):
         for layer in range(0, self.n_layers * 2, 2):
             if not evaluate:
                 current_embeddings = list(self.disengcn_network.children())[layer][0](current_embeddings.to(self.device))
-                # for _ in range(self.routing_iterations):
-                #     current_embeddings = list(self.disengcn_network.children())[layer][1](current_embeddings.to(self.device),
-                #                                                                           self.edge_index.to(self.device))
+                for _ in range(self.routing_iterations):
+                    current_embeddings = list(self.disengcn_network.children())[layer][1](current_embeddings.to(self.device),
+                                                                                          self.edge_index.to(self.device))
                 current_embeddings = torch.reshape(current_embeddings, [current_embeddings.shape[0], 
                                                                         current_embeddings.shape[1] * current_embeddings.shape[2]])
                 current_embeddings = list(self.disengcn_network.children())[layer + 1](current_embeddings.to(self.device))
@@ -95,9 +95,9 @@ class DisenGCNModel(torch.nn.Module, ABC):
                 self.disengcn_network.eval()
                 with torch.no_grad():
                     current_embeddings = list(self.disengcn_network.children())[layer][0](current_embeddings.to(self.device))
-                    # for _ in range(self.routing_iterations):
-                    #     current_embeddings = list(self.disengcn_network.children())[layer][1](current_embeddings.to(self.device),
-                    #                                                                         self.edge_index.to(self.device))
+                    for _ in range(self.routing_iterations):
+                        current_embeddings = list(self.disengcn_network.children())[layer][1](current_embeddings.to(self.device),
+                                                                                            self.edge_index.to(self.device))
                     current_embeddings = torch.reshape(current_embeddings, [current_embeddings.shape[0], 
                                                                             current_embeddings.shape[1] * current_embeddings.shape[2]])
                     current_embeddings = list(self.disengcn_network.children())[layer + 1](current_embeddings.to(self.device))
