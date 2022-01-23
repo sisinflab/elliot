@@ -19,7 +19,7 @@ from elliot.recommender import BaseRecommenderModel
 from elliot.recommender.base_recommender_model import init_charger
 from elliot.recommender.recommender_utils_mixin import RecMixin
 from .DisenGCNModel import DisenGCNModel
-from .pairwise_sampler_disengcn import Sampler
+from elliot.dataset.samplers import custom_sampler as cs
 
 
 class DisenGCN(RecMixin, BaseRecommenderModel):
@@ -32,6 +32,7 @@ class DisenGCN(RecMixin, BaseRecommenderModel):
         lr: Learning rate
         epochs: Number of epochs
         factors: Number of latent factors
+        batch_size: Batch size
         l_w: Regularization coefficient
         weight_size: Tuple with number of units for each embedding propagation layer
         message_dropout: Tuple with dropout rate for each embedding propagation layer
@@ -50,6 +51,7 @@ class DisenGCN(RecMixin, BaseRecommenderModel):
           lr: 0.0005
           epochs: 50
           factors: 64
+          batch_size: 512
           l_w: 0.1
           weight_size: (64,)
           message_dropout: (0.1,)
@@ -59,16 +61,9 @@ class DisenGCN(RecMixin, BaseRecommenderModel):
     """
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
-
-        iu_dict = data.build_items_neighbour()
-
-        print(iu_dict)
-        exit()
-
-        self._sampler = Sampler(self._data.i_train_dict,
-                                iu_dict,
-                                self._epochs)
-
+        self._sampler = cs.Sampler(self._data.i_train_dict)
+        if self._batch_size < 1:
+            self._batch_size = self._num_users
         ######################################
 
         self._params_list = [
@@ -121,10 +116,10 @@ class DisenGCN(RecMixin, BaseRecommenderModel):
         for it in self.iterate(self._epochs):
             loss = 0
             steps = 0
-            with tqdm(total=int(self._data.transactions), disable=not self._verbose) as t:
-                for user_item in self._sampler.step(self._data.transactions):
+            with tqdm(total=int(self._data.transactions // self._batch_size), disable=not self._verbose) as t:
+                for batch in self._sampler.step(self._data.transactions):
                     steps += 1
-                    loss += self._model.train_step(user_item)
+                    loss += self._model.train_step(batch)
                     t.set_postfix({'loss': f'{loss / steps:.5f}'})
                     t.update()
 
@@ -133,9 +128,11 @@ class DisenGCN(RecMixin, BaseRecommenderModel):
     def get_recommendations(self, k: int = 100):
         predictions_top_k_test = {}
         predictions_top_k_val = {}
-        for user in enumerate(range(0, self._num_users)):
-            predictions = self._model.predict(user, user + 1)
-            recs_val, recs_test = self.process_protocol(k, predictions, user, user + 1)
+        gu, gi = self._model.propagate_embeddings(evaluate=True)
+        for index, offset in enumerate(range(0, self._num_users, self._batch_size)):
+            offset_stop = min(offset + self._batch_size, self._num_users)
+            predictions = self._model.predict(gu[offset: offset_stop], gi)
+            recs_val, recs_test = self.process_protocol(k, predictions, offset, offset_stop)
             predictions_top_k_val.update(recs_val)
             predictions_top_k_test.update(recs_test)
         return predictions_top_k_val, predictions_top_k_test

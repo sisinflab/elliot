@@ -80,57 +80,53 @@ class DisenGCNModel(torch.nn.Module, ABC):
 
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
 
-    def forward(self, inputs, **kwargs):
-        user, item, neigh_user, neigh_item = inputs
-        current_edge_index_u = torch.tensor([[0] * len(neigh_user), list(range(1, len(neigh_user) + 1))])
-        current_edge_index_i = torch.tensor([[0] * len(neigh_item), list(range(1, len(neigh_item) + 1))])
-        users_embeddings = self.Gu[[user] + neigh_item]
-        items_embeddings = self.Gi[[item] + neigh_user]
-        embeddings_zeta_u = torch.cat((torch.unsqueeze(users_embeddings[0], 0), items_embeddings[1:]), 0)
-        embeddings_zeta_i = torch.cat((torch.unsqueeze(items_embeddings[0], 0), users_embeddings[1:]), 0)
+    def propagate_embeddings(self, evaluate=False):
+        current_embeddings = torch.cat((self.Gu.to(self.device), self.Gi.to(self.device)), 0)
         for layer in range(0, self.n_layers * 2, 2):
-            zeta_u = list(self.disengcn_network.children())[layer][0](embeddings_zeta_u.to(self.device))
-            zeta_i = list(self.disengcn_network.children())[layer][0](embeddings_zeta_i.to(self.device))
-            for _ in range(self.routing_iterations):
-                c_u = list(self.disengcn_network.children())[layer][1](zeta_u.to(self.device),
-                                                                       current_edge_index_u.to(self.device))[0]
-                c_i = list(self.disengcn_network.children())[layer][1](zeta_i.to(self.device),
-                                                                       current_edge_index_i.to(self.device))[0]
-                zeta_u[0] = c_u
-                zeta_i[0] = c_i
-            embeddings_zeta_u = zeta_u.reshape(zeta_u.shape[0], zeta_u.shape[1] * zeta_u.shape[2])
-            embeddings_zeta_i = zeta_i.reshape(zeta_i.shape[0], zeta_i.shape[1] * zeta_i.shape[2])
-            embeddings_zeta_u = list(self.disengcn_network.children())[layer + 1](embeddings_zeta_u.to(self.device))
-            embeddings_zeta_i = list(self.disengcn_network.children())[layer + 1](embeddings_zeta_i.to(self.device))
+            if not evaluate:
+                current_embeddings = list(self.disengcn_network.children())[layer][0](current_embeddings.to(self.device))
+                for _ in range(self.routing_iterations):
+                    current_embeddings = list(self.disengcn_network.children())[layer][1](current_embeddings.to(self.device),
+                                                                                          self.edge_index.to(self.device))[0]
+                current_embeddings = list(self.disengcn_network.children())[layer + 1](current_embeddings.to(self.device))
+            else:
+                self.disengcn_network.eval()
+                with torch.no_grad:
+                    current_embeddings = list(self.disengcn_network.children())[layer][0](current_embeddings.to(self.device))
+                for _ in range(self.routing_iterations):
+                    current_embeddings = list(self.disengcn_network.children())[layer][1](current_embeddings.to(self.device),
+                                                                                          self.edge_index.to(self.device))[0]
+                current_embeddings = list(self.disengcn_network.children())[layer + 1](current_embeddings.to(self.device))
 
-        xui = torch.sum(torch.unsqueeze(embeddings_zeta_u[0], 0) * torch.unsqueeze(embeddings_zeta_i[0], 0), 1)
+        if evaluate:
+            self.disengcn_network.train()
 
-        return xui, embeddings_zeta_u[0], embeddings_zeta_i[0]
+        gu, gi = torch.split(current_embeddings, [self.num_users, self.num_items], 0)
+        return gu, gi
 
-    def predict(self, start, stop, **kwargs):
-        zeta_u = self.projection_network(self.Gu)
-        zeta_i = self.projection_network(self.Gi)
 
-        all_zeta = torch.cat((zeta_u, zeta_i), 0)
-        self.disentangle_network.eval()
-        all_zeta = self.disentangle_network(all_zeta, self.edge_index)
-        self.disentangle_network.train()
-        zeta_u, zeta_i = torch.split(all_zeta, [self.num_users, self.num_items], 0)
-        c_u = zeta_u.reshape(zeta_u.shape[0], zeta_u.shape[1] * zeta_u.shape[2])
-        c_i = zeta_i.reshape(zeta_i.shape[0], zeta_i.shape[1] * zeta_i.shape[2])
+    def forward(self, inputs, **kwargs):
+        gu, gi = inputs
+        gamma_u = torch.squeeze(gu).to(self.device)
+        gamma_i = torch.squeeze(gi).to(self.device)
 
-        return torch.matmul(c_u[start:stop], torch.transpose(c_i, 0, 1))
+        xui = torch.sum(gamma_u * gamma_i, 1)
+
+        return xui
+
+    def predict(self, gu, gi, **kwargs):
+        return torch.matmul(gu.to(self.device), torch.transpose(gi.to(self.device), 0, 1))
 
     def train_step(self, batch):
-        user, pos, neg, neigh_user, neigh_pos_items, neigh_neg_items = batch
-        xu_pos, zeta_u, zeta_i_pos = self.forward(inputs=(user, pos, neigh_user, neigh_pos_items))
-        xu_neg, _, zeta_i_neg = self.forward(inputs=(user, neg, neigh_user, neigh_neg_items))
+        gu, gi = self.propagate_embeddings()
+        user, pos, neg = batch
+        xu_pos = self.forward(inputs=(gu[user[:, 0]], gi[pos[:, 0]]))
+        xu_neg = self.forward(inputs=(gu[user[:, 0]], gi[neg[:, 0]]))
 
         difference = torch.clamp(xu_pos - xu_neg, -80.0, 1e8)
         loss = torch.sum(self.softplus(-difference))
-        reg_loss = self.l_w * (torch.norm(zeta_u, 2) +
-                               torch.norm(zeta_i_pos, 2) +
-                               torch.norm(zeta_i_neg, 2) +
+        reg_loss = self.l_w * (torch.norm(self.Gu, 2) +
+                               torch.norm(self.Gi, 2) +
                                torch.stack([torch.norm(value, 2) for value in self.disengcn_network.parameters()],
                                            dim=0).sum(dim=0)) * 2
         loss += reg_loss
