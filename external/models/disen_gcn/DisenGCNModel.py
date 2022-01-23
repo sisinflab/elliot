@@ -86,9 +86,9 @@ class DisenGCNModel(torch.nn.Module, ABC):
             if not evaluate:
                 current_embeddings = list(self.disengcn_network.children())[layer][0](current_embeddings.to(self.device))
                 for _ in range(self.routing_iterations):
-                    print(current_embeddings.shape)
                     current_embeddings = list(self.disengcn_network.children())[layer][1](current_embeddings.to(self.device),
                                                                                           self.edge_index.to(self.device))[0]
+                    print(current_embeddings.shape)
                 current_embeddings = list(self.disengcn_network.children())[layer + 1](current_embeddings.to(self.device))
             else:
                 self.disengcn_network.eval()
