@@ -16,6 +16,6 @@ class FeatureProjection(torch.nn.Module, ABC):
     def forward(self, x):
         z = self.relu(torch.matmul(self.W, x.permute(1, 0)).permute(2, 0, 1) +
                       torch.unsqueeze(self.b, 0))
-        # z = z / torch.unsqueeze(torch.unsqueeze(torch.norm(z, 2, dim=[0, 2]), 0), 2)
+        z = z / torch.unsqueeze(torch.unsqueeze(torch.norm(z, 2, dim=[0, 2]), 0), 2)
 
         return z
