@@ -143,6 +143,19 @@ class MFModel(object):
 
         return this_loss
 
+
+    def get_all_topks(self, mask, k, user_map, item_map):
+        masking = np.where(mask, self._preds, -np.inf)
+        partial_index = np.argpartition(masking, -k, axis=1)[:, -k:]
+        masking_partition = np.take_along_axis(masking, partial_index, axis=1)
+        masking_partition_index = masking_partition.argsort(axis=1)[:, ::-1]
+        partial_index = np.take_along_axis(partial_index, masking_partition_index, axis=1)
+        masking_partition = np.take_along_axis(masking_partition, masking_partition_index, axis=1)
+        predictions_top_k = {
+            user_map[u]: list(map(lambda x: (item_map.get(x[0]), x[1]), zip(*map(lambda x: x, top)))) for
+            u, top in enumerate(zip(*(partial_index.tolist(), masking_partition.tolist())))}
+        return predictions_top_k
+
     def get_model_state(self):
         saving_dict = {}
         saving_dict['_global_bias'] = self._global_bias
