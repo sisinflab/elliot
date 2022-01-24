@@ -4,8 +4,8 @@ Module description:
 """
 
 __version__ = '0.3.0'
-__author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta, Felice Antonio Merra'
-__email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malitesta@poliba.it, felice.merra@poliba.it'
+__author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta'
+__email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malitesta@poliba.it'
 
 from tqdm import tqdm
 import numpy as np
@@ -107,10 +107,7 @@ class EGCF(RecMixin, BaseRecommenderModel):
         list_edges_edges = []
         for e in set(self.node_edge_index[1]):
             nodes_connected_to_e = self.node_edge_index[0, np.argwhere(self.node_edge_index[1] == e)][:, 0].tolist()
-            edges_connected_to_e = self.node_edge_index[
-                                       1, np.argwhere(self.node_edge_index[0] == nodes_connected_to_e[0])].tolist() + \
-                                   self.node_edge_index[
-                                       1, np.argwhere(self.node_edge_index[0] == nodes_connected_to_e[1])].tolist()
+            edges_connected_to_e = self.node_edge_index[1, np.argwhere(np.isin(self.node_edge_index[0], nodes_connected_to_e))].tolist()
             # edges_connected_to_e = [ee[0] for ee in edges_connected_to_e if ee[0] != e]
             edges_connected_to_e = np.array(edges_connected_to_e)[edges_connected_to_e != e].tolist()
             list_edges_edges += list(map(list, zip([e] * len(edges_connected_to_e), edges_connected_to_e)))
