@@ -9,13 +9,15 @@ class FeatureProjection(torch.nn.Module, ABC):
         self.W = torch.nn.Parameter(
             torch.nn.init.xavier_normal_(torch.empty((disen_k, out_channels // disen_k, in_channels))))
         self.b = torch.nn.Parameter(
-            torch.nn.init.zeros_(torch.empty((disen_k, out_channels // disen_k))))
+            torch.nn.init.xavier_normal_(torch.empty((disen_k, out_channels // disen_k))))
         self.relu = torch.nn.ReLU()
         self.disen_k = disen_k
 
     def forward(self, x):
         z = self.relu(torch.matmul(self.W, x.permute(1, 0)).permute(2, 0, 1) +
                       torch.unsqueeze(self.b, 0))
+        print(torch.norm(z, 2, dim=[0, 2]).shape)
+        exit()
         z = z / torch.unsqueeze(torch.unsqueeze(torch.norm(z, 2, dim=[0, 2]), 0), 2)
 
         return z
