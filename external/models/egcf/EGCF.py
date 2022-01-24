@@ -95,14 +95,11 @@ class EGCF(RecMixin, BaseRecommenderModel):
 
         list_nodes_edges = []
 
-        print('Starting creation of node-edge graph')
         for idx in range(self.edge_index.shape[1]):
             list_nodes_edges.append([self.edge_index[0, idx], idx + self._num_users + self._num_items])
             list_nodes_edges.append([self.edge_index[1, idx], idx + self._num_users + self._num_items])
 
         self.node_edge_index = np.array(list_nodes_edges).transpose()
-        print('End of creation for the node-edge graph')
-        print('Starting creation of edge-edge graph')
 
         list_edges_edges = []
         for e in set(self.node_edge_index[1]):
@@ -116,7 +113,6 @@ class EGCF(RecMixin, BaseRecommenderModel):
 
         self.edge_edge_index = np.array(list_edges_edges).transpose()
         self.edge_edge_index -= np.min(self.edge_edge_index)
-        print('End of creation for edge-edge graph')
 
         self._n_layers = len(self._weight_size_nodes)
 
