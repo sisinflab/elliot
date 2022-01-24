@@ -143,7 +143,6 @@ class MFModel(object):
 
         return this_loss
 
-
     def get_all_topks(self, mask, k, user_map, item_map):
         masking = np.where(mask, self._preds, -np.inf)
         partial_index = np.argpartition(masking, -k, axis=1)[:, -k:]

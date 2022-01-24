@@ -73,17 +73,17 @@ class ModelCoordinator(object):
 
         loss = np.average(losses)
         results_mean = self._average_results(results)
-        results_std = self._std_results(results)
+        # results_std = self._std_results(results)
 
         return {
             'loss': loss,
             'status': STATUS_OK,
             'params': model.get_params(),
             'val_results': {k: result_dict["val_results"] for k, result_dict in results_mean.items()},
-            'val_std_results': {k: result_dict["val_results"] for k, result_dict in results_std.items()},
+            # 'val_std_results': {k: result_dict["val_results"] for k, result_dict in results_std.items()},
             'val_statistical_results': {k: result_dict["val_statistical_results"] for k, result_dict in model.get_results().items()},
             'test_results': {k: result_dict["test_results"] for k, result_dict in results_mean.items()},
-            'test_std_results': {k: result_dict["test_results"] for k, result_dict in results_std.items()},
+            # 'test_std_results': {k: result_dict["test_results"] for k, result_dict in results_std.items()},
             'test_statistical_results': {k: result_dict["test_statistical_results"] for k, result_dict in model.get_results().items()},
             'time': times,
             'name': model.name
@@ -117,17 +117,17 @@ class ModelCoordinator(object):
 
         loss = np.average(losses)
         results_mean = self._average_results(results)
-        results_std = self._std_results(results)
+        # results_std = self._std_results(results)
 
         return {
             'loss': loss,
             'status': STATUS_OK,
             'params': model.get_params(),
             'val_results': {k: result_dict["val_results"] for k, result_dict in results_mean.items()},
-            'val_std_results': {k: result_dict["val_results"] for k, result_dict in results_std.items()},
+            # 'val_std_results': {k: result_dict["val_results"] for k, result_dict in results_std.items()},
             'val_statistical_results': {k: result_dict["val_statistical_results"] for k, result_dict in model.get_results().items()},
             'test_results': {k: result_dict["test_results"] for k, result_dict in results_mean.items()},
-            'test_std_results': {k: result_dict["test_results"] for k, result_dict in results_std.items()},
+            # 'test_std_results': {k: result_dict["test_results"] for k, result_dict in results_std.items()},
             'test_statistical_results': {k: result_dict["test_statistical_results"] for k, result_dict in model.get_results().items()},
             'time': times,
             'name': model.name
@@ -147,7 +147,7 @@ class ModelCoordinator(object):
     @staticmethod
     def _std_results(results_list):
         ks = list(results_list[0].keys())
-        eval_result_types = ["val_results", "test_results"]
+        eval_result_types = ["val_results"]
         metrics = list(results_list[0][ks[0]]["val_results"].keys())
         return {k: {type_: {metric: np.std([fold_result[k][type_][metric] for fold_result in results_list])
                             for metric in metrics}

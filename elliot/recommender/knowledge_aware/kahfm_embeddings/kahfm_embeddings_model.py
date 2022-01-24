@@ -67,7 +67,6 @@ class KaHFMEmbeddingsModel(keras.Model):
 
         return xui, beta_i, gamma_u, gamma_i
 
-    @tf.function
     def train_step(self, batch):
         with tf.GradientTape() as tape:
             user, pos, neg = batch
