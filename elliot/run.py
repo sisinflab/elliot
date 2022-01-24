@@ -120,18 +120,32 @@ def run_experiment(config_path: str = ''):
         # Migliore sui test, aggiunta a performance totali
         min_val = np.argmin([i["loss"] for i in test_results])
 
-        res_handler.add_oneshot_recommender(**test_results[min_val])
+        # target_test_results = test_results[min_val]
+        #
+        # ks = base.base_namespace.evaluation.cutoffs
+        # metrics = list(test_results[0]["test_results"][ks[0]].keys())
+        # mean_ = {
+        #     k: {metric: np.average([fold_result["test_results"][k][metric] for fold_result in test_results]) for metric
+        #         in metrics}
+        #     for k in ks}
+        # std_ = {
+        #     k: {metric: np.std([fold_result["test_results"][k][metric] for fold_result in test_results]) for metric in
+        #         metrics}
+        #     for k in ks}
+        # target_test_results.update({"test_mean_results": mean_, "test_std_results": std_})
+        # res_handler.add_oneshot_recommender(**test_results[min_val])
 
         if isinstance(model_base, tuple):
             hyper_handler.add_trials(test_trials[min_val])
 
     # res_handler.save_results(output=base.base_namespace.path_output_rec_performance)
     hyper_handler.save_trials(output=base.base_namespace.path_output_rec_performance)
-    hyper_handler.save_trials_std(output=base.base_namespace.path_output_rec_performance)
-    hyper_handler.save_trials_times(output=base.base_namespace.path_output_rec_performance)
+    # hyper_handler.save_trials_std(output=base.base_namespace.path_output_rec_performance)
+    # hyper_handler.save_trials_times(output=base.base_namespace.path_output_rec_performance)
     res_handler.save_best_results(output=base.base_namespace.path_output_rec_performance)
-    res_handler.save_best_times(output=base.base_namespace.path_output_rec_performance)
-    res_handler.save_best_results_std(output=base.base_namespace.path_output_rec_performance)
+    # res_handler.save_best_times(output=base.base_namespace.path_output_rec_performance)
+    # res_handler.save_best_results_std(output=base.base_namespace.path_output_rec_performance)
+    res_handler.save_best_results_mean(output=base.base_namespace.path_output_rec_performance)
     cutoff_k = getattr(base.base_namespace.evaluation, "cutoffs", [base.base_namespace.top_k])
     cutoff_k = cutoff_k if isinstance(cutoff_k, list) else [cutoff_k]
     first_metric = base.base_namespace.evaluation.simple_metrics[
@@ -141,9 +155,9 @@ def run_experiment(config_path: str = ''):
     if hasattr(base.base_namespace,
                "print_results_as_triplets") and base.base_namespace.print_results_as_triplets == True:
         res_handler.save_best_results_as_triplets(output=base.base_namespace.path_output_rec_performance)
-        res_handler.save_best_results_std_as_triplets(output=base.base_namespace.path_output_rec_performance)
+        # res_handler.save_best_results_std_as_triplets(output=base.base_namespace.path_output_rec_performance)
         hyper_handler.save_trials_as_triplets(output=base.base_namespace.path_output_rec_performance)
-        hyper_handler.save_trials_as_triplets_std(output=base.base_namespace.path_output_rec_performance)
+        # hyper_handler.save_trials_as_triplets_std(output=base.base_namespace.path_output_rec_performance)
     if hasattr(base.base_namespace.evaluation, "paired_ttest") and base.base_namespace.evaluation.paired_ttest:
         res_handler.save_best_statistical_results(stat_test=StatTest.PairedTTest,
                                                   output=base.base_namespace.path_output_rec_performance)

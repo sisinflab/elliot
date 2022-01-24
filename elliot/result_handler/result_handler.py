@@ -18,6 +18,7 @@ from elliot.evaluation.statistical_significance import PairedTTest, WilcoxonTest
 
 _eval_results = "test_results"
 _eval_std_results = "test_std_results"
+_eval_mean_results = "test_mean_results"
 _eval_statistical_results = "test_statistical_results"
 _eval_results_time = "time"
 
@@ -75,6 +76,19 @@ class ResultHandler:
             info.insert(0, 'model', info.index)
             info.to_csv(os.path.abspath(os.sep.join([output,
                 f'rec_std_cutoff_{k}_relthreshold_{self.rel_threshold}_{datetime.now().strftime("%Y_%m_%d_%H_%M_%S")}.tsv'])),
+                sep='\t', index=False)
+
+    def save_best_results_mean(self, output=''):
+        global_results = dict(self.oneshot_recommenders)
+        for k in self.ks:
+            results = {}
+            for rec in global_results.keys():
+                for result in global_results[rec]:
+                    results.update({result['params']['name']: result[_eval_mean_results][k]})
+            info = pd.DataFrame.from_dict(results, orient='index')
+            info.insert(0, 'model', info.index)
+            info.to_csv(os.path.abspath(os.sep.join([output,
+                f'rec_mean_cutoff_{k}_relthreshold_{self.rel_threshold}_{datetime.now().strftime("%Y_%m_%d_%H_%M_%S")}.tsv'])),
                 sep='\t', index=False)
 
     def save_best_results_as_triplets(self, output='../results/'):
@@ -190,7 +204,7 @@ class HyperParameterStudy:
             info = pd.DataFrame.from_dict(results, orient='index')
             info.insert(0, 'model', info.index)
             info.to_csv(os.path.abspath(os.sep.join([output,
-                f'rec_train_time_{rec}_relthreshold_{self.rel_threshold}_{datetime.now().strftime("%Y_%m_%d_%H_%M_%S")}.tsv'])),
+                f'rec_{rec}_train_time_{rec}_relthreshold_{self.rel_threshold}_{datetime.now().strftime("%Y_%m_%d_%H_%M_%S")}.tsv'])),
                 sep='\t', index=False)
 
     def save_trials_std(self, output='../results/'):
