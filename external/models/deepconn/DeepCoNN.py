@@ -142,7 +142,18 @@ class DeepCoNN(RecMixin, BaseRecommenderModel):
         users_tokens = self._sampler.users_tokens
         items_tokens = self._sampler.items_tokens
 
-        self.logger.info('Starting convolutions for all items...')
+        self.logger.info('Starting convolutions for all users...')
+        out_users = np.empty((self._num_users, self._latent_size))
+        with tqdm(total=int(self._num_users // self._batch_eval), disable=not self._verbose) as t:
+            for start_batch in range(0, self._num_users, self._batch_eval):
+                stop_batch = min(start_batch + self._batch_eval, self._num_users)
+                user_reviews = list(
+                    itemgetter(*list(range(start_batch, stop_batch)))(users_tokens))
+                out_users[start_batch: stop_batch] = self._model.conv_users(np.array(user_reviews, dtype=np.int64))
+                t.update()
+        self.logger.info('Convolutions for all users is complete!')
+
+        self.logger.info('Starting convolutions for selected items...')
         out_items = np.empty((self._num_items, self._latent_size))
         with tqdm(total=int(self._num_items // self._batch_eval), disable=not self._verbose) as t:
             for start_batch in range(0, self._num_items, self._batch_eval):
@@ -151,18 +162,15 @@ class DeepCoNN(RecMixin, BaseRecommenderModel):
                     itemgetter(*list(range(start_batch, stop_batch)))(items_tokens))
                 out_items[start_batch: stop_batch] = self._model.conv_items(np.array(item_reviews, dtype=np.int64))
                 t.update()
-        self.logger.info('Convolutions for all items is complete!')
+        self.logger.info('Convolutions for selected items is complete!')
 
         for index, offset in enumerate(range(0, self._num_users, self._batch_eval)):
             offset_stop = min(offset + self._batch_eval, self._num_users)
-            predictions = np.empty((offset_stop - offset, self._num_items))
-            user_reviews = list(
-                itemgetter(*list(range(offset, offset_stop)))(users_tokens))
-            out_users = self._model.conv_users(np.array(user_reviews, dtype=np.int64))
+            predictions = np.empty((offset_stop - offset, self._negative_items_per_user))
             with tqdm(total=int(self._num_items // self._batch_eval), disable=not self._verbose) as t:
                 for item_index, item_offset in enumerate(range(0, self._num_items, self._batch_eval)):
                     item_offset_stop = min(item_offset + self._batch_eval, self._num_items)
-                    p = self._model.predict(out_users,
+                    p = self._model.predict(out_users[offset: offset_stop],
                                             tf.Variable(out_items[item_index * self._batch_eval:item_offset_stop],
                                                         dtype=tf.float32))
                     predictions[:(offset_stop - offset), item_index * self._batch_eval:item_offset_stop] = p
