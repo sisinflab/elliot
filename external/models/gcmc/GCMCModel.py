@@ -54,13 +54,13 @@ class GCMCModel(torch.nn.Module, ABC):
         self.edge_index = torch.tensor(edge_index, dtype=torch.int64)
 
         self.Gu = torch.nn.Parameter(
-            torch.nn.init.zeros_(torch.empty((self.num_users, self.embed_k))))
+            torch.nn.init.xavier_normal_(torch.empty((self.num_users, self.embed_k))))
         self.Gu.to(self.device)
         self.Gi = torch.nn.Parameter(
-            torch.nn.init.zeros_(torch.empty((self.num_items, self.embed_k))))
+            torch.nn.init.xavier_normal_(torch.empty((self.num_items, self.embed_k))))
         self.Gi.to(self.device)
         self.Q = torch.nn.Parameter(
-            torch.nn.init.zeros_(torch.empty((self.dense_layer_size[-1], self.dense_layer_size[-1]))))
+            torch.nn.init.xavier_normal_(torch.empty((self.dense_layer_size[-1], self.dense_layer_size[-1]))))
         self.Q.to(self.device)
 
         # Convolutional part
