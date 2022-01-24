@@ -181,7 +181,7 @@ class DeepCoNNModel(tf.keras.Model, ABC):
     def train_step(self, batch):
         _, _, r, _, _ = batch
         with tf.GradientTape() as t:
-            xui = self(inputs=batch, training=True)
+            xui = self.call(inputs=batch, training=True)
             loss = tf.reduce_mean(tf.square(xui - r))
 
             # Regularization Component
