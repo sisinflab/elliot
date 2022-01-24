@@ -56,7 +56,7 @@ class Sampler:
             return u, i, b, u_review_tokens, i_review_tokens
 
         for batch_start in range(0, events, batch_size):
-            user, item, bit, u_t, i_t = map(np.asarray, zip(*[sample() for _ in
+            user, item, bit, u_t, i_t = map(np.array, zip(*[sample() for _ in
                                                             range(batch_start, min(batch_start + batch_size, events))]))
             yield user, item, bit.astype('float32'), u_t, i_t
 
