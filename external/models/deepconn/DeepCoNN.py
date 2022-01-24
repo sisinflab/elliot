@@ -129,6 +129,16 @@ class DeepCoNN(RecMixin, BaseRecommenderModel):
             with tqdm(total=int(self._data.transactions // self._batch_size), disable=not self._verbose) as t:
                 for batch in self._sampler.step(self._data.transactions, self._batch_size):
                     steps += 1
+                    a, b, c, d, e = batch
+                    print(a)
+                    print('\n\n')
+                    print(b)
+                    print('\n\n')
+                    print(c)
+                    print('\n\n')
+                    print(d)
+                    print('\n\n')
+                    print(e)
                     loss += self._model.train_step(batch)
                     t.set_postfix({'loss': f'{loss / steps:.5f}'})
                     t.update()
