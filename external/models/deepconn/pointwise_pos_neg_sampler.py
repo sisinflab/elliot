@@ -8,7 +8,7 @@ __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
 import random
-import numpy as np
+import tensorflow as tf
 
 
 class Sampler:
@@ -56,9 +56,9 @@ class Sampler:
             return u, i, b, u_review_tokens, i_review_tokens
 
         for batch_start in range(0, events, batch_size):
-            user, item, bit, u_t, i_t = map(np.array, zip(*[sample() for _ in
+            user, item, bit, u_t, i_t = map(tf.Variable, zip(*[sample() for _ in
                                                             range(batch_start, min(batch_start + batch_size, events))]))
-            yield user, item, bit.astype('float32'), u_t, i_t
+            yield user, item, bit, u_t, i_t
 
     @property
     def users_tokens(self):
