@@ -82,7 +82,7 @@ class DisenGCNModel(torch.nn.Module, ABC):
                                                          current_embeddings.shape[1] // self.disen_k[layer // 2])
             if not evaluate:
                 for _ in range(self.routing_iterations):
-                    current_embeddings = list(self.disengcn_network.children())[layer](current_embeddings.to(self.device),
+                    current_embeddings = list(self.disengcn_network.children())[layer][0](current_embeddings.to(self.device),
                                                                                        self.edge_index.to(self.device))
                 current_embeddings = current_embeddings.view(current_embeddings.shape[0], 
                                                              current_embeddings.shape[1] * self.disen_k[layer // 2])
@@ -91,7 +91,7 @@ class DisenGCNModel(torch.nn.Module, ABC):
                 self.disengcn_network.eval()
                 with torch.no_grad():
                     for _ in range(self.routing_iterations):
-                        current_embeddings = list(self.disengcn_network.children())[layer](current_embeddings.to(self.device),
+                        current_embeddings = list(self.disengcn_network.children())[layer][0](current_embeddings.to(self.device),
                                                                                            self.edge_index.to(self.device))
                     current_embeddings = current_embeddings.view(current_embeddings.shape[0], 
                                                                  current_embeddings.shape[1] * self.disen_k[layer // 2])
