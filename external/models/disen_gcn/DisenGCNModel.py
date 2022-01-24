@@ -125,9 +125,7 @@ class DisenGCNModel(torch.nn.Module, ABC):
         difference = torch.clamp(xu_pos - xu_neg, -80.0, 1e8)
         loss = torch.sum(self.softplus(-difference))
         reg_loss = self.l_w * (torch.norm(self.Gu, 2) +
-                               torch.norm(self.Gi, 2) +
-                               torch.stack([torch.norm(value, 2) for value in self.disengcn_network.parameters()],
-                                           dim=0).sum(dim=0)) * 2
+                               torch.norm(self.Gi, 2)) * 2
         loss += reg_loss
 
         self.optimizer.zero_grad()
