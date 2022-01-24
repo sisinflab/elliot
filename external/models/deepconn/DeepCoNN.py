@@ -130,11 +130,7 @@ class DeepCoNN(RecMixin, BaseRecommenderModel):
                 for batch in self._sampler.step(self._data.transactions, self._batch_size):
                     steps += 1
                     a, b, c, d, e = batch
-                    print(a.shape)
-                    print(b.shape)
-                    print(c.shape)
-                    print(d.shape)
-                    print(e.shape)
+                    print(d[0])
                     loss += self._model.train_step(batch)
                     t.set_postfix({'loss': f'{loss / steps:.5f}'})
                     t.update()
