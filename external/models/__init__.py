@@ -39,3 +39,4 @@ for _backend in sys.modules["external"].backend:
         from .dgcf.DGCF import DGCF
         from .egcf.EGCF import EGCF
         from .lgacn.LGACN import LGACN
+        from .lightegcf.LightEGCF import LightEGCF
