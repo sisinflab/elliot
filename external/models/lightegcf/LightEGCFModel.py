@@ -153,7 +153,7 @@ class LightEGCFModel(torch.nn.Module, ABC):
             self.propagation_network_ee.train()
             self.propagation_network_ne.train()
 
-        node_node_embeddings = sum([node_node_embeddings[k] * self.alpha[k] for k in range(len(node_node_embeddings))])
+        node_node_embeddings = torch.cat([node_node_embeddings[k] * self.alpha[k] for k in range(len(node_node_embeddings))], dim=1)
         gu, gi = torch.split(node_node_embeddings, [self.num_users, self.num_items], 0)
         return gu, gi
 
