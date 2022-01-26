@@ -50,7 +50,7 @@ class LightEGCFModel(torch.nn.Module, ABC):
         self.edge_index = torch.tensor(edge_index, dtype=torch.int64)
         self.node_edge_index = torch.tensor(node_edge_index, dtype=torch.int64)
         self.edge_edge_index = torch.tensor(edge_edge_index, dtype=torch.int64)
-        self.alpha = torch.tensor([1 / (k + 1) for k in range(self.n_layers)])
+        self.alpha = torch.tensor([1 / (k + 1) for k in range(self.n_layers + 1)])
 
         self.Gu = torch.nn.Parameter(
             torch.nn.init.xavier_normal_(torch.empty((self.num_users, self.embed_k))))
