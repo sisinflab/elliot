@@ -219,7 +219,7 @@ class EGCFModel(torch.nn.Module, ABC):
                                            dim=0).sum(dim=0) +
                                torch.stack([torch.norm(value, 2) for value in self.propagation_network_ne.parameters()],
                                            dim=0).sum(dim=0) +
-                               torch.stack([torch.norm(value, 2) for value in self.projection_network_edges.parameters()],
+                               torch.stack([torch.norm(value, 2) for value in self.projection_network_nodes.parameters()],
                                            dim=0).sum(dim=0) +
                                torch.stack([torch.norm(value, 2) for value in self.projection_network_edges.parameters()],
                                            dim=0).sum(dim=0)) * 2

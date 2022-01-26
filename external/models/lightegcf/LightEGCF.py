@@ -106,7 +106,7 @@ class LightEGCF(RecMixin, BaseRecommenderModel):
             num_items=self._num_items,
             learning_rate=self._learning_rate,
             embed_k=self._factors,
-            weight_size_projection_node_edge=self._weight_size_proj,
+            weight_size_projection_edge=self._weight_size_proj,
             l_w=self._l_w,
             n_layers=self._n_layers,
             edge_features=self._side_edge_textual.object.get_all_features(),
