@@ -144,7 +144,7 @@ class LightEGCFModel(torch.nn.Module, ABC):
                 torch.split(node_edge_embeddings, [self.num_users + self.num_items,
                                                    node_edge_embeddings.shape[0] - (self.num_users + self.num_items)],
                             0)
-            node_node_embeddings += torch.cat((current_node_node_embeddings, node_edge_node_embeddings), dim=1)
+            node_node_embeddings += [torch.cat((current_node_node_embeddings, node_edge_node_embeddings), dim=1)]
             edge_edge_embeddings = torch.cat((edge_edge_embeddings, node_edge_edge_embeddings), dim=1)
             node_edge_embeddings = torch.cat((node_node_embeddings[layer + 1].to(self.device),
                                               edge_edge_embeddings.to(self.device)), 0)
