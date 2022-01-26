@@ -105,7 +105,7 @@ class LightEGCFModel(torch.nn.Module, ABC):
 
         # we project edge embeddings into the nodes latent space
         edge_edge_embeddings = self.projection_network_edges(self.Ge)
-        node_edge_embeddings = torch.cat((node_node_embeddings[0].to(self.device),
+        node_edge_embeddings = torch.cat((node_node_embeddings.to(self.device),
                                           edge_edge_embeddings.to(self.device)), 0)
 
         for layer in range(self.n_layers):
