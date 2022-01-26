@@ -93,11 +93,6 @@ class LightEGCFModel(torch.nn.Module, ABC):
                                                     in_features=self.weight_size_projection_edge_list[layer - 1],
                                                     out_features=self.weight_size_projection_edge_list[layer])))
             projection_layer_edges_list.append(('relu_' + str(layer), torch.nn.ReLU()))
-            projection_layer_edges_list.append(('feat_proj_edges_' + str(layer),
-                                                torch.nn.Linear(
-                                                    in_features=self.weight_size_projection_node_edge_list[layer - 1],
-                                                    out_features=self.weight_size_projection_node_edge_list[layer])))
-            projection_layer_edges_list.append(('relu_' + str(layer), torch.nn.ReLU()))
 
         self.projection_network_edges = torch.nn.Sequential(OrderedDict(projection_layer_edges_list))
         self.projection_network_edges.to(self.device)
