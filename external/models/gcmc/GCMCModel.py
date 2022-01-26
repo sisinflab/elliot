@@ -139,7 +139,7 @@ class GCMCModel(torch.nn.Module, ABC):
         return xui
 
     def predict(self, zu, zi, **kwargs):
-        return torch.matmul(zu.to(self.device), torch.matmul(self.Q, torch.transpose(zi.to(self.device), 0, 1)))
+        return torch.matmul(zu.to(self.device), torch.matmul(self.Q.to(self.device), torch.transpose(zi.to(self.device), 0, 1)))
 
     def train_step(self, batch):
         zu, zi = self.propagate_embeddings()
