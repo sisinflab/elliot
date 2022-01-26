@@ -125,9 +125,9 @@ class LightEGCFModel(torch.nn.Module, ABC):
         for layer in range(self.n_layers):
             if not evaluate:
                 # first, we propagate node-node embeddings
-                node_node_embeddings += [list(
+                current_node_node_embeddings = list(
                     self.propagation_network_nn.children()
-                )[layer](node_node_embeddings[layer].to(self.device), self.edge_index.to(self.device))]
+                )[layer](node_node_embeddings[layer].to(self.device), self.edge_index.to(self.device))
                 # then, we propagate edge-edge embedding
                 edge_edge_embeddings = list(
                     self.propagation_network_ee.children()
