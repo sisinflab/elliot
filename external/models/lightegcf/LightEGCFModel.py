@@ -142,9 +142,9 @@ class LightEGCFModel(torch.nn.Module, ABC):
                 self.propagation_network_ne.eval()
                 with torch.no_grad():
                     # first, we propagate node-node embeddings
-                    node_node_embeddings += [list(
+                    current_node_node_embeddings = list(
                         self.propagation_network_nn.children()
-                    )[layer](node_node_embeddings[layer].to(self.device), self.edge_index.to(self.device))]
+                    )[layer](node_node_embeddings[layer].to(self.device), self.edge_index.to(self.device))
                     # then, we propagate edge-edge embedding
                     edge_edge_embeddings = list(
                         self.propagation_network_ee.children()
@@ -157,9 +157,9 @@ class LightEGCFModel(torch.nn.Module, ABC):
                 torch.split(node_edge_embeddings, [self.num_users + self.num_items,
                                                    node_edge_embeddings.shape[0] - (self.num_users + self.num_items)],
                             0)
-            node_node_embeddings[layer] = torch.cat((node_node_embeddings[layer], node_edge_node_embeddings), dim=1)
+            node_node_embeddings += torch.cat((current_node_node_embeddings, node_edge_node_embeddings), dim=1)
             edge_edge_embeddings = torch.cat((edge_edge_embeddings, node_edge_edge_embeddings), dim=1)
-            node_edge_embeddings = torch.cat((node_node_embeddings[layer].to(self.device),
+            node_edge_embeddings = torch.cat((current_node_node_embeddings.to(self.device),
                                               edge_edge_embeddings.to(self.device)), 0)
         if evaluate:
             self.propagation_network_nn.train()
