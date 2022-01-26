@@ -98,22 +98,22 @@ class GCMCModel(torch.nn.Module, ABC):
             if not evaluate:
                 dropout_edge_index = list(
                     self.convolutional_network.children()
-                )[0][layer](self.edge_index.to(self.device))
+                )[layer](self.edge_index.to(self.device))
                 current_embeddings = list(
                     self.convolutional_network.children()
-                )[0][layer + 1](current_embeddings.to(self.device), dropout_edge_index.to(self.device))
+                )[layer + 1](current_embeddings.to(self.device), dropout_edge_index.to(self.device))
                 current_embeddings = list(
                     self.convolutional_network.children()
-                )[0][layer + 2](current_embeddings.to(self.device))
+                )[layer + 2](current_embeddings.to(self.device))
             else:
                 self.convolutional_network.eval()
                 with torch.no_grad():
                     current_embeddings = list(
                         self.convolutional_network.children()
-                    )[0][layer + 1](current_embeddings.to(self.device), self.edge_index.to(self.device))
+                    )[layer + 1](current_embeddings.to(self.device), self.edge_index.to(self.device))
                     current_embeddings = list(
                         self.convolutional_network.children()
-                    )[0][layer + 2](current_embeddings.to(self.device))
+                    )[layer + 2](current_embeddings.to(self.device))
 
         if evaluate:
             self.dense_network.eval()
