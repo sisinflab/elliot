@@ -146,7 +146,7 @@ class LightEGCFModel(torch.nn.Module, ABC):
                             0)
             node_node_embeddings += torch.cat((current_node_node_embeddings, node_edge_node_embeddings), dim=1)
             edge_edge_embeddings = torch.cat((edge_edge_embeddings, node_edge_edge_embeddings), dim=1)
-            node_edge_embeddings = torch.cat((node_node_embeddings.to(self.device),
+            node_edge_embeddings = torch.cat((node_node_embeddings[layer].to(self.device),
                                               edge_edge_embeddings.to(self.device)), 0)
         if evaluate:
             self.propagation_network_nn.train()
