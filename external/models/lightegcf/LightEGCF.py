@@ -32,7 +32,7 @@ class LightEGCF(RecMixin, BaseRecommenderModel):
         epochs: Number of epochs
         factors: Number of latent factors
         trainable_edges: Whether to train edge embeddings or not
-        weight_size_projection_node_edge: Tuple with number of units for each node edge propagation layer
+        weight_size_proj: Tuple with number of units for each node edge propagation layer
         batch_size: Batch size
         l_w: Regularization coefficient
         n_layers: Number of propagation layers
@@ -50,7 +50,7 @@ class LightEGCF(RecMixin, BaseRecommenderModel):
           batch_size: 512
           trainable_edges: True
           factors: 64
-          weight_size_projection_node_edge: (64, 64)
+          weight_size_proj: (64, 64)
           l_w: 0.1
           n_layer: 3
     """
@@ -68,7 +68,7 @@ class LightEGCF(RecMixin, BaseRecommenderModel):
             ("_learning_rate", "lr", "lr", 0.0005, float, None),
             ("_factors", "factors", "factors", 64, int, None),
             ("_trainable_edges", "trainable_edges", "trainable_edges", True, bool, None),
-            ("_weight_size_projection_node_edge", "weight_size_projection_node_edge", "weight_size_projection_node_edge", "(64,)",
+            ("_weight_size_proj", "weight_size_proj", "weight_size_proj", "(64,)",
              lambda x: list(make_tuple(x)),
              lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
             ("_l_w", "l_w", "l_w", 0.01, float, None),
@@ -106,7 +106,7 @@ class LightEGCF(RecMixin, BaseRecommenderModel):
             num_items=self._num_items,
             learning_rate=self._learning_rate,
             embed_k=self._factors,
-            weight_size_projection_node_edge=self._weight_size_projection_node_edge,
+            weight_size_projection_node_edge=self._weight_size_proj,
             l_w=self._l_w,
             n_layers=self._n_layers,
             edge_features=self._side_edge_textual.object.get_all_features(),
