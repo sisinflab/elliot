@@ -18,14 +18,14 @@ class KGINLoader(AbstractLoader):
             self.map_ = self.read_triplets(self.attribute_file)
             # self.items = self.items & set(self.map_.keys())
 
-        entities = set()
+        self.entities = set()
 
         with open(self.entities_file) as f:
-            next(f) # considers the header
+            next(f)     # considers the header
             for line in f:
-                entities.add(int(line.split(' ')[-1]))
+                self.entities.add(int(line.split(' ')[-1]))
 
-        self.entity_list = set.difference(entities, self.items)
+        self.entity_list = set.difference(self.entities, self.items)
 
     def get_mapped(self):
         return self.users, self.items
