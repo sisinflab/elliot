@@ -16,7 +16,7 @@ from .UserFeatureMapper import UserFeatureMapper
 from .KGFlexTFModel import KGFlexTFModel
 from .tfidf_utils import TFIDF
 
-# mp.set_start_method('fork')
+mp.set_start_method('fork')
 
 
 def uif_worker(us_f, its_f, mapping):
@@ -124,7 +124,7 @@ class KGFlexTF(RecMixin, BaseRecommenderModel):
                      feature_key_mapping) for u in self._data.private_users.keys())
 
         arguments = uif_args()
-        with mp.Pool(processes=mp.cpu_count() - 1) as pool:
+        with mp.Pool(processes=mp.cpu_count()) as pool:
             user_item_features = pool.starmap(uif_worker, tqdm(arguments, total=len(self._data.private_users.keys()),
                                                                desc='User-Item Features'))
 
