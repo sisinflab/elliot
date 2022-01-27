@@ -123,14 +123,14 @@ class KGFlexTF(RecMixin, BaseRecommenderModel):
                      item_features,
                      feature_key_mapping) for u in self._data.private_users.keys())
 
-        # arguments = uif_args()
-        # with mp.Pool(processes=mp.cpu_count()) as pool:
-        #     user_item_features = pool.starmap(uif_worker, tqdm(arguments, total=len(self._data.private_users.keys()),
-        #                                                        desc='User-Item Features'))
+        arguments = uif_args()
+        with mp.Pool(processes=mp.cpu_count() - 1) as pool:
+            user_item_features = pool.starmap(uif_worker, tqdm(arguments, total=len(self._data.private_users.keys()),
+                                                               desc='User-Item Features'))
 
-        user_item_features = []
-        for u in tqdm(self._data.private_users.keys(), desc='User-Item Features'):
-            user_item_features.append(uif_worker(users_features[u], item_features, feature_key_mapping))
+        # user_item_features = []
+        # for u in tqdm(self._data.private_users.keys(), desc='User-Item Features'):
+        #     user_item_features.append(uif_worker(users_features[u], item_features, feature_key_mapping))
 
         user_item_features = tf.ragged.stack(user_item_features)
 
