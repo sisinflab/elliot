@@ -16,7 +16,7 @@ from .UserFeatureMapper import UserFeatureMapper
 from .KGFlexTFModel import KGFlexTFModel
 from .tfidf_utils import TFIDF
 
-mp.set_start_method('fork')
+#mp.set_start_method('fork')
 
 
 def uif_worker(us_f, its_f, mapping):
