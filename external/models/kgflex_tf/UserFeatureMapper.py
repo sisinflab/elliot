@@ -42,10 +42,17 @@ class UserFeatureMapper:
                     self._second_order_limit,
                     random.randint(0, 100000)) for u in self._users)
 
+        # arguments = args()
+        # with mp.Pool(processes=mp.cpu_count()) as pool:
+        #     results = pool.starmap(worker, tqdm(arguments, total=len(self._users),
+        #                                         desc="Computing user features and entropy..."))
+
         arguments = args()
-        with mp.Pool(processes=mp.cpu_count()) as pool:
-            results = pool.starmap(worker, tqdm(arguments, total=len(self._users),
-                                                desc="Computing user features and entropy..."))
+        pool = mp.Pool(processes=mp.cpu_count())
+        results = pool.starmap(worker, tqdm(arguments, total=len(self._users),
+                                        desc="Computing user features and entropy..."))
+        pool.close()
+        pool.join()
 
         return {u: f for u, f in results}
 
