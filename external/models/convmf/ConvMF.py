@@ -36,7 +36,6 @@ class ConvMF(RecMixin, BaseRecommenderModel):
             ("_loader", "loader", "load", "TextualAttributeSequence", None, None)
         ]
         self.autoset_params()
-        self._step_to_switch = self._joint_ratio * 10
         self._side = getattr(self._data.side_information, self._loader, None)
         vocab_size = len(self._side.textual_features['X_vocab']) + 1
         CNN_X = self._side.textual_features['X_sequence']
