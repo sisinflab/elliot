@@ -20,12 +20,12 @@ from elliot.dataset.samplers import custom_sampler as cs
 from elliot.recommender import BaseRecommenderModel
 from elliot.recommender.base_recommender_model import init_charger
 from elliot.recommender.recommender_utils_mixin import RecMixin
-from .EGCFModel import EGCFModel
+from .LightEGCFModel import LightEGCFModel
 
 
-class EGCF(RecMixin, BaseRecommenderModel):
+class LightEGCF(RecMixin, BaseRecommenderModel):
     r"""
-    Edge-Based Graph Collaborative Filtering
+    Light Edge-Based Graph Collaborative Filtering
 
     Args:
         lr: Learning rate
@@ -33,18 +33,16 @@ class EGCF(RecMixin, BaseRecommenderModel):
         factors: Number of latent factors
         trainable_edges: Whether to train edge embeddings or not
         weight_size_proj: Tuple with number of units for each node edge propagation layer
-        weight_size_nodes: Tuple with number of units for each node embedding propagation layer
-        weight_size_edges: Tuple with number of units for each edge embedding propagation layer
-        weight_size_nodes_edges: Tuple with number of units for each node-edge embedding propagation layer
         batch_size: Batch size
         l_w: Regularization coefficient
+        n_layers: Number of propagation layers
 
     To include the recommendation model, add it to the config file adopting the following pattern:
 
     .. code:: yaml
 
       models:
-        EGCF:
+        LightEGCF:
           meta:
             save_recs: True
           lr: 0.0005
@@ -53,10 +51,8 @@ class EGCF(RecMixin, BaseRecommenderModel):
           trainable_edges: True
           factors: 64
           weight_size_proj: (64, 64)
-          weight_size_nodes: (64,)
-          weight_size_edges: (64,)
-          weight_size_nodes_edges: (64,)
           l_w: 0.1
+          n_layer: 3
     """
 
     @init_charger
@@ -75,14 +71,8 @@ class EGCF(RecMixin, BaseRecommenderModel):
             ("_weight_size_proj", "weight_size_proj", "weight_size_proj", "(64,)",
              lambda x: list(make_tuple(x)),
              lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
-            ("_weight_size_nodes", "weight_size_nodes", "weight_size_nodes", "(64,)", lambda x: list(make_tuple(x)),
-             lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
-            ("_weight_size_edges", "weight_size_edges", "weight_size_edges", "(64,)", lambda x: list(make_tuple(x)),
-             lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
-            ("_weight_size_nodes_edges", "weight_size_nodes_edges", "weight_size_nodes_edges", "(64,)",
-             lambda x: list(make_tuple(x)),
-             lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
             ("_l_w", "l_w", "l_w", 0.01, float, None),
+            ("_n_layers", "n_layers", "n_layers", 3, int, None),
             ("_loader", "loader", "loader", 'InteractionsTextualAttributes', str, None)
         ]
         self.autoset_params()
@@ -105,27 +95,19 @@ class EGCF(RecMixin, BaseRecommenderModel):
         for e in set(self.node_edge_index[1]):
             nodes_connected_to_e = self.node_edge_index[0, np.argwhere(self.node_edge_index[1] == e)][:, 0].tolist()
             edges_connected_to_e = self.node_edge_index[1, np.argwhere(np.isin(self.node_edge_index[0], nodes_connected_to_e))].tolist()
-            # edges_connected_to_e = [ee[0] for ee in edges_connected_to_e if ee[0] != e]
             edges_connected_to_e = np.array(edges_connected_to_e)[edges_connected_to_e != e].tolist()
             list_edges_edges += list(map(list, zip([e] * len(edges_connected_to_e), edges_connected_to_e)))
-            # for ee in edges_connected_to_e:
-            #     list_edges_edges.append([e, ee])
 
         self.edge_edge_index = np.array(list_edges_edges).transpose()
         self.edge_edge_index -= np.min(self.edge_edge_index)
 
-        self._n_layers = len(self._weight_size_nodes)
-
-        self._model = EGCFModel(
+        self._model = LightEGCFModel(
             num_users=self._num_users,
             num_items=self._num_items,
             learning_rate=self._learning_rate,
             embed_k=self._factors,
-            weight_size_projection_node_edge=self._weight_size_proj,
+            weight_size_projection_edge=self._weight_size_proj,
             l_w=self._l_w,
-            weight_size_nodes=self._weight_size_nodes,
-            weight_size_edges=self._weight_size_edges,
-            weight_size_nodes_edges=self._weight_size_nodes_edges,
             n_layers=self._n_layers,
             edge_features=self._side_edge_textual.object.get_all_features(),
             edge_index=self.edge_index,
@@ -137,7 +119,7 @@ class EGCF(RecMixin, BaseRecommenderModel):
 
     @property
     def name(self):
-        return "EGCF" \
+        return "LightEGCF" \
                + f"_{self.get_base_params_shortcut()}" \
                + f"_{self.get_params_shortcut()}"
 

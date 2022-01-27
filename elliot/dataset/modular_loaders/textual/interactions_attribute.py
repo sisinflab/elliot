@@ -63,7 +63,7 @@ class InteractionsTextualAttributes(AbstractLoader):
     def get_all_features(self):
         all_interactions = pd.read_csv(self.interactions_path, sep='\t', header=None)
         interactions = all_interactions[2].nunique()
-        all_features = np.empty((interactions, self.interactions_features_shape))
+        all_features = np.empty((interactions, *self.interactions_features_shape))
         for i, row in all_interactions.iterrows():
             all_features[int(row[2])] = np.load(self.interactions_feature_folder_path + '/' + str(row[2]) + '.npy')
         return all_features
