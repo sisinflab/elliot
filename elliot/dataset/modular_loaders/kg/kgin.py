@@ -18,10 +18,14 @@ class KGINLoader(AbstractLoader):
             self.map_ = self.read_triplets(self.attribute_file)
             # self.items = self.items & set(self.map_.keys())
 
-        if self.entities_file is not None:
-            self.entities = set(pd.read_csv(self.entities_file, names=['name', 'id'], sep=' ')['id'])
+        entities = set()
 
-        self.entity_list = set.difference(self.entities, self.items)
+        with open(self.entities_file) as f:
+            next(f) # considers the header
+            for line in f:
+                entities.add(int(line.split(' ')[-1]))
+
+        self.entity_list = set.difference(entities, self.items)
 
     def get_mapped(self):
         return self.users, self.items
@@ -40,7 +44,7 @@ class KGINLoader(AbstractLoader):
         ns.__dict__.update(self.__dict__)
         ns.feature_map = self.map_
         ns.relations = np.unique(ns.feature_map[:, 1])
-        ns.n_relations = len(ns.relations)
+        ns.n_relations = len(ns.relations) + 1
         # ns.entities = np.unique(ns.feature_map[:, 2])
         ns.n_entities = len(self.items) + len(ns.entities)
         ns.private_relations = {p[0] + 1: f for p, f in list(np.ndenumerate(ns.relations))}
