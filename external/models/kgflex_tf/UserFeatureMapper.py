@@ -5,6 +5,7 @@ from tqdm import tqdm
 from itertools import islice
 from operator import itemgetter
 from collections import OrderedDict, Counter
+
 mp.set_start_method("fork")
 
 
@@ -19,7 +20,6 @@ def worker(user, user_items, neg_items, if1, if2, fol, sol, seed):
 class UserFeatureMapper:
     def __init__(self, data, item_features: dict, item_features2=None,
                  first_order_limit=100, second_order_limit=100):
-
         # for all the users compute the information for each feature
         self._data = data
         self._item_features = item_features
@@ -35,24 +35,24 @@ class UserFeatureMapper:
     def user_features_selected_MP(self):
         def args():
             return ((u,
-                    set(self._data.i_train_dict[u].keys()),
-                    set.difference(self._items, set(self._data.i_train_dict[u].keys())),
-                    self._item_features, self._item_features2,
-                    self._first_order_limit,
-                    self._second_order_limit,
-                    random.randint(0, 100000)) for u in self._users)
-
-        # arguments = args()
-        # with mp.Pool(processes=mp.cpu_count()) as pool:
-        #     results = pool.starmap(worker, tqdm(arguments, total=len(self._users),
-        #                                         desc="Computing user features and entropy..."))
+                     set(self._data.i_train_dict[u].keys()),
+                     set.difference(self._items, set(self._data.i_train_dict[u].keys())),
+                     self._item_features, self._item_features2,
+                     self._first_order_limit,
+                     self._second_order_limit,
+                     random.randint(0, 100000)) for u in self._users)
 
         arguments = args()
-        pool = mp.Pool(processes=mp.cpu_count())
-        results = pool.starmap(worker, tqdm(arguments, total=len(self._users),
-                                        desc="Computing user features and entropy..."))
-        pool.close()
-        pool.join()
+        with mp.Pool(processes=mp.cpu_count()) as pool:
+            results = pool.starmap(worker, tqdm(arguments, total=len(self._users),
+                                                desc="Computing user features and entropy..."))
+
+        # arguments = args()
+        # pool = mp.Pool(processes=mp.cpu_count())
+        # results = pool.starmap(worker,
+        #                        tqdm(arguments, total=len(self._users), desc="Computing user features and entropy..."))
+        # pool.close()
+        # pool.join()
 
         return {u: f for u, f in results}
 
@@ -67,7 +67,6 @@ class UserFeatureMapper:
 
 
 def user_features_counter(user_items, neg_items, item_features_):
-
     def count_features(item_features_):
         """
         Given a list of positive and negative items retrieves all them features and then counts them.
@@ -138,11 +137,10 @@ def features_entropy(pos_counter, neg_counter, counter):
     #     if ig > 0:
     #         attribute_entropies[negative_feature] = ig
 
-
     return OrderedDict(sorted(attribute_entropies.items(), key=itemgetter(1, 0), reverse=True))
 
-def limited_second_order_selection(counters, limit_first, limit_second):
 
+def limited_second_order_selection(counters, limit_first, limit_second):
     # 1st-order-features
     pos_1, neg_1, counter_1 = counters[1]
     # 2nd-order-features
