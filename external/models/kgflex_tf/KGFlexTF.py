@@ -134,15 +134,15 @@ class KGFlexTF(RecMixin, BaseRecommenderModel):
 
         arguments = uif_args()
 
-        # with mp.Pool(processes=mp.cpu_count()) as pool:
-        #     user_item_features = pool.starmap(uif_worker, tqdm(arguments, total=len(self._data.private_users.keys()),
-        #                                                        desc='User-Item Features'))
+        with mp.Pool(processes=mp.cpu_count()) as pool:
+            user_item_features = pool.starmap(uif_worker, tqdm(arguments, total=len(self._data.private_users.keys()),
+                                                               desc='User-Item Features'))
 
-        pool = mp.Pool(processes=mp.cpu_count())
-        user_item_features = pool.starmap(uif_worker, tqdm(arguments, total=len(self._data.private_users.keys()),
-                                                           desc='User-Item Features'))
-        pool.join()
-        pool.close()
+        # pool = mp.Pool(processes=mp.cpu_count())
+        # user_item_features = pool.starmap(uif_worker, tqdm(arguments, total=len(self._data.private_users.keys()),
+        #                                                    desc='User-Item Features'))
+        # pool.join()
+        # pool.close()
 
 
         # queue = mp.Queue()
