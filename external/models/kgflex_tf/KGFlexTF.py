@@ -129,7 +129,7 @@ class KGFlexTF(RecMixin, BaseRecommenderModel):
         #                                                        desc='User-Item Features'))
 
         user_item_features = []
-        for u in self._data.private_users.keys():
+        for u in tqdm(self._data.private_users.keys(), desc='User-Item Features'):
             user_item_features.append(uif_worker(users_features[u], item_features, feature_key_mapping))
 
         user_item_features = tf.ragged.stack(user_item_features)
