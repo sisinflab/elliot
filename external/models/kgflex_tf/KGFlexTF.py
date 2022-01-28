@@ -16,7 +16,7 @@ from .UserFeatureMapper import UserFeatureMapper
 from .KGFlexTFModel import KGFlexTFModel
 from .tfidf_utils import TFIDF
 
-# mp.set_start_method('fork')
+#mp.set_start_method('fork')
 
 
 def uif_worker(us_f, its_f, mapping):
@@ -28,30 +28,14 @@ def uif_worker(us_f, its_f, mapping):
         uif.extend(list(s))
     return tf.RaggedTensor.from_row_lengths(uif, lengths)
 
-
-def user_item_feature_getter(private_users, users_features, item_features, feature_key_mapping):
-    user_item_features = []
-
-    def uif_worker(us_f, its_f, mapping):
-        uif = []
-        lengths = []
-        for it_f in its_f:
-            s = set.intersection(set(map(lambda x: mapping[x], us_f)), it_f)
-            lengths.append(len(s))
-            uif.extend(list(s))
-        user_item_features.append(tf.RaggedTensor.from_row_lengths(uif, lengths))
-        # return tf.RaggedTensor.from_row_lengths(uif, lengths)
-
-    threads = []
-    for u in tqdm(private_users.keys(), desc='Computing user-item features...'):
-        t = threading.Thread(target=uif_worker, args=(users_features[u], item_features, feature_key_mapping,))
-        threads.append(t)
-        t.start()
-
-    for thr in threads:
-        thr.join()
-
-    return user_item_features
+def uif_worker2(queue_:mp.Queue, us_f, its_f, mapping):
+    uif = []
+    lengths = []
+    for it_f in its_f:
+        s = set.intersection(set(map(lambda x: mapping[x], us_f)), it_f)
+        lengths.append(len(s))
+        uif.extend(list(s))
+    queue_.put(tf.RaggedTensor.from_row_lengths(uif, lengths))
 
 
 class KGFlexTF(RecMixin, BaseRecommenderModel):
@@ -149,9 +133,24 @@ class KGFlexTF(RecMixin, BaseRecommenderModel):
                      feature_key_mapping) for u in self._data.private_users.keys())
 
         arguments = uif_args()
+
         with mp.Pool(processes=mp.cpu_count()) as pool:
             user_item_features = pool.starmap(uif_worker, tqdm(arguments, total=len(self._data.private_users.keys()),
                                                                desc='User-Item Features'))
+
+        # pool = mp.Pool(processes=mp.cpu_count())
+        # user_item_features = pool.starmap(uif_worker, tqdm(arguments, total=len(self._data.private_users.keys()),
+        #                                                    desc='User-Item Features'))
+        # pool.join()
+        # pool.close()
+
+
+        # queue = mp.Queue()
+        # p = mp.Process(target=uif_worker2, args=queue, arguments)
+
+        # user_item_features = []
+        # for u in tqdm(self._data.private_users.keys(), desc='User-Item Features'):
+        #     user_item_features.append(uif_worker(users_features[u], item_features, feature_key_mapping))
 
         user_item_features = tf.ragged.stack(user_item_features)
 

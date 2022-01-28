@@ -65,7 +65,7 @@ class KGFlexLoader(AbstractLoader):
             self.triples[['predicate', 'object']].set_index(['predicate', 'object']).index.map(
                 lambda f: f in keep_set)].astype(str)
 
-        if len(second_order_features > 0):
+        if len(second_order_features) > 0:
             self.second_order_features = second_order_features[second_order_features[
                 ['predicate_x', 'predicate_y', 'object_y']].set_index(['predicate_x', 'predicate_y', 'object_y'])
                 .index.map(lambda f: f in keep_set2)].astype(str)

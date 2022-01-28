@@ -7,251 +7,140 @@ __version__ = '0.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
+import math
+
 import numpy as np
-import tensorflow as tf
-from tensorflow import keras
+from tqdm import tqdm
+
+from .ConvMFCNN import CNN_module
 
 
-class convMF(keras.Model):
+class convMF(object):
 
     def __init__(self,
-                 learning_rate,
-                 L1_flag,
-                 l2_lambda,
-                 norm_lambda,
-                 isShare,
+                 data,
+                 lambda_u,
+                 lambda_i,
                  embedding_size,
-                 user_total,
-                 item_total,
-                 entity_total,
-                 relation_total,
-                 new_map,
-                 name="cofm",
+                 factors_dim,
+                 kernel_per_ws,
+                 drop_out_rate,
+                 epochs,
+                 vocab_size,
+                 max_len,
+                 CNN_X,
+                 init_W,
+                 batch_size,
+                 give_item_weight,
+                 random_seed,
+                 name="ConvMF",
                  **kwargs):
-        super().__init__(name=name, **kwargs)
-        tf.random.set_seed(42)
+        np.random.seed(random_seed)
 
-        self.learning_rate = learning_rate
-        self.L1_flag = L1_flag
-        self.l2_lambda = l2_lambda
-        self.is_share = isShare
-        self.new_map = new_map
+        self.a = 1
+        self.b = 0
+        self._data = data
+        self.seed = random_seed
+        self.lambda_u = lambda_u
+        self.lambda_i = lambda_i
+        self.kernel_per_ws = kernel_per_ws
+        self.epochs = epochs
         self.embedding_size = embedding_size
-        self.user_total = user_total
-        self.item_total = item_total
-        # padding when item are not aligned with any entity
-        self.ent_total = entity_total
-        self.rel_total = relation_total
-        self.is_pretrained = False
-        self.norm_lambda = norm_lambda
+        self.factors_dim = factors_dim
+        self.data_ratings = self._data.sp_i_train_ratings
+        self.data_ratings_transpose = self._data.sp_i_train_ratings.T
+        self.dropout_rate = drop_out_rate
+        self.max_len = max_len
+        self.init_W = init_W
+        self.CNN_X = CNN_X
+        self.batch_size = batch_size
 
-        initializer = keras.initializers.GlorotNormal()
-        # FM
-        self.user_embeddings = keras.layers.Embedding(input_dim=self.user_total, output_dim=self.embedding_size,
-                                                      embeddings_initializer=initializer,
-                                                      trainable=True, dtype=tf.float32,
-                                                      embeddings_regularizer=keras.regularizers.l2(self.l2_lambda))
-        self.user_embeddings(0)
-        self.user_embeddings.weights[0] = tf.math.l2_normalize(self.user_embeddings.weights[0])
 
-        self.user_bias = keras.layers.Embedding(input_dim=self.user_total, output_dim=1,
-                                                embeddings_initializer=tf.keras.initializers.Zeros(),
-                                                trainable=True, dtype=tf.float32,
-                                                embeddings_regularizer=keras.regularizers.l2(self.l2_lambda))
-        self.user_bias(0)
+        self.user_total = self.data_ratings.shape[0]
+        self.item_total = self.data_ratings.shape[1]
 
-        self.item_bias = keras.layers.Embedding(input_dim=self.item_total, output_dim=1,
-                                                embeddings_initializer=tf.keras.initializers.Zeros(),
-                                                trainable=True, dtype=tf.float32,
-                                                embeddings_regularizer=keras.regularizers.l2(self.l2_lambda))
-        self.item_bias(0)
-
-        self.bias = tf.Variable([0.])
-
-        # trans-E
-
-        self.ent_embeddings = keras.layers.Embedding(input_dim=self.ent_total, output_dim=self.embedding_size,
-                                                     embeddings_initializer=initializer,
-                                                     trainable=True, dtype=tf.float32,
-                                                     embeddings_regularizer=keras.regularizers.l2(self.l2_lambda))
-        self.ent_embeddings(0)
-        self.ent_embeddings.weights[0] = tf.math.l2_normalize(self.ent_embeddings.weights[0])
-
-        self.rel_embeddings = keras.layers.Embedding(input_dim=self.rel_total, output_dim=self.embedding_size,
-                                                     embeddings_initializer=initializer,
-                                                     trainable=True, dtype=tf.float32,
-                                                     embeddings_regularizer=keras.regularizers.l2(self.l2_lambda))
-        self.rel_embeddings(0)
-        self.rel_embeddings.weights[0] = tf.math.l2_normalize(self.rel_embeddings.weights[0])
-
-        if self.is_share:
-            assert self.item_total == self.ent_total, "item numbers didn't match entities!"
-            self.item_embeddings = self.ent_embeddings
+        if give_item_weight:
+            self.item_weight = np.array([math.sqrt(len(r))
+                                    for r in self.data_ratings_transpose.tolil().rows], dtype=float)
+            self.item_weight = (float(self.item_total) / self.item_weight.sum()) * self.item_weight
         else:
-            self.item_embeddings = keras.layers.Embedding(input_dim=self.item_total, output_dim=self.embedding_size,
-                                                          embeddings_initializer=initializer,
-                                                          trainable=True, dtype=tf.float32,
-                                                          embeddings_regularizer=keras.regularizers.l2(self.l2_lambda))
-            self.item_embeddings(0)
-            self.item_embeddings.weights[0] = tf.math.l2_normalize(self.item_embeddings.weights[0])
+            self.item_weight = np.ones(self.item_total, dtype=float)
 
-        keys, values = tuple(zip(*self.new_map.items()))
-        initMappingItems = tf.lookup.KeyValueTensorInitializer(keys, values)
-        initMappingEntities = tf.lookup.KeyValueTensorInitializer(values, keys)
-        self.mappingItems = tf.lookup.StaticHashTable(initMappingItems, default_value=-1)
-        self.mappingEntities = tf.lookup.StaticHashTable(initMappingEntities, default_value=-1)
-        self.optimizer = tf.optimizers.Adam(self.learning_rate)
-        self.one = tf.Variable(1.0)
-        self.zero = tf.Variable(0.0)
+        self.user_embeddings = np.random.uniform(size=(self.user_total, self.embedding_size))
 
-        def get_config(self):
-            raise NotImplementedError
+        self.cnn_module = CNN_module(self.factors_dim, vocab_size, self.dropout_rate, self.batch_size,
+                                     self.embedding_size, self.max_len, self.kernel_per_ws, self.init_W, self.seed)
+        self.theta = self.cnn_module.get_projection_layer(CNN_X)
+        self.item_embeddings = self.theta
+        self.pred_mat = None
+        self.lambda_u_matrix = self.lambda_u * np.eye(self.factors_dim, dtype=np.float32)
+        self.lambda_i_matrix = self.lambda_i * np.eye(self.factors_dim, dtype=np.float32)
 
-    # @tf.function
-    def call(self, inputs, training=None, **kwargs):
+    def get_config(self):
+        raise NotImplementedError
 
-        if kwargs['is_rec']:
-            u_ids, i_ids = inputs
-            batch_size = len(u_ids)
+    def train_step(self, **kwargs):
+        with tqdm(total=self.user_total, position=0, leave=True) as pbar:
+            loss = 0
+            pbar.set_description("Users")
+            VV = self.b * (self.item_embeddings.T.dot(self.item_embeddings)) + self.lambda_u_matrix
+            sub_loss = np.zeros(self.user_total)
+            for u, idx_item in enumerate(self.data_ratings.tolil().rows):
+                # idx_item = self.data_ratings[u].indices
+                V_i = self.item_embeddings[idx_item]
+                R_i = self.data_ratings[u].data
+                A = VV + (self.a - self.b) * (V_i.T.dot(V_i))
+                B = (self.a * V_i * (np.tile(R_i, (self.factors_dim, 1)).T)).sum(0)
 
-            u_e = self.user_embeddings(tf.squeeze(u_ids))
-            i_e = self.item_embeddings(tf.squeeze(i_ids))
-            u_b = self.user_bias(tf.squeeze(u_ids))
-            i_b = self.item_bias(tf.squeeze(i_ids))
+                self.user_embeddings[u] = np.linalg.solve(A, B)
 
-            score = self.bias + u_b + i_b + tf.squeeze(tf.matmul(tf.expand_dims(u_e, len(tf.shape(u_e))-1),
-                                                                 tf.expand_dims(i_e, len(tf.shape(i_e)))), axis=-1)
+                sub_loss[u] = -0.5 * self.lambda_u * np.dot(self.user_embeddings[u], self.user_embeddings[u])
+                pbar.update()
 
-        elif not kwargs['is_rec']:
-            h, t, r = inputs
-            h_e = self.ent_embeddings(h)
-            t_e = self.ent_embeddings(t)
-            r_e = self.rel_embeddings(r)
+            loss = loss + np.sum(sub_loss)
+            pbar.reset(total=self.item_total)
+            pbar.set_description("Items")
+            UU = self.b * self.user_embeddings.T.dot(self.user_embeddings)
+            sub_loss = np.zeros(self.item_total)
+            for i, idx_user in enumerate(self.data_ratings_transpose.tolil().rows):
+                # idx_user = self.data_ratings.T[i].indices
+                U_j = self.user_embeddings[idx_user]
+                R_j = self.data_ratings_transpose[i].data
 
-            if self.L1_flag:
-                score = tf.reduce_sum(tf.abs(h_e + r_e - t_e), -1)
-            else:
-                score = tf.reduce_sum((h_e + r_e - t_e) ** 2, -1)
+                tmp_A = UU + (self.a - self.b) * (U_j.T.dot(U_j))
+                A = tmp_A + self.lambda_i_matrix * self.item_weight[i]
+                B = (self.a * U_j * (np.tile(R_j, (self.factors_dim, 1)).T)).sum(0) \
+                    + self.lambda_i * self.item_weight[i] * self.theta[i]
+                self.item_embeddings[i] = np.linalg.solve(A, B)
 
-        return score
+                sub_loss[i] = -0.5 * np.square(R_j * self.a).sum()
+                sub_loss[i] = sub_loss[i] + self.a * np.sum((U_j.dot(self.item_embeddings[i])) * R_j)
+                sub_loss[i] = sub_loss[i] - 0.5 * np.dot(self.item_embeddings[i].dot(tmp_A), self.item_embeddings[i])
+                pbar.update()
 
-    @tf.function
-    def train_step_rec(self, batch, **kwargs):
+            loss = loss + np.sum(sub_loss)
+            history = self.cnn_module.train(self.CNN_X, self.item_embeddings, self.item_weight, self.seed)
 
-        with tf.GradientTape() as tape:
-            user, pos, neg = batch
+            cnn_loss = history.history['loss'][-1]
 
-            i_ids = tf.squeeze((tf.concat([pos, neg], 0)))
-            e_ids = self.mappingItems.lookup(tf.squeeze(tf.cast(i_ids, tf.int32)))
-            indices = ~tf.equal(e_ids, -1)
+            loss = loss - 0.5 * self.lambda_i * cnn_loss * self.item_total
 
-            i_ids = tf.boolean_mask(i_ids, indices)
-            e_ids = tf.boolean_mask(e_ids, indices)
+        return loss
 
-            pos_score = self.call(inputs=(user, pos), training=True, **kwargs)
-            neg_score = self.call(inputs=(user, neg), training=True, **kwargs)
+    def prepare_predictions(self):
+        self.pred_mat = self.user_embeddings.dot(self.item_embeddings.T)
 
-            losses = self.bprLoss(pos_score, neg_score)
+    def predict(self, user, item):
+        return self.pred_mat[self._data.public_users[user], self._data.public_items[item]]
 
-            if not self.is_share:
-                ent_embeddings = self.ent_embeddings(e_ids)
-                item_embeddings = self.item_embeddings(i_ids)
-                losses += self.norm_lambda * self.pNormLoss(ent_embeddings, item_embeddings, L1_flag=self.L1_flag)
-
-        grads = tape.gradient(losses, self.trainable_weights)
-        grads, _ = tf.clip_by_global_norm(grads, 5)  # fix clipping value
-        self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
-
-        return losses
-
-    @tf.function
-    def train_step_kg(self, batch, **kwargs):
-        with tf.GradientTape() as tape:
-            ph, pr, pt, nh, nr, nt = batch
-
-            e_ids = tf.squeeze((tf.concat([ph, pt, nh, nt], 0)))
-            i_ids = self.mappingEntities.lookup(tf.squeeze(tf.cast(e_ids, tf.int32)))
-            indices = ~tf.equal(i_ids, -1)
-
-            i_ids = tf.boolean_mask(i_ids, indices)
-            e_ids = tf.boolean_mask(e_ids, indices)
-
-            pos_score = self.call(inputs=(ph, pt, pr), training=True, **kwargs)
-            neg_score = self.call(inputs=(nh, nt, nr), training=True, **kwargs)
-
-            losses = self.marginLoss(pos_score, neg_score, 1)  # fix margin loss value
-            ent_embeddings = self.ent_embeddings(tf.concat([ph, pt, nh, nt], 0))
-            rel_embeddings = self.rel_embeddings(tf.concat([pr, nr], 0))
-            losses += self.normLoss(ent_embeddings) + self.normLoss(rel_embeddings)
-            losses = kwargs['kg_lambda'] * losses
-            if not self.is_share:
-                ent_embeddings = self.ent_embeddings(e_ids)
-                item_embeddings = self.item_embeddings(i_ids)
-                losses += self.norm_lambda * self.pNormLoss(ent_embeddings, item_embeddings, L1_flag=self.L1_flag)
-
-        grads = tape.gradient(losses, self.trainable_weights)
-        grads, _ = tf.clip_by_global_norm(grads, 1)  # fix clipping value
-        self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
-
-        return losses
-
-    @tf.function
-    def predict(self, inputs, training=False, **kwargs):
-        score = self.call(inputs=inputs, training=training, is_rec=True)
-        return score
-
-    @tf.function
-    def get_recs(self, inputs, training=False, **kwargs):
-        """
-        Get full predictions on the whole users/items matrix.
-
-        Returns:
-            The matrix of predicted values.
-        """
-        u_ids, i_ids = inputs
-
-        score = self.call(inputs=(u_ids, i_ids), training=False, is_rec=True, **kwargs)
-
-        # e_var = self.paddingItems.lookup(tf.squeeze(tf.cast(i_ids, tf.int32)))
-        # u_e = self.user_embeddings(u_ids)
-        # i_e = self.item_embeddings(i_ids)
-        # e_e = self.ent_embeddings(e_var)
-        # ie_e = i_e + e_e
-        #
-        # _, r_e, norm = self.getPreferences(u_e, ie_e)
-        #
-        # proj_u_e = self.projection_trans_h(u_e, norm)
-        # proj_i_e = self.projection_trans_h(ie_e, norm)
-        #
-        # if self.L1_flag:
-        #     score = tf.reduce_sum(tf.abs(proj_u_e + r_e - proj_i_e), -1)
-        # else:
-        #     score = tf.reduce_sum((proj_u_e + r_e - proj_i_e) ** 2, -1)
-        return tf.squeeze(score)
-
-    @tf.function
-    def get_top_k(self, preds, train_mask, k=100):
-        return tf.nn.top_k(tf.where(train_mask, preds, -np.inf), k=k, sorted=True)
-
-    @tf.function
-    def pNormLoss(self, emb1, emb2, L1_flag=False):
-        if L1_flag:
-            distance = tf.reduce_sum(tf.abs(emb1 - emb2), 1)
-        else:
-            distance = tf.reduce_sum((emb1 - emb2) ** 2, 1)
-        return tf.reduce_mean(distance)
-
-    @tf.function
-    def bprLoss(self, pos, neg, target=1.0):
-        loss = - tf.math.log_sigmoid(target * (pos - neg))
-        return tf.reduce_mean(loss)
-
-    @tf.function
-    def marginLoss(self, pos, neg, margin):
-        zero_tensor = tf.zeros(len(pos))
-        return tf.reduce_sum(tf.math.maximum(pos - neg + margin, zero_tensor))
-
-    @tf.function
-    def normLoss(self, embeddings, dim=-1):
-        norm = tf.reduce_sum(embeddings ** 2, axis=dim, keepdims=True)
-        return tf.reduce_sum(tf.math.maximum(norm - self.one, self.zero))
+    def get_all_topks(self, mask, k, user_map, item_map):
+        masking = np.where(mask, self.pred_mat, -np.inf)
+        partial_index = np.argpartition(masking, -k, axis=1)[:, -k:]
+        masking_partition = np.take_along_axis(masking, partial_index, axis=1)
+        masking_partition_index = masking_partition.argsort(axis=1)[:, ::-1]
+        partial_index = np.take_along_axis(partial_index, masking_partition_index, axis=1)
+        masking_partition = np.take_along_axis(masking_partition, masking_partition_index, axis=1)
+        predictions_top_k = {
+            user_map[u]: list(map(lambda x: (item_map.get(x[0]), x[1]), zip(*map(lambda x: x, top)))) for
+            u, top in enumerate(zip(*(partial_index.tolist(), masking_partition.tolist())))}
+        return predictions_top_k

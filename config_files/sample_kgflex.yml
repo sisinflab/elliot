@@ -25,6 +25,7 @@ experiment:
   evaluation:
     cutoffs: [10]
     simple_metrics: [nDCGRendle2020, nDCG, HR, Precision, Recall, MAP, MRR, ItemCoverage, UserCoverage, NumRetrieved, UserCoverage, Gini, SEntropy, EFD, EPC]
+    relevance_threshold: 3
   models:
     KGIN:
       meta:
