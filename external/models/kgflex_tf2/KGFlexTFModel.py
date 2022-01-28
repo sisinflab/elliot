@@ -98,12 +98,12 @@ class KGFlexTFModel(keras.Model):
         output = self.call(inputs=inputs, training=training)
         return output
 
-    @tf.function
+    #@tf.function
     def get_all_recs(self):
         Z = self.H @ tf.transpose(self.G)
         Z_plus_bias = tf.add(Z, self.F_B)
         A = self.K * Z_plus_bias
-        predictions = tf.add(tf.reduce_sum(tf.gather(A, self.C, batch_dims=1), axis=-1).to_tensor(), self.I_B)
+        predictions = tf.add(tf.reduce_sum(tf.gather(A, self.C, axis=1, batch_dims=0), axis=-1).to_tensor(), self.I_B)
         # predictions = tf.reduce_sum(tf.gather(A, self.C, batch_dims=1), axis=-1).to_tensor()
 
         return predictions
