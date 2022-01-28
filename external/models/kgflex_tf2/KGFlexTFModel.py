@@ -10,6 +10,7 @@ import os
 import numpy as np
 import tensorflow as tf
 from tensorflow import keras
+import math
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 tf.random.set_seed(0)
@@ -103,10 +104,15 @@ class KGFlexTFModel(keras.Model):
         Z = self.H @ tf.transpose(self.G)
         Z_plus_bias = tf.add(Z, self.F_B)
         A = self.K * Z_plus_bias
-        predictions = tf.add(tf.reduce_sum(tf.gather(A, self.C, axis=1, batch_dims=0), axis=-1).to_tensor(), self.I_B)
+        predictions = []
+        bs = 100
+        for i in range(math.ceil(self.num_users / bs)):
+            predictions.append(tf.add(
+                tf.reduce_sum(tf.gather(A[i * bs:(i + 1) * bs], self.C, axis=1, batch_dims=0), axis=-1).to_tensor(),
+                self.I_B))
         # predictions = tf.reduce_sum(tf.gather(A, self.C, batch_dims=1), axis=-1).to_tensor()
 
-        return predictions
+        return tf.concat(predictions, axis=0)
 
     def get_all_topks(self, predictions, mask, k, user_map, item_map):
         predictions_top_k = {
