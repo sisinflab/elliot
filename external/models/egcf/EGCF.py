@@ -77,6 +77,7 @@ class EGCF(RecMixin, BaseRecommenderModel):
             ("_ee_drop", "ee_drop", "ee_drop", 0.1, float, None),
             ("_ne_drop", "ne_drop", "ne_drop", 0.1, float, None),
             ("_att_drop", "att_drop", "att_drop", 0.1, float, None),
+            ("_temp", "temp", "temp", 1.0, float, None),
             ("_weight_size_proj", "weight_size_proj", "weight_size_proj", "(64,)",
              lambda x: list(make_tuple(x)),
              lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
