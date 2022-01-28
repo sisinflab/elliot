@@ -156,8 +156,8 @@ class EGCFModel(torch.nn.Module, ABC):
         node_node_embeddings = torch.cat((self.Gu.to(self.device), self.Gi.to(self.device)), 0)
         edge_edge_embeddings = self.projection_network_edges(self.Ge)
 
-        node_edge_embeddings = torch.cat((node_node_embeddings_projected.to(self.device),
-                                          edge_edge_embeddings_projected.to(self.device)), 0)
+        node_edge_embeddings = torch.cat((node_node_embeddings.to(self.device),
+                                          edge_edge_embeddings.to(self.device)), 0)
 
         for layer in range(self.n_layers):
             if not evaluate:
