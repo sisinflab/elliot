@@ -204,8 +204,8 @@ class EGCFModel(torch.nn.Module, ABC):
                 node_node_embeddings = torch.cat((node_node_embeddings, node_edge_node_embeddings), dim=1)
                 edge_edge_embeddings = torch.cat((edge_edge_embeddings, node_edge_edge_embeddings), dim=1)
             elif self.aggregation_mode == 'add':
-                node_node_embeddings = torch.sum(node_node_embeddings, node_edge_node_embeddings)
-                edge_edge_embeddings = torch.sum(edge_edge_embeddings, node_edge_edge_embeddings)
+                node_node_embeddings = torch.add(node_node_embeddings, node_edge_node_embeddings)
+                edge_edge_embeddings = torch.add(edge_edge_embeddings, node_edge_edge_embeddings)
             elif self.aggregation_mode == 'mult':
                 node_node_embeddings = torch.mul(node_node_embeddings, node_edge_node_embeddings)
                 edge_edge_embeddings = torch.mul(edge_edge_embeddings, node_edge_edge_embeddings)
@@ -250,8 +250,8 @@ class EGCFModel(torch.nn.Module, ABC):
             pe = self.attention_edge(e1e2)
             pe = torch.nn.functional.softmax(pe / self.temperature, dim=1)
 
-        return torch.sum(torch.mul(pn[0], n1), torch.mul(pn[1], n2)), \
-               torch.sum(torch.mul(pe[0], e1), torch.mul(pe[1], e2))
+        return torch.add(torch.mul(pn[0], n1), torch.mul(pn[1], n2)), \
+               torch.add(torch.mul(pe[0], e1), torch.mul(pe[1], e2))
 
     def forward(self, inputs, **kwargs):
         gu, gi = inputs
