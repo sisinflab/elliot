@@ -95,15 +95,18 @@ class EGCFModel(torch.nn.Module, ABC):
 
         for layer in range(1, self.n_layers):
             propagation_network_nn_list.append(
-                (GCNConv(in_channels=self.weight_size_nodes_list[layer - 1] + self.weight_size_edges_list[layer - 1],
+                (GCNConv(in_channels=self.weight_size_nodes_list[layer - 1] + self.weight_size_edges_list[layer - 1]
+                         if self.aggregation_mode == 'concat' else self.weight_size_nodes_list[layer - 1],
                          out_channels=self.weight_size_nodes_list[layer],
                          add_self_loops=True), 'x, edge_index -> x'))
             propagation_network_ee_list.append(
-                (GCNConv(in_channels=self.weight_size_edges_list[layer - 1] + self.weight_size_edges_list[layer - 1],
+                (GCNConv(in_channels=self.weight_size_edges_list[layer - 1] + self.weight_size_edges_list[layer - 1]
+                         if self.aggregation_mode == 'concat' else self.weight_size_edges_list[layer - 1],
                          out_channels=self.weight_size_edges_list[layer],
                          add_self_loops=True), 'x, edge_index -> x'))
             propagation_network_ne_list.append(
-                (GCNConv(in_channels=self.weight_size_nodes_list[layer - 1] + self.weight_size_edges_list[layer - 1],
+                (GCNConv(in_channels=self.weight_size_nodes_list[layer - 1] + self.weight_size_edges_list[layer - 1]
+                         if self.aggregation_mode == 'concat' else self.weight_size_nodes_list[layer - 1],
                          out_channels=self.weight_size_nodes_edges_list[layer],
                          add_self_loops=True), 'x, edge_index -> x'))
 
