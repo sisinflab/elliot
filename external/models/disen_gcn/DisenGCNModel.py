@@ -44,7 +44,6 @@ class DisenGCNModel(torch.nn.Module, ABC):
         self.embed_k = embed_k
         self.learning_rate = learning_rate
         self.l_w = l_w
-        self.n_layers = n_layers
         self.disen_k = disen_k
         self.temperature = temperature
         self.routing_iterations = routing_iterations
