@@ -106,22 +106,22 @@ class EGCFModel(torch.nn.Module, ABC):
         projection_layer_nodes_list = [('feat_proj_nodes_0',
                                         torch.nn.Linear(in_features=self.embed_k,
                                                         out_features=self.weight_size_projection_node_edge_list[0])),
-                                       ('relu_0', torch.nn.ReLU())]
+                                       ('relu_0', torch.nn.Tanh())]
         projection_layer_edges_list = [('feat_proj_edges_0',
                                         torch.nn.Linear(in_features=self.Ge.shape[1],
                                                         out_features=self.weight_size_projection_node_edge_list[0])),
-                                       ('relu_0', torch.nn.ReLU())]
+                                       ('relu_0', torch.nn.Tanh())]
         for layer in range(1, len(self.weight_size_projection_node_edge_list)):
             projection_layer_nodes_list.append(('feat_proj_nodes_' + str(layer),
                                                 torch.nn.Linear(
                                                     in_features=self.weight_size_projection_node_edge_list[layer - 1],
                                                     out_features=self.weight_size_projection_node_edge_list[layer])))
-            projection_layer_nodes_list.append(('relu_' + str(layer), torch.nn.ReLU()))
+            projection_layer_nodes_list.append(('relu_' + str(layer), torch.nn.Tanh()))
             projection_layer_edges_list.append(('feat_proj_edges_' + str(layer),
                                                 torch.nn.Linear(
                                                     in_features=self.weight_size_projection_node_edge_list[layer - 1],
                                                     out_features=self.weight_size_projection_node_edge_list[layer])))
-            projection_layer_edges_list.append(('relu_' + str(layer), torch.nn.ReLU()))
+            projection_layer_edges_list.append(('relu_' + str(layer), torch.nn.Tanh()))
 
         self.projection_network_nodes = torch.nn.Sequential(OrderedDict(projection_layer_nodes_list))
         self.projection_network_nodes.to(self.device)
