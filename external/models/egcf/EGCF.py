@@ -120,7 +120,7 @@ class EGCF(RecMixin, BaseRecommenderModel):
         self.edge_edge_index = np.array(list_edges_edges).transpose()
         self.edge_edge_index -= np.min(self.edge_edge_index)
 
-        self._n_layers = len(self._weight_size_nodes)
+        self._n_layers = len(self._w_n)
 
         self._model = EGCFModel(
             num_users=self._num_users,
