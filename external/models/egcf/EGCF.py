@@ -69,17 +69,23 @@ class EGCF(RecMixin, BaseRecommenderModel):
         ######################################
 
         self._params_list = [
-            ("_learning_rate", "lr", "lr", 0.0005, float, None),
-            ("_factors", "factors", "factors", 64, int, None),
-            ("_trainable_edges", "trainable_edges", "trainable_edges", True, bool, None),
-            ("_weight_size_proj", "weight_size_proj", "weight_size_proj", "(64,)",
+            ("_lr", "lr", "lr", 0.0005, float, None),
+            ("_emb", "emb", "emb", 64, int, None),
+            ("_tr_e", "tr_e", "tr_e", True, bool, None),
+            ("_aggr", "aggr", "aggr", 'add', str, None),
+            ("_nn_d", "nn_d", "nn_d", 0.1, float, None),
+            ("_ee_d", "ee_d", "ee_d", 0.1, float, None),
+            ("_ne_d", "ne_d", "ne_d", 0.1, float, None),
+            ("_att_d", "att_d", "att_d", 0.1, float, None),
+            ("_t", "t", "t", 1.0, float, None),
+            ("_w_proj", "w_proj", "w_proj", "(64,)",
              lambda x: list(make_tuple(x)),
              lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
-            ("_weight_size_nodes", "weight_size_nodes", "weight_size_nodes", "(64,)", lambda x: list(make_tuple(x)),
+            ("_w_n", "w_n", "w_n", "(64,)", lambda x: list(make_tuple(x)),
              lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
-            ("_weight_size_edges", "weight_size_edges", "weight_size_edges", "(64,)", lambda x: list(make_tuple(x)),
+            ("_w_e", "w_e", "w_e", "(64,)", lambda x: list(make_tuple(x)),
              lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
-            ("_weight_size_nodes_edges", "weight_size_nodes_edges", "weight_size_nodes_edges", "(64,)",
+            ("_w_ne", "w_ne", "w_ne", "(64,)",
              lambda x: list(make_tuple(x)),
              lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
             ("_l_w", "l_w", "l_w", 0.01, float, None),
@@ -114,24 +120,30 @@ class EGCF(RecMixin, BaseRecommenderModel):
         self.edge_edge_index = np.array(list_edges_edges).transpose()
         self.edge_edge_index -= np.min(self.edge_edge_index)
 
-        self._n_layers = len(self._weight_size_nodes)
+        self._n_layers = len(self._w_n)
 
         self._model = EGCFModel(
             num_users=self._num_users,
             num_items=self._num_items,
-            learning_rate=self._learning_rate,
-            embed_k=self._factors,
-            weight_size_projection_node_edge=self._weight_size_proj,
+            learning_rate=self._lr,
+            embed_k=self._emb,
+            weight_size_projection_node_edge=self._w_proj,
+            weight_size_nodes=self._w_n,
+            weight_size_edges=self._w_e,
+            weight_size_nodes_edges=self._w_ne,
             l_w=self._l_w,
-            weight_size_nodes=self._weight_size_nodes,
-            weight_size_edges=self._weight_size_edges,
-            weight_size_nodes_edges=self._weight_size_nodes_edges,
             n_layers=self._n_layers,
             edge_features=self._side_edge_textual.object.get_all_features(),
             edge_index=self.edge_index,
             node_edge_index=self.node_edge_index,
             edge_edge_index=self.edge_edge_index,
-            trainable_edges=self._trainable_edges,
+            trainable_edges=self._tr_e,
+            aggregation_mode=self._aggr,
+            node_node_mess_drop=self._nn_d,
+            edge_edge_mess_drop=self._ee_d,
+            node_edge_mess_drop=self._ne_d,
+            att_drop=self._att_d,
+            temperature=self._t,
             random_seed=self._seed
         )
 
@@ -160,7 +172,7 @@ class EGCF(RecMixin, BaseRecommenderModel):
     def get_recommendations(self, k: int = 100):
         predictions_top_k_test = {}
         predictions_top_k_val = {}
-        gu, gi = self._model.propagate_embeddings(evaluate=True)
+        gu, gi, _ = self._model.propagate_embeddings(evaluate=True)
         for index, offset in enumerate(range(0, self._num_users, self._batch_size)):
             offset_stop = min(offset + self._batch_size, self._num_users)
             predictions = self._model.predict(gu[offset: offset_stop], gi)
