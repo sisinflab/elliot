@@ -62,11 +62,15 @@ class DisenGCNModel(torch.nn.Module, ABC):
         self.Gi.to(self.device)
 
         disengcn_network_list = []
-        for layer in range(self.n_layers):
+        for layer in range(self.n_layers - 1):
             disentangle_layer = torch_geometric.nn.Sequential('x, edge_index', [
                 (DisenGCNLayer(self.temperature), 'x, edge_index -> x')])
             disengcn_network_list.append(('disen_gcn_' + str(layer), torch.nn.Sequential(disentangle_layer)))
             disengcn_network_list.append(('dropout_' + str(layer), torch.nn.Dropout(self.message_dropout)))
+
+        disentangle_layer = torch_geometric.nn.Sequential('x, edge_index', [
+            (DisenGCNLayer(self.temperature), 'x, edge_index -> x')])
+        disengcn_network_list.append(('disen_gcn_' + str(self.n_layers - 1), torch.nn.Sequential(disentangle_layer)))
 
         self.disengcn_network = torch.nn.Sequential(OrderedDict(disengcn_network_list))
         self.disengcn_network.to(self.device)
