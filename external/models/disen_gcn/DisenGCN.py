@@ -35,7 +35,7 @@ class DisenGCN(RecMixin, BaseRecommenderModel):
         batch_size: Batch size
         l_w: Regularization coefficient
         weight_size: Tuple with number of units for each embedding propagation layer
-        message_dropout: Tuple with dropout rate for each embedding propagation layer
+        message_dropout: Dropout rate for each embedding propagation layer
         disen_k: Tuple with factor for disentanglement for each embedding propagation layer
         temperature: Temperature value for softmax
         routing_iterations: Number of routing iterations
@@ -54,7 +54,7 @@ class DisenGCN(RecMixin, BaseRecommenderModel):
           batch_size: 512
           l_w: 0.1
           weight_size: (64,)
-          message_dropout: (0.1,)
+          message_dropout: 0.1
           disen_k: (10,)
           temperature: 10
           routing_iterations: 5
@@ -72,8 +72,7 @@ class DisenGCN(RecMixin, BaseRecommenderModel):
             ("_l_w", "l_w", "l_w", 0.01, float, None),
             ("_weight_size", "weight_size", "weight_size", "(64,)", lambda x: list(make_tuple(x)),
              lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
-            ("_message_dropout", "message_dropout", "message_dropout", "()", lambda x: list(make_tuple(x)),
-             lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
+            ("_message_dropout", "message_dropout", "message_dropout", 0.1, float, None),
             ("_disen_k", "disen_k", "disen_k", "()", lambda x: list(make_tuple(x)),
              lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
             ("_temperature", "temperature", "temperature", 10, float, None),
