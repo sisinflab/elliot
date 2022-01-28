@@ -24,7 +24,6 @@ class DisenGCNModel(torch.nn.Module, ABC):
                  learning_rate,
                  embed_k,
                  l_w,
-                 weight_size,
                  n_layers,
                  disen_k,
                  temperature,
@@ -51,7 +50,6 @@ class DisenGCNModel(torch.nn.Module, ABC):
         self.temperature = temperature
         self.routing_iterations = routing_iterations
         self.message_dropout = message_dropout
-        self.weight_size_list = [self.embed_k] + self.weight_size
         self.edge_index = torch.tensor(edge_index, dtype=torch.int64)
 
         self.Gu = torch.nn.Parameter(
@@ -92,7 +90,8 @@ class DisenGCNModel(torch.nn.Module, ABC):
                                                                                        self.edge_index.to(self.device))
                 current_embeddings = current_embeddings.view(current_embeddings.shape[0], 
                                                              current_embeddings.shape[1] * self.disen_k[idx])
-                current_embeddings = list(self.disengcn_network.children())[layer + 1](current_embeddings.to(self.device))
+                if idx < self.n_layers - 1:
+                    current_embeddings = list(self.disengcn_network.children())[layer + 1](current_embeddings.to(self.device))
             else:
                 self.disengcn_network.eval()
                 with torch.no_grad():
@@ -101,7 +100,8 @@ class DisenGCNModel(torch.nn.Module, ABC):
                                                                                            self.edge_index.to(self.device))
                     current_embeddings = current_embeddings.view(current_embeddings.shape[0], 
                                                                  current_embeddings.shape[1] * self.disen_k[idx])
-                    current_embeddings = list(self.disengcn_network.children())[layer + 1](current_embeddings.to(self.device))
+                    if idx < self.n_layers - 1:
+                        current_embeddings = list(self.disengcn_network.children())[layer + 1](current_embeddings.to(self.device))
             idx += 1
 
         if evaluate:
