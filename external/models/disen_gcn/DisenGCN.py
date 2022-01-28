@@ -78,8 +78,6 @@ class DisenGCN(RecMixin, BaseRecommenderModel):
         ]
         self.autoset_params()
 
-        self._n_layers = len(self._weight_size)
-
         row, col = data.sp_i_train.nonzero()
         col = [c + self._num_users for c in col]
         self.edge_index = np.array([row, col])
