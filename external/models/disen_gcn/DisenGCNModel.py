@@ -78,14 +78,15 @@ class DisenGCNModel(torch.nn.Module, ABC):
         current_embeddings = torch.cat((self.Gu.to(self.device), self.Gi.to(self.device)), 0)
         for layer in range(0, self.n_layers * 2, 2):
             current_embeddings = current_embeddings.view(current_embeddings.shape[0], 
-                                                         current_embeddings.shape[1] // self.disen_k[layer // 2], 
-                                                         self.disen_k[layer // 2])
+                                                         current_embeddings.shape[1] // self.disen_k[torch.ceil(layer / 2)],
+                                                         self.disen_k[torch.ceil(layer / 2)])
+            current_embeddings = torch.nn.functional.normalize(current_embeddings, dim=2)
             if not evaluate:
                 for _ in range(self.routing_iterations):
                     current_embeddings = list(self.disengcn_network.children())[layer][0](current_embeddings.to(self.device),
                                                                                        self.edge_index.to(self.device))
                 current_embeddings = current_embeddings.view(current_embeddings.shape[0], 
-                                                             current_embeddings.shape[1] * self.disen_k[layer // 2])
+                                                             current_embeddings.shape[1] * self.disen_k[torch.ceil(layer / 2)])
                 current_embeddings = list(self.disengcn_network.children())[layer + 1](current_embeddings.to(self.device))
             else:
                 self.disengcn_network.eval()
@@ -94,7 +95,7 @@ class DisenGCNModel(torch.nn.Module, ABC):
                         current_embeddings = list(self.disengcn_network.children())[layer][0](current_embeddings.to(self.device),
                                                                                            self.edge_index.to(self.device))
                     current_embeddings = current_embeddings.view(current_embeddings.shape[0], 
-                                                                 current_embeddings.shape[1] * self.disen_k[layer // 2])
+                                                                 current_embeddings.shape[1] * self.disen_k[torch.ceil(layer / 2)])
                     current_embeddings = list(self.disengcn_network.children())[layer + 1](current_embeddings.to(self.device))
 
         if evaluate:
@@ -125,7 +126,7 @@ class DisenGCNModel(torch.nn.Module, ABC):
         difference = torch.clamp(xu_pos - xu_neg, -80.0, 1e8)
         loss = torch.sum(self.softplus(-difference))
         reg_loss = self.l_w * (torch.norm(self.Gu, 2) +
-                               torch.norm(self.Gi, 2)) * 2
+                               torch.norm(self.Gi, 2))
         loss += reg_loss
 
         self.optimizer.zero_grad()
