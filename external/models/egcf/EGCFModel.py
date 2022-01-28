@@ -204,11 +204,11 @@ class EGCFModel(torch.nn.Module, ABC):
                 node_node_embeddings = torch.cat((node_node_embeddings, node_edge_node_embeddings), dim=1)
                 edge_edge_embeddings = torch.cat((edge_edge_embeddings, node_edge_edge_embeddings), dim=1)
             elif self.aggregation_mode == 'add':
-                node_node_embeddings = torch.sum((node_node_embeddings, node_edge_node_embeddings))
-                edge_edge_embeddings = torch.sum((edge_edge_embeddings, node_edge_edge_embeddings))
+                node_node_embeddings = torch.sum(node_node_embeddings, node_edge_node_embeddings)
+                edge_edge_embeddings = torch.sum(edge_edge_embeddings, node_edge_edge_embeddings)
             elif self.aggregation_mode == 'mult':
-                node_node_embeddings = torch.mul((node_node_embeddings, node_edge_node_embeddings))
-                edge_edge_embeddings = torch.mul((edge_edge_embeddings, node_edge_edge_embeddings))
+                node_node_embeddings = torch.mul(node_node_embeddings, node_edge_node_embeddings)
+                edge_edge_embeddings = torch.mul(edge_edge_embeddings, node_edge_edge_embeddings)
             elif self.aggregation_mode == 'att':
                 node_node_embeddings, edge_edge_embeddings = \
                     self._attention(node_node_embeddings, node_edge_node_embeddings,
