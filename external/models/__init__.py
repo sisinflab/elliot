@@ -19,6 +19,7 @@ from .cofm import CoFM
 from .convmf import ConvMF
 from .kgflex import KGFlex
 from .kgflex_tf import KGFlexTF
+from .kgflex_tf2 import KGFlexTF2
 from .convmf import ConvMF
 from .hrdr import HRDR
 from .KaVAE import KaVAE
