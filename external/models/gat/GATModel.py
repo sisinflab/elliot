@@ -61,8 +61,7 @@ class GATModel(torch.nn.Module, ABC):
                                                  heads=self.heads[0],
                                                  dropout=self.message_dropout,
                                                  add_self_loops=False,
-                                                 concat=True), 'x, edge_index -> x'),
-                                                 (torch.nn.ELU(), 'x -> x')]
+                                                 concat=True), 'x, edge_index -> x')]
 
             for layer in range(1, self.n_layers - 1):
                 propagation_network_list.append((GATConv(in_channels=-1,
@@ -71,7 +70,6 @@ class GATModel(torch.nn.Module, ABC):
                                                          dropout=self.message_dropout,
                                                          add_self_loops=False,
                                                          concat=True), 'x, edge_index -> x'))
-                propagation_network_list.append((torch.nn.ELU(), 'x -> x'))
 
             propagation_network_list.append((GATConv(in_channels=-1,
                                                     out_channels=self.weight_size_list[self.n_layers],
@@ -79,15 +77,13 @@ class GATModel(torch.nn.Module, ABC):
                                                     dropout=self.message_dropout,
                                                     add_self_loops=False,
                                                     concat=False), 'x, edge_index -> x'))
-            propagation_network_list.append((torch.nn.Identity(), 'x -> x'))
         else:
             propagation_network_list = [(GATConv(in_channels=self.embed_k,
                                                  out_channels=self.weight_size_list[0],
                                                  heads=self.heads[0],
                                                  dropout=self.message_dropout,
                                                  add_self_loops=False,
-                                                 concat=False), 'x, edge_index -> x'),
-                                                 (torch.nn.Identity(), 'x -> x')]
+                                                 concat=False), 'x, edge_index -> x')]
 
         self.propagation_network = torch_geometric.nn.Sequential('x, edge_index', propagation_network_list)
         self.propagation_network.to(self.device)
@@ -98,23 +94,27 @@ class GATModel(torch.nn.Module, ABC):
     def propagate_embeddings(self, evaluate=False):
         current_embeddings = torch.cat((self.Gu.to(self.device), self.Gi.to(self.device)), 0)
 
-        for layer in range(0, self.n_layers * 2, 2):
+        for layer in range(self.n_layers):
             if evaluate:
                 self.propagation_network.eval()
                 with torch.no_grad():
+                    if layer == self.n_layers - 1:
+                        current_embeddings = list(
+                            self.propagation_network.children()
+                        )[layer](current_embeddings.to(self.device), self.edge_index.to(self.device))
+                    else:
+                        current_embeddings = torch.nn.functional.elu(list(
+                            self.propagation_network.children()
+                        )[layer](current_embeddings.to(self.device), self.edge_index.to(self.device)))
+            else:
+                if layer == self.n_layers - 1:
                     current_embeddings = list(
                         self.propagation_network.children()
                     )[layer](current_embeddings.to(self.device), self.edge_index.to(self.device))
-                    current_embeddings = list(
+                else:
+                    current_embeddings = torch.nn.functional.elu(list(
                         self.propagation_network.children()
-                    )[layer + 1](current_embeddings.to(self.device))
-            else:
-                current_embeddings = list(
-                    self.propagation_network.children()
-                )[layer](current_embeddings.to(self.device), self.edge_index.to(self.device))
-                current_embeddings = list(
-                    self.propagation_network.children()
-                )[layer + 1](current_embeddings.to(self.device))
+                    )[layer](current_embeddings.to(self.device), self.edge_index.to(self.device)))
 
         if evaluate:
             self.propagation_network.train()
@@ -137,8 +137,8 @@ class GATModel(torch.nn.Module, ABC):
     def train_step(self, batch):
         gu, gi = self.propagate_embeddings()
         user, pos, neg = batch
-        xu_pos = self.forward(inputs=(gu[user], gi[pos]))
-        xu_neg = self.forward(inputs=(gu[user], gi[neg]))
+        xu_pos = self.forward(inputs=(gu[user[:, 0]], gi[pos[:, 0]]))
+        xu_neg = self.forward(inputs=(gu[user[:, 0]], gi[neg[:, 0]]))
 
         difference = torch.clamp(xu_pos - xu_neg, -80.0, 1e8)
         loss = torch.sum(self.softplus(-difference))
