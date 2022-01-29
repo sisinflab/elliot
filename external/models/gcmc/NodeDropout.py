@@ -8,7 +8,7 @@ class NodeDropout(torch.nn.Module, ABC):
     # as presented in the original paper
     def __init__(self, node_dropout, num_users, num_items):
         super(NodeDropout, self).__init__()
-        self.node_dropout = node_dropout.detach().cpu().numpy()[0]
+        self.node_dropout = node_dropout.detach().cpu().numpy()
         self.num_users = num_users
         self.num_items = num_items
         self.all_nodes_indices = torch.arange(0, self.num_users + self.num_items)
