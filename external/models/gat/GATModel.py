@@ -41,11 +41,10 @@ class GATModel(torch.nn.Module, ABC):
         self.embed_k = embed_k
         self.learning_rate = learning_rate
         self.l_w = l_w
-        self.weight_size = weight_size
+        self.weight_size_list = weight_size
         self.n_layers = n_layers
         self.heads = heads
         self.message_dropout = message_dropout
-        self.weight_size_list = [self.embed_k] + self.weight_size
         self.edge_index = torch.tensor(edge_index, dtype=torch.int64)
 
         self.Gu = torch.nn.Parameter(
@@ -56,17 +55,22 @@ class GATModel(torch.nn.Module, ABC):
         self.Gi.to(self.device)
 
         if self.n_layers > 1:
-            propagation_network_list = []
-            for layer in range(self.n_layers - 1):
-                propagation_network_list.append((GATConv(in_channels=self.embed_k,
+            propagation_network_list = [(GATConv(in_channels=self.embed_k,
+                                                 out_channels=self.weight_size_list[0],
+                                                 heads=self.heads[0],
+                                                 dropout=self.message_dropout,
+                                                 add_self_loops=False,
+                                                 concat=True), 'x, edge_index -> x')]
+            for layer in range(1, self.n_layers - 1):
+                propagation_network_list.append((GATConv(in_channels=self.weight_size_list[layer - 1] * self.heads[layer - 1],
                                                          out_channels=self.weight_size_list[layer],
                                                          heads=self.heads[layer],
                                                          dropout=self.message_dropout,
                                                          add_self_loops=False,
                                                          concat=True), 'x, edge_index -> x'))
 
-            propagation_network_list.append((GATConv(in_channels=-1,
-                                                    out_channels=self.weight_size_list[self.n_layers],
+            propagation_network_list.append((GATConv(in_channels=self.weight_size_list[self.n_layers - 2] * self.heads[self.n_layers - 2],
+                                                    out_channels=self.weight_size_list[self.n_layers - 1],
                                                     heads=self.heads[self.n_layers - 1],
                                                     dropout=self.message_dropout,
                                                     add_self_loops=False,
