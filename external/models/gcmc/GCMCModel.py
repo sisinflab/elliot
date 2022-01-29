@@ -93,26 +93,26 @@ class GCMCModel(torch.nn.Module, ABC):
     def propagate_embeddings(self, evaluate=False):
         current_embeddings = torch.cat((self.Gu, self.Gi), 0)
 
-        for layer in range(0, self.n_convolutional_layers * 3, 3):
-            if not evaluate:
-                dropout_edge_index = list(
-                    self.convolutional_network.children()
-                )[layer](self.edge_index.to(self.device))
-                current_embeddings = list(
-                    self.convolutional_network.children()
-                )[layer + 1](current_embeddings.to(self.device), dropout_edge_index.to(self.device))
-                current_embeddings = list(
-                    self.convolutional_network.children()
-                )[layer + 2](current_embeddings.to(self.device))
-            else:
-                self.convolutional_network.eval()
-                with torch.no_grad():
-                    current_embeddings = list(
-                        self.convolutional_network.children()
-                    )[layer + 1](current_embeddings.to(self.device), self.edge_index.to(self.device))
-                    current_embeddings = list(
-                        self.convolutional_network.children()
-                    )[layer + 2](current_embeddings.to(self.device))
+        # for layer in range(0, self.n_convolutional_layers * 3, 3):
+        #     if not evaluate:
+        #         dropout_edge_index = list(
+        #             self.convolutional_network.children()
+        #         )[layer](self.edge_index.to(self.device))
+        #         current_embeddings = list(
+        #             self.convolutional_network.children()
+        #         )[layer + 1](current_embeddings.to(self.device), dropout_edge_index.to(self.device))
+        #         current_embeddings = list(
+        #             self.convolutional_network.children()
+        #         )[layer + 2](current_embeddings.to(self.device))
+        #     else:
+        #         self.convolutional_network.eval()
+        #         with torch.no_grad():
+        #             current_embeddings = list(
+        #                 self.convolutional_network.children()
+        #             )[layer + 1](current_embeddings.to(self.device), self.edge_index.to(self.device))
+        #             current_embeddings = list(
+        #                 self.convolutional_network.children()
+        #             )[layer + 2](current_embeddings.to(self.device))
 
         if evaluate:
             self.dense_network.eval()
