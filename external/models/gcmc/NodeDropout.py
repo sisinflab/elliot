@@ -15,7 +15,7 @@ class NodeDropout(torch.nn.Module, ABC):
 
     def forward(self, edge_index):
         if self.node_dropout:
-            n_nodes_to_drop = round((self.num_users + self.num_items) * self.node_dropout)
+            n_nodes_to_drop = torch.round((self.num_users + self.num_items) * self.node_dropout)
             nodes_to_drop = self.all_nodes_indices[torch.randperm(self.num_users + self.num_items)][:n_nodes_to_drop]
             users_to_drop = nodes_to_drop[nodes_to_drop < self.num_users]
             items_to_drop = nodes_to_drop[nodes_to_drop >= self.num_users] - self.num_users
