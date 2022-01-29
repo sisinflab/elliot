@@ -133,7 +133,7 @@ class GCMCModel(torch.nn.Module, ABC):
         zeta_u = torch.squeeze(zu).to(self.device)
         zeta_i = torch.squeeze(zi).to(self.device)
 
-        xui = torch.sigmoid(torch.sum(zeta_u.to(self.device) * torch.matmul(zeta_i.to(self.device), self.Q.to(self.device)), 1))
+        xui = torch.sum(zeta_u.to(self.device) * torch.matmul(zeta_i.to(self.device), self.Q.to(self.device)), 1)
 
         return xui
 
