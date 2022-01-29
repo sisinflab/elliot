@@ -65,7 +65,7 @@ class GAT(RecMixin, BaseRecommenderModel):
         ######################################
 
         self._params_list = [
-            ("_learning_rate", "lr", "lr", 0.0005, int, None),
+            ("_learning_rate", "lr", "lr", 0.0005, float, None),
             ("_factors", "factors", "factors", 64, int, None),
             ("_l_w", "l_w", "l_w", 0.01, float, None),
             ("_weight_size", "weight_size", "weight_size", "(64,)", lambda x: list(make_tuple(x)),
