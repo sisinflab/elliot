@@ -71,7 +71,7 @@ class GCMCModel(torch.nn.Module, ABC):
             convolutional_network_list.append((GCNConv(in_channels=self.convolutional_layer_size[layer],
                                                        out_channels=self.convolutional_layer_size[layer + 1],
                                                        add_self_loops=True,
-                                                       bias=False), 'x, edge_index -> x'))
+                                                       bias=True), 'x, edge_index -> x'))
         self.convolutional_network = torch_geometric.nn.Sequential('x, edge_index', convolutional_network_list)
         self.convolutional_network.to(self.device)
 
