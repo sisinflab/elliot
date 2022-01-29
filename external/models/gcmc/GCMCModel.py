@@ -114,12 +114,12 @@ class GCMCModel(torch.nn.Module, ABC):
                         self.convolutional_network.children()
                     )[layer + 2](current_embeddings.to(self.device))
 
-        # if evaluate:
-        #     self.dense_network.eval()
-        #     with torch.no_grad():
-        #         current_embeddings = self.dense_network(current_embeddings.to(self.device))
-        # else:
-        #     current_embeddings = self.dense_network(current_embeddings.to(self.device))
+        if evaluate:
+            self.dense_network.eval()
+            with torch.no_grad():
+                current_embeddings = self.dense_network(current_embeddings.to(self.device))
+        else:
+            current_embeddings = self.dense_network(current_embeddings.to(self.device))
 
         if evaluate:
             self.convolutional_network.train()
@@ -133,7 +133,8 @@ class GCMCModel(torch.nn.Module, ABC):
         zeta_u = torch.squeeze(zu).to(self.device)
         zeta_i = torch.squeeze(zi).to(self.device)
 
-        xui = torch.sum(zeta_u.to(self.device) * torch.matmul(zeta_i.to(self.device), self.Q.to(self.device)), 1)
+        # xui = torch.sum(zeta_u.to(self.device) * torch.matmul(zeta_i.to(self.device), self.Q.to(self.device)), 1)
+        xui = torch.sum(zeta_u * zeta_i, 1)
 
         return xui
 
