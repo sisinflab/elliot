@@ -16,11 +16,11 @@ class NodeDropout(torch.nn.Module, ABC):
     def forward(self, edge_index):
         if self.node_dropout:
             n_nodes_to_drop = torch.round((self.num_users + self.num_items) * self.node_dropout).type(torch.int32)
-            nodes_to_drop = self.all_nodes_indices[torch.randperm(self.num_users + self.num_items)][:n_nodes_to_drop.numpy()]
+            nodes_to_drop = self.all_nodes_indices[torch.randperm(self.num_users + self.num_items)][:n_nodes_to_drop.detach().cpu().numpy()]
             users_to_drop = nodes_to_drop[nodes_to_drop < self.num_users]
             items_to_drop = nodes_to_drop[nodes_to_drop >= self.num_users] - self.num_users
-            mask_users = np.invert(np.in1d(edge_index[0].numpy(), users_to_drop.numpy()))
-            mask_items = np.invert(np.in1d(edge_index[1].numpy(), items_to_drop.numpy()))
+            mask_users = np.invert(np.in1d(edge_index[0].detach().cpu().numpy(), users_to_drop.detach().cpu().numpy()))
+            mask_items = np.invert(np.in1d(edge_index[1].detach().cpu().numpy(), items_to_drop.detach().cpu().numpy()))
             mask_users_items = mask_users + mask_items
             dropout_users = torch.unsqueeze(edge_index[0, mask_users_items], 0)
             dropout_items = torch.unsqueeze(edge_index[1, mask_users_items], 0)
