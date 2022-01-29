@@ -49,7 +49,7 @@ class GCMCModel(torch.nn.Module, ABC):
         self.dense_layer_size = [self.convolutional_layer_size[-1]] + dense_layer_size
         self.n_convolutional_layers = n_convolutional_layers
         self.n_dense_layers = n_dense_layers
-        self.node_dropout = node_dropout
+        self.node_dropout = torch.tensor(node_dropout, dtype=torch.float32)
         self.dense_layer_dropout = dense_layer_dropout
         self.edge_index = torch.tensor(edge_index, dtype=torch.int64)
 
