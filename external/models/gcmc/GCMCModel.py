@@ -133,12 +133,12 @@ class GCMCModel(torch.nn.Module, ABC):
         zeta_u = torch.squeeze(zu).to(self.device)
         zeta_i = torch.squeeze(zi).to(self.device)
 
-        xui = torch.nn.functional.sigmoid(torch.sum(zeta_u.to(self.device) * torch.matmul(zeta_i.to(self.device), self.Q.to(self.device)), 1))
+        xui = torch.sigmoid(torch.sum(zeta_u.to(self.device) * torch.matmul(zeta_i.to(self.device), self.Q.to(self.device)), 1))
 
         return xui
 
     def predict(self, zu, zi, **kwargs):
-        return torch.nn.functional.sigmoid(torch.matmul(zu.to(self.device), torch.matmul(self.Q.to(self.device), torch.transpose(zi.to(self.device), 0, 1))))
+        return torch.sigmoid(torch.matmul(zu.to(self.device), torch.matmul(self.Q.to(self.device), torch.transpose(zi.to(self.device), 0, 1))))
 
     def train_step(self, batch):
         zu, zi = self.propagate_embeddings()
