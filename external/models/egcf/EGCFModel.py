@@ -212,7 +212,7 @@ class EGCFModel(torch.nn.Module, ABC):
             elif self.aggregation_mode == 'att':
                 node_node_embeddings, edge_edge_embeddings = \
                     self._attention(node_node_embeddings, node_edge_node_embeddings,
-                                    edge_edge_embeddings, node_edge_edge_embeddings)
+                                    edge_edge_embeddings, node_edge_edge_embeddings, evaluate=evaluate)
             else:
                 raise NotImplementedError('This aggregation mode has not been implemented yet!')
 
