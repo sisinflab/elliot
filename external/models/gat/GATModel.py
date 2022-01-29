@@ -44,7 +44,7 @@ class GATModel(torch.nn.Module, ABC):
         self.weight_size = weight_size
         self.n_layers = n_layers
         self.heads = heads
-        self.message_dropout = message_dropout if message_dropout else [0.0] * self.n_layers
+        self.message_dropout = message_dropout
         self.weight_size_list = [self.embed_k] + self.weight_size
         self.edge_index = torch.tensor(edge_index, dtype=torch.int64)
 
@@ -59,7 +59,7 @@ class GATModel(torch.nn.Module, ABC):
             propagation_network_list = [(GATConv(in_channels=self.embed_k,
                                                  out_channels=self.weight_size_list[0],
                                                  heads=self.heads[0],
-                                                 dropout=self.message_dropout[0],
+                                                 dropout=self.message_dropout,
                                                  add_self_loops=False,
                                                  concat=True), 'x, edge_index -> x'),
                                                  (torch.nn.ELU(), 'x -> x')]
@@ -68,7 +68,7 @@ class GATModel(torch.nn.Module, ABC):
                 propagation_network_list.append((GATConv(in_channels=-1,
                                                          out_channels=self.weight_size_list[layer],
                                                          heads=self.heads[layer],
-                                                         dropout=self.message_dropout[layer],
+                                                         dropout=self.message_dropout,
                                                          add_self_loops=False,
                                                          concat=True), 'x, edge_index -> x'))
                 propagation_network_list.append((torch.nn.ELU(), 'x -> x'))
@@ -76,7 +76,7 @@ class GATModel(torch.nn.Module, ABC):
             propagation_network_list.append((GATConv(in_channels=-1,
                                                     out_channels=self.weight_size_list[self.n_layers],
                                                     heads=self.heads[self.n_layers - 1],
-                                                    dropout=self.message_dropout[self.n_layers - 1],
+                                                    dropout=self.message_dropout,
                                                     add_self_loops=False,
                                                     concat=False), 'x, edge_index -> x'))
             propagation_network_list.append((torch.nn.Identity(), 'x -> x'))
@@ -84,7 +84,7 @@ class GATModel(torch.nn.Module, ABC):
             propagation_network_list = [(GATConv(in_channels=self.embed_k,
                                                  out_channels=self.weight_size_list[0],
                                                  heads=self.heads[0],
-                                                 dropout=self.message_dropout[0],
+                                                 dropout=self.message_dropout,
                                                  add_self_loops=False,
                                                  concat=False), 'x, edge_index -> x'),
                                                  (torch.nn.Identity(), 'x -> x')]

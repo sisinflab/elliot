@@ -65,15 +65,14 @@ class GAT(RecMixin, BaseRecommenderModel):
         ######################################
 
         self._params_list = [
-            ("_learning_rate", "lr", "lr", 0.0005, None, None),
-            ("_factors", "factors", "factors", 64, None, None),
-            ("_l_w", "l_w", "l_w", 0.01, None, None),
+            ("_learning_rate", "lr", "lr", 0.0005, int, None),
+            ("_factors", "factors", "factors", 64, int, None),
+            ("_l_w", "l_w", "l_w", 0.01, float, None),
             ("_weight_size", "weight_size", "weight_size", "(64,)", lambda x: list(make_tuple(x)),
              lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
             ("_heads", "heads", "heads", "(1,)", lambda x: list(make_tuple(x)),
              lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
-            ("_message_dropout", "message_dropout", "message_dropout", "()", lambda x: list(make_tuple(x)),
-             lambda x: self._batch_remove(str(x), " []").replace(",", "-"))
+            ("_message_dropout", "message_dropout", "message_dropout", 0.1, float, None),
         ]
         self.autoset_params()
 
