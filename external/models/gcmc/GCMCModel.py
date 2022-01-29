@@ -87,7 +87,7 @@ class GCMCModel(torch.nn.Module, ABC):
         self.dense_network.to(self.device)
 
         self.sigmoid = torch.nn.Sigmoid()
-        self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
+        self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate, weight_decay=0.995)
 
     def propagate_embeddings(self, evaluate=False):
         current_embeddings = torch.cat((self.Gu, self.Gi), 0)
