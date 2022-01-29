@@ -250,6 +250,9 @@ class EGCFModel(torch.nn.Module, ABC):
             pe = self.attention_edge(e1e2)
             pe = torch.nn.functional.softmax(pe / self.temperature, dim=1)
 
+        print(pn.shape)
+        print(pe.shape)
+
         return torch.add(torch.mul(pn[0], n1), torch.mul(pn[1], n2)), \
                torch.add(torch.mul(pe[0], e1), torch.mul(pe[1], e2))
 
