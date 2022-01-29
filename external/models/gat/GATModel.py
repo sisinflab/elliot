@@ -56,15 +56,9 @@ class GATModel(torch.nn.Module, ABC):
         self.Gi.to(self.device)
 
         if self.n_layers > 1:
-            propagation_network_list = [(GATConv(in_channels=self.embed_k,
-                                                 out_channels=self.weight_size_list[0],
-                                                 heads=self.heads[0],
-                                                 dropout=self.message_dropout,
-                                                 add_self_loops=False,
-                                                 concat=True), 'x, edge_index -> x')]
-
-            for layer in range(1, self.n_layers - 1):
-                propagation_network_list.append((GATConv(in_channels=-1,
+            propagation_network_list = []
+            for layer in range(self.n_layers - 1):
+                propagation_network_list.append((GATConv(in_channels=self.embed_k,
                                                          out_channels=self.weight_size_list[layer],
                                                          heads=self.heads[layer],
                                                          dropout=self.message_dropout,
@@ -135,21 +129,17 @@ class GATModel(torch.nn.Module, ABC):
         return torch.matmul(gu.to(self.device), torch.transpose(gi.to(self.device), 0, 1))
 
     def train_step(self, batch):
-        # gu, gi = self.propagate_embeddings()
-        gu = self.Gu
-        gi = self.Gi
+        gu, gi = self.propagate_embeddings()
         user, pos, neg = batch
         xu_pos = self.forward(inputs=(gu[user[:, 0]], gi[pos[:, 0]]))
         xu_neg = self.forward(inputs=(gu[user[:, 0]], gi[neg[:, 0]]))
 
         difference = torch.clamp(xu_pos - xu_neg, -80.0, 1e8)
         loss = torch.sum(self.softplus(-difference))
-        # reg_loss = self.l_w * (torch.norm(self.Gu, 2) +
-        #                        torch.norm(self.Gi, 2) +
-        #                        torch.stack([torch.norm(value, 2) for value in self.propagation_network.parameters()],
-        #                                    dim=0).sum(dim=0)) * 2
         reg_loss = self.l_w * (torch.norm(self.Gu, 2) +
-                               torch.norm(self.Gi, 2)) * 2
+                               torch.norm(self.Gi, 2) +
+                               torch.stack([torch.norm(value, 2) for value in self.propagation_network.parameters()],
+                                           dim=0).sum(dim=0)) * 2
         loss += reg_loss
 
         self.optimizer.zero_grad()
