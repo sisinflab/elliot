@@ -143,7 +143,7 @@ class GCMCModel(torch.nn.Module, ABC):
     def train_step(self, batch):
         zu, zi = self.propagate_embeddings()
         user, item, _ = batch
-        xui = self.forward(inputs=(zu[user], zi[item]))
+        xui = self.forward(inputs=(zu[user[:, 0]], zi[item[:, 0]]))
 
         log_likelihood = torch.log(self.sigmoid(xui))
         loss = - torch.sum(log_likelihood)
