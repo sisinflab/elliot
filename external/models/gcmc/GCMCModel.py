@@ -49,8 +49,8 @@ class GCMCModel(torch.nn.Module, ABC):
         self.dense_layer_size = [self.convolutional_layer_size[-1]] + dense_layer_size
         self.n_convolutional_layers = n_convolutional_layers
         self.n_dense_layers = n_dense_layers
-        self.node_dropout = node_dropout if node_dropout else [0.0] * self.n_convolutional_layers
-        self.dense_layer_dropout = dense_layer_dropout if dense_layer_dropout else [0.0] * self.n_dense_layers
+        self.node_dropout = node_dropout
+        self.dense_layer_dropout = dense_layer_dropout
         self.edge_index = torch.tensor(edge_index, dtype=torch.int64)
 
         self.Gu = torch.nn.Parameter(
@@ -66,7 +66,7 @@ class GCMCModel(torch.nn.Module, ABC):
         # Convolutional part
         convolutional_network_list = []
         for layer in range(self.n_convolutional_layers):
-            convolutional_network_list.append((NodeDropout(self.node_dropout[layer], self.num_users, self.num_items),
+            convolutional_network_list.append((NodeDropout(self.node_dropout, self.num_users, self.num_items),
                                                'edge_index -> edge_index'))
             convolutional_network_list.append((GCNConv(in_channels=self.convolutional_layer_size[layer],
                                                        out_channels=self.convolutional_layer_size[layer + 1],
@@ -83,8 +83,7 @@ class GCMCModel(torch.nn.Module, ABC):
                                                                               out_features=self.dense_layer_size[
                                                                                   layer + 1],
                                                                               bias=False)))
-            dense_network_list.append(('relu_' + str(layer), torch.nn.ReLU()))
-            dense_network_list.append(('dropout_' + str(layer), torch.nn.Dropout(self.dense_layer_dropout[layer])))
+            dense_network_list.append(('dropout_' + str(layer), torch.nn.Dropout(self.dense_layer_dropout)))
         self.dense_network = torch.nn.Sequential(OrderedDict(dense_network_list))
         self.dense_network.to(self.device)
 

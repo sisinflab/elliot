@@ -67,17 +67,15 @@ class GCMC(RecMixin, BaseRecommenderModel):
         ######################################
 
         self._params_list = [
-            ("_learning_rate", "lr", "lr", 0.0005, None, None),
-            ("_factors", "factors", "factors", 64, None, None),
-            ("_l_w", "l_w", "l_w", 0.01, None, None),
+            ("_learning_rate", "lr", "lr", 0.0005, float, None),
+            ("_factors", "factors", "factors", 64, int, None),
+            ("_l_w", "l_w", "l_w", 0.01, float, None),
             ("_convolutional_layer_size", "convolutional_layer_size", "convolutional_layer_size", "(64,)", lambda x: list(make_tuple(x)),
              lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
             ("_dense_layer_size", "dense_layer_size", "dense_layer_size", "(64,)", lambda x: list(make_tuple(x)),
              lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
-            ("_node_dropout", "node_dropout", "node_dropout", "()", lambda x: list(make_tuple(x)),
-             lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
-            ("_dense_layer_dropout", "dense_layer_dropout", "dense_layer_dropout", "()", lambda x: list(make_tuple(x)),
-             lambda x: self._batch_remove(str(x), " []").replace(",", "-"))
+            ("_node_dropout", "node_dropout", "node_dropout", 0.1, float, None),
+            ("_dense_layer_dropout", "dense_layer_dropout", "dense_layer_dropout", 0.1, float, None)
         ]
         self.autoset_params()
 
