@@ -135,7 +135,9 @@ class GATModel(torch.nn.Module, ABC):
         return torch.matmul(gu.to(self.device), torch.transpose(gi.to(self.device), 0, 1))
 
     def train_step(self, batch):
-        gu, gi = self.propagate_embeddings()
+        # gu, gi = self.propagate_embeddings()
+        gu = self.Gu
+        gi = self.Gi
         user, pos, neg = batch
         xu_pos = self.forward(inputs=(gu[user[:, 0]], gi[pos[:, 0]]))
         xu_neg = self.forward(inputs=(gu[user[:, 0]], gi[neg[:, 0]]))
