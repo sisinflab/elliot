@@ -19,7 +19,7 @@ class LightEdgeGCNLayer(MessagePassing, ABC):
         deg_inv_sqrt[deg_inv_sqrt == float('inf')] = 0
         norm = deg_inv_sqrt[row] * deg_inv_sqrt[col]
 
-        return (x * self.lin1(edge_attr)) + self.propagate(edge_index, x=x, norm=norm, edge_attr=self.lin1(edge_attr))
+        return self.propagate(edge_index, x=x, norm=norm, edge_attr=self.lin1(edge_attr))
 
     def message(self, x_j, norm, edge_attr):
-        return norm.view(-1, 1) * x_j * edge_attr
+        return norm.view(-1, 1) * ((x_i * edge_attr) + (x_j * edge_attr))
