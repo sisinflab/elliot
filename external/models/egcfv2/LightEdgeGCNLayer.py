@@ -2,6 +2,7 @@ from abc import ABC
 
 from torch_geometric.nn import MessagePassing
 from torch_geometric.utils import degree
+import torch
 
 
 class LightEdgeGCNLayer(MessagePassing, ABC):
