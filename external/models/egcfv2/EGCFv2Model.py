@@ -54,8 +54,11 @@ class EGCFv2Model(torch.nn.Module, ABC):
         self.Gi = torch.nn.Parameter(
             torch.nn.init.xavier_normal_(torch.empty((self.num_items, self.embed_k))))
         self.Gi.to(self.device)
-        self.Ge = torch.tensor(edge_features, dtype=torch.float32, device=self.device)
-        self.feature_dim = self.Ge.shape[1]
+        # self.Ge = torch.tensor(edge_features, dtype=torch.float32, device=self.device)
+        self.Ge = orch.nn.Parameter(
+            torch.nn.init.xavier_normal_(torch.empty((self.node_node_graph.shape[1], self.embed_k))))
+        self.Ge.to(self.device)
+        # self.feature_dim = self.Ge.shape[1]
         self.Gut = torch.nn.Parameter(
             torch.nn.init.xavier_normal_(torch.empty((self.num_users, self.embed_k))))
         self.Gut.to(self.device)
@@ -82,8 +85,7 @@ class EGCFv2Model(torch.nn.Module, ABC):
         # create node-node textual
         propagation_node_node_textual_list = []
         for _ in range(self.n_layers):
-            propagation_node_node_textual_list.append((LightEdgeGCNLayer(self.feature_dim, self.embed_k),
-                                                       'x, edge_index -> x'))
+            propagation_node_node_textual_list.append((LightEdgeGCNLayer(), 'x, edge_index -> x'))
 
         self.node_node_textual_network = torch_geometric.nn.Sequential('x, edge_index', propagation_node_node_textual_list)
         self.node_node_textual_network.to(self.device)
@@ -154,6 +156,7 @@ class EGCFv2Model(torch.nn.Module, ABC):
         loss = torch.sum(self.softplus(-difference))
         reg_loss = self.l_w * (torch.norm(self.Gu, 2) +
                                torch.norm(self.Gi, 2) +
+                               torch.norm(self.Ge, 2) +
                                torch.stack([torch.norm(value, 2) for value in self.node_node_textual_network.parameters()],
                                            dim=0).sum(dim=0)) * 2
         loss += reg_loss
