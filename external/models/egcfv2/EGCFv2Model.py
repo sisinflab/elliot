@@ -19,7 +19,7 @@ import torch_geometric
 import numpy as np
 
 
-class EGCv2FModel(torch.nn.Module, ABC):
+class EGCFv2Model(torch.nn.Module, ABC):
     def __init__(self,
                  num_users,
                  num_items,
