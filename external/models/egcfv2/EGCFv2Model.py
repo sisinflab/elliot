@@ -55,7 +55,7 @@ class EGCFv2Model(torch.nn.Module, ABC):
             torch.nn.init.xavier_normal_(torch.empty((self.num_items, self.embed_k))))
         self.Gi.to(self.device)
         # self.Ge = torch.tensor(edge_features, dtype=torch.float32, device=self.device)
-        self.Ge = orch.nn.Parameter(
+        self.Ge = torch.nn.Parameter(
             torch.nn.init.xavier_normal_(torch.empty((self.node_node_graph.shape[1], self.embed_k))))
         self.Ge.to(self.device)
         # self.feature_dim = self.Ge.shape[1]
