@@ -53,7 +53,7 @@ class EGCFv2(RecMixin, BaseRecommenderModel):
 
         list_nodes_edges = []
 
-        for idx in range(self.edge_index.shape[1]):
+        for idx in range(self.node_node_graph.shape[1]):
             list_nodes_edges.append([self.node_node_graph[0, idx], idx + self._num_users + self._num_items])
             list_nodes_edges.append([self.node_node_graph[1, idx], idx + self._num_users + self._num_items])
 
