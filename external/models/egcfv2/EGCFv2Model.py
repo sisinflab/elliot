@@ -96,7 +96,7 @@ class EGCFv2Model(torch.nn.Module, ABC):
                              self.node_node_graph.to(self.device),
                              edge_edge_textual_emb)]
                 self.node_node_network.train()
-                self.edge_edge_network.train()
+                # self.edge_edge_network.train()
             else:
                 # edge_edge_textual_emb = list(
                 #     self.edge_edge_network.children()
