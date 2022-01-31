@@ -85,7 +85,7 @@ class EGCFv2Model(torch.nn.Module, ABC):
         for layer in range(0, self.n_layers):
             if evaluate:
                 self.node_node_network.eval()
-                self.edge_edge_network.eval()
+                # self.edge_edge_network.eval()
                 with torch.no_grad():
                     # edge_edge_textual_emb = list(
                     #     self.edge_edge_network.children()
