@@ -21,10 +21,11 @@ class KGINLoader(AbstractLoader):
         self.entities = set()
 
         with open(self.entities_file) as f:
-            next(f)     # considers the header
+            # next(f)     # considers the header
             for line in f:
                 self.entities.add(int(line.split(' ')[-1]))
 
+        # TODO: in realtà sarebbe interessante capire quali item sono stati eliminati, per rimuoverli anche da entities
         self.entity_list = set.difference(self.entities, self.items)
 
     def get_mapped(self):
@@ -46,7 +47,8 @@ class KGINLoader(AbstractLoader):
         ns.relations = np.unique(ns.feature_map[:, 1])
         ns.n_relations = len(ns.relations) + 1
         # ns.entities = np.unique(ns.feature_map[:, 2])
-        ns.n_entities = len(self.items) + len(ns.entities)
+        ns.n_entities = len(self.items) + len(ns.entity_list)
+        ns.n_nodes = ns.n_entities + len(self.users)
         ns.private_relations = {p[0] + 1: f for p, f in list(np.ndenumerate(ns.relations))}
         ns.public_relations = {v: k for k, v in ns.private_relations.items()}
         ns.private_objects = {p + len(self.items): f for p, f in list(enumerate(ns.entity_list))}
