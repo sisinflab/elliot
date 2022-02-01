@@ -24,7 +24,6 @@ class DisenGCNModel(torch.nn.Module, ABC):
                  learning_rate,
                  embed_k,
                  l_w,
-                 weight_size,
                  n_layers,
                  disen_k,
                  temperature,
@@ -45,13 +44,11 @@ class DisenGCNModel(torch.nn.Module, ABC):
         self.embed_k = embed_k
         self.learning_rate = learning_rate
         self.l_w = l_w
-        self.weight_size = weight_size
         self.n_layers = n_layers
         self.disen_k = disen_k
         self.temperature = temperature
         self.routing_iterations = routing_iterations
         self.message_dropout = message_dropout
-        self.weight_size_list = [self.embed_k] + self.weight_size
         self.edge_index = torch.tensor(edge_index, dtype=torch.int64)
 
         self.Gu = torch.nn.Parameter(
@@ -62,11 +59,15 @@ class DisenGCNModel(torch.nn.Module, ABC):
         self.Gi.to(self.device)
 
         disengcn_network_list = []
-        for layer in range(self.n_layers):
+        for layer in range(self.n_layers - 1):
             disentangle_layer = torch_geometric.nn.Sequential('x, edge_index', [
                 (DisenGCNLayer(self.temperature), 'x, edge_index -> x')])
             disengcn_network_list.append(('disen_gcn_' + str(layer), torch.nn.Sequential(disentangle_layer)))
             disengcn_network_list.append(('dropout_' + str(layer), torch.nn.Dropout(self.message_dropout)))
+
+        disentangle_layer = torch_geometric.nn.Sequential('x, edge_index', [
+            (DisenGCNLayer(self.temperature), 'x, edge_index -> x')])
+        disengcn_network_list.append(('disen_gcn_' + str(self.n_layers - 1), torch.nn.Sequential(disentangle_layer)))
 
         self.disengcn_network = torch.nn.Sequential(OrderedDict(disengcn_network_list))
         self.disengcn_network.to(self.device)
@@ -76,17 +77,20 @@ class DisenGCNModel(torch.nn.Module, ABC):
 
     def propagate_embeddings(self, evaluate=False):
         current_embeddings = torch.cat((self.Gu.to(self.device), self.Gi.to(self.device)), 0)
+        idx = 0
         for layer in range(0, self.n_layers * 2, 2):
             current_embeddings = current_embeddings.view(current_embeddings.shape[0], 
-                                                         current_embeddings.shape[1] // self.disen_k[layer // 2], 
-                                                         self.disen_k[layer // 2])
+                                                         current_embeddings.shape[1] // self.disen_k[idx],
+                                                         self.disen_k[idx])
+            current_embeddings = torch.nn.functional.normalize(current_embeddings, dim=2)
             if not evaluate:
                 for _ in range(self.routing_iterations):
                     current_embeddings = list(self.disengcn_network.children())[layer][0](current_embeddings.to(self.device),
                                                                                        self.edge_index.to(self.device))
                 current_embeddings = current_embeddings.view(current_embeddings.shape[0], 
-                                                             current_embeddings.shape[1] * self.disen_k[layer // 2])
-                current_embeddings = list(self.disengcn_network.children())[layer + 1](current_embeddings.to(self.device))
+                                                             current_embeddings.shape[1] * self.disen_k[idx])
+                if idx < self.n_layers - 1:
+                    current_embeddings = list(self.disengcn_network.children())[layer + 1](current_embeddings.to(self.device))
             else:
                 self.disengcn_network.eval()
                 with torch.no_grad():
@@ -94,8 +98,10 @@ class DisenGCNModel(torch.nn.Module, ABC):
                         current_embeddings = list(self.disengcn_network.children())[layer][0](current_embeddings.to(self.device),
                                                                                            self.edge_index.to(self.device))
                     current_embeddings = current_embeddings.view(current_embeddings.shape[0], 
-                                                                 current_embeddings.shape[1] * self.disen_k[layer // 2])
-                    current_embeddings = list(self.disengcn_network.children())[layer + 1](current_embeddings.to(self.device))
+                                                                 current_embeddings.shape[1] * self.disen_k[idx])
+                    if idx < self.n_layers - 1:
+                        current_embeddings = list(self.disengcn_network.children())[layer + 1](current_embeddings.to(self.device))
+            idx += 1
 
         if evaluate:
             self.disengcn_network.train()

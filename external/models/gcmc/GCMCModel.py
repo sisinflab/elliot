@@ -49,8 +49,8 @@ class GCMCModel(torch.nn.Module, ABC):
         self.dense_layer_size = [self.convolutional_layer_size[-1]] + dense_layer_size
         self.n_convolutional_layers = n_convolutional_layers
         self.n_dense_layers = n_dense_layers
-        self.node_dropout = node_dropout if node_dropout else [0.0] * self.n_convolutional_layers
-        self.dense_layer_dropout = dense_layer_dropout if dense_layer_dropout else [0.0] * self.n_dense_layers
+        self.node_dropout = torch.tensor(node_dropout, dtype=torch.float32)
+        self.dense_layer_dropout = dense_layer_dropout
         self.edge_index = torch.tensor(edge_index, dtype=torch.int64)
 
         self.Gu = torch.nn.Parameter(
@@ -66,13 +66,12 @@ class GCMCModel(torch.nn.Module, ABC):
         # Convolutional part
         convolutional_network_list = []
         for layer in range(self.n_convolutional_layers):
-            convolutional_network_list.append((NodeDropout(self.node_dropout[layer], self.num_users, self.num_items),
+            convolutional_network_list.append((NodeDropout(self.node_dropout, self.num_users, self.num_items),
                                                'edge_index -> edge_index'))
             convolutional_network_list.append((GCNConv(in_channels=self.convolutional_layer_size[layer],
                                                        out_channels=self.convolutional_layer_size[layer + 1],
-                                                       add_self_loops=False,
-                                                       bias=False), 'x, edge_index -> x'))
-            convolutional_network_list.append((torch.nn.ReLU(), 'x -> x'))
+                                                       add_self_loops=True,
+                                                       bias=True), 'x, edge_index -> x'))
         self.convolutional_network = torch_geometric.nn.Sequential('x, edge_index', convolutional_network_list)
         self.convolutional_network.to(self.device)
 
@@ -83,37 +82,30 @@ class GCMCModel(torch.nn.Module, ABC):
                                                                               out_features=self.dense_layer_size[
                                                                                   layer + 1],
                                                                               bias=False)))
-            dense_network_list.append(('relu_' + str(layer), torch.nn.ReLU()))
-            dense_network_list.append(('dropout_' + str(layer), torch.nn.Dropout(self.dense_layer_dropout[layer])))
+            dense_network_list.append(('dropout_' + str(layer), torch.nn.Dropout(self.dense_layer_dropout)))
         self.dense_network = torch.nn.Sequential(OrderedDict(dense_network_list))
         self.dense_network.to(self.device)
 
         self.sigmoid = torch.nn.Sigmoid()
-        self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
+        self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate, weight_decay=0.995)
 
     def propagate_embeddings(self, evaluate=False):
         current_embeddings = torch.cat((self.Gu, self.Gi), 0)
 
-        for layer in range(0, self.n_convolutional_layers * 3, 3):
+        for layer in range(0, self.n_convolutional_layers * 2, 2):
             if not evaluate:
                 dropout_edge_index = list(
                     self.convolutional_network.children()
                 )[layer](self.edge_index.to(self.device))
-                current_embeddings = list(
+                current_embeddings = torch.nn.functional.relu(list(
                     self.convolutional_network.children()
-                )[layer + 1](current_embeddings.to(self.device), dropout_edge_index.to(self.device))
-                current_embeddings = list(
-                    self.convolutional_network.children()
-                )[layer + 2](current_embeddings.to(self.device))
+                )[layer + 1](current_embeddings.to(self.device), dropout_edge_index.to(self.device)))
             else:
                 self.convolutional_network.eval()
                 with torch.no_grad():
-                    current_embeddings = list(
-                        self.convolutional_network.children()
-                    )[layer + 1](current_embeddings.to(self.device), self.edge_index.to(self.device))
-                    current_embeddings = list(
-                        self.convolutional_network.children()
-                    )[layer + 2](current_embeddings.to(self.device))
+                    current_embeddings = torch.nn.functional.relu(list(
+                    self.convolutional_network.children()
+                )[layer + 1](current_embeddings.to(self.device), self.edge_index.to(self.device)))
 
         if evaluate:
             self.dense_network.eval()
@@ -139,7 +131,7 @@ class GCMCModel(torch.nn.Module, ABC):
         return xui
 
     def predict(self, zu, zi, **kwargs):
-        return torch.matmul(zu.to(self.device), torch.matmul(self.Q.to(self.device), torch.transpose(zi.to(self.device), 0, 1)))
+        return torch.sigmoid(torch.matmul(zu.to(self.device), torch.matmul(self.Q.to(self.device), torch.transpose(zi.to(self.device), 0, 1))))
 
     def train_step(self, batch):
         zu, zi = self.propagate_embeddings()

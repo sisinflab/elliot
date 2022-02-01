@@ -212,7 +212,7 @@ class EGCFModel(torch.nn.Module, ABC):
             elif self.aggregation_mode == 'att':
                 node_node_embeddings, edge_edge_embeddings = \
                     self._attention(node_node_embeddings, node_edge_node_embeddings,
-                                    edge_edge_embeddings, node_edge_edge_embeddings)
+                                    edge_edge_embeddings, node_edge_edge_embeddings, evaluate=evaluate)
             else:
                 raise NotImplementedError('This aggregation mode has not been implemented yet!')
 
@@ -250,8 +250,10 @@ class EGCFModel(torch.nn.Module, ABC):
             pe = self.attention_edge(e1e2)
             pe = torch.nn.functional.softmax(pe / self.temperature, dim=1)
 
-        return torch.add(torch.mul(pn[0], n1), torch.mul(pn[1], n2)), \
-               torch.add(torch.mul(pe[0], e1), torch.mul(pe[1], e2))
+        return torch.add(torch.mul(torch.unsqueeze(pn[:, 0], dim=1), n1),
+                         torch.mul(torch.unsqueeze(pn[:, 1], dim=1), n2)), \
+               torch.add(torch.mul(torch.unsqueeze(pe[:, 0], dim=1), e1),
+                         torch.mul(torch.unsqueeze(pe[:, 1], dim=1), e2))
 
     def forward(self, inputs, **kwargs):
         gu, gi = inputs

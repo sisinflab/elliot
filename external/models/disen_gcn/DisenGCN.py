@@ -69,9 +69,8 @@ class DisenGCN(RecMixin, BaseRecommenderModel):
         self._params_list = [
             ("_learning_rate", "lr", "lr", 0.0005, float, None),
             ("_factors", "factors", "factors", 64, int, None),
+            ("_n_layers", "n_layers", "n_layers", 3, int, None),
             ("_l_w", "l_w", "l_w", 0.01, float, None),
-            ("_weight_size", "weight_size", "weight_size", "(64,)", lambda x: list(make_tuple(x)),
-             lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
             ("_message_dropout", "message_dropout", "message_dropout", 0.1, float, None),
             ("_disen_k", "disen_k", "disen_k", "()", lambda x: list(make_tuple(x)),
              lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
@@ -79,8 +78,6 @@ class DisenGCN(RecMixin, BaseRecommenderModel):
             ("_routing_iterations", "routing_iterations", "routing_iterations", 5, int, None)
         ]
         self.autoset_params()
-
-        self._n_layers = len(self._weight_size)
 
         row, col = data.sp_i_train.nonzero()
         col = [c + self._num_users for c in col]
@@ -92,7 +89,6 @@ class DisenGCN(RecMixin, BaseRecommenderModel):
             learning_rate=self._learning_rate,
             embed_k=self._factors,
             l_w=self._l_w,
-            weight_size=self._weight_size,
             n_layers=self._n_layers,
             disen_k=self._disen_k,
             temperature=self._temperature,

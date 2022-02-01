@@ -4,107 +4,88 @@ Module description:
 """
 
 __version__ = '0.3.0'
-__author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta, Felice Antonio Merra'
-__email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malitesta@poliba.it, felice.merra@poliba.it'
-
-from ast import literal_eval as make_tuple
+__author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta'
+__email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malitesta@poliba.it'
 
 from tqdm import tqdm
 import numpy as np
 import torch
 import os
+import itertools
 
+from ast import literal_eval as make_tuple
 from elliot.utils.write import store_recommendation
-from elliot.dataset.samplers import pointwise_pos_neg_ratio_ratings_sampler as ppnrrs
+
+from elliot.dataset.samplers import custom_sampler as cs
+
 from elliot.recommender import BaseRecommenderModel
 from elliot.recommender.base_recommender_model import init_charger
 from elliot.recommender.recommender_utils_mixin import RecMixin
-from .GCMCModel import GCMCModel
+from .EGCFv2Model import EGCFv2Model
 
 
-class GCMC(RecMixin, BaseRecommenderModel):
+class EGCFv2(RecMixin, BaseRecommenderModel):
     r"""
-    Graph Convolutional Matrix Completion
-
-    For further details, please refer to the `paper <https://arxiv.org/abs/1706.02263>`_
-
-    Args:
-        lr: Learning rate
-        epochs: Number of epochs
-        factors: Number of latent factors
-        batch_size: Batch size
-        l_w: Regularization coefficient
-        convolutional_layer_size: Tuple with number of units for each convolutional layer
-        dense_layer_size: Tuple with number of units for each dense layer
-        node_dropout: Tuple with dropout rate for each node
-        dense_layer_dropout: Tuple with hidden layer dropout rate for each dense propagation layer
-
-    To include the recommendation model, add it to the config file adopting the following pattern:
-
-    .. code:: yaml
-
-      models:
-        GCMC:
-          meta:
-            save_recs: True
-          lr: 0.0005
-          epochs: 50
-          batch_size: 512
-          factors: 64
-          l_w: 0.1
-          convolutional_layer_size: (64,)
-          dense_layer_size: (64,)
-          node_dropout: ()
-          dense_layer_dropout: (0.1,)
+    Edge-Based Graph Collaborative Filtering (version 2)
     """
+
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
+        self._sampler = cs.Sampler(self._data.i_train_dict)
 
-        self._sampler = ppnrrs.Sampler(self._data.i_train_dict, self._data.sp_i_train_ratings, 0)
         if self._batch_size < 1:
             self._batch_size = self._num_users
 
         ######################################
-
         self._params_list = [
-            ("_learning_rate", "lr", "lr", 0.0005, float, None),
-            ("_factors", "factors", "factors", 64, int, None),
+            ("_lr", "lr", "lr", 0.0005, float, None),
+            ("_emb", "emb", "emb", 64, int, None),
+            ("_n_layers", "n_layers", "n_layers", 64, int, None),
             ("_l_w", "l_w", "l_w", 0.01, float, None),
-            ("_convolutional_layer_size", "convolutional_layer_size", "convolutional_layer_size", "(64,)", lambda x: list(make_tuple(x)),
-             lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
-            ("_dense_layer_size", "dense_layer_size", "dense_layer_size", "(64,)", lambda x: list(make_tuple(x)),
-             lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
-            ("_node_dropout", "node_dropout", "node_dropout", 0.1, float, None),
-            ("_dense_layer_dropout", "dense_layer_dropout", "dense_layer_dropout", 0.1, float, None)
+            ("_loader", "loader", "loader", 'InteractionsTextualAttributes', str, None)
         ]
         self.autoset_params()
 
-        self._n_convolutional_layers = len(self._convolutional_layer_size)
-        self._n_dense_layers = len(self._dense_layer_size)
+        self._side_edge_textual = self._data.side_information.InteractionsTextualAttributes
 
         row, col = data.sp_i_train.nonzero()
         col = [c + self._num_users for c in col]
-        self.edge_index = np.array([row, col])
+        self.node_node_graph = np.array([row, col])
 
-        self._model = GCMCModel(
+        list_nodes_edges = []
+
+        for idx in range(self.node_node_graph.shape[1]):
+            list_nodes_edges.append([self.node_node_graph[0, idx], idx + self._num_users + self._num_items])
+            list_nodes_edges.append([self.node_node_graph[1, idx], idx + self._num_users + self._num_items])
+
+        node_edge_graph = np.array(list_nodes_edges).transpose()
+
+        list_edges_edges = []
+        for n in set(node_edge_graph[0]):
+            edges_connected_to_n = node_edge_graph[1][np.argwhere(node_edge_graph[0] == n)][:, 0].tolist()
+            list_edges_edges += list(set(itertools.combinations(edges_connected_to_n, 2)))
+
+        self.edge_edge_graph = np.array(list_edges_edges).transpose()
+        self.edge_edge_graph -= np.min(self.edge_edge_graph)
+
+        del list_nodes_edges, node_edge_graph, list_edges_edges
+
+        self._model = EGCFv2Model(
             num_users=self._num_users,
             num_items=self._num_items,
-            learning_rate=self._learning_rate,
-            embed_k=self._factors,
+            learning_rate=self._lr,
+            embed_k=self._emb,
             l_w=self._l_w,
-            convolutional_layer_size=self._convolutional_layer_size,
-            dense_layer_size=self._dense_layer_size,
-            n_convolutional_layers=self._n_convolutional_layers,
-            n_dense_layers=self._n_dense_layers,
-            node_dropout=self._node_dropout,
-            dense_layer_dropout=self._dense_layer_dropout,
-            edge_index=self.edge_index,
+            n_layers=self._n_layers,
+            edge_features=self._side_edge_textual.object.get_all_features(),
+            node_node_graph=self.node_node_graph,
+            edge_edge_graph=self.edge_edge_graph,
             random_seed=self._seed
         )
 
     @property
     def name(self):
-        return "GCMC" \
+        return "EGCFv2" \
                + f"_{self.get_base_params_shortcut()}" \
                + f"_{self.get_params_shortcut()}"
 
@@ -127,10 +108,10 @@ class GCMC(RecMixin, BaseRecommenderModel):
     def get_recommendations(self, k: int = 100):
         predictions_top_k_test = {}
         predictions_top_k_val = {}
-        zu, zi = self._model.propagate_embeddings(evaluate=True)
+        gu, gi = self._model.propagate_embeddings(evaluate=True)
         for index, offset in enumerate(range(0, self._num_users, self._batch_size)):
             offset_stop = min(offset + self._batch_size, self._num_users)
-            predictions = self._model.predict(zu[offset: offset_stop], zi)
+            predictions = self._model.predict(gu[offset: offset_stop], gi)
             recs_val, recs_test = self.process_protocol(k, predictions, offset, offset_stop)
             predictions_top_k_val.update(recs_val)
             predictions_top_k_test.update(recs_test)
