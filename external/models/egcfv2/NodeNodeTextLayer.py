@@ -2,13 +2,11 @@ from abc import ABC
 
 from torch_geometric.nn import MessagePassing
 from torch_geometric.utils import degree
-import torch
 
 
-class LightEdgeGCNLayer(MessagePassing, ABC):
-    def __init__(self, feature_dim, embed_dim):
-        super(LightEdgeGCNLayer, self).__init__(aggr='add')
-        self.lin1 = torch.nn.Linear(feature_dim, embed_dim)
+class NodeNodeTextLayer(MessagePassing, ABC):
+    def __init__(self):
+        super(NodeNodeTextLayer, self).__init__(aggr='add')
 
     def forward(self, x, edge_index, edge_attr):
         row, col = edge_index
@@ -19,7 +17,7 @@ class LightEdgeGCNLayer(MessagePassing, ABC):
         deg_inv_sqrt[deg_inv_sqrt == float('inf')] = 0
         norm = deg_inv_sqrt[row] * deg_inv_sqrt[col]
 
-        return self.propagate(edge_index, x=x, norm=norm, edge_attr=self.lin1(edge_attr))
+        return self.propagate(edge_index, x=x, norm=norm, edge_attr=edge_attr)
 
     def message(self, x_i, x_j, norm, edge_attr):
         return norm.view(-1, 1) * (x_j + (x_i * x_j) + (x_i * edge_attr) + (x_j * edge_attr))

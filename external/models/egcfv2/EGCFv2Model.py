@@ -9,8 +9,9 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malite
 
 from abc import ABC
 
-from .LightGCNLayer import LightGCNLayer
-from .LightEdgeGCNLayer import LightEdgeGCNLayer
+from .EdgeEdgeLayer import EdgeEdgeLayer
+from .NodeNodeCollabLayer import NodeNodeCollabLayer
+from .NodeNodeTextLayer import NodeNodeTextLayer
 
 import torch
 import torch_geometric
@@ -53,21 +54,37 @@ class EGCFv2Model(torch.nn.Module, ABC):
         self.Gi = torch.nn.Parameter(
             torch.nn.init.xavier_normal_(torch.empty((self.num_items, self.embed_k))))
         self.Gi.to(self.device)
+
+        self.Gut = torch.nn.Parameter(
+            torch.nn.init.xavier_normal_(torch.empty((self.num_users, self.embed_k))))
+        self.Gut.to(self.device)
+        self.Git = torch.nn.Parameter(
+            torch.nn.init.xavier_normal_(torch.empty((self.num_items, self.embed_k))))
+        self.Git.to(self.device)
+
         self.Ge = torch.tensor(edge_features, dtype=torch.float32, device=self.device)
         self.feature_dim = self.Ge.shape[1]
 
         # create node-node collaborative
-        propagation_node_node_list = []
+        propagation_node_node_collab_list = []
         for _ in range(self.n_layers):
-            propagation_node_node_list.append((LightEdgeGCNLayer(self.feature_dim, self.embed_k), 'x, edge_index -> x'))
+            propagation_node_node_collab_list.append((NodeNodeCollabLayer(), 'x, edge_index -> x'))
 
-        self.node_node_network = torch_geometric.nn.Sequential('x, edge_index', propagation_node_node_list)
-        self.node_node_network.to(self.device)
+        self.node_node_collab_network = torch_geometric.nn.Sequential('x, edge_index', propagation_node_node_collab_list)
+        self.node_node_collab_network.to(self.device)
+
+        # create node-node textual
+        propagation_node_node_textual_list = []
+        for _ in range(self.n_layers):
+            propagation_node_node_textual_list.append((NodeNodeTextLayer(), 'x, edge_index -> x'))
+
+        self.node_node_textual_network = torch_geometric.nn.Sequential('x, edge_index', propagation_node_node_textual_list)
+        self.node_node_textual_network.to(self.device)
 
         # create edge-edge textual
         propagation_edge_edge_list = []
         for _ in range(self.n_layers):
-            propagation_edge_edge_list.append((LightGCNLayer(), 'x, edge_index -> x'))
+            propagation_edge_edge_list.append((EdgeEdgeLayer(self.feature_dim, self.embed_k), 'x, edge_index -> x'))
 
         self.edge_edge_network = torch_geometric.nn.Sequential('x, edge_index', propagation_edge_edge_list)
         self.edge_edge_network.to(self.device)
@@ -78,60 +95,76 @@ class EGCFv2Model(torch.nn.Module, ABC):
 
     def propagate_embeddings(self, evaluate=False):
         node_node_collab_emb = [torch.cat((self.Gu.to(self.device), self.Gi.to(self.device)), 0)]
+        node_node_textual_emb = [torch.cat((self.Gut.to(self.device), self.Git.to(self.device)), 0)]
         edge_edge_textual_emb = self.Ge
 
         for layer in range(0, self.n_layers):
             if evaluate:
-                self.node_node_network.eval()
+                self.node_node_collab_network.eval()
+                self.node_node_textual_network.eval()
                 self.edge_edge_network.eval()
                 with torch.no_grad():
                     edge_edge_textual_emb = list(
                         self.edge_edge_network.children()
                     )[layer](edge_edge_textual_emb.to(self.device), self.edge_edge_graph.to(self.device))
                     node_node_collab_emb += [list(
-                        self.node_node_network.children()
+                        self.node_node_collab_network.children()
                     )[layer](node_node_collab_emb[layer].to(self.device),
-                             self.node_node_graph.to(self.device),
-                             edge_edge_textual_emb)]
-                self.node_node_network.train()
+                             self.node_node_graph.to(self.device))]
+                    node_node_textual_emb += [list(
+                        self.node_node_textual_network.children()
+                    )[layer](node_node_textual_emb[layer].to(self.device),
+                             self.node_node_graph.to(self.device), edge_edge_textual_emb)]
+                self.node_node_collab_network.train()
+                self.node_node_textual_network.train()
                 self.edge_edge_network.train()
             else:
                 edge_edge_textual_emb = list(
                     self.edge_edge_network.children()
                 )[layer](edge_edge_textual_emb.to(self.device), self.edge_edge_graph.to(self.device))
                 node_node_collab_emb += [list(
-                    self.node_node_network.children()
+                    self.node_node_collab_network.children()
                 )[layer](node_node_collab_emb[layer].to(self.device),
-                         self.node_node_graph.to(self.device),
-                         edge_edge_textual_emb)]
+                         self.node_node_graph.to(self.device))]
+                node_node_textual_emb += [list(
+                    self.node_node_textual_network.children()
+                )[layer](node_node_textual_emb[layer].to(self.device),
+                         self.node_node_graph.to(self.device), edge_edge_textual_emb)]
 
         node_node_collab_emb = sum([node_node_collab_emb[k] * self.alpha[k] for k in range(len(node_node_collab_emb))])
+        node_node_textual_emb = sum([node_node_textual_emb[k] * self.alpha[k] for k in range(len(node_node_textual_emb))])
         gu, gi = torch.split(node_node_collab_emb, [self.num_users, self.num_items], 0)
-        return gu, gi
+        gut, git = torch.split(node_node_textual_emb, [self.num_users, self.num_items], 0)
+        return gu, gi, gut, git
 
     def forward(self, inputs, **kwargs):
-        gu, gi = inputs
+        gu, gi, gut, git = inputs
         gamma_u = torch.squeeze(gu).to(self.device)
         gamma_i = torch.squeeze(gi).to(self.device)
+        gamma_u_t = torch.squeeze(gut).to(self.device)
+        gamma_i_t = torch.squeeze(git).to(self.device)
 
-        xui = torch.sum(gamma_u * gamma_i, 1)
+        xui = torch.sum(gamma_u * gamma_i, 1) + torch.sum(gamma_u_t * gamma_i_t, 1)
 
         return xui
 
-    def predict(self, gu, gi, **kwargs):
-        return torch.matmul(gu.to(self.device), torch.transpose(gi.to(self.device), 0, 1))
+    def predict(self, gu, gi, gut, git, **kwargs):
+        return torch.matmul(gu.to(self.device), torch.transpose(gi.to(self.device), 0, 1)) + \
+               torch.matmul(gut.to(self.device), torch.transpose(git.to(self.device), 0, 1))
 
     def train_step(self, batch):
-        gu, gi = self.propagate_embeddings()
+        gu, gi, gut, git = self.propagate_embeddings()
         user, pos, neg = batch
-        xu_pos = self.forward(inputs=(gu[user[:, 0]], gi[pos[:, 0]]))
-        xu_neg = self.forward(inputs=(gu[user[:, 0]], gi[neg[:, 0]]))
+        xu_pos = self.forward(inputs=(gu[user[:, 0]], gi[pos[:, 0]], gut[user[:, 0]], git[pos[:, 0]]))
+        xu_neg = self.forward(inputs=(gu[user[:, 0]], gi[neg[:, 0]], gut[user[:, 0]], git[neg[:, 0]]))
         difference = torch.clamp(xu_pos - xu_neg, -80.0, 1e8)
         loss = torch.sum(self.softplus(-difference))
         reg_loss = self.l_w * (torch.norm(self.Gu, 2) +
                                torch.norm(self.Gi, 2) +
+                               torch.norm(self.Gut, 2) +
+                               torch.norm(self.Git, 2) +
                                torch.norm(self.Ge, 2) +
-                               torch.stack([torch.norm(value, 2) for value in self.node_node_network.parameters()],
+                               torch.stack([torch.norm(value, 2) for value in self.edge_edge_network.parameters()],
                                            dim=0).sum(dim=0)) * 2
         loss += reg_loss
 
