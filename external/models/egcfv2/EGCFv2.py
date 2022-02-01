@@ -11,6 +11,7 @@ from tqdm import tqdm
 import numpy as np
 import torch
 import os
+import itertools
 
 from ast import literal_eval as make_tuple
 from elliot.utils.write import store_recommendation
@@ -60,11 +61,9 @@ class EGCFv2(RecMixin, BaseRecommenderModel):
         node_edge_graph = np.array(list_nodes_edges).transpose()
 
         list_edges_edges = []
-        for e in set(node_edge_graph[1]):
-            nodes_connected_to_e = node_edge_graph[0, np.argwhere(node_edge_graph[1] == e)][:, 0].tolist()
-            edges_connected_to_e = node_edge_graph[1, np.argwhere(np.isin(node_edge_graph[0], nodes_connected_to_e))].tolist()
-            edges_connected_to_e = np.array(edges_connected_to_e)[edges_connected_to_e != e].tolist()
-            list_edges_edges += list(map(list, zip([e] * len(edges_connected_to_e), edges_connected_to_e)))
+        for n in set(node_edge_graph[0]):
+            edges_connected_to_n = node_edge_graph[1][np.argwhere(node_edge_graph[0] == n)][:, 0].tolist()
+            list_edges_edges += list(set(itertools.combinations(edges_connected_to_n, 2)))
 
         self.edge_edge_graph = np.array(list_edges_edges).transpose()
         self.edge_edge_graph -= np.min(self.edge_edge_graph)

@@ -9,8 +9,6 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malite
 
 from abc import ABC
 
-from collections import OrderedDict
-
 from .LightGCNLayer import LightGCNLayer
 from .LightEdgeGCNLayer import LightEdgeGCNLayer
 
@@ -67,12 +65,12 @@ class EGCFv2Model(torch.nn.Module, ABC):
         self.node_node_network.to(self.device)
 
         # create edge-edge textual
-        # propagation_edge_edge_list = []
-        # for _ in range(self.n_layers):
-        #     propagation_edge_edge_list.append((LightGCNLayer(), 'x, edge_index -> x'))
-        #
-        # self.edge_edge_network = torch_geometric.nn.Sequential('x, edge_index', propagation_edge_edge_list)
-        # self.edge_edge_network.to(self.device)
+        propagation_edge_edge_list = []
+        for _ in range(self.n_layers):
+            propagation_edge_edge_list.append((LightGCNLayer(), 'x, edge_index -> x'))
+
+        self.edge_edge_network = torch_geometric.nn.Sequential('x, edge_index', propagation_edge_edge_list)
+        self.edge_edge_network.to(self.device)
 
         self.softplus = torch.nn.Softplus()
 
@@ -85,22 +83,22 @@ class EGCFv2Model(torch.nn.Module, ABC):
         for layer in range(0, self.n_layers):
             if evaluate:
                 self.node_node_network.eval()
-                # self.edge_edge_network.eval()
+                self.edge_edge_network.eval()
                 with torch.no_grad():
-                    # edge_edge_textual_emb = list(
-                    #     self.edge_edge_network.children()
-                    # )[layer](edge_edge_textual_emb.to(self.device), self.edge_edge_graph.to(self.device))
+                    edge_edge_textual_emb = list(
+                        self.edge_edge_network.children()
+                    )[layer](edge_edge_textual_emb.to(self.device), self.edge_edge_graph.to(self.device))
                     node_node_collab_emb += [list(
                         self.node_node_network.children()
                     )[layer](node_node_collab_emb[layer].to(self.device),
                              self.node_node_graph.to(self.device),
                              edge_edge_textual_emb)]
                 self.node_node_network.train()
-                # self.edge_edge_network.train()
+                self.edge_edge_network.train()
             else:
-                # edge_edge_textual_emb = list(
-                #     self.edge_edge_network.children()
-                # )[layer](edge_edge_textual_emb.to(self.device), self.edge_edge_graph.to(self.device))
+                edge_edge_textual_emb = list(
+                    self.edge_edge_network.children()
+                )[layer](edge_edge_textual_emb.to(self.device), self.edge_edge_graph.to(self.device))
                 node_node_collab_emb += [list(
                     self.node_node_network.children()
                 )[layer](node_node_collab_emb[layer].to(self.device),
