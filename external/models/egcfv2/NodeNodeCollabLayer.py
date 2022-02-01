@@ -20,4 +20,4 @@ class NodeNodeCollabLayer(MessagePassing, ABC):
         return self.propagate(edge_index, x=x, norm=norm)
 
     def message(self, x_i, x_j, norm):
-        return norm.view(-1, 1) * (x_j + (x_i * x_j))
+        return norm.view(-1, 1) * x_j
