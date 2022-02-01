@@ -21,4 +21,5 @@ class NodeNodeTextLayer(MessagePassing, ABC):
         return self.propagate(edge_index, x=x, norm=norm, edge_attr=edge_attr)
 
     def message(self, x_i, x_j, norm, edge_attr):
+        print(torch.nn.functional.cosine_similarity(x_j, edge_attr, dim=1).shape)
         return norm.view(-1, 1) * x_j * torch.nn.functional.cosine_similarity(x_j, edge_attr, dim=1)
