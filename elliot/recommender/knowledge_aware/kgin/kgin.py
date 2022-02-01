@@ -16,8 +16,7 @@ from collections import defaultdict
 from elliot.dataset.samplers import custom_sampler as cs
 from elliot.recommender import BaseRecommenderModel
 from elliot.recommender.base_recommender_model import init_charger
-from elliot.recommender.knowledge_aware.kaHFM_batch.tfidf_utils import TFIDF
-from elliot.recommender.knowledge_aware.kahfm_embeddings.kahfm_embeddings_model import KaHFMEmbeddingsModel
+from elliot.recommender.knowledge_aware.kgin.kgin_model import KGINModel
 from elliot.recommender.recommender_utils_mixin import RecMixin
 from elliot.utils.write import store_recommendation
 
@@ -30,10 +29,18 @@ class KGIN(RecMixin, BaseRecommenderModel):
         ######################################
 
         self._params_list = [
-            ("_learning_rate", "lr", "lr", 0.0001, None, None),
-            ("_l_w", "l_w", "l_w", 0.005, None, None),
-            ("_l_b", "l_b", "l_b", 0, None, None),
-            ("_loader", "loader", "load", "ChainedKG", None, None),
+            ("_lr", "lr", "lr", 1e-4, float, None), # learning rate
+            ("_decay", "decay", "decay", 1e-5, float, None),    # l2 regularization weight
+            ("_sim_decay", "sim_decay", "sim_decay", 1e-4, float, None),  # regularization weight for latent factor
+            ("_emb_size", "emb_size", "emb_size", 64, int, None),   # embedding size
+            ("_context_hops", "context_hops", "context_hops", 3, int, None),  # number of context hops
+            ("_n_factors", "n_factors", "n_factors", 4, int, None),    # number of latent factor for user favour
+            ("_node_dropout", "node_dropout", "node_dropout", True, bool, None), # consider node dropout or not
+            ("_node_dropout_rate", "node_dropout_rate", "node_dropout_rate", 0.5, float, None), # ratio of node dropout
+            ("_mess_dropout", "mess_dropout", "mess_dropout", True, bool, None),   # consider message dropout or not
+            ("_mess_dropout_rate", "mess_dropout_rate", "mess_dropout_rate", 0.1, float, None), # ratio of node dropout
+            ("_ind", "ind", "ind", "distance", str, None),    # independence modeling: mi, distance, cosine
+            ("_loader", "loader", "load", "KGINLoader", None, None)
         ]
         self.autoset_params()
 
@@ -89,10 +96,12 @@ class KGIN(RecMixin, BaseRecommenderModel):
                 cf = np_mat.copy()
                 cf[:, 1] = cf[:, 1] + len(self._data.users)  # [0, n_items) -> [n_users, n_users+n_items)
                 vals = [1.] * len(cf)
-                adj = sp.coo_matrix((vals, (cf[:, 0], cf[:, 1])), shape=(len(self.public_entities), len(self.public_entities)))
+                adj = sp.coo_matrix((vals, (cf[:, 0], cf[:, 1])),
+                                    shape=(self._side.n_nodes, self._side.n_nodes), dtype=np.float32)
             else:
                 vals = [1.] * len(np_mat)
-                adj = sp.coo_matrix((vals, (np_mat[:, 0], np_mat[:, 1])), shape=(len(self.public_entities), len(self.public_entities)))
+                adj = sp.coo_matrix((vals, (np_mat[:, 0], np_mat[:, 1])),
+                                    shape=(self._side.n_nodes, self._side.n_nodes), dtype=np.float32)
             adj_mat_list.append(adj)
 
         norm_mat_list = [_bi_norm_lap(mat) for mat in adj_mat_list]
@@ -101,12 +110,18 @@ class KGIN(RecMixin, BaseRecommenderModel):
         norm_mat_list[0] = norm_mat_list[0].tocsr()[:len(self._data.users), len(self._data.users):].tocoo()
         mean_mat_list[0] = mean_mat_list[0].tocsr()[:len(self._data.users), len(self._data.users):].tocoo()
 
-        self._model = KaHFMEmbeddingsModel(self._user_factors,
-                                           self._item_factors,
-                                           self._params.lr,
-                                           self._params.l_w,
-                                           self._params.l_b,
-                                           self._seed)
+        self._model = KGINModel(self._num_users, self._num_items,
+                                self._side.n_relations, self._side.n_entities,
+                                mean_mat_list[0], ckg_graph,
+                                self._lr,
+                                self._decay, self._sim_decay,
+                                self._emb_size,
+                                self._context_hops,
+                                self._n_factors,
+                                self._node_dropout, self._node_dropout_rate,
+                                self._mess_dropout, self._mess_dropout_rate,
+                                self._ind,
+                                self._seed)
 
     @property
     def name(self):
@@ -121,8 +136,8 @@ class KGIN(RecMixin, BaseRecommenderModel):
         for it in self.iterate(self._epochs):
             loss = 0
             steps = 0
-            with tqdm(total=int(self._transactions_per_epoch // self._batch_size), disable=not self._verbose) as t:
-                for batch in self._sampler.step(self._transactions_per_epoch, self._batch_size):
+            with tqdm(total=int(self._data.transactions // self._batch_size), disable=not self._verbose) as t:
+                for batch in self._sampler.step(self._data.transactions, self._batch_size):
                     steps += 1
                     loss += self._model.train_step(batch)
                     t.set_postfix({'loss': f'{loss.numpy() / steps:.5f}'})
