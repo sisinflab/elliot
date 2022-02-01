@@ -82,9 +82,9 @@ class EGCFv2Model(torch.nn.Module, ABC):
         self.node_node_textual_network.to(self.device)
 
         # create edge-edge textual
-        propagation_edge_edge_list = []
-        for _ in range(self.n_layers):
-            propagation_edge_edge_list.append((EdgeEdgeLayer(self.feature_dim, self.embed_k), 'x, edge_index -> x'))
+        propagation_edge_edge_list = [(EdgeEdgeLayer(self.feature_dim, self.embed_k), 'x, edge_index -> x')]
+        for _ in range(1, self.n_layers):
+            propagation_edge_edge_list.append((EdgeEdgeLayer(self.embed_k, self.embed_k), 'x, edge_index -> x'))
 
         self.edge_edge_network = torch_geometric.nn.Sequential('x, edge_index', propagation_edge_edge_list)
         self.edge_edge_network.to(self.device)
