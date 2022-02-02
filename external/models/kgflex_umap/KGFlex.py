@@ -6,6 +6,7 @@ import multiprocessing as mp
 import threading
 import tensorflow as tf
 
+
 from elliot.recommender import BaseRecommenderModel
 from elliot.recommender.base_recommender_model import init_charger
 from elliot.recommender.recommender_utils_mixin import RecMixin
@@ -13,7 +14,7 @@ from elliot.recommender.recommender_utils_mixin import RecMixin
 from elliot.dataset.samplers import custom_sampler as cs
 
 from .UserFeatureMapper import UserFeatureMapper
-from .KGFlexTFModel import KGFlexTFModel
+from .KGFlexModel import KGFlexModel
 from .tfidf_utils import TFIDF
 
 #mp.set_start_method('fork')
@@ -29,7 +30,7 @@ def uif_worker(us_f, its_f, mapping):
     return tf.RaggedTensor.from_row_lengths(uif, lengths)
 
 
-class KGFlexTF2(RecMixin, BaseRecommenderModel):
+class KGFlexUmap(RecMixin, BaseRecommenderModel):
 
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
@@ -89,43 +90,56 @@ class KGFlexTF2(RecMixin, BaseRecommenderModel):
         for _, f in users_features.items():
             features = set.union(features, set(f))
 
-        feature_key_mapping = dict(zip(list(features), range(len(features))))
+        self.num_features = len(features)
+        feature_key_mapping = dict(zip(list(features), range(self.num_features)))
 
         self.logger.info('FEATURES INFO: {} features found'.format(len(feature_key_mapping)))
+
+        # -------------------------- BUILDING CONTENT VECTORS --------------------------
+        content_item_idxs = list()
+        content_feature_idxs = list()
+        for i in range(self._data.num_items):
+            ifs = self.item_features[i]
+            common = set.intersection(set(feature_key_mapping.keys()), ifs)
+            for f in common:
+                content_item_idxs.append(i)
+                content_feature_idxs.append(feature_key_mapping[f])
+            #item_features.extend(list(map(lambda x: (i, feature_key_mapping[x]), common)))
+
+        content_vectors = csr_matrix((np.ones(len(content_item_idxs)), (content_item_idxs, content_feature_idxs)),
+                                     (self._data.num_items, self.num_features))
+
+        # content_vectors = tf.sparse.SparseTensor(item_features, np.ones(len(item_features), dtype=np.float32),
+        #                                          (self._data.num_items, self.num_features))
+
+        # -------------------------- BUILDING USER-FEATURE VECTORS -------------------------
 
         user_feature_weights = tf.constant(
             [[users_features[u].get(f, 0) for f in features] for u in self._data.private_users])
 
-        item_features = list()
-        for i in range(self._data.num_items):
-            features = self.item_features[i]
-            common = set.intersection(set(feature_key_mapping.keys()), features)
-            # item_features[i] = list(map(lambda x: feature_key_mapping[x], common))
-            item_features.append(list(map(lambda x: feature_key_mapping[x], common)))
-
-        def stack_ragged(tensors):
-            values = tf.concat(tensors, axis=0)
-            lens = tf.stack([tf.shape(t, out_type=tf.int64)[0] for t in tensors])
-            return tf.RaggedTensor.from_row_lengths(values, lens)
-
-        item_features = stack_ragged(item_features)
+        # def stack_ragged(tensors):
+        #     values = tf.concat(tensors, axis=0)
+        #     lens = tf.stack([tf.shape(t, out_type=tf.int64)[0] for t in tensors])
+        #     return tf.RaggedTensor.from_row_lengths(values, lens)
+        #
+        # item_features = stack_ragged(item_features)
 
         self.logger.info('Starting KGFlex experiment...')
 
         self._sampler = cs.Sampler(self._data.i_train_dict)
 
         # ------------------------------ MODEL ------------------------------
-        self._model = KGFlexTFModel(num_users=self._data.num_users,
-                                    num_items=self._data.num_items,
-                                    user_feature_weights=user_feature_weights,
-                                    item_features=item_features,
-                                    num_features=len(feature_key_mapping),
-                                    factors=self._embedding,
-                                    learning_rate=self._lr)
+        self._model = KGFlexModel(num_users=self._data.num_users,
+                                  num_items=self._data.num_items,
+                                  user_feature_weights=user_feature_weights,
+                                  content_vectors=content_vectors,
+                                  num_features=self.num_features,
+                                  factors=self._embedding,
+                                  learning_rate=self._lr)
 
     @property
     def name(self):
-        return "KGFlexTF2" \
+        return "KGFlexUmap" \
                + "_e:" + str(self._epochs) \
                + f"_{self.get_params_shortcut()}"
 

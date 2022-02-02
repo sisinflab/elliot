@@ -1,2 +1,2 @@
-from .KGFlexTF import KGFlexTF2
-from .KGFlexTFModel import KGFlexTFModel
+from .KGFlex import KGFlexUmap
+from .KGFlexModel import KGFlexModel
