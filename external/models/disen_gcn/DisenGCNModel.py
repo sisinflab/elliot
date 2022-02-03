@@ -81,8 +81,9 @@ class DisenGCNModel(torch.nn.Module, ABC):
             if not evaluate:
                 for _ in range(self.routing_iterations):
                     if idx == self.n_layers - 1:
-                        current_embeddings = list(self.disengcn_network.children())[layer](
-                            current_embeddings.to(self.device))
+                        current_embeddings = list(self.disengcn_network.children())[layer][0](
+                            current_embeddings.to(self.device),
+                            self.edge_index.to(self.device))
                     else:
                         current_embeddings = torch.nn.functional.dropout(
                             list(self.disengcn_network.children())[layer][0](current_embeddings.to(self.device),
