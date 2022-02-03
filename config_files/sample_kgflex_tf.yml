@@ -28,23 +28,23 @@ experiment:
     simple_metrics: [nDCGRendle2020, nDCG, HR, Precision, ItemCoverage]
     relevance_threshold: 3
   models:
-    external.KGFlexTF:
+    external.KGFlexUmap:
       meta:
         verbose: True
         validation_rate: 1
-        save_recs: True
+        save_recs: False
         save_weights: False
         restore: False
         hyper_max_evals: 10
         hyper_opt_alg: tpe
       seed: 42
-      lr: 0.0005438474900776614
+      lr: 0.005438474900776614
       # lr: 0.001
       epochs: 50
       batch_size: 64
       # batch_size: 128
-      embedding: 64
+      embedding: 5
       # embedding: 256
       first_order_limit: 50
-      second_order_limit: 50
+      second_order_limit: None
       loader: KGFlexLoader

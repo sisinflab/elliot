@@ -7,6 +7,8 @@ from operator import itemgetter
 from collections import OrderedDict, Counter
 
 #mp.set_start_method("fork")
+DEFAULT_FEATURE_WEIGHT = 'gini'
+NEGATIVE_POSITIVE_RATIO = 1
 
 
 def worker(user, user_items, neg_items, if1, if2, fol, sol, seed):
@@ -90,15 +92,15 @@ def user_features_counter(user_items, neg_items, item_features_):
         return pos_counter, neg_counter
 
     # for each postive item pick a negative
-    negatives = random.choices(list(neg_items), k=len(user_items))
+    negatives = random.choices(list(neg_items), k=NEGATIVE_POSITIVE_RATIO * len(user_items))
     positives = user_items
 
     # count positive feature and negative features
     pos_c, neg_c = count_features(item_features_)
-    return pos_c, neg_c, len(positives)
+    return pos_c, neg_c, len(positives), len(negatives)
 
 
-def features_entropy(pos_counter, neg_counter, counter):
+def feature_entropy(pos_counter, neg_counter, n_pos_items, n_neg_items):
     """
     :param pos_counter: number of times in which feature is true and target is true
     :param neg_counter: number of times in which feature is true and target is false
@@ -114,125 +116,164 @@ def features_entropy(pos_counter, neg_counter, counter):
             return 0
         return - ratio * math.log2(ratio)
 
-    def info_gain(pos_c, neg_c, n_items):
+    def info_gain(pos_c, neg_c, n_pos_items, n_neg_items):
 
         den_1 = pos_c + neg_c
 
         h_pos = relative_gain(pos_c, den_1) + relative_gain(neg_c, den_1)
-        den_2 = 2 * n_items - (pos_c + neg_c)
+        den_2 = n_pos_items + n_neg_items - (pos_c + neg_c)
 
-        num_1 = n_items - pos_c
-        num_2 = n_items - neg_c
+        num_1 = n_pos_items - pos_c
+        num_2 = n_neg_items - neg_c
         h_neg = relative_gain(num_1, den_2) + relative_gain(num_2, den_2)
 
         return 1 - den_1 / (den_1 + den_2) * h_pos - den_2 / (den_1 + den_2) * h_neg
 
     attribute_entropies = dict()
     for positive_feature in pos_counter:
-        ig = info_gain(pos_counter[positive_feature], neg_counter[positive_feature], counter)
+        ig = info_gain(pos_counter[positive_feature], neg_counter[positive_feature], n_pos_items, n_neg_items)
         if ig > 0:
             attribute_entropies[positive_feature] = ig
-    # for negative_feature in neg_counter:
-    #     ig = info_gain(pos_counter[negative_feature], neg_counter[negative_feature], counter)
-    #     if ig > 0:
-    #         attribute_entropies[negative_feature] = ig
+    for negative_feature in neg_counter:
+        ig = info_gain(pos_counter[negative_feature], neg_counter[negative_feature], n_pos_items, n_neg_items)
+        if ig > 0:
+            attribute_entropies[negative_feature] = ig
 
     return OrderedDict(sorted(attribute_entropies.items(), key=itemgetter(1, 0), reverse=True))
 
-def features_gini(pos_counter, neg_counter, counter):
+def feature_gini(pos_counter, neg_counter, n_pos_items, n_neg_items):
     # TODO: change var names according to the formula
     def relative_gini(partial, total):
+        if total == 0:
+            return 0
         return (partial / total) ** 2
 
-    def gini_index(pos_c, neg_c, n_items):
+    def gini_index(pos_c, neg_c, n_pos_items, n_neg_items):
 
         den_1 = pos_c + neg_c
         gini_pos = 1 - (relative_gini(pos_c, den_1) + relative_gini(neg_c, den_1))
 
-        den_2 = 2 * n_items - (pos_c + neg_c)
-        num_1 = n_items - pos_c
-        num_2 = n_items - neg_c
+        den_2 = n_pos_items + n_neg_items - (pos_c + neg_c)
+        num_1 = n_pos_items - pos_c
+        num_2 = n_neg_items - neg_c
         gini_neg = 1 - (relative_gini(num_1, den_2) + relative_gini(num_2, den_2))
 
         return 1 - (den_1 / (den_1 + den_2) * gini_pos + den_2 / (den_1 + den_2) * gini_neg)
 
     attribute_entropies = dict()
     # compute Gini for each feature
-    for positive_feature in pos_counter:
-        gini = gini_index(pos_counter[positive_feature], neg_counter[positive_feature], counter)
-        if gini > 0:
-            attribute_entropies[positive_feature] = gini
 
-    return OrderedDict(sorted(attribute_entropies.items(), key=itemgetter(1), reverse=True))
+    # let's multiply the value of pos_counter to obtain a weighted version of gini impurity
+    ratio = n_neg_items / n_pos_items
+
+    for positive_feature in pos_counter:
+        gini = gini_index(pos_counter[positive_feature] * ratio, neg_counter[positive_feature], ratio * n_pos_items,
+                          n_neg_items)
+        attribute_entropies[positive_feature] = gini
+    for negative_feature in neg_counter:
+        gini = gini_index(pos_counter[negative_feature] * ratio, neg_counter[negative_feature], ratio * n_pos_items,
+                          n_neg_items)
+        attribute_entropies[negative_feature] = gini
+
+    return OrderedDict(sorted(attribute_entropies.items(), key=itemgetter(1, 0), reverse=True))
+
+# def bak_limited_second_order_selection(counters, limit_first, limit_second):
+#     # 1st-order-features
+#     pos_1, neg_1, counter_1 = counters[1]
+#     # 2nd-order-features
+#     pos_2, neg_2, counter_2 = counters[2]
+#
+#     if limit_first == -1 and limit_second == -1:
+#         pos_f = pos_1 + pos_2
+#         neg_f = neg_1 + neg_2
+#     else:
+#         if limit_first == -1:
+#             if limit_second != 0:
+#                 entropies_2 = feature_weight(pos_2, neg_2, counter_2)
+#                 # top 2nd-order-features ordered by entropy
+#                 entropies_2_red = OrderedDict(islice(entropies_2.items(), limit_second))
+#                 # filtering pos and neg features respect to the 'top limit' selected
+#                 pos_2_red = Counter({k: pos_2[k] for k in entropies_2_red.keys()})
+#                 neg_2_red = Counter({k: neg_2[k] for k in entropies_2_red.keys()})
+#             else:
+#                 pos_2_red = Counter()
+#                 neg_2_red = Counter()
+#
+#             # final features: 1st-order-f + top 2nd-order-f
+#             pos_f = pos_1 + pos_2_red
+#             neg_f = neg_1 + neg_2_red
+#         elif limit_second == -1:
+#             if limit_first != 0:
+#                 entropies_1 = feature_weight(pos_1, neg_1, counter_1)
+#
+#                 # top 1st-order-features ordered by entropy
+#                 entropies_1_red = OrderedDict(islice(entropies_1.items(), limit_second))
+#                 # filtering pos and neg features respect to the 'top limit' selected
+#                 pos_1_red = Counter({k: pos_1[k] for k in entropies_1_red.keys()})
+#                 neg_1_red = Counter({k: neg_1[k] for k in entropies_1_red.keys()})
+#             else:
+#                 pos_1_red = Counter()
+#                 neg_1_red = Counter()
+#
+#             # final features: top 1st-order-f + 2nd-order-f
+#             pos_f = pos_1_red + pos_2
+#             neg_f = neg_1_red + neg_2
+#         else:
+#             if limit_first != 0:
+#                 entropies_1 = feature_weight(pos_1, neg_1, counter_1)
+#
+#                 # top 10 1st-order-features ordered by entropy
+#                 entropies_1_red = OrderedDict(islice(entropies_1.items(), limit_first))
+#                 # filtering pos and neg features respect to the 'top limit' selected
+#                 pos_1_red = Counter({k: pos_1[k] for k in entropies_1_red.keys()})
+#                 neg_1_red = Counter({k: neg_1[k] for k in entropies_1_red.keys()})
+#             else:
+#                 pos_1_red = Counter()
+#                 neg_1_red = Counter()
+#
+#             if limit_second != 0:
+#                 entropies_2 = feature_weight(pos_2, neg_2, counter_2)
+#
+#                 # top 10 2nd-order-features ordered by entropy
+#                 entropies_2_red = OrderedDict(islice(entropies_2.items(), limit_second))
+#                 # filtering pos and neg features respect to the 'top limit' selected
+#                 pos_2_red = Counter({k: pos_2[k] for k in entropies_2_red.keys()})
+#                 neg_2_red = Counter({k: neg_2[k] for k in entropies_2_red.keys()})
+#             else:
+#                 pos_2_red = Counter()
+#                 neg_2_red = Counter()
+#
+#             # final features: top 1st-order-f + top 2nd-order-f
+#             pos_f = pos_1_red + pos_2_red
+#             neg_f = neg_1_red + neg_2_red
+#
+#     return feature_weight(pos_f, neg_f, counter_2)
+
 
 def limited_second_order_selection(counters, limit_first, limit_second):
     # 1st-order-features
-    pos_1, neg_1, counter_1 = counters[1]
+    pos_1, neg_1, num_pos_items_1, num_neg_items_1 = counters[1]
     # 2nd-order-features
-    pos_2, neg_2, counter_2 = counters[2]
+    pos_2, neg_2, num_pos_items_2, num_neg_items_2 = counters[2]
 
-    if limit_first == -1 and limit_second == -1:
-        pos_f = pos_1 + pos_2
-        neg_f = neg_1 + neg_2
-    else:
-        if limit_first == -1:
-            if limit_second != 0:
-                entropies_2 = features_entropy(pos_2, neg_2, counter_2)
-                # top 2nd-order-features ordered by entropy
-                entropies_2_red = OrderedDict(islice(entropies_2.items(), limit_second))
-                # filtering pos and neg features respect to the 'top limit' selected
-                pos_2_red = Counter({k: pos_2[k] for k in entropies_2_red.keys()})
-                neg_2_red = Counter({k: neg_2[k] for k in entropies_2_red.keys()})
-            else:
-                pos_2_red = Counter()
-                neg_2_red = Counter()
+    entropies_1 = feature_weight(pos_1, neg_1, num_pos_items_1, num_neg_items_1)
+    entropies_2 = feature_weight(pos_2, neg_2, num_pos_items_2, num_neg_items_2)
+    entropies = {**entropies_1, **entropies_2}
 
-            # final features: 1st-order-f + top 2nd-order-f
-            pos_f = pos_1 + pos_2_red
-            neg_f = neg_1 + neg_2_red
-        elif limit_second == -1:
-            if limit_first != 0:
-                entropies_1 = features_entropy(pos_1, neg_1, counter_1)
+    attributes_dict = OrderedDict(islice(sorted(entropies.items(), key=itemgetter(1, 0), reverse=True), limit_first))
 
-                # top 1st-order-features ordered by entropy
-                entropies_1_red = OrderedDict(islice(entropies_1.items(), limit_second))
-                # filtering pos and neg features respect to the 'top limit' selected
-                pos_1_red = Counter({k: pos_1[k] for k in entropies_1_red.keys()})
-                neg_1_red = Counter({k: neg_1[k] for k in entropies_1_red.keys()})
-            else:
-                pos_1_red = Counter()
-                neg_1_red = Counter()
+    # mn = min(attributes_dict.values())
+    # mx = max(attributes_dict.values())
+    # diff = mx - mn
+    #
+    # if diff:
+    #     for k, v in attributes_dict.items():
+    #         attributes_dict[k] = (v - mn) / diff
 
-            # final features: top 1st-order-f + 2nd-order-f
-            pos_f = pos_1_red + pos_2
-            neg_f = neg_1_red + neg_2
-        else:
-            if limit_first != 0:
-                entropies_1 = features_entropy(pos_1, neg_1, counter_1)
+    return attributes_dict
 
-                # top 10 1st-order-features ordered by entropy
-                entropies_1_red = OrderedDict(islice(entropies_1.items(), limit_first))
-                # filtering pos and neg features respect to the 'top limit' selected
-                pos_1_red = Counter({k: pos_1[k] for k in entropies_1_red.keys()})
-                neg_1_red = Counter({k: neg_1[k] for k in entropies_1_red.keys()})
-            else:
-                pos_1_red = Counter()
-                neg_1_red = Counter()
-
-            if limit_second != 0:
-                entropies_2 = features_entropy(pos_2, neg_2, counter_2)
-
-                # top 10 2nd-order-features ordered by entropy
-                entropies_2_red = OrderedDict(islice(entropies_2.items(), limit_second))
-                # filtering pos and neg features respect to the 'top limit' selected
-                pos_2_red = Counter({k: pos_2[k] for k in entropies_2_red.keys()})
-                neg_2_red = Counter({k: neg_2[k] for k in entropies_2_red.keys()})
-            else:
-                pos_2_red = Counter()
-                neg_2_red = Counter()
-
-            # final features: top 1st-order-f + top 2nd-order-f
-            pos_f = pos_1_red + pos_2_red
-            neg_f = neg_1_red + neg_2_red
-
-    return features_entropy(pos_f, neg_f, counter_2)
+def feature_weight(pos_counter, neg_counter, num_pos_items, num_neg_items, type=DEFAULT_FEATURE_WEIGHT):
+    if type == 'info_gain':
+        return feature_entropy(pos_counter, neg_counter, num_pos_items, num_neg_items)
+    elif type == 'gini':
+        return feature_gini(pos_counter, neg_counter, num_pos_items, num_neg_items)

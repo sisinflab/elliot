@@ -10,6 +10,7 @@ import os
 import numpy as np
 import tensorflow as tf
 from tensorflow import keras
+from scipy.sparse.linalg import LinearOperator
 import math
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
@@ -41,29 +42,35 @@ class KGFlexModel(keras.Model):
 
         self.K = user_feature_weights
         self.F_B = tf.Variable(self.initializer(shape=[self.num_features]), name='F_B', dtype=tf.float32)
-        # self.I_B = tf.Variable(self.initializer(shape=[self.num_items]), name='I_B', dtype=tf.float32)
-        # self.U_B = tf.Variable(self.initializer(shape=[self.num_users]), name='U_B', dtype=tf.float32)
+        self.I_B = tf.Variable(self.initializer(shape=[self.num_items]), name='I_B', dtype=tf.float32)
+        self.U_B = tf.Variable(self.initializer(shape=[self.num_users]), name='U_B', dtype=tf.float32)
         self.H = tf.Variable(self.initializer(shape=[self.num_users, self._factors]), name='H', dtype=tf.float32)
         self.G = tf.Variable(self.initializer(shape=[self.num_features, self._factors]), name='G', dtype=tf.float32)
         self.C = content_vectors
 
-        self.optimizer = tf.optimizers.Adam(learning_rate)
+        self.optimizer = tf.optimizers.Adamax(learning_rate)
 
     def scipy_gather(self, idx):
-        return self.C[idx].A
+        return self.C[idx].A - 1
 
     def scipy_matmul(self, mat):
-        return self.C * mat
+        def subtract_and_matvec(x):
+            return self.C * x - 1 * x.sum()
+
+        op = LinearOperator(self.C.shape, matvec=subtract_and_matvec)
+
+        return op.dot(mat)
 
     @tf.function
     def call(self, inputs, training=None, mask=None):
         user, item = inputs
+        i_b = tf.squeeze(tf.nn.embedding_lookup(self.I_B, item))
         h_u = tf.squeeze(tf.nn.embedding_lookup(self.H, user))
         z_u = h_u @ tf.transpose(self.G)  # num_features x 1
         c_i = tf.py_function(self.scipy_gather, [tf.squeeze(item)], Tout=[tf.float32])
         s_ui = c_i * z_u
         k_u = tf.squeeze(tf.nn.embedding_lookup(self.K, user))  # num_features x 1
-        x_ui = tf.reduce_sum(k_u * s_ui, axis=-1)
+        x_ui = tf.add(tf.reduce_sum(k_u * s_ui, axis=-1), i_b)
 
         return x_ui
 
@@ -104,8 +111,8 @@ class KGFlexModel(keras.Model):
     @tf.function
     def get_all_recs(self):
         Z = self.H @ tf.transpose(self.G)
-        return tf.transpose(
-            tf.squeeze(tf.py_function(self.scipy_matmul, [tf.transpose(self.K * Z)], Tout=[tf.float32])))
+        return tf.add(tf.transpose(
+            tf.squeeze(tf.py_function(self.scipy_matmul, [tf.transpose(self.K * Z)], Tout=[tf.float32]))), self.I_B)
 
     def get_all_topks(self, predictions, mask, k, user_map, item_map):
         predictions_top_k = {

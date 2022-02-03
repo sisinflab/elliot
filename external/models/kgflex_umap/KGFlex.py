@@ -5,6 +5,7 @@ import pandas as pd
 import multiprocessing as mp
 import threading
 import tensorflow as tf
+from collections import Counter
 
 
 from elliot.recommender import BaseRecommenderModel
@@ -86,6 +87,7 @@ class KGFlexUmap(RecMixin, BaseRecommenderModel):
         # ------------------------------ MODEL FEATURES ------------------------------
         self.logger.info('Features mapping started')
         users_features = self.user_feature_mapper.users_features
+
         features = set()
         for _, f in users_features.items():
             features = set.union(features, set(f))
@@ -104,10 +106,11 @@ class KGFlexUmap(RecMixin, BaseRecommenderModel):
             for f in common:
                 content_item_idxs.append(i)
                 content_feature_idxs.append(feature_key_mapping[f])
-            #item_features.extend(list(map(lambda x: (i, feature_key_mapping[x]), common)))
 
-        content_vectors = csr_matrix((np.ones(len(content_item_idxs)), (content_item_idxs, content_feature_idxs)),
+        content_vectors = csr_matrix((np.ones(len(content_item_idxs)) + 1, (content_item_idxs, content_feature_idxs)),
                                      (self._data.num_items, self.num_features))
+
+        # Plus one above is for using linear operator that subtracts 1
 
         # content_vectors = tf.sparse.SparseTensor(item_features, np.ones(len(item_features), dtype=np.float32),
         #                                          (self._data.num_items, self.num_features))
