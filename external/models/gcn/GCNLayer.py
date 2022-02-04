@@ -114,18 +114,14 @@ class GCNConv(MessagePassing):
     _cached_edge_index: Optional[Tuple[Tensor, Tensor]]
     _cached_adj_t: Optional[SparseTensor]
 
-    def __init__(self, in_channels: int, out_channels: int,
+    def __init__(self, weight: Tensor, weight_bias: Tensor,
                  improved: bool = False, cached: bool = False,
                  add_self_loops: bool = True, normalize: bool = True,
-                 bias: bool = True, seed: int=42, **kwargs):
+                 bias: bool = True, **kwargs):
 
         kwargs.setdefault('aggr', 'add')
         super(GCNConv, self).__init__(**kwargs)
 
-        torch.manual_seed(seed)
-
-        self.in_channels = in_channels
-        self.out_channels = out_channels
         self.improved = improved
         self.cached = cached
         self.add_self_loops = add_self_loops
@@ -134,24 +130,12 @@ class GCNConv(MessagePassing):
         self._cached_edge_index = None
         self._cached_adj_t = None
 
-        self.weight = torch.nn.Parameter(
-            torch.nn.init.xavier_normal_(torch.empty((in_channels, out_channels))))
+        self.weight = weight
 
         if bias:
-            self.bias = torch.nn.Parameter(
-            torch.nn.init.zeros_(torch.empty((out_channels,))))
+            self.bias = weight_bias
         else:
             self.register_parameter('bias', None)
-
-        # self.reset_parameters()
-
-    def reset_parameters(self):
-        self.weight = torch.nn.Parameter(
-            torch.nn.init.xavier_normal_(torch.empty((self.in_channels, self.out_channels))))
-        self.bias = torch.nn.Parameter(
-            torch.nn.init.zeros_(torch.empty((self.out_channels,))))
-        self._cached_edge_index = None
-        self._cached_adj_t = None
 
     def forward(self, x: Tensor, edge_index: Adj,
                 edge_weight: OptTensor = None) -> Tensor:

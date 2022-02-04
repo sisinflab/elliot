@@ -54,10 +54,14 @@ class GCNModel(torch.nn.Module, ABC):
         propagation_network_list = []
 
         for layer in range(self.n_layers):
-            propagation_network_list.append((GCNConv(in_channels=self.weight_size_list[layer],
-                                                     out_channels=self.weight_size_list[layer + 1],
-                                                     add_self_loops=True,
-                                                     seed=random_seed), 'x, edge_index -> x'))
+            weight = torch.nn.Parameter(
+            torch.nn.init.xavier_normal_(torch.empty((self.weight_size_list[layer], self.weight_size_list[layer + 1]))))
+            weight_bias = torch.nn.Parameter(
+            torch.nn.init.zeros_(torch.empty((self.weight_size_list[layer + 1],))))
+            propagation_network_list.append((GCNConv(
+                weight=weight,
+                weight_bias=weight_bias,
+                add_self_loops=True), 'x, edge_index -> x'))
 
         self.propagation_network = torch_geometric.nn.Sequential('x, edge_index', propagation_network_list)
         self.propagation_network.to(self.device)
