@@ -11,6 +11,7 @@ from abc import ABC
 
 from .NGCFLayer import NGCFLayer
 from .NodeDropout import NodeDropout
+from torch_sparse import SparseTensor
 import torch
 import torch_geometric
 import numpy as np
@@ -79,21 +80,28 @@ class NGCFModel(torch.nn.Module, ABC):
         all_embeddings = [ego_embeddings]
         embedding_idx = 0
 
+        adj = SparseTensor(row=self.edge_index[0], col=self.edge_index[1],
+                           sparse_sizes=(self.num_users + self.num_items,
+                                         self.num_users + self.num_items))
+
         for layer in range(0, self.n_layers * 2, 2):
             if not evaluate:
                 dropout_edge_index = list(
                     self.propagation_network.children()
                 )[layer](self.edge_index.to(self.device))
+                adj = SparseTensor(row=dropout_edge_index[0], col=dropout_edge_index[1],
+                                   sparse_sizes=(self.num_users + self.num_items,
+                                                 self.num_users + self.num_items))
                 all_embeddings += [torch.nn.functional.dropout(list(
                     self.propagation_network.children()
-                )[layer + 1](all_embeddings[embedding_idx].to(self.device), dropout_edge_index.to(self.device)),
+                )[layer + 1](all_embeddings[embedding_idx].to(self.device), adj.to(self.device)),
                                                                self.message_dropout[embedding_idx])]
             else:
                 self.propagation_network.eval()
                 with torch.no_grad():
                     all_embeddings += [list(
                         self.propagation_network.children()
-                    )[layer + 1](all_embeddings[embedding_idx].to(self.device), self.edge_index.to(self.device))]
+                    )[layer + 1](all_embeddings[embedding_idx].to(self.device), adj.to(self.device))]
 
             embedding_idx += 1
 
