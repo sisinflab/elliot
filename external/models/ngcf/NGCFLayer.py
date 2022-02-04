@@ -4,6 +4,8 @@ import torch
 from torch_geometric.nn import MessagePassing
 from torch_geometric.utils import degree
 
+torch.manual_seed(42)
+
 
 class NGCFLayer(MessagePassing, ABC):
     def __init__(self, in_channels, out_channels):
