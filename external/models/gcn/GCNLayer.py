@@ -139,7 +139,7 @@ class GCNConv(MessagePassing):
 
         if bias:
             self.bias = torch.nn.Parameter(
-            torch.nn.init.xavier_normal_(torch.empty(out_channels)))
+            torch.nn.init.zeros_(torch.empty((out_channels,))))
         else:
             self.register_parameter('bias', None)
 
@@ -149,7 +149,7 @@ class GCNConv(MessagePassing):
         self.weight = torch.nn.Parameter(
             torch.nn.init.xavier_normal_(torch.empty((self.in_channels, self.out_channels))))
         self.bias = torch.nn.Parameter(
-            torch.nn.init.xavier_normal_(torch.empty(self.out_channels)))
+            torch.nn.init.zeros_(torch.empty((self.out_channels,))))
         self._cached_edge_index = None
         self._cached_adj_t = None
 
