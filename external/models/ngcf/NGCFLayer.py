@@ -24,7 +24,7 @@ class NGCFLayer(MessagePassing, ABC):
         # deg_inv_sqrt[deg_inv_sqrt == float('inf')] = 0
         # norm = deg_inv_sqrt[row] * deg_inv_sqrt[col]
 
-        t1 = torch.sparse.mm(adj, x)
+        t1 = adj.matmul(x)
         t2 = t1.mul(x)
 
         # return self.leaky_relu(self.lin1(x) + self.propagate(edge_index, x=x, norm=norm))
