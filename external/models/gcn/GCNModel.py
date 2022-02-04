@@ -26,7 +26,7 @@ class GCNModel(torch.nn.Module, ABC):
                  l_w,
                  weight_size,
                  n_layers,
-                 edge_index,
+                 adj,
                  random_seed,
                  name="GCN",
                  **kwargs
@@ -43,7 +43,6 @@ class GCNModel(torch.nn.Module, ABC):
         self.weight_size = weight_size
         self.n_layers = n_layers
         self.weight_size_list = [self.embed_k] + self.weight_size
-        self.edge_index = torch.tensor(edge_index, dtype=torch.int64)
 
         self.Gu = torch.nn.Parameter(
             torch.nn.init.xavier_normal_(torch.empty((self.num_users, self.embed_k))))
@@ -73,13 +72,13 @@ class GCNModel(torch.nn.Module, ABC):
             if not evaluate:
                 ego_embeddings = list(
                     self.propagation_network.children()
-                )[layer](ego_embeddings.to(self.device), self.edge_index.to(self.device))
+                )[layer](ego_embeddings.to(self.device), self.adj.to(self.device))
             else:
                 self.propagation_network.eval()
                 with torch.no_grad():
                     ego_embeddings = list(
                         self.propagation_network.children()
-                    )[layer](ego_embeddings.to(self.device), self.edge_index.to(self.device))
+                    )[layer](ego_embeddings.to(self.device), self.adj.to(self.device))
 
         if evaluate:
             self.propagation_network.train()

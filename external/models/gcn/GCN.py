@@ -13,6 +13,7 @@ from tqdm import tqdm
 import numpy as np
 import torch
 import os
+from torch_sparse import SparseTensor
 
 from elliot.utils.write import store_recommendation
 from elliot.dataset.samplers import custom_sampler as cs
@@ -73,7 +74,8 @@ class GCN(RecMixin, BaseRecommenderModel):
 
         row, col = data.sp_i_train.nonzero()
         col = [c + self._num_users for c in col]
-        self.edge_index = np.array([row, col])
+        edge_index = np.array([row, col])
+        self.adj = SparseTensor(row=edge_index[0], col=edge_index[1], sparse_sizes=(self._num_users, self._num_items))
 
         self._model = GCNModel(
             num_users=self._num_users,
@@ -83,7 +85,7 @@ class GCN(RecMixin, BaseRecommenderModel):
             l_w=self._l_w,
             weight_size=self._weight_size,
             n_layers=self._n_layers,
-            edge_index=self.edge_index,
+            adj=self.adj,
             random_seed=self._seed
         )
 
