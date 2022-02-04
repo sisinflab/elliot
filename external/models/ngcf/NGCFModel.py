@@ -16,6 +16,7 @@ import torch_geometric
 import numpy as np
 
 torch.manual_seed(42)
+torch.use_deterministic_algorithms(True)
 
 
 class NGCFModel(torch.nn.Module, ABC):

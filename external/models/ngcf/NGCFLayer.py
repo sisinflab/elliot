@@ -5,6 +5,7 @@ from torch_geometric.nn import MessagePassing
 from torch_geometric.utils import degree
 
 torch.manual_seed(42)
+torch.use_deterministic_algorithms(True)
 
 
 class NGCFLayer(MessagePassing, ABC):
