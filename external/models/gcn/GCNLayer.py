@@ -122,7 +122,7 @@ class GCNConv(MessagePassing):
         kwargs.setdefault('aggr', 'add')
         super(GCNConv, self).__init__(**kwargs)
 
-        torch_geometric.seed_everything(seed)
+        torch.manual_seed(seed)
 
         self.in_channels = in_channels
         self.out_channels = out_channels
@@ -143,7 +143,7 @@ class GCNConv(MessagePassing):
         else:
             self.register_parameter('bias', None)
 
-        self.reset_parameters()
+        # self.reset_parameters()
 
     def reset_parameters(self):
         self.weight = torch.nn.Parameter(
