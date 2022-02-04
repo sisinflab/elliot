@@ -24,8 +24,8 @@ here = path.abspath(path.dirname(__file__))
 
 print(u'''
 
-  /\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\   /\\\\\\\\\\\\     /\\\\\\\\\\\\                         ''' + f'Version: {__version__}' + '''                              
-  \\/\\\\\\///////////   \\////\\\\\\    \\////\\\\\\                                            
+  /\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\   /\\\\\\\\\\\\      /\\\\\\\\\\\\                         ''' + f'Version: {__version__}' + '''                              
+  \\/\\\\\\///////////   \\////\\\\\\     \\////\\\\\\                                           
    \\/\\\\\\                 \\/\\\\\\        \\/\\\\\\      /\\\\\\                     /\\\\\\       
     \\/\\\\\\\\\\\\\\\\\\\\\\         \\/\\\\\\        \\/\\\\\\     \\///       /\\\\\\\\\\      /\\\\\\\\\\\\\\\\\\\\\\     
      \\/\\\\\\///////          \\/\\\\\\        \\/\\\\\\      /\\\\\\    /\\\\\\///\\\\\\   \\////\\\\\\////     
@@ -133,7 +133,7 @@ def run_experiment(config_path: str = ''):
         #         metrics}
         #     for k in ks}
         # target_test_results.update({"test_mean_results": mean_, "test_std_results": std_})
-        # res_handler.add_oneshot_recommender(**test_results[min_val])
+        res_handler.add_oneshot_recommender(**test_results[min_val])
 
         if isinstance(model_base, tuple):
             hyper_handler.add_trials(test_trials[min_val])

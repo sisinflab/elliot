@@ -65,8 +65,7 @@ class NGCFModel(torch.nn.Module, ABC):
                                                          random_seed),
                                              'edge_index -> edge_index'))
             propagation_network_list.append((NGCFLayer(self.weight_size_list[layer],
-                                                       self.weight_size_list[layer + 1],
-                                                       self.message_dropout[layer]), 'x, edge_index -> x'))
+                                                       self.weight_size_list[layer + 1]), 'x, edge_index -> x'))
 
         self.propagation_network = torch_geometric.nn.Sequential('x, edge_index', propagation_network_list)
         self.propagation_network.to(self.device)
@@ -84,9 +83,10 @@ class NGCFModel(torch.nn.Module, ABC):
                 dropout_edge_index = list(
                     self.propagation_network.children()
                 )[layer](self.edge_index.to(self.device))
-                all_embeddings += [list(
+                all_embeddings += [torch.nn.functional.dropout(list(
                     self.propagation_network.children()
-                )[layer + 1](all_embeddings[embedding_idx].to(self.device), dropout_edge_index.to(self.device))]
+                )[layer + 1](all_embeddings[embedding_idx].to(self.device), dropout_edge_index.to(self.device)),
+                                                               self.message_dropout[embedding_idx])]
             else:
                 self.propagation_network.eval()
                 with torch.no_grad():
