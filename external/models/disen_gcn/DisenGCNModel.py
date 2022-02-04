@@ -35,7 +35,7 @@ class DisenGCNModel(torch.nn.Module, ABC):
                  **kwargs
                  ):
         super().__init__()
-        torch.manual_seed(random_seed)
+        torch_geometric.seed_everything(random_seed)
 
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
