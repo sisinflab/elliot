@@ -9,10 +9,12 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malite
 
 from abc import ABC
 
-from .GCNLayer import GCNConv
+from torch_geometric.nn import GCNConv
 import torch
 import torch_geometric
 import numpy as np
+
+torch.manual_seed(42)
 
 
 class GCNModel(torch.nn.Module, ABC):
@@ -30,7 +32,6 @@ class GCNModel(torch.nn.Module, ABC):
                  **kwargs
                  ):
         super().__init__()
-        torch.manual_seed(random_seed)
 
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -54,14 +55,10 @@ class GCNModel(torch.nn.Module, ABC):
         propagation_network_list = []
 
         for layer in range(self.n_layers):
-            weight = torch.nn.Parameter(
-            torch.nn.init.xavier_normal_(torch.empty((self.weight_size_list[layer], self.weight_size_list[layer + 1]))))
-            weight_bias = torch.nn.Parameter(
-            torch.nn.init.zeros_(torch.empty((self.weight_size_list[layer + 1],))))
-            propagation_network_list.append((GCNConv(
-                weight=weight,
-                weight_bias=weight_bias,
-                add_self_loops=True), 'x, edge_index -> x'))
+            propagation_network_list.append((GCNConv(in_channels=self.convolutional_layer_size[layer],
+                                                     out_channels=self.convolutional_layer_size[layer + 1],
+                                                     add_self_loops=True,
+                                                     bias=True), 'x, edge_index -> x'))
 
         self.propagation_network = torch_geometric.nn.Sequential('x, edge_index', propagation_network_list)
         self.propagation_network.to(self.device)
