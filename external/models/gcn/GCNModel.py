@@ -55,8 +55,8 @@ class GCNModel(torch.nn.Module, ABC):
         propagation_network_list = []
 
         for layer in range(self.n_layers):
-            propagation_network_list.append((GCNConv(in_channels=self.convolutional_layer_size[layer],
-                                                     out_channels=self.convolutional_layer_size[layer + 1],
+            propagation_network_list.append((GCNConv(in_channels=self.weight_size_list[layer],
+                                                     out_channels=self.weight_size_list[layer + 1],
                                                      add_self_loops=True,
                                                      bias=True), 'x, edge_index -> x'))
 
