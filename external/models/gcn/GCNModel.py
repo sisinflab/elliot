@@ -9,7 +9,7 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malite
 
 from abc import ABC
 
-from torch_geometric.nn import GCNConv
+from .GCNLayer import GCNConv
 import torch
 import torch_geometric
 import numpy as np
@@ -56,7 +56,8 @@ class GCNModel(torch.nn.Module, ABC):
         for layer in range(self.n_layers):
             propagation_network_list.append((GCNConv(in_channels=self.weight_size_list[layer],
                                                      out_channels=self.weight_size_list[layer + 1],
-                                                     add_self_loops=True), 'x, edge_index -> x'))
+                                                     add_self_loops=True,
+                                                     seed=random_seed), 'x, edge_index -> x'))
 
         self.propagation_network = torch_geometric.nn.Sequential('x, edge_index', propagation_network_list)
         self.propagation_network.to(self.device)
