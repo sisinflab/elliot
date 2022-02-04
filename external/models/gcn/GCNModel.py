@@ -44,6 +44,8 @@ class GCNModel(torch.nn.Module, ABC):
         self.n_layers = n_layers
         self.weight_size_list = [self.embed_k] + self.weight_size
 
+        self.adj = adj
+
         self.Gu = torch.nn.Parameter(
             torch.nn.init.xavier_normal_(torch.empty((self.num_users, self.embed_k))))
         self.Gu.to(self.device)
