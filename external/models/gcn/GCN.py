@@ -76,7 +76,8 @@ class GCN(RecMixin, BaseRecommenderModel):
         col = [c + self._num_users for c in col]
         edge_index = np.array([row, col])
         edge_index = torch.tensor(edge_index, dtype=torch.int64)
-        self.adj = SparseTensor(row=edge_index[0], col=edge_index[1], sparse_sizes=(self._num_users, self._num_items))
+        self.adj = SparseTensor(row=edge_index[0], col=edge_index[1], sparse_sizes=(self._num_users + self._num_items,
+                                                                                    self._num_users + self._num_items))
 
         self._model = GCNModel(
             num_users=self._num_users,
