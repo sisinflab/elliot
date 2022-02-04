@@ -15,6 +15,8 @@ import torch
 import torch_geometric
 import numpy as np
 
+torch.manual_seed(42)
+
 
 class NGCFModel(torch.nn.Module, ABC):
     def __init__(self,
@@ -33,7 +35,6 @@ class NGCFModel(torch.nn.Module, ABC):
                  **kwargs
                  ):
         super().__init__()
-        torch_geometric.seed_everything(random_seed)
 
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
