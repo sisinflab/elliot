@@ -14,6 +14,8 @@ import torch
 import torch_geometric
 import numpy as np
 
+torch.manual_seed(42)
+
 
 class GATModel(torch.nn.Module, ABC):
     def __init__(self,
@@ -26,13 +28,12 @@ class GATModel(torch.nn.Module, ABC):
                  n_layers,
                  heads,
                  message_dropout,
-                 edge_index,
+                 adj,
                  random_seed,
                  name="GAT",
                  **kwargs
                  ):
         super().__init__()
-        torch_geometric.seed_everything(random_seed)
 
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -45,7 +46,7 @@ class GATModel(torch.nn.Module, ABC):
         self.n_layers = n_layers
         self.heads = heads
         self.message_dropout = message_dropout
-        self.edge_index = torch.tensor(edge_index, dtype=torch.int64)
+        self.adj = adj
 
         self.Gu = torch.nn.Parameter(
             torch.nn.init.xavier_normal_(torch.empty((self.num_users, self.embed_k))))
@@ -62,19 +63,21 @@ class GATModel(torch.nn.Module, ABC):
                                                  add_self_loops=False,
                                                  concat=True), 'x, edge_index -> x')]
             for layer in range(1, self.n_layers - 1):
-                propagation_network_list.append((GATConv(in_channels=self.weight_size_list[layer - 1] * self.heads[layer - 1],
-                                                         out_channels=self.weight_size_list[layer],
-                                                         heads=self.heads[layer],
-                                                         dropout=self.message_dropout,
-                                                         add_self_loops=False,
-                                                         concat=True), 'x, edge_index -> x'))
+                propagation_network_list.append(
+                    (GATConv(in_channels=self.weight_size_list[layer - 1] * self.heads[layer - 1],
+                             out_channels=self.weight_size_list[layer],
+                             heads=self.heads[layer],
+                             dropout=self.message_dropout,
+                             add_self_loops=False,
+                             concat=True), 'x, edge_index -> x'))
 
-            propagation_network_list.append((GATConv(in_channels=self.weight_size_list[self.n_layers - 2] * self.heads[self.n_layers - 2],
-                                                    out_channels=self.weight_size_list[self.n_layers - 1],
-                                                    heads=self.heads[self.n_layers - 1],
-                                                    dropout=self.message_dropout,
-                                                    add_self_loops=False,
-                                                    concat=False), 'x, edge_index -> x'))
+            propagation_network_list.append(
+                (GATConv(in_channels=self.weight_size_list[self.n_layers - 2] * self.heads[self.n_layers - 2],
+                         out_channels=self.weight_size_list[self.n_layers - 1],
+                         heads=self.heads[self.n_layers - 1],
+                         dropout=self.message_dropout,
+                         add_self_loops=False,
+                         concat=False), 'x, edge_index -> x'))
         else:
             propagation_network_list = [(GATConv(in_channels=self.embed_k,
                                                  out_channels=self.weight_size_list[0],
@@ -99,20 +102,20 @@ class GATModel(torch.nn.Module, ABC):
                     if layer == self.n_layers - 1:
                         current_embeddings = list(
                             self.propagation_network.children()
-                        )[layer](current_embeddings.to(self.device), self.edge_index.to(self.device))
+                        )[layer](current_embeddings.to(self.device), self.adj.to(self.device))
                     else:
                         current_embeddings = torch.nn.functional.elu(list(
                             self.propagation_network.children()
-                        )[layer](current_embeddings.to(self.device), self.edge_index.to(self.device)))
+                        )[layer](current_embeddings.to(self.device), self.adj.to(self.device)))
             else:
                 if layer == self.n_layers - 1:
                     current_embeddings = list(
                         self.propagation_network.children()
-                    )[layer](current_embeddings.to(self.device), self.edge_index.to(self.device))
+                    )[layer](current_embeddings.to(self.device), self.adj.to(self.device))
                 else:
                     current_embeddings = torch.nn.functional.elu(list(
                         self.propagation_network.children()
-                    )[layer](current_embeddings.to(self.device), self.edge_index.to(self.device)))
+                    )[layer](current_embeddings.to(self.device), self.adj.to(self.device)))
 
         if evaluate:
             self.propagation_network.train()

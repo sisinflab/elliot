@@ -21,6 +21,8 @@ from elliot.recommender.base_recommender_model import init_charger
 from elliot.recommender.recommender_utils_mixin import RecMixin
 from .GATModel import GATModel
 
+from torch_sparse import SparseTensor
+
 
 class GAT(RecMixin, BaseRecommenderModel):
     r"""
@@ -80,7 +82,10 @@ class GAT(RecMixin, BaseRecommenderModel):
 
         row, col = data.sp_i_train.nonzero()
         col = [c + self._num_users for c in col]
-        self.edge_index = np.array([row, col])
+        edge_index = np.array([row, col])
+        edge_index = torch.tensor(edge_index, dtype=torch.int64)
+        self.adj = SparseTensor(row=edge_index[0], col=edge_index[1], sparse_sizes=(self._num_users + self._num_items,
+                                                                                    self._num_users + self._num_items))
 
         self._model = GATModel(
             num_users=self._num_users,
@@ -92,7 +97,7 @@ class GAT(RecMixin, BaseRecommenderModel):
             n_layers=self._n_layers,
             heads=self._heads,
             message_dropout=self._message_dropout,
-            edge_index=self.edge_index,
+            adj=self.adj,
             random_seed=self._seed
         )
 
