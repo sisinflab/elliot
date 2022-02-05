@@ -17,6 +17,8 @@ import numpy as np
 
 from torch_sparse import SparseTensor
 
+torch.manual_seed(42)
+
 
 class NGCFModel(torch.nn.Module, ABC):
     def __init__(self,
