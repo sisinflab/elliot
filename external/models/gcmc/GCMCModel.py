@@ -16,6 +16,10 @@ import torch
 import torch_geometric
 import numpy as np
 
+from torch_sparse import SparseTensor
+
+torch.manual_seed(42)
+
 
 class GCMCModel(torch.nn.Module, ABC):
     def __init__(self,
@@ -36,7 +40,6 @@ class GCMCModel(torch.nn.Module, ABC):
                  **kwargs
                  ):
         super().__init__()
-        torch_geometric.seed_everything(random_seed)
 
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -52,6 +55,10 @@ class GCMCModel(torch.nn.Module, ABC):
         self.node_dropout = torch.tensor(node_dropout, dtype=torch.float32)
         self.dense_layer_dropout = dense_layer_dropout
         self.edge_index = torch.tensor(edge_index, dtype=torch.int64)
+
+        self.adj = SparseTensor(row=self.edge_index[0], col=self.edge_index[1],
+                                sparse_sizes=(self.num_users + self.num_items,
+                                              self.num_users + self.num_items))
 
         self.Gu = torch.nn.Parameter(
             torch.nn.init.xavier_normal_(torch.empty((self.num_users, self.embed_k))))
@@ -97,15 +104,18 @@ class GCMCModel(torch.nn.Module, ABC):
                 dropout_edge_index = list(
                     self.convolutional_network.children()
                 )[layer](self.edge_index.to(self.device))
+                adj = SparseTensor(row=dropout_edge_index[0], col=dropout_edge_index[1],
+                                   sparse_sizes=(self.num_users + self.num_items,
+                                                 self.num_users + self.num_items))
                 current_embeddings = torch.nn.functional.relu(list(
                     self.convolutional_network.children()
-                )[layer + 1](current_embeddings.to(self.device), dropout_edge_index.to(self.device)))
+                )[layer + 1](current_embeddings.to(self.device), adj.to(self.device)))
             else:
                 self.convolutional_network.eval()
                 with torch.no_grad():
                     current_embeddings = torch.nn.functional.relu(list(
                     self.convolutional_network.children()
-                )[layer + 1](current_embeddings.to(self.device), self.edge_index.to(self.device)))
+                )[layer + 1](current_embeddings.to(self.device), self.adj.to(self.device)))
 
         if evaluate:
             self.dense_network.eval()
