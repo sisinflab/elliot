@@ -52,7 +52,8 @@ class NGCFModel(torch.nn.Module, ABC):
         self.weight_size_list = [self.embed_k] + self.weight_size
         self.edge_index = torch.tensor(edge_index, dtype=torch.int64)
 
-        self.adj = SparseTensor(row=self.edge_index[0], col=self.edge_index[1],
+        self.adj = SparseTensor(row=torch.cat([self.edge_index[0], self.edge_index[1]], dim=0),
+                                col=torch.cat([self.edge_index[1], self.edge_index[0]], dim=0),
                                 sparse_sizes=(self.num_users + self.num_items,
                                               self.num_users + self.num_items))
 
@@ -68,8 +69,7 @@ class NGCFModel(torch.nn.Module, ABC):
         for layer in range(self.n_layers):
             propagation_network_list.append((NodeDropout(self.node_dropout[layer],
                                                          self.num_users,
-                                                         self.num_items,
-                                                         random_seed),
+                                                         self.num_items),
                                              'edge_index -> edge_index'))
             propagation_network_list.append((NGCFLayer(self.weight_size_list[layer],
                                                        self.weight_size_list[layer + 1]), 'x, edge_index -> x'))
@@ -90,7 +90,8 @@ class NGCFModel(torch.nn.Module, ABC):
                 dropout_edge_index = list(
                     self.propagation_network.children()
                 )[layer](self.edge_index.to(self.device))
-                adj = SparseTensor(row=dropout_edge_index[0], col=dropout_edge_index[1],
+                adj = SparseTensor(row=torch.cat([dropout_edge_index[0], dropout_edge_index[1]], dim=0),
+                                   col=torch.cat([dropout_edge_index[1], dropout_edge_index[0]], dim=0),
                                    sparse_sizes=(self.num_users + self.num_items,
                                                  self.num_users + self.num_items))
                 all_embeddings += [torch.nn.functional.dropout(list(

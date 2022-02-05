@@ -3,13 +3,13 @@ from abc import ABC
 import torch
 import numpy as np
 
+torch.manual_seed(42)
+
 
 class NodeDropout(torch.nn.Module, ABC):
     # as presented in the original paper
-    def __init__(self, node_dropout, num_users, num_items, random_seed):
+    def __init__(self, node_dropout, num_users, num_items):
         super(NodeDropout, self).__init__()
-
-        torch.manual_seed(random_seed)
 
         self.node_dropout = node_dropout
         self.num_users = num_users
