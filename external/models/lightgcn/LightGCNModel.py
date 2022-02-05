@@ -9,10 +9,12 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malite
 
 from abc import ABC
 
-from .LightGCNLayer import LightGCNLayer
+from torch_geometric.nn import LGConv
 import torch
 import torch_geometric
 import numpy as np
+
+torch.manual_seed(42)
 
 
 class LightGCNModel(torch.nn.Module, ABC):
@@ -23,13 +25,12 @@ class LightGCNModel(torch.nn.Module, ABC):
                  embed_k,
                  l_w,
                  n_layers,
-                 edge_index,
+                 adj,
                  random_seed,
                  name="LightGCN",
                  **kwargs
                  ):
         super().__init__()
-        torch_geometric.seed_everything(random_seed)
 
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -41,7 +42,7 @@ class LightGCNModel(torch.nn.Module, ABC):
         self.n_layers = n_layers
         self.weight_size_list = [self.embed_k] * (self.n_layers + 1)
         self.alpha = torch.tensor([1 / (k + 1) for k in range(len(self.weight_size_list))])
-        self.edge_index = torch.tensor(edge_index, dtype=torch.int64)
+        self.adj = adj
 
         self.Gu = torch.nn.Parameter(
             torch.nn.init.xavier_normal_(torch.empty((self.num_users, self.embed_k))))
@@ -53,7 +54,7 @@ class LightGCNModel(torch.nn.Module, ABC):
         propagation_network_list = []
 
         for layer in range(self.n_layers):
-            propagation_network_list.append((LightGCNLayer(), 'x, edge_index -> x'))
+            propagation_network_list.append((LGConv(), 'x, edge_index -> x'))
 
         self.propagation_network = torch_geometric.nn.Sequential('x, edge_index', propagation_network_list)
         self.propagation_network.to(self.device)
@@ -71,11 +72,11 @@ class LightGCNModel(torch.nn.Module, ABC):
                 with torch.no_grad():
                     all_embeddings += [list(
                         self.propagation_network.children()
-                    )[layer](all_embeddings[layer].to(self.device), self.edge_index.to(self.device))]
+                    )[layer](all_embeddings[layer].to(self.device), self.adj.to(self.device))]
             else:
                 all_embeddings += [list(
                     self.propagation_network.children()
-                )[layer](all_embeddings[layer].to(self.device), self.edge_index.to(self.device))]
+                )[layer](all_embeddings[layer].to(self.device), self.adj.to(self.device))]
 
         if evaluate:
             self.propagation_network.train()
