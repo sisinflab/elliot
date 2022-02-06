@@ -9,11 +9,10 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malite
 
 import random
 import numpy as np
-import tensorflow as tf
 
 
 class Sampler:
-    def __init__(self, ui_dict, iu_dict, private_users, private_items, train_reviews_tokens, epochs, pad_index):
+    def __init__(self, ui_dict, iu_dict, public_users, public_items, users_tokens, items_tokens):
         np.random.seed(42)
         random.seed(42)
         self._ui_dict = ui_dict
@@ -21,15 +20,13 @@ class Sampler:
         self._nusers = len(self._users)
         self._items = list({k for a in self._ui_dict.values() for k in a.keys()})
         self._nitems = len(self._items)
-        self._ui_dict = {u: list(set(ui_dict[u])) for u in ui_dict}
-        self._lui_dict = {u: len(v) for u, v in self._ui_dict.items()}
+        self._ui_dict = ui_dict
         self._iu_dict = iu_dict
-        self._train_reviews_tokens = train_reviews_tokens
-        self._max_tokens = int(self._train_reviews_tokens['num_tokens'].max())
-        self._private_users = private_users
-        self._private_items = private_items
-        self._epochs = epochs
-        self._pad_index = pad_index
+        self._lui_dict = {u: len(v) for u, v in self._ui_dict.items()}
+        self._public_users = public_users
+        self._public_items = public_items
+        self._users_tokens = {self._public_users[u]: v for u, v in users_tokens.items()}
+        self._items_tokens = {self._public_items[i]: v for i, v in items_tokens.items()}
 
     def step(self, events: int, batch_size: int):
         r_int = np.random.randint
@@ -38,128 +35,46 @@ class Sampler:
         ui_dict = self._ui_dict
         iu_dict = self._iu_dict
         lui_dict = self._lui_dict
-
-        actual_inter = (events // batch_size) * batch_size * self._epochs
-
-        counter_inter = 1
+        users_tokens = self._users_tokens
+        items_tokens = self._items_tokens
 
         def sample():
-            # sample user/item pair
             u = r_int(n_users)
-            u_pos = ui_dict[u]
+            ui = ui_dict[u]
             lui = lui_dict[u]
             if lui == n_items:
                 sample()
             b = random.getrandbits(1)
             if b:
-                i = u_pos[r_int(lui)]
+                i = ui[r_int(lui)]
             else:
                 i = r_int(n_items)
-                while i in u_pos:
+                while i in ui:
                     i = r_int(n_items)
 
-            i_pos = iu_dict[i]
-
-            # get user ratings and item ratings
-            u_ratings = np.zeros((1, self._nitems))
-            i_ratings = np.zeros((1, self._nusers))
-            u_ratings[0, u_pos] = 1.0
-            i_ratings[0, i_pos] = 1.0
-
-            # get user review and item review tokens
-            u_review_tokens = \
-                self._train_reviews_tokens[self._train_reviews_tokens['USER_ID'] == self._private_users[u]][
-                    'tokens_position'].tolist()
-            u_review_tokens = [sublist + ([self._pad_index] * (self._max_tokens - len(sublist))) for sublist in
-                               u_review_tokens]
-            i_review_tokens = \
-                self._train_reviews_tokens[self._train_reviews_tokens['ITEM_ID'] == self._private_items[i]][
-                    'tokens_position'].tolist()
-            i_review_tokens = [sublist + ([self._pad_index] * (self._max_tokens - len(sublist))) for sublist in
-                               i_review_tokens]
-
-            return u, i, float(b), u_ratings, i_ratings, u_review_tokens, i_review_tokens
-
-        for ep in range(self._epochs):
-            for _ in range(events):
-                yield sample()
-                if counter_inter == actual_inter:
-                    return
-                else:
-                    counter_inter += 1
-
-    def pipeline(self, events, batch_size):
-        data = tf.data.Dataset.from_generator(
-            generator=self.step,
-            output_signature=(
-                tf.TensorSpec(shape=(), dtype=tf.int32),
-                tf.TensorSpec(shape=(), dtype=tf.int32),
-                tf.TensorSpec(shape=(), dtype=tf.float32),
-                tf.TensorSpec(shape=(1, self._nitems), dtype=tf.float32),
-                tf.TensorSpec(shape=(1, self._nusers), dtype=tf.float32),
-                tf.TensorSpec(shape=(None, self._max_tokens), dtype=tf.int32),
-                tf.TensorSpec(shape=(None, self._max_tokens), dtype=tf.int32),
-            ),
-            args=(events, batch_size)
-        )
-        data = data.map(lambda a, b, c, d, e, f, g: (a, b, c, d, e, tf.expand_dims(f, 0), tf.expand_dims(g, 0)))
-        data = data.map(
-            lambda a, b, c, d, e, f, g: (a, b, c, d, e, tf.RaggedTensor.from_tensor(f), tf.RaggedTensor.from_tensor(g)))
-        data = data.batch(batch_size=batch_size)
-        data = data.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
-        data = data.map(lambda a, b, c, d, e, f, g: (a, b, c, d, e, tf.squeeze(f, 1), tf.squeeze(g, 1)))
-
-        return data
-
-    def step_eval(self, user):
-        n_items = self._nitems
-        ui_dict = self._ui_dict
-        iu_dict = self._iu_dict
-
-        def sample(u, i):
-            u_pos = ui_dict[u]
-            i_pos = iu_dict[i]
+            iu = iu_dict[i]
 
             u_ratings = np.zeros((1, self._nitems))
             i_ratings = np.zeros((1, self._nusers))
-            u_ratings[0, u_pos] = 1.0
-            i_ratings[0, i_pos] = 1.0
+            u_ratings[0, ui] = 1.0
+            i_ratings[0, iu] = 1.0
 
-            u_review_tokens = \
-                self._train_reviews_tokens[self._train_reviews_tokens['USER_ID'] == self._private_users[u]][
-                    'tokens_position'].tolist()
-            u_review_tokens = [sublist + ([self._pad_index] * (self._max_tokens - len(sublist))) for sublist in
-                               u_review_tokens]
-            i_review_tokens = \
-                self._train_reviews_tokens[self._train_reviews_tokens['ITEM_ID'] == self._private_items[i]][
-                    'tokens_position'].tolist()
-            i_review_tokens = [sublist + ([self._pad_index] * (self._max_tokens - len(sublist))) for sublist in
-                               i_review_tokens]
+            u_reviews = users_tokens[u]
+            i_reviews = items_tokens[i]
 
-            return u, i, 1.0, u_ratings, i_ratings, u_review_tokens, i_review_tokens
+            return u, i, b, u_ratings, i_ratings, u_reviews, i_reviews
 
-        for item in range(n_items):
-            yield sample(user, item)
+        for batch_start in range(0, events, batch_size):
+            user, item, bit, u_r, i_r = map(np.array, zip(*[sample() for _ in
+                                                            range(batch_start, min(batch_start + batch_size, events))]))
+            yield user, item, bit.astype('float32'), u_r, i_r
 
-    def pipeline_eval(self, user, batch_size):
-        data = tf.data.Dataset.from_generator(
-            generator=self.step_eval,
-            output_signature=(
-                tf.TensorSpec(shape=(), dtype=tf.int32),
-                tf.TensorSpec(shape=(), dtype=tf.int32),
-                tf.TensorSpec(shape=(), dtype=tf.float32),
-                tf.TensorSpec(shape=(1, self._nitems), dtype=tf.float32),
-                tf.TensorSpec(shape=(1, self._nusers), dtype=tf.float32),
-                tf.TensorSpec(shape=(None, self._max_tokens), dtype=tf.int32),
-                tf.TensorSpec(shape=(None, self._max_tokens), dtype=tf.int32),
-            ),
-            args=(user,)
-        )
-        data = data.map(lambda a, b, c, d, e, f, g: (a, b, c, d, e, tf.expand_dims(f, 0), tf.expand_dims(g, 0)))
-        data = data.map(
-            lambda a, b, c, d, e, f, g: (a, b, c, d, e, tf.RaggedTensor.from_tensor(f), tf.RaggedTensor.from_tensor(g)))
-        data = data.batch(batch_size=batch_size)
-        data = data.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
-        data = data.map(lambda a, b, c, d, e, f, g: (a, b, c, d, e, tf.squeeze(f, 1), tf.squeeze(g, 1)))
+    @property
+    def users_tokens(self):
+        return self._users_tokens
 
-        return data
+    @property
+    def items_tokens(self):
+        return self._items_tokens
+
+

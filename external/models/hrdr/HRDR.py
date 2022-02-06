@@ -9,6 +9,8 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malite
 
 from ast import literal_eval as make_tuple
 
+from operator import itemgetter
+
 from tqdm import tqdm
 from .pointwise_pos_neg_sampler_hrdr import Sampler
 from elliot.recommender import BaseRecommenderModel
@@ -17,6 +19,7 @@ from elliot.recommender.recommender_utils_mixin import RecMixin
 from .HRDRModel import HRDRModel
 
 import numpy as np
+import tensorflow as tf
 
 
 class HRDR(RecMixin, BaseRecommenderModel):
@@ -70,7 +73,7 @@ class HRDR(RecMixin, BaseRecommenderModel):
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
 
-        iu_dict = data.build_items_neighbour()
+        self._iu_dict = data.build_items_neighbour()
 
         if self._batch_size < 1:
             self._batch_size = self._num_users
@@ -113,15 +116,14 @@ class HRDR(RecMixin, BaseRecommenderModel):
 
         self._pad_index = self._interactions_textual.object.word_features.shape[0] - 1
 
-        self._sampler = Sampler(self._data.i_train_dict,
-                                iu_dict,
-                                self._data.private_users,
-                                self._data.private_items,
-                                self._interactions_textual.object.all_reviews_tokens,
-                                self._epochs,
-                                self._pad_index)
+        self._ui_dict = {u: list(set(self._data.i_train_dict[u])) for u in self._data.i_train_dict}
 
-        self._next_batch = self._sampler.pipeline(self._data.transactions, self._batch_size)
+        self._sampler = Sampler(self._ui_dict,
+                                self._iu_dict,
+                                self._data.public_users,
+                                self._data.public_items,
+                                self._interactions_textual.object.users_tokens,
+                                self._interactions_textual.object.items_tokens)
 
         self._model = HRDRModel(
             num_users=self._num_users,
@@ -153,37 +155,79 @@ class HRDR(RecMixin, BaseRecommenderModel):
         if self._restore:
             return self.restore_weights()
 
-        loss = 0
-        steps = 0
-        it = 0
-        with tqdm(total=int(self._data.transactions // self._batch_size), disable=not self._verbose) as t:
-            for batch in self._next_batch:
-                steps += 1
-                # loss += self._model.train_step(batch)
-                # t.set_postfix({'loss': f'{loss.numpy() / steps:.5f}'})
-                t.set_postfix({'loss': f'{loss / steps:.5f}'})
-                t.update()
+        for it in self.iterate(self._epochs):
+            loss = 0
+            steps = 0
+            with tqdm(total=int(self._data.transactions // self._batch_size), disable=not self._verbose) as t:
+                for batch in self._sampler.step(self._data.transactions, self._batch_size):
+                    steps += 1
+                    loss += self._model.train_step(batch)
+                    t.set_postfix({'loss': f'{loss / steps:.5f}'})
+                    t.update()
 
-                if steps == self._data.transactions // self._batch_size:
-                    t.reset()
-                    # self.evaluate(it, loss.numpy() / steps)
-                    self.evaluate(it, loss / steps)
-                    it += 1
-                    steps = 0
-                    loss = 0
+            self.evaluate(it, loss / (it + 1))
 
     def get_recommendations(self, k: int = 100):
         predictions_top_k_test = {}
         predictions_top_k_val = {}
-        for user in range(self._num_users):
-            predictions = np.empty((1, self._num_items))
-            start_index = 0
-            for batch in self._sampler.pipeline_eval(user, self._batch_eval):
-                u, i, rating, u_ratings, i_ratings, u_review_tokens, i_review_tokens = batch
-                end_index = start_index + u.shape[0]
-                predictions[0, start_index:end_index] = self._model.predict(batch)
-                start_index += u.shape[0]
-            recs_val, recs_test = self.process_protocol(k, predictions, user, user + 1)
+        users_tokens = self._sampler.users_tokens
+        items_tokens = self._sampler.items_tokens
+
+        self.logger.info('Starting all operations for users...')
+        xu = np.empty((self._num_users, self._model.user_projection_rating[-1]))
+        ou = np.empty((self._num_users, self._model.user_final_representation[-1]))
+        with tqdm(total=int(self._num_users // self._batch_eval), disable=not self._verbose) as t:
+            for start_batch in range(0, self._num_users, self._batch_eval):
+                stop_batch = min(start_batch + self._batch_eval, self._num_users)
+                u_ratings = self._data.sp_i_train.todense[start_batch: stop_batch]
+                xu[start_batch: stop_batch] = self._model.user_projection_rating_network(u_ratings, training=False)
+                user_reviews = list(itemgetter(*list(range(start_batch, stop_batch)))(users_tokens))
+                user_reviews_features = tf.nn.embedding_lookup(self._model.V, user_reviews)
+                ou_current = tf.reduce_max(self._model.user_review_cnn_network(user_reviews_features), axis=-1)
+                qru = self._model.user_review_attention_network(xu, training=False)
+                au = tf.reduce_sum(tf.multiply(ou_current, qru), axis=-1)
+                au_norm = tf.nn.softmax(au, axis=1)
+                ou_current = tf.multiply(ou_current, tf.expand_dims(au_norm, -1))
+                ou_current = tf.reduce_sum(ou_current, 0)
+                ou[start_batch: stop_batch] = self._model.user_final_representation_network(ou_current, training=False)
+                t.update()
+        self.logger.info('Operations for users are complete!')
+
+        self.logger.info('Starting all operations for items...')
+        xi = np.empty((self._num_items, self._model.item_projection_rating[-1]))
+        oi = np.empty((self._num_items, self._model.item_final_representation[-1]))
+        with tqdm(total=int(self._num_items // self._batch_eval), disable=not self._verbose) as t:
+            for start_batch in range(0, self._num_items, self._batch_eval):
+                stop_batch = min(start_batch + self._batch_eval, self._num_items)
+                i_ratings = self._data.sp_i_train.todense[:, start_batch: stop_batch]
+                xi[start_batch: stop_batch] = self._model.item_projection_rating_network(i_ratings, training=False)
+                item_reviews = list(itemgetter(*list(range(start_batch, stop_batch)))(items_tokens))
+                item_reviews_features = tf.nn.embedding_lookup(self._model.V, item_reviews)
+                oi_current = tf.reduce_max(self._model.item_review_cnn_network(item_reviews_features), axis=-1)
+                qri = self._model.item_review_attention_network(xi, training=False)
+                ai = tf.reduce_sum(tf.multiply(oi_current, qri), axis=-1)
+                ai_norm = tf.nn.softmax(ai, axis=1)
+                oi_current = tf.multiply(oi_current, tf.expand_dims(ai_norm, -1))
+                oi_current = tf.reduce_sum(oi_current, 0)
+                oi[start_batch: stop_batch] = self._model.item_final_representation_network(oi_current, training=False)
+                t.update()
+        self.logger.info('Operations for items are complete!')
+
+        for index, offset in enumerate(range(0, self._num_users, self._batch_eval)):
+            offset_stop = min(offset + self._batch_eval, self._num_users)
+            predictions = np.empty((offset_stop - offset, self._num_items))
+            with tqdm(total=int(self._num_items // self._batch_eval), disable=not self._verbose) as t:
+                for item_index, item_offset in enumerate(range(0, self._num_items, self._batch_eval)):
+                    item_offset_stop = min(item_offset + self._batch_eval, self._num_items)
+                    p = self._model.predict(list(range(offset, offset_stop)),
+                                            list(range(item_offset, item_offset_stop)),
+                                            tf.Variable(xu[offset: offset_stop], tf.float32),
+                                            tf.Variable(xi[item_offset: item_offset_stop], tf.float32),
+                                            tf.Variable(ou[offset: offset_stop], tf.float32),
+                                            tf.Variable(oi[item_offset: item_offset_stop], tf.float32))
+                    predictions[:(offset_stop - offset), item_index * self._batch_eval:item_offset_stop] = p
+                    t.update()
+            recs_val, recs_test = self.process_protocol(k, predictions, offset, offset_stop)
             predictions_top_k_val.update(recs_val)
             predictions_top_k_test.update(recs_test)
         return predictions_top_k_val, predictions_top_k_test
