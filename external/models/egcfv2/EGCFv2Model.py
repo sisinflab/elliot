@@ -119,13 +119,13 @@ class EGCFv2Model(torch.nn.Module, ABC):
                     node_node_collab_emb += [list(
                         self.node_node_collab_network.children()
                     )[layer](node_node_collab_emb[layer].to(self.device),
-                             self.node_node_graph.to(self.device))]
+                             self.node_node_adj.to(self.device))]
 
                     # node-node textual graph
                     node_node_textual_emb += [list(
                         self.node_node_textual_network.children()
                     )[layer](node_node_textual_emb[layer].to(self.device),
-                             self.node_node_graph.to(self.device),
+                             self.node_node_adj.to(self.device),
                              self.user_item_embeddings_interactions.to(self.device),
                              self.edge_embeddings_interactions.to(self.device))]
                 self.node_node_collab_network.train()
@@ -136,13 +136,13 @@ class EGCFv2Model(torch.nn.Module, ABC):
                 node_node_collab_emb += [list(
                     self.node_node_collab_network.children()
                 )[layer](node_node_collab_emb[layer].to(self.device),
-                         self.node_node_graph.to(self.device))]
+                         self.node_node_adj.to(self.device))]
 
                 # node-node textual graph
                 node_node_textual_emb += [list(
                     self.node_node_textual_network.children()
                 )[layer](node_node_textual_emb[layer].to(self.device),
-                         self.node_node_graph.to(self.device),
+                         self.node_node_adj.to(self.device),
                          self.user_item_embeddings_interactions.to(self.device),
                          self.edge_embeddings_interactions.to(self.device))]
 
