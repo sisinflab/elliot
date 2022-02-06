@@ -72,9 +72,6 @@ class EGCFv2Model(torch.nn.Module, ABC):
             torch.nn.init.xavier_normal_(torch.empty((self.num_items, self.embed_k))))
         self.Git.to(self.device)
 
-        self.user_item_embeddings_interactions = torch.cat([self.Git[self.cols - self.num_users],
-                                                            self.Gut[self.rows]], dim=0)
-
         self.interactions_sorted_by_items = torch.tensor(interactions_sorted_by_items, dtype=torch.int64)
         self.edge_embeddings_interactions = torch.tensor(edge_features, dtype=torch.float32, device=self.device)
         self.edge_embeddings_interactions = torch.cat([self.edge_embeddings_interactions,
@@ -109,6 +106,9 @@ class EGCFv2Model(torch.nn.Module, ABC):
         node_node_collab_emb = [torch.cat((self.Gu.to(self.device), self.Gi.to(self.device)), 0)]
         node_node_textual_emb = [torch.cat((self.Gut.to(self.device), self.Git.to(self.device)), 0)]
 
+        user_item_embeddings_interactions = torch.cat([self.Git[self.cols - self.num_users],
+                                                       self.Gut[self.rows]], dim=0)
+
         for layer in range(self.n_layers):
             if evaluate:
                 self.node_node_collab_network.eval()
@@ -125,7 +125,7 @@ class EGCFv2Model(torch.nn.Module, ABC):
                         self.node_node_textual_network.children()
                     )[layer](node_node_textual_emb[layer].to(self.device),
                              self.node_node_adj.to(self.device),
-                             self.user_item_embeddings_interactions.to(self.device),
+                             user_item_embeddings_interactions.to(self.device),
                              self.edge_embeddings_interactions.to(self.device))]
                 self.node_node_collab_network.train()
                 self.node_node_textual_network.train()
@@ -137,18 +137,18 @@ class EGCFv2Model(torch.nn.Module, ABC):
                          self.node_node_adj.to(self.device))]
 
                 # node-node textual graph
-                # node_node_textual_emb += [list(
-                #     self.node_node_textual_network.children()
-                # )[layer](node_node_textual_emb[layer].to(self.device),
-                #          self.node_node_adj.to(self.device),
-                #          self.user_item_embeddings_interactions.to(self.device),
-                #          self.edge_embeddings_interactions.to(self.device))]
+                node_node_textual_emb += [list(
+                    self.node_node_textual_network.children()
+                )[layer](node_node_textual_emb[layer].to(self.device),
+                         self.node_node_adj.to(self.device),
+                         user_item_embeddings_interactions.to(self.device),
+                         self.edge_embeddings_interactions.to(self.device))]
 
         node_node_collab_emb = sum([node_node_collab_emb[k] * self.alpha[k] for k in range(len(node_node_collab_emb))])
-        # node_node_textual_emb = sum(
-        #     [node_node_textual_emb[k] * self.alpha[k] for k in range(len(node_node_textual_emb))])
+        node_node_textual_emb = sum(
+            [node_node_textual_emb[k] * self.alpha[k] for k in range(len(node_node_textual_emb))])
         gu, gi = torch.split(node_node_collab_emb, [self.num_users, self.num_items], 0)
-        gut, git = torch.split(node_node_textual_emb[0], [self.num_users, self.num_items], 0)
+        gut, git = torch.split(node_node_textual_emb, [self.num_users, self.num_items], 0)
         return gu, gi, gut, git
 
     def forward(self, inputs, **kwargs):
