@@ -14,6 +14,7 @@ from .NodeDropout import NodeDropout
 import torch
 import torch_geometric
 import numpy as np
+import random
 
 from torch_sparse import SparseTensor
 
@@ -36,7 +37,13 @@ class NGCFModel(torch.nn.Module, ABC):
                  ):
         super().__init__()
 
+        # set seed
+        random.seed(random_seed)
+        np.random.seed(random_seed)
         torch.manual_seed(random_seed)
+        torch.cuda.manual_seed(random_seed)
+        torch.cuda.manual_seed_all(random_seed)
+        torch.backends.cudnn.deterministic = True
 
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -65,6 +72,7 @@ class NGCFModel(torch.nn.Module, ABC):
         self.Gi.to(self.device)
 
         propagation_network_list = []
+        self.dropout_layers = []
 
         for layer in range(self.n_layers):
             propagation_network_list.append((NodeDropout(self.node_dropout[layer],
@@ -73,6 +81,7 @@ class NGCFModel(torch.nn.Module, ABC):
                                              'edge_index -> edge_index'))
             propagation_network_list.append((NGCFLayer(self.weight_size_list[layer],
                                                        self.weight_size_list[layer + 1]), 'x, edge_index -> x'))
+            self.dropout_layers.append(torch.nn.Dropout(p=self.message_dropout[layer]))
 
         self.propagation_network = torch_geometric.nn.Sequential('x, edge_index', propagation_network_list)
         self.propagation_network.to(self.device)
@@ -94,10 +103,9 @@ class NGCFModel(torch.nn.Module, ABC):
                                    col=torch.cat([dropout_edge_index[1], dropout_edge_index[0]], dim=0),
                                    sparse_sizes=(self.num_users + self.num_items,
                                                  self.num_users + self.num_items))
-                all_embeddings += [torch.nn.functional.dropout(list(
+                all_embeddings += [self.dropout_layers[embedding_idx](list(
                     self.propagation_network.children()
-                )[layer + 1](all_embeddings[embedding_idx].to(self.device), adj.to(self.device)),
-                                                               self.message_dropout[embedding_idx])]
+                )[layer + 1](all_embeddings[embedding_idx].to(self.device), adj.to(self.device)))]
             else:
                 self.propagation_network.eval()
                 with torch.no_grad():
