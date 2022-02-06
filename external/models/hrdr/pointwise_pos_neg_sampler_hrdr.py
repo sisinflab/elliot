@@ -64,9 +64,11 @@ class Sampler:
             return u, i, b, u_ratings, i_ratings, u_reviews, i_reviews
 
         for batch_start in range(0, events, batch_size):
-            user, item, bit, u_r, i_r = map(np.array, zip(*[sample() for _ in
-                                                            range(batch_start, min(batch_start + batch_size, events))]))
-            yield user, item, bit.astype('float32'), u_r, i_r
+            user, item, bit, u_ra, i_ra, u_re, i_re = map(np.array, zip(*[sample() for _ in
+                                                                          range(batch_start,
+                                                                                min(batch_start + batch_size,
+                                                                                    events))]))
+            yield user, item, bit.astype('float32'), u_ra, i_ra, u_re, i_re
 
     @property
     def users_tokens(self):
@@ -75,5 +77,3 @@ class Sampler:
     @property
     def items_tokens(self):
         return self._items_tokens
-
-
