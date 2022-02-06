@@ -3,8 +3,6 @@ from abc import ABC
 import torch
 import numpy as np
 
-torch.manual_seed(42)
-
 
 class NodeDropout(torch.nn.Module, ABC):
     # as presented in the original paper

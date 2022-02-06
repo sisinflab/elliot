@@ -15,8 +15,8 @@ class NGCFLayer(MessagePassing, ABC):
         self.normalize = normalize
 
     def forward(self, x, edge_index):
-        # if self.normalize:
-        #     edge_index = gcn_norm(edge_index, None, x.size(self.node_dim), add_self_loops=True, dtype=x.dtype)
+        if self.normalize:
+            edge_index = gcn_norm(edge_index, None, x.size(self.node_dim), add_self_loops=True, dtype=x.dtype)
         return self.leaky_relu(self.lin1(x) + self.propagate(edge_index, x=x))
 
     def message_and_aggregate(self, adj_t, x):
