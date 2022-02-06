@@ -95,7 +95,7 @@ class HRDRModel(tf.keras.Model, ABC):
             filters=self.user_review_cnn[0],
             kernel_size=[3, 3],
             activation='relu',
-            input_shape=[None, *self.textual_words_feature_shape]))
+            input_shape=[None, None, *self.textual_words_feature_shape]))
         for layer in range(1, len(self.user_review_cnn)):
             self.user_review_cnn_network.add(tf.keras.layers.Conv2D(
                 filters=self.user_review_cnn[layer],
@@ -107,7 +107,7 @@ class HRDRModel(tf.keras.Model, ABC):
             filters=self.item_review_cnn[0],
             kernel_size=[3, 3],
             activation='relu',
-            input_shape=[None, *self.textual_words_feature_shape]))
+            input_shape=[None, None, *self.textual_words_feature_shape]))
         for layer in range(len(self.item_review_cnn)):
             self.item_review_cnn_network.add(tf.keras.layers.Conv2D(
                 filters=self.item_review_cnn[layer],
