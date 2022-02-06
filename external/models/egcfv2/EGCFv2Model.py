@@ -148,7 +148,7 @@ class EGCFv2Model(torch.nn.Module, ABC):
         # node_node_textual_emb = sum(
         #     [node_node_textual_emb[k] * self.alpha[k] for k in range(len(node_node_textual_emb))])
         gu, gi = torch.split(node_node_collab_emb, [self.num_users, self.num_items], 0)
-        gut, git = torch.split(node_node_textual_emb, [self.num_users, self.num_items], 0)
+        gut, git = torch.split(node_node_textual_emb[0], [self.num_users, self.num_items], 0)
         return gu, gi, gut, git
 
     def forward(self, inputs, **kwargs):
