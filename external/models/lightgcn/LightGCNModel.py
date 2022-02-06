@@ -14,8 +14,6 @@ import torch
 import torch_geometric
 import numpy as np
 
-torch.manual_seed(42)
-
 
 class LightGCNModel(torch.nn.Module, ABC):
     def __init__(self,
@@ -31,6 +29,8 @@ class LightGCNModel(torch.nn.Module, ABC):
                  **kwargs
                  ):
         super().__init__()
+
+        torch.manual_seed(random_seed)
 
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -115,4 +115,5 @@ class LightGCNModel(torch.nn.Module, ABC):
         return loss.detach().cpu().numpy()
 
     def get_top_k(self, preds, train_mask, k=100):
-        return torch.topk(torch.where(torch.tensor(train_mask).to(self.device), preds.to(self.device), torch.tensor(-np.inf).to(self.device)), k=k, sorted=True)
+        return torch.topk(torch.where(torch.tensor(train_mask).to(self.device), preds.to(self.device),
+                                      torch.tensor(-np.inf).to(self.device)), k=k, sorted=True)
