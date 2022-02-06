@@ -103,6 +103,8 @@ class EGCFv2Model(torch.nn.Module, ABC):
 
         self.softplus = torch.nn.Softplus()
 
+        print(self.parameters())
+
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
 
     def propagate_embeddings(self, evaluate=False):
@@ -113,7 +115,6 @@ class EGCFv2Model(torch.nn.Module, ABC):
             if evaluate:
                 self.node_node_collab_network.eval()
                 self.node_node_textual_network.eval()
-                self.edge_edge_network.eval()
                 with torch.no_grad():
                     # node-node collaborative graph
                     node_node_collab_emb += [list(
@@ -130,7 +131,6 @@ class EGCFv2Model(torch.nn.Module, ABC):
                              self.edge_embeddings_interactions.to(self.device))]
                 self.node_node_collab_network.train()
                 self.node_node_textual_network.train()
-                self.edge_edge_network.train()
             else:
                 # node-node collaborative graph
                 node_node_collab_emb += [list(
