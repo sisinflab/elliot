@@ -22,5 +22,6 @@ class NGCFLayer(MessagePassing, ABC):
         return self.leaky_relu(self.lin1(x) + self.propagate(edge_index, x=x))
 
     def message_and_aggregate(self, adj_t, x):
+        print('qui')
         return self.lin1(matmul(adj_t, x, reduce=self.aggr)) + \
                self.lin2(torch.mul(matmul(adj_t, x, reduce=self.aggr), x))
