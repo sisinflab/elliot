@@ -89,7 +89,7 @@ class NGCFModel(torch.nn.Module, ABC):
             if not evaluate:
                 dropout_edge_index = list(
                     self.propagation_network.children()
-                )[0][layer](self.edge_index.to(self.device))
+                )[layer](self.edge_index.to(self.device))
                 adj = SparseTensor(row=torch.cat([dropout_edge_index[0], dropout_edge_index[1]], dim=0),
                                    col=torch.cat([dropout_edge_index[1], dropout_edge_index[0]], dim=0),
                                    sparse_sizes=(self.num_users + self.num_items,
@@ -103,7 +103,7 @@ class NGCFModel(torch.nn.Module, ABC):
                 with torch.no_grad():
                     all_embeddings += [list(
                         self.propagation_network.children()
-                    )[0][layer + 1](all_embeddings[embedding_idx].to(self.device), self.adj.to(self.device))]
+                    )[layer + 1](all_embeddings[embedding_idx].to(self.device), self.adj.to(self.device))]
 
             embedding_idx += 1
 
