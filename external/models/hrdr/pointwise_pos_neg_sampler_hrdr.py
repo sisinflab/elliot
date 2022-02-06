@@ -16,12 +16,11 @@ class Sampler:
         np.random.seed(42)
         random.seed(42)
         self._ui_dict = ui_dict
+        self._iu_dict = iu_dict
         self._users = list(self._ui_dict.keys())
         self._nusers = len(self._users)
-        self._items = list({k for a in self._ui_dict.values() for k in a.keys()})
+        self._items = list(self._iu_dict.keys())
         self._nitems = len(self._items)
-        self._ui_dict = ui_dict
-        self._iu_dict = iu_dict
         self._lui_dict = {u: len(v) for u, v in self._ui_dict.items()}
         self._public_users = public_users
         self._public_items = public_items
