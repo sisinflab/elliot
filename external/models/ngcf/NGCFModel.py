@@ -17,8 +17,6 @@ import numpy as np
 
 from torch_sparse import SparseTensor
 
-torch.manual_seed(42)
-
 
 class NGCFModel(torch.nn.Module, ABC):
     def __init__(self,
@@ -37,6 +35,8 @@ class NGCFModel(torch.nn.Module, ABC):
                  **kwargs
                  ):
         super().__init__()
+
+        torch.manual_seed(random_seed)
 
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -89,7 +89,7 @@ class NGCFModel(torch.nn.Module, ABC):
             if not evaluate:
                 dropout_edge_index = list(
                     self.propagation_network.children()
-                )[layer](self.edge_index.to(self.device))
+                )[0][layer](self.edge_index.to(self.device))
                 adj = SparseTensor(row=torch.cat([dropout_edge_index[0], dropout_edge_index[1]], dim=0),
                                    col=torch.cat([dropout_edge_index[1], dropout_edge_index[0]], dim=0),
                                    sparse_sizes=(self.num_users + self.num_items,
@@ -103,7 +103,7 @@ class NGCFModel(torch.nn.Module, ABC):
                 with torch.no_grad():
                     all_embeddings += [list(
                         self.propagation_network.children()
-                    )[layer + 1](all_embeddings[embedding_idx].to(self.device), self.adj.to(self.device))]
+                    )[0][layer + 1](all_embeddings[embedding_idx].to(self.device), self.adj.to(self.device))]
 
             embedding_idx += 1
 
