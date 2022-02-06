@@ -179,7 +179,7 @@ class EGCFv2Model(torch.nn.Module, ABC):
                                torch.norm(self.Gi, 2) +
                                torch.norm(self.Gut, 2) +
                                torch.norm(self.Git, 2) +
-                               torch.stack([torch.norm(value, 2) for value in self.edge_edge_network.parameters()],
+                               torch.stack([torch.norm(value, 2) for value in self.node_node_textual_network.parameters()],
                                            dim=0).sum(dim=0))
         loss += reg_loss
 
