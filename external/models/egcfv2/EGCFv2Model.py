@@ -103,7 +103,7 @@ class EGCFv2Model(torch.nn.Module, ABC):
 
         self.softplus = torch.nn.Softplus()
 
-        print(self.parameters())
+        print(list(self.parameters()))
 
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
 
