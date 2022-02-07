@@ -100,7 +100,8 @@ class HRDRModel(tf.keras.Model, ABC):
             self.user_review_cnn_network.add(tf.keras.layers.Conv2D(
                 filters=self.user_review_cnn[layer],
                 kernel_size=[3, 3],
-                activation='relu'
+                activation='relu',
+                padding='same'
             ))
         self.item_review_cnn_network = tf.keras.Sequential()
         self.item_review_cnn_network.add(tf.keras.layers.Conv2D(
@@ -108,11 +109,12 @@ class HRDRModel(tf.keras.Model, ABC):
             kernel_size=[3, 3],
             activation='relu',
             input_shape=[None, None, *self.textual_words_feature_shape]))
-        for layer in range(len(self.item_review_cnn)):
+        for layer in range(1, len(self.item_review_cnn)):
             self.item_review_cnn_network.add(tf.keras.layers.Conv2D(
                 filters=self.item_review_cnn[layer],
                 kernel_size=[3, 3],
-                activation='relu'
+                activation='relu',
+                padding='same'
             ))
 
         # attention network for user and item reviews
@@ -160,18 +162,18 @@ class HRDRModel(tf.keras.Model, ABC):
         xi = self.item_projection_rating_network(item_ratings, training)
         user_reviews_features = tf.nn.embedding_lookup(self.V, user_reviews)
         item_reviews_features = tf.nn.embedding_lookup(self.V, item_reviews)
-        ou = tf.reduce_max(self.user_review_cnn_network(user_reviews_features), axis=-1)
-        oi = tf.reduce_max(self.item_review_cnn_network(item_reviews_features), axis=-1)
+        ou = tf.reduce_max(self.user_review_cnn_network(user_reviews_features), axis=-2)  # max-pooling over tokens
+        oi = tf.reduce_max(self.item_review_cnn_network(item_reviews_features), axis=-2)  # max-pooling over tokens
         qru = self.user_review_attention_network(xu, training)
         qri = self.item_review_attention_network(xi, training)
-        au = tf.reduce_sum(tf.multiply(ou, qru), axis=-1)
-        ai = tf.reduce_sum(tf.multiply(oi, qri), axis=-1)
+        au = tf.reduce_sum(tf.multiply(ou, qru), axis=-1, keepdims=True)
+        ai = tf.reduce_sum(tf.multiply(oi, qri), axis=-1, keepdims=True)
         au_norm = tf.nn.softmax(au, axis=1)
         ai_norm = tf.nn.softmax(ai, axis=1)
-        ou = tf.multiply(ou, tf.expand_dims(au_norm, -1))
-        oi = tf.multiply(oi, tf.expand_dims(ai_norm, -1))
-        ou = tf.reduce_sum(ou, 0)
-        oi = tf.reduce_sum(oi, 0)
+        ou = tf.multiply(ou, au_norm)
+        oi = tf.multiply(oi, ai_norm)
+        ou = tf.reduce_sum(ou, axis=1)
+        oi = tf.reduce_sum(oi, axis=1)
         ou = self.user_final_representation_network(ou, training)
         oi = self.item_final_representation_network(oi, training)
         u = tf.nn.embedding_lookup(self.Gu, user)
