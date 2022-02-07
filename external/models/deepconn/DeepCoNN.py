@@ -162,7 +162,7 @@ class DeepCoNN(RecMixin, BaseRecommenderModel):
                     itemgetter(*list(range(start_batch, stop_batch)))(items_tokens))
                 out_items[start_batch: stop_batch] = self._model.conv_items(np.array(item_reviews, dtype=np.int64))
                 t.update()
-        self.logger.info('Convolutions for selected items is complete!')
+        self.logger.info('Convolutions for all items is complete!')
 
         self.logger.info('Starting predictions on all users/items pairs...')
         with tqdm(total=int(self._num_users // self._batch_eval), disable=not self._verbose) as t:
