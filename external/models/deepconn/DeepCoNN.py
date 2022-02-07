@@ -170,7 +170,7 @@ class DeepCoNN(RecMixin, BaseRecommenderModel):
             with tqdm(total=int(self._num_items // self._batch_eval), disable=not self._verbose) as t:
                 for item_index, item_offset in enumerate(range(0, self._num_items, self._batch_eval)):
                     item_offset_stop = min(item_offset + self._batch_eval, self._num_items)
-                    p = self._model.predict(out_users[offset: offset_stop],
+                    p = self._model.predict(tf.Variable(out_users[offset: offset_stop], dtype=tf.float32),
                                             tf.Variable(out_items[item_index * self._batch_eval:item_offset_stop],
                                                         dtype=tf.float32))
                     predictions[:(offset_stop - offset), item_index * self._batch_eval:item_offset_stop] = p
