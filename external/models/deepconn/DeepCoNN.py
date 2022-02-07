@@ -153,7 +153,7 @@ class DeepCoNN(RecMixin, BaseRecommenderModel):
                 t.update()
         self.logger.info('Convolutions for all users is complete!')
 
-        self.logger.info('Starting convolutions for selected items...')
+        self.logger.info('Starting convolutions for all items...')
         out_items = np.empty((self._num_items, self._latent_size))
         with tqdm(total=int(self._num_items // self._batch_eval), disable=not self._verbose) as t:
             for start_batch in range(0, self._num_items, self._batch_eval):
@@ -166,7 +166,7 @@ class DeepCoNN(RecMixin, BaseRecommenderModel):
 
         for index, offset in enumerate(range(0, self._num_users, self._batch_eval)):
             offset_stop = min(offset + self._batch_eval, self._num_users)
-            predictions = np.empty((offset_stop - offset, self._negative_items_per_user))
+            predictions = np.empty((offset_stop - offset, self._num_items))
             with tqdm(total=int(self._num_items // self._batch_eval), disable=not self._verbose) as t:
                 for item_index, item_offset in enumerate(range(0, self._num_items, self._batch_eval)):
                     item_offset_stop = min(item_offset + self._batch_eval, self._num_items)
