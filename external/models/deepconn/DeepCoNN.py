@@ -164,18 +164,20 @@ class DeepCoNN(RecMixin, BaseRecommenderModel):
                 t.update()
         self.logger.info('Convolutions for selected items is complete!')
 
-        for index, offset in enumerate(range(0, self._num_users, self._batch_eval)):
-            offset_stop = min(offset + self._batch_eval, self._num_users)
-            predictions = np.empty((offset_stop - offset, self._num_items))
-            with tqdm(total=int(self._num_items // self._batch_eval), disable=not self._verbose) as t:
+        self.logger.info('Starting predictions on all users/items pairs...')
+        with tqdm(total=int(self._num_users // self._batch_eval), disable=not self._verbose) as t:
+            for index, offset in enumerate(range(0, self._num_users, self._batch_eval)):
+                offset_stop = min(offset + self._batch_eval, self._num_users)
+                predictions = np.empty((offset_stop - offset, self._num_items))
                 for item_index, item_offset in enumerate(range(0, self._num_items, self._batch_eval)):
                     item_offset_stop = min(item_offset + self._batch_eval, self._num_items)
                     p = self._model.predict(tf.Variable(out_users[offset: offset_stop], dtype=tf.float32),
                                             tf.Variable(out_items[item_index * self._batch_eval:item_offset_stop],
                                                         dtype=tf.float32))
                     predictions[:(offset_stop - offset), item_index * self._batch_eval:item_offset_stop] = p
-                    t.update()
-            recs_val, recs_test = self.process_protocol(k, predictions, offset, offset_stop)
-            predictions_top_k_val.update(recs_val)
-            predictions_top_k_test.update(recs_test)
+                t.update()
+        self.logger.info('Predictions on all users/items pairs is complete!')
+        recs_val, recs_test = self.process_protocol(k, predictions, offset, offset_stop)
+        predictions_top_k_val.update(recs_val)
+        predictions_top_k_test.update(recs_test)
         return predictions_top_k_val, predictions_top_k_test
