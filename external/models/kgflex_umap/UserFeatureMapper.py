@@ -7,21 +7,20 @@ from operator import itemgetter
 from collections import OrderedDict, Counter
 
 #mp.set_start_method("fork")
-DEFAULT_FEATURE_WEIGHT = 'gini'
-NEGATIVE_POSITIVE_RATIO = 1
+DEFAULT_FEATURE_WEIGHT = 'info_gain'
 
 
-def worker(user, user_items, neg_items, if1, if2, fol, sol, seed):
+def worker(user, user_items, neg_items, if1, if2, fol, sol, npr, seed):
     random.seed(seed)
     counters = dict()
-    counters[1] = user_features_counter(user_items, neg_items, if1)
-    counters[2] = user_features_counter(user_items, neg_items, if2)
+    counters[1] = user_features_counter(user_items, neg_items, if1, npr)
+    counters[2] = user_features_counter(user_items, neg_items, if2, npr)
     return user, limited_second_order_selection(counters, fol, sol)
 
 
 class UserFeatureMapper:
     def __init__(self, data, item_features: dict, item_features2=None,
-                 first_order_limit=100, second_order_limit=100):
+                 first_order_limit=100, second_order_limit=100, negative_positive_ratio=1):
         # for all the users compute the information for each feature
         self._data = data
         self._item_features = item_features
@@ -31,6 +30,7 @@ class UserFeatureMapper:
         self._users = self._data.private_users.keys()
         self._items = set(self._data.private_items.keys())
         self._depth = 2
+        self._npr = negative_positive_ratio
 
         self.users_features = self.user_features_selected_MP()
 
@@ -42,6 +42,7 @@ class UserFeatureMapper:
                      self._item_features, self._item_features2,
                      self._first_order_limit,
                      self._second_order_limit,
+                     self._npr,
                      random.randint(0, 100000)) for u in self._users)
 
         # arguments = args()
@@ -68,7 +69,7 @@ class UserFeatureMapper:
         return user, limited_second_order_selection(counters, self._first_order_limit, self._second_order_limit)
 
 
-def user_features_counter(user_items, neg_items, item_features_):
+def user_features_counter(user_items, neg_items, item_features_, npr):
     def count_features(item_features_):
         """
         Given a list of positive and negative items retrieves all them features and then counts them.
@@ -92,7 +93,7 @@ def user_features_counter(user_items, neg_items, item_features_):
         return pos_counter, neg_counter
 
     # for each postive item pick a negative
-    negatives = random.choices(list(neg_items), k=NEGATIVE_POSITIVE_RATIO * len(user_items))
+    negatives = random.choices(list(neg_items), k=npr * len(user_items))
     positives = user_items
 
     # count positive feature and negative features
