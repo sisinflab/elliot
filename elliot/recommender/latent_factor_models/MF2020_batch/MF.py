@@ -19,7 +19,7 @@ from elliot.utils.write import store_recommendation
 from elliot.recommender.latent_factor_models.MF2020.MF_model import MFModel
 
 
-class MF2020(RecMixin, BaseRecommenderModel):
+class MF2020_batch(RecMixin, BaseRecommenderModel):
     r"""
     Matrix Factorization (implementation from "Neural Collaborative Filtering vs. Matrix Factorization Revisited")
 
@@ -66,7 +66,8 @@ class MF2020(RecMixin, BaseRecommenderModel):
         self._sampler = ps.Sampler(self._data.i_train_dict, self._m, self._data.sp_i_train, self._seed)
 
         # This is not a real batch size. Its only purpose is the live visualization of the training
-        self._batch_size = 100000
+        if self._batch_size < 1:
+            self._batch_size = self._data.transactions
 
         self._model = MFModel(self._factors,
                               self._data,
@@ -77,15 +78,23 @@ class MF2020(RecMixin, BaseRecommenderModel):
     def get_recommendations(self, k: int = 10):
         self._model.prepare_predictions()
 
-        predictions_top_k_val = {}
-        predictions_top_k_test = {}
+        # predictions_top_k_val = {}
+        # predictions_top_k_test = {}
+        #
+        # recs_val, recs_test = self.process_protocol(k)
+        #
+        # predictions_top_k_val.update(recs_val)
+        # predictions_top_k_test.update(recs_test)
+        #
+        # return predictions_top_k_val, predictions_top_k_test
 
-        recs_val, recs_test = self.process_protocol(k)
-
-        predictions_top_k_val.update(recs_val)
-        predictions_top_k_test.update(recs_test)
-
-        return predictions_top_k_val, predictions_top_k_test
+        return self._model.get_all_topks(self.get_candidate_mask(validation=True), k,
+                                         self._data.private_users,
+                                         self._data.private_items) \
+                   if hasattr(self._data, "val_dict") \
+                   else {}, self._model.get_all_topks(self.get_candidate_mask(), k,
+                                                      self._data.private_users,
+                                                      self._data.private_items)
 
     def get_single_recommendation(self, mask, k, *args):
         return {u: self._model.get_user_predictions(u, mask, k) for u in self._data.train_dict.keys()}
