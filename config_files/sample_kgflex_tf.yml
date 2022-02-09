@@ -12,8 +12,10 @@ experiment:
         properties: ../data/{0}/properties.conf
         additive: True
   prefiltering:
-    strategy: iterative_k_core
-    core: 10
+    - strategy: global_threshold
+      threshold: 3
+    - strategy: iterative_k_core
+      core: 10
   splitting:
     # save_on_disk: False
     # save_folder: ../data/{0}/5-core/
@@ -21,30 +23,33 @@ experiment:
         strategy: random_subsampling
         test_ratio: 0.2
   top_k: 10
-  # gpu: 0
+  gpu: 0
   external_models_path: ../external/models/__init__.py
   evaluation:
-    cutoffs: [10]
-    simple_metrics: [nDCGRendle2020, nDCG, HR, Precision, ItemCoverage]
+    cutoffs: [10, 5, 3, 1]
+    simple_metrics: [nDCGRendle2020, HR, Precision, Recall, ItemCoverage, ARP]
     relevance_threshold: 3
   models:
     external.KGFlexUmap:
       meta:
         verbose: True
-        validation_rate: 1
-        save_recs: False
+        validation_rate: 5
+        save_recs: True
         save_weights: False
         restore: False
-        hyper_max_evals: 10
+        hyper_max_evals: 20
         hyper_opt_alg: tpe
       seed: 42
-      lr: 0.005438474900776614
+      lr: [loguniform, -11, -4]
+      l_w: [loguniform, -11, -4]
+      l_b: [loguniform, -11, -4]
       # lr: 0.001
       epochs: 50
-      batch_size: 64
+      batch_size: [32, 64, 128]
       # batch_size: 128
-      embedding: 5
+      embedding: [5, 10, 50]
       # embedding: 256
-      first_order_limit: 50
+      first_order_limit: [10, 50, 100, 200]
       second_order_limit: None
+      npr: [1, 2, 5, 10]
       loader: KGFlexLoader

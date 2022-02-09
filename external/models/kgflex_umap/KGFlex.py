@@ -44,6 +44,7 @@ class KGFlexUmap(RecMixin, BaseRecommenderModel):
             ("_l_w", "l_w", "l_w", 0.1, float, None),
             ("_l_b", "l_b", "l_b", 0.001, float, None),
             ("_loader", "loader", "load", "KGRec", None, None),
+            ("_npr", "npr", "npr", 1, int, None)
         ]
         self.autoset_params()
 
@@ -82,7 +83,8 @@ class KGFlexUmap(RecMixin, BaseRecommenderModel):
                                                      item_features=self.item_features1,
                                                      item_features2=self.item_features2,
                                                      first_order_limit=first_order_limit,
-                                                     second_order_limit=second_order_limit)
+                                                     second_order_limit=second_order_limit,
+                                                     negative_positive_ratio=self._npr)
 
         # ------------------------------ MODEL FEATURES ------------------------------
         self.logger.info('Features mapping started')

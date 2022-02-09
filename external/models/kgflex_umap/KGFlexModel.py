@@ -41,14 +41,14 @@ class KGFlexModel(keras.Model):
         self.initializer = tf.initializers.RandomNormal(stddev=0.1)
 
         self.K = user_feature_weights
-        self.F_B = tf.Variable(self.initializer(shape=[self.num_features]), name='F_B', dtype=tf.float32)
+        # self.F_B = tf.Variable(self.initializer(shape=[self.num_features]), name='F_B', dtype=tf.float32)
         self.I_B = tf.Variable(self.initializer(shape=[self.num_items]), name='I_B', dtype=tf.float32)
-        self.U_B = tf.Variable(self.initializer(shape=[self.num_users]), name='U_B', dtype=tf.float32)
+        # self.U_B = tf.Variable(self.initializer(shape=[self.num_users]), name='U_B', dtype=tf.float32)
         self.H = tf.Variable(self.initializer(shape=[self.num_users, self._factors]), name='H', dtype=tf.float32)
         self.G = tf.Variable(self.initializer(shape=[self.num_features, self._factors]), name='G', dtype=tf.float32)
         self.C = content_vectors
 
-        self.optimizer = tf.optimizers.Adamax(learning_rate)
+        self.optimizer = tf.optimizers.Adam(learning_rate)
 
     def scipy_gather(self, idx):
         return self.C[idx].A - 1
@@ -70,28 +70,28 @@ class KGFlexModel(keras.Model):
         c_i = tf.py_function(self.scipy_gather, [tf.squeeze(item)], Tout=[tf.float32])
         s_ui = c_i * z_u
         k_u = tf.squeeze(tf.nn.embedding_lookup(self.K, user))  # num_features x 1
-        x_ui = tf.add(tf.reduce_sum(k_u * s_ui, axis=-1), i_b)
+        inter_ui = k_u * s_ui
+        x_ui = tf.add(tf.reduce_sum(inter_ui, axis=-1), i_b)
 
-        return x_ui
+        return x_ui, inter_ui, i_b
 
     @tf.function
     def train_step(self, batch):
         user, pos, neg = batch
         with tf.GradientTape() as tape:
             # Clean Inference
-            xu_pos = self(inputs=(user, pos), training=True)
-            xu_neg = self(inputs=(user, neg), training=True)
+            xu_pos, inter_pos, i_b_pos = self(inputs=(user, pos), training=True)
+            xu_neg, inter_neg, i_b_neg = self(inputs=(user, neg), training=True)
 
             difference = tf.clip_by_value(xu_pos - xu_neg, -80.0, 1e8)
             loss = tf.reduce_sum(tf.nn.softplus(-difference))
             # Regularization Component
-            # reg_loss = self._l_w * tf.reduce_sum([tf.nn.l2_loss(self.H),
-            #                                      tf.nn.l2_loss(self.G)]) \
-            #            + self._l_b * tf.nn.l2_loss(self.B)
-            #            # + self._l_b * tf.nn.l2_loss(beta_neg) / 10
+            reg_loss = self._l_w * tf.reduce_sum([tf.nn.l2_loss(inter_pos),
+                                                  tf.nn.l2_loss(inter_neg)]) + self._l_b * tf.nn.l2_loss(
+                i_b_pos) + self._l_b * tf.nn.l2_loss(i_b_neg) / 10
 
             # Loss to be optimized
-            # loss += reg_loss
+            loss += reg_loss
 
         grads = tape.gradient(loss, self.trainable_weights)
         self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
