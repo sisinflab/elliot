@@ -4,8 +4,8 @@ Module description:
 """
 
 __version__ = '0.3.0'
-__author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta, Felice Antonio Merra'
-__email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malitesta@poliba.it, felice.merra@poliba.it'
+__author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta'
+__email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malitesta@poliba.it'
 
 from abc import ABC
 
@@ -13,6 +13,7 @@ from .MMGCNLayer import MMGCNLayer
 import torch
 import torch_geometric
 import numpy as np
+import random
 
 
 class MMGCNModel(torch.nn.Module, ABC):
@@ -28,13 +29,20 @@ class MMGCNModel(torch.nn.Module, ABC):
                  aggregation,
                  combination,
                  multimodal_features,
-                 edge_index,
+                 adj,
                  random_seed,
                  name="MMGCN",
                  **kwargs
                  ):
         super().__init__()
-        torch_geometric.seed_everything(random_seed)
+
+        # set seed
+        random.seed(random_seed)
+        np.random.seed(random_seed)
+        torch.manual_seed(random_seed)
+        torch.cuda.manual_seed(random_seed)
+        torch.cuda.manual_seed_all(random_seed)
+        torch.backends.cudnn.deterministic = True
 
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -48,7 +56,7 @@ class MMGCNModel(torch.nn.Module, ABC):
         self.aggregation = aggregation
         self.combination = combination
         self.n_layers = num_layers
-        self.edge_index = torch.tensor(edge_index, dtype=torch.int64)
+        self.adj = adj
 
         # collaborative embeddings
         self.Gu = torch.nn.Parameter(
@@ -109,7 +117,7 @@ class MMGCNModel(torch.nn.Module, ABC):
                         self.propagation_network_multimodal[m].children()
                     )[layer](x_all_m[m].to(self.device),
                              torch.cat((self.Gu.to(self.device), self.Gi.to(self.device)), 0).to(self.device),
-                             self.edge_index.to(self.device))
+                             self.adj.to(self.device))
                 else:
                     self.propagation_network_multimodal[m].eval()
                     with torch.no_grad():
@@ -117,7 +125,7 @@ class MMGCNModel(torch.nn.Module, ABC):
                             self.propagation_network_multimodal[m].children()
                         )[layer](x_all_m[m].to(self.device),
                                  torch.cat((self.Gu.to(self.device), self.Gi.to(self.device)), 0).to(self.device),
-                                 self.edge_index.to(self.device))
+                                 self.adj.to(self.device))
                 if evaluate:
                     self.propagation_network_multimodal[m].train()
 

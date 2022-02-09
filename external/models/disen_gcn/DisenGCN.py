@@ -4,8 +4,8 @@ Module description:
 """
 
 __version__ = '0.3.0'
-__author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta, Felice Antonio Merra'
-__email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malitesta@poliba.it, felice.merra@poliba.it'
+__author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta'
+__email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malitesta@poliba.it'
 
 from ast import literal_eval as make_tuple
 
@@ -81,7 +81,7 @@ class DisenGCN(RecMixin, BaseRecommenderModel):
 
         row, col = data.sp_i_train.nonzero()
         col = [c + self._num_users for c in col]
-        self.edge_index = np.array([row, col])
+        self.edge_index = np.array([row + col, col + row])
 
         self._model = DisenGCNModel(
             num_users=self._num_users,

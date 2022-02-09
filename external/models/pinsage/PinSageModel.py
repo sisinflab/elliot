@@ -4,8 +4,8 @@ Module description:
 """
 
 __version__ = '0.3.0'
-__author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta, Felice Antonio Merra'
-__email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malitesta@poliba.it, felice.merra@poliba.it'
+__author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta'
+__email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malitesta@poliba.it'
 
 from abc import ABC
 
@@ -15,6 +15,7 @@ from .PinSageLayer import PinSageLayer
 import torch
 import torch_geometric
 import numpy as np
+import random
 from collections import OrderedDict
 
 
@@ -32,13 +33,19 @@ class PinSageModel(torch.nn.Module, ABC):
                  n_layers,
                  delta,
                  edge_index,
-                 graph,
                  random_seed,
                  name="PinSage",
                  **kwargs
                  ):
         super().__init__()
-        torch_geometric.seed_everything(random_seed)
+
+        # set seed
+        random.seed(random_seed)
+        np.random.seed(random_seed)
+        torch.manual_seed(random_seed)
+        torch.cuda.manual_seed(random_seed)
+        torch.cuda.manual_seed_all(random_seed)
+        torch.backends.cudnn.deterministic = True
 
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -57,7 +64,6 @@ class PinSageModel(torch.nn.Module, ABC):
         self.convolution_weight_size_list = list(self.convolution_weight_size)
         self.out_weight_size_list = list(self.out_weight_size)
         self.edge_index = torch.tensor(edge_index, dtype=torch.int64)
-        self.graph = graph
 
         self.Gu = torch.nn.Parameter(
             torch.nn.init.zeros_(torch.empty((self.num_users, self.embed_k))))
@@ -95,14 +101,14 @@ class PinSageModel(torch.nn.Module, ABC):
 
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
 
-    def _get_personalized_page_rank(self):
-
-        def pagerank(node):
-            return nx.pagerank(self.graph, personalization={node: 1})
-
-        results = []
-        for n in list(self.graph.nodes):
-            results.append(pagerank(n))
+    # def _get_personalized_page_rank(self):
+    #
+    #     def pagerank(node):
+    #         return nx.pagerank(self.graph, personalization={node: 1})
+    #
+    #     results = []
+    #     for n in list(self.graph.nodes):
+    #         results.append(pagerank(n))
 
     def propagate_embeddings(self, evaluate=False):
         current_embeddings = torch.cat((self.Gu.to(self.device), self.Gi.to(self.device)), 0)
@@ -113,11 +119,11 @@ class PinSageModel(torch.nn.Module, ABC):
                 with torch.no_grad():
                     current_embeddings = list(
                         self.propagation_network.children()
-                    )[0][layer](current_embeddings.to(self.device), self.edge_index.to(self.device))
+                    )[layer](current_embeddings.to(self.device), self.edge_index.to(self.device))
             else:
                 current_embeddings = list(
                     self.propagation_network.children()
-                )[0][layer](current_embeddings.to(self.device), self.edge_index.to(self.device))
+                )[layer](current_embeddings.to(self.device), self.edge_index.to(self.device))
 
         if evaluate:
             self.out_network.eval()

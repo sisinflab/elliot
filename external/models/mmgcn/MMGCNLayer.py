@@ -2,6 +2,7 @@ from abc import ABC
 
 import torch
 from torch_geometric.nn import MessagePassing
+from torch_sparse import matmul
 
 
 class MMGCNLayer(MessagePassing, ABC):
@@ -29,5 +30,5 @@ class MMGCNLayer(MessagePassing, ABC):
         else:
             raise NotImplementedError('This aggregation function has not been implemented yet!')
 
-    def message(self, x_j):
-        return self.lin1(x_j)
+    def message_and_aggregate(self, adj_t, x):
+        return self.lin1(matmul(adj_t, x, reduce=self.aggr))

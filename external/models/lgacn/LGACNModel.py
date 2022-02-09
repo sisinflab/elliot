@@ -15,6 +15,7 @@ from collections import OrderedDict
 import torch
 import torch_geometric
 import numpy as np
+import random
 
 
 class LGACNModel(torch.nn.Module, ABC):
@@ -31,7 +32,14 @@ class LGACNModel(torch.nn.Module, ABC):
                  **kwargs
                  ):
         super().__init__()
-        torch_geometric.seed_everything(random_seed)
+
+        # set seed
+        random.seed(random_seed)
+        np.random.seed(random_seed)
+        torch.manual_seed(random_seed)
+        torch.cuda.manual_seed(random_seed)
+        torch.cuda.manual_seed_all(random_seed)
+        torch.backends.cudnn.deterministic = True
 
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 

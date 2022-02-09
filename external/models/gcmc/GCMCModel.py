@@ -4,8 +4,8 @@ Module description:
 """
 
 __version__ = '0.3.0'
-__author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta, Felice Antonio Merra'
-__email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malitesta@poliba.it, felice.merra@poliba.it'
+__author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta'
+__email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malitesta@poliba.it'
 
 from abc import ABC
 from torch_geometric.nn import GCNConv
@@ -15,10 +15,9 @@ from collections import OrderedDict
 import torch
 import torch_geometric
 import numpy as np
+import random
 
 from torch_sparse import SparseTensor
-
-torch.manual_seed(42)
 
 
 class GCMCModel(torch.nn.Module, ABC):
@@ -41,6 +40,14 @@ class GCMCModel(torch.nn.Module, ABC):
                  ):
         super().__init__()
 
+        # set seed
+        random.seed(random_seed)
+        np.random.seed(random_seed)
+        torch.manual_seed(random_seed)
+        torch.cuda.manual_seed(random_seed)
+        torch.cuda.manual_seed_all(random_seed)
+        torch.backends.cudnn.deterministic = True
+
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
         self.num_users = num_users
@@ -56,7 +63,8 @@ class GCMCModel(torch.nn.Module, ABC):
         self.dense_layer_dropout = dense_layer_dropout
         self.edge_index = torch.tensor(edge_index, dtype=torch.int64)
 
-        self.adj = SparseTensor(row=self.edge_index[0], col=self.edge_index[1],
+        self.adj = SparseTensor(row=torch.cat([self.edge_index[0], self.edge_index[1]], dim=0),
+                                col=torch.cat([self.edge_index[1], self.edge_index[0]], dim=0),
                                 sparse_sizes=(self.num_users + self.num_items,
                                               self.num_users + self.num_items))
 
@@ -104,7 +112,8 @@ class GCMCModel(torch.nn.Module, ABC):
                 dropout_edge_index = list(
                     self.convolutional_network.children()
                 )[layer](self.edge_index.to(self.device))
-                adj = SparseTensor(row=dropout_edge_index[0], col=dropout_edge_index[1],
+                adj = SparseTensor(row=torch.cat([dropout_edge_index[0], dropout_edge_index[1]], dim=0),
+                                   col=torch.cat([dropout_edge_index[1], dropout_edge_index[0]], dim=0),
                                    sparse_sizes=(self.num_users + self.num_items,
                                                  self.num_users + self.num_items))
                 current_embeddings = torch.nn.functional.relu(list(

@@ -4,8 +4,8 @@ Module description:
 """
 
 __version__ = '0.3.0'
-__author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta, Felice Antonio Merra'
-__email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malitesta@poliba.it, felice.merra@poliba.it'
+__author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta'
+__email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malitesta@poliba.it'
 
 from ast import literal_eval as make_tuple
 
@@ -92,10 +92,10 @@ class PinSage(RecMixin, BaseRecommenderModel):
         self.edge_index = np.array([row, col])
 
         # Build graph with networkx for personalized page rank
-        G = nx.Graph()
-        G.add_nodes_from(row, bipartite=0)
-        G.add_nodes_from(col, bipartite=1)
-        G.add_edges_from(list(zip(col, row)))
+        # G = nx.Graph()
+        # G.add_nodes_from(row, bipartite=0)
+        # G.add_nodes_from(col, bipartite=1)
+        # G.add_edges_from(list(zip(col, row)))
 
         self._model = PinSageModel(
             num_users=self._num_users,
@@ -110,7 +110,6 @@ class PinSage(RecMixin, BaseRecommenderModel):
             n_layers=self._n_layers,
             delta=self._delta,
             edge_index=self.edge_index,
-            graph=G,
             random_seed=self._seed
         )
 

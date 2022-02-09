@@ -2,6 +2,7 @@ from abc import ABC
 
 import torch
 from torch_geometric.nn import MessagePassing
+from torch_sparse import matmul
 
 
 class PinSageLayer(MessagePassing, ABC):
@@ -16,5 +17,5 @@ class PinSageLayer(MessagePassing, ABC):
         out = out / torch.unsqueeze(torch.norm(out, 2, dim=1), dim=1)
         return out
 
-    def message(self, x_j):
-        return self.relu(self.lin1(x_j))
+    def message_and_aggregate(self, adj_t, x):
+        return self.relu(self.lin1(matmul(adj_t, x, reduce=self.aggr)))

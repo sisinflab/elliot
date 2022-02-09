@@ -4,8 +4,8 @@ Module description:
 """
 
 __version__ = '0.3.0'
-__author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta, Felice Antonio Merra'
-__email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malitesta@poliba.it, felice.merra@poliba.it'
+__author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta'
+__email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malitesta@poliba.it'
 
 from abc import ABC
 
@@ -14,6 +14,7 @@ from .DGCFLayer import DGCFLayer
 import torch
 import torch_geometric
 import numpy as np
+import random
 
 
 class DGCFModel(torch.nn.Module, ABC):
@@ -34,7 +35,14 @@ class DGCFModel(torch.nn.Module, ABC):
                  **kwargs
                  ):
         super().__init__()
-        torch_geometric.seed_everything(random_seed)
+
+        # set seed
+        random.seed(random_seed)
+        np.random.seed(random_seed)
+        torch.manual_seed(random_seed)
+        torch.cuda.manual_seed(random_seed)
+        torch.cuda.manual_seed_all(random_seed)
+        torch.backends.cudnn.deterministic = True
 
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 

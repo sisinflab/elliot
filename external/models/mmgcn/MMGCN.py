@@ -4,8 +4,8 @@ Module description:
 """
 
 __version__ = '0.3.0'
-__author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta, Felice Antonio Merra'
-__email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malitesta@poliba.it, felice.merra@poliba.it'
+__author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta'
+__email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malitesta@poliba.it'
 
 from ast import literal_eval as make_tuple
 
@@ -20,6 +20,8 @@ from elliot.recommender import BaseRecommenderModel
 from elliot.recommender.base_recommender_model import init_charger
 from elliot.recommender.recommender_utils_mixin import RecMixin
 from .MMGCNModel import MMGCNModel
+
+from torch_sparse import SparseTensor
 
 
 class MMGCN(RecMixin, BaseRecommenderModel):
@@ -90,7 +92,11 @@ class MMGCN(RecMixin, BaseRecommenderModel):
 
         row, col = data.sp_i_train.nonzero()
         col = [c + self._num_users for c in col]
-        self.edge_index = np.array([row, col])
+        edge_index = np.array([row, col])
+        self.adj = SparseTensor(row=torch.cat([edge_index[0], edge_index[1]], dim=0),
+                                col=torch.cat([edge_index[1], edge_index[0]], dim=0),
+                                sparse_sizes=(self._num_users + self._num_items,
+                                              self._num_users + self._num_items))
 
         self._model = MMGCNModel(
             num_users=self._num_users,
@@ -105,7 +111,7 @@ class MMGCN(RecMixin, BaseRecommenderModel):
             combination=self._combination,
             multimodal_features=[self.__getattribute__(f'''_side_{m}''').object.get_all_features() for m in
                                  self._modalities],
-            edge_index=self.edge_index,
+            adj=self.adj,
             random_seed=self._seed
         )
 
