@@ -73,25 +73,25 @@ class KGFlexModel(keras.Model):
         inter_ui = k_u * s_ui
         x_ui = tf.add(tf.reduce_sum(inter_ui, axis=-1), i_b)
 
-        return x_ui, inter_ui, i_b
+        return x_ui
 
     @tf.function
     def train_step(self, batch):
         user, pos, neg = batch
         with tf.GradientTape() as tape:
             # Clean Inference
-            xu_pos, inter_pos, i_b_pos = self(inputs=(user, pos), training=True)
-            xu_neg, inter_neg, i_b_neg = self(inputs=(user, neg), training=True)
+            xu_pos = self(inputs=(user, pos), training=True)
+            xu_neg = self(inputs=(user, neg), training=True)
 
             difference = tf.clip_by_value(xu_pos - xu_neg, -80.0, 1e8)
             loss = tf.reduce_sum(tf.nn.softplus(-difference))
             # Regularization Component
-            reg_loss = self._l_w * tf.reduce_sum([tf.nn.l2_loss(inter_pos),
-                                                  tf.nn.l2_loss(inter_neg)]) + self._l_b * tf.nn.l2_loss(
-                i_b_pos) + self._l_b * tf.nn.l2_loss(i_b_neg) / 10
-
-            # Loss to be optimized
-            loss += reg_loss
+            # reg_loss = self._l_w * tf.reduce_sum([tf.nn.l2_loss(inter_pos),
+            #                                       tf.nn.l2_loss(inter_neg)]) + self._l_b * tf.nn.l2_loss(
+            #     i_b_pos) + self._l_b * tf.nn.l2_loss(i_b_neg) / 10
+            #
+            # # Loss to be optimized
+            # loss += reg_loss
 
         grads = tape.gradient(loss, self.trainable_weights)
         self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
