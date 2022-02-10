@@ -54,34 +54,34 @@ class DeepCoNNModel(tf.keras.Model, ABC):
         self.user_review_cnn_network = []
         self.user_review_cnn_network.append(
             (tf.Variable(
-                initial_value=self.initializer([self.user_review_cnn_kernel[0][0],
+                initial_value=self.initializer([self.user_review_cnn_kernel[0],
                                                 self.textual_words_feature_shape,
-                                                self.user_review_cnn_kernel[0][1],
+                                                self.user_review_cnn_kernel[1],
                                                 self.user_review_cnn_features[0]])),
              tf.Variable(initial_value=tf.zeros([1, self.user_review_cnn_features[0]])))
         )
         for layer in range(1, len(self.user_review_cnn_features)):
             self.user_review_cnn_network.append((tf.Variable(
-                initial_value=self.initializer([self.user_review_cnn_kernel[layer][0],
+                initial_value=self.initializer([self.user_review_cnn_kernel[0],
                                                 self.textual_words_feature_shape,
-                                                self.user_review_cnn_kernel[layer][1],
+                                                self.user_review_cnn_kernel[1],
                                                 self.user_review_cnn_features[layer]])),
                                                  tf.Variable(initial_value=tf.zeros(
                                                      [1, self.user_review_cnn_features[layer]]))))
         self.item_review_cnn_network = []
         self.item_review_cnn_network.append(
             (tf.Variable(
-                initial_value=self.initializer([self.item_review_cnn_kernel[0][0],
+                initial_value=self.initializer([self.item_review_cnn_kernel[0],
                                                 self.textual_words_feature_shape,
-                                                self.item_review_cnn_kernel[0][1],
+                                                self.item_review_cnn_kernel[1],
                                                 self.item_review_cnn_features[0]])),
              tf.Variable(initial_value=tf.zeros([1, self.item_review_cnn_features[0]])))
         )
         for layer in range(1, len(self.item_review_cnn_features)):
             self.item_review_cnn_network.append((tf.Variable(
-                initial_value=self.initializer([self.item_review_cnn_kernel[layer][0],
+                initial_value=self.initializer([self.item_review_cnn_kernel[0],
                                                 self.textual_words_feature_shape,
-                                                self.item_review_cnn_kernel[layer][1],
+                                                self.item_review_cnn_kernel[1],
                                                 self.item_review_cnn_features[layer]])),
                                                  tf.Variable(initial_value=tf.zeros(
                                                      [1, self.item_review_cnn_features[layer]]))))
