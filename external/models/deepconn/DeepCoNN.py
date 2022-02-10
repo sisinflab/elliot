@@ -70,6 +70,8 @@ class DeepCoNN(RecMixin, BaseRecommenderModel):
 
         ######################################
 
+        print(params)
+
         self._params_list = [
             ("_batch_eval", "batch_eval", "batch_eval", 64, int, None),
             ("_learning_rate", "lr", "lr", 0.0005, float, None),
