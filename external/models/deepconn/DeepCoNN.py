@@ -78,7 +78,7 @@ class DeepCoNN(RecMixin, BaseRecommenderModel):
              lambda x: list(make_tuple(x)), None),
             ("_u_rev_cnn_features", "u_rev_cnn_features", "u_rev_cnn_features", "(64,)", lambda x: list(make_tuple(x)),
              lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
-            ("_i_rev_cnn_kernel", "i_rev_cnn_kernel", "i_rev_cnn_kernel", "(3,)", lambda x: list(make_tuple(x)),
+            ("_i_rev_cnn_kernel", "i_rev_cnn_kernel", "i_rev_cnn_kernel", "(3,)",
              lambda x: list(make_tuple(x)), None),
             ("_i_rev_cnn_features", "i_rev_cnn_features", "i_rev_cnn_features", "(64,)", lambda x: list(make_tuple(x)),
              lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
