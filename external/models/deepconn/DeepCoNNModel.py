@@ -98,7 +98,7 @@ class DeepCoNNModel(tf.keras.Model, ABC):
         self.sigmoid = tf.keras.layers.Activation(tf.nn.sigmoid)
         self.dropout = tf.keras.layers.Dropout(self.dropout_rate)
 
-        self.optimizer = tf.optimizers.Adam(self.learning_rate)
+        self.optimizer = tf.optimizers.RMSprop(self.learning_rate)
 
     @tf.function
     def conv_users(self, user_reviews):
@@ -185,7 +185,7 @@ class DeepCoNNModel(tf.keras.Model, ABC):
             loss = tf.reduce_mean(tf.square(xui - r))
 
             # Regularization Component
-            reg_loss = self.l_w * tf.reduce_sum([tf.nn.l2_loss(variable) for variable in self.trainable_variables])
+            reg_loss = self.l_w * tf.reduce_sum([tf.nn.l2_loss(variable) for variable in self.trainable_variables]) * 2
 
             # Loss to be optimized
             loss += reg_loss
