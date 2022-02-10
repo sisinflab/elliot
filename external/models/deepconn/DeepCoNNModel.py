@@ -182,7 +182,7 @@ class DeepCoNNModel(tf.keras.Model, ABC):
         _, _, r, _, _ = batch
         with tf.GradientTape() as t:
             xui = self(inputs=batch, training=True)
-            loss = tf.reduce_mean(tf.square(xui - r))
+            loss = tf.nn.l2_loss(tf.subtract(xui, r))
 
             # Regularization Component
             reg_loss = self.l_w * tf.reduce_sum([tf.nn.l2_loss(variable) for variable in self.trainable_variables]) * 2
