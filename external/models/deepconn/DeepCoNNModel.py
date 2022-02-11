@@ -192,6 +192,8 @@ class DeepCoNNModel(tf.keras.Model, ABC):
         out = tf.nn.relu(tf.concat([tf.repeat(out_users, repeats=out_items.shape[0], axis=0),
                                     tf.tile(out_items, multiples=tf.constant([out_users.shape[0], 1], tf.int32))],
                                    axis=-1))
+        print(out.shape)
+        exit()
         one = tf.expand_dims(tf.matmul(out, self.W1), -1)
 
         out_1 = tf.matmul(out, self.W2)
