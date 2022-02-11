@@ -81,9 +81,7 @@ class DGCF(RecMixin, BaseRecommenderModel):
 
         row, col = data.sp_i_train.nonzero()
         col = [c + self._num_users for c in col]
-        print(row)
-        print(col)
-        self.edge_index = np.array([row + col, col + row])
+        self.edge_index = np.array([list(row) + col, col + list(row)])
 
         self._model = DGCFModel(
             num_users=self._num_users,
