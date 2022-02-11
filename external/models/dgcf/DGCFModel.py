@@ -85,7 +85,7 @@ class DGCFModel(torch.nn.Module, ABC):
         col -= self.num_users
 
         print(torch.sum(
-            ego_embeddings[row].to(self.device) * torch.tanh(ego_embeddings[col].to(self.device)).to(
+            ego_embeddings[row.to(self.device)].to(self.device) * torch.tanh(ego_embeddings[col.to(self.device)].to(self.device)).to(
                 self.device), dim=-1))
         exit()
 
