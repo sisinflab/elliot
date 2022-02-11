@@ -84,6 +84,11 @@ class DGCFModel(torch.nn.Module, ABC):
         row, col = current_egde_index[:, :current_egde_index.shape[1] // 2]
         col -= self.num_users
 
+        print(torch.sum(
+            ego_embeddings[row].to(self.device) * torch.tanh(ego_embeddings[col].to(self.device)).to(
+                self.device), dim=-1))
+        exit()
+
         for layer in range(self.n_layers):
             current_edge_index_intents = self.edge_index_intents.to(self.device)
             current_embeddings = all_embeddings[layer]
