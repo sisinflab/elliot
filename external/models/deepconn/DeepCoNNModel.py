@@ -199,7 +199,8 @@ class DeepCoNNModel(tf.keras.Model, ABC):
         out_2 = tf.matmul(tf.square(out), tf.square(self.W2))
 
         out_inter = self.dropout(tf.constant(0.5) * (tf.square(out_1) - out_2), training=False)
-        out_inter = tf.reduce_sum(out_inter, -1)
+        out_inter = tf.reduce_sum(out_inter, -1, keepdims=True)
+        print(out_inter)
         rui = tf.squeeze(self.sigmoid(self.B + out_inter + one))
 
         return tf.reshape(rui, [out_users.shape[0], out_items.shape[0]])
