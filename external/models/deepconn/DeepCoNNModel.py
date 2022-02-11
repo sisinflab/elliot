@@ -103,7 +103,7 @@ class DeepCoNNModel(tf.keras.Model, ABC):
         self.sigmoid = tf.keras.layers.Activation(tf.nn.sigmoid)
         self.dropout = tf.keras.layers.Dropout(self.dropout_rate)
 
-        self.optimizer = tf.optimizers.Adam(self.learning_rate)
+        self.optimizer = tf.optimizers.RMSprop(self.learning_rate)
 
     @tf.function
     def conv_users(self, user_reviews):
