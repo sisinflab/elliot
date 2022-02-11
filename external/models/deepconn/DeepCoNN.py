@@ -90,8 +90,6 @@ class DeepCoNN(RecMixin, BaseRecommenderModel):
 
         self._interactions_textual = self._data.side_information.WordsTextualAttributes
 
-        self._pad_index = self._interactions_textual.object.word_features.shape[0] - 1
-
         self._sampler = Sampler(self._data.i_train_dict,
                                 self._data.public_users,
                                 self._data.public_items,
