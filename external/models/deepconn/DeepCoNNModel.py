@@ -146,8 +146,8 @@ class DeepCoNNModel(tf.keras.Model, ABC):
     @tf.function
     def call(self, inputs, training=True):
         user, item, _, user_reviews, item_reviews = inputs
-        user_reviews_features = tf.nn.embedding_lookup(self.V, user_reviews)
-        item_reviews_features = tf.nn.embedding_lookup(self.V, item_reviews)
+        user_reviews_features = tf.nn.embedding_lookup(self.Vu, user_reviews)
+        item_reviews_features = tf.nn.embedding_lookup(self.Vi, item_reviews)
 
         out_users = []
         for layer in range(len(self.user_review_cnn_network)):
