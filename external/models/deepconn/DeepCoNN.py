@@ -172,12 +172,12 @@ class DeepCoNN(RecMixin, BaseRecommenderModel):
                 for item_index, item_offset in enumerate(range(0, self._num_items, self._batch_eval)):
                     item_offset_stop = min(item_offset + self._batch_eval, self._num_items)
                     p = self._model.predict(tf.Variable(out_users[offset: offset_stop], dtype=tf.float32),
-                                            tf.Variable(out_items[item_index * self._batch_eval:item_offset_stop],
+                                            tf.Variable(out_items[item_offset: item_offset_stop],
                                                         dtype=tf.float32))
-                    predictions[:(offset_stop - offset), item_index * self._batch_eval:item_offset_stop] = p
+                    predictions[:, item_offset: item_offset_stop] = p
+                recs_val, recs_test = self.process_protocol(k, predictions, offset, offset_stop)
+                predictions_top_k_val.update(recs_val)
+                predictions_top_k_test.update(recs_test)
                 t.update()
         self.logger.info('Predictions on all users/items pairs is complete!')
-        recs_val, recs_test = self.process_protocol(k, predictions, offset, offset_stop)
-        predictions_top_k_val.update(recs_val)
-        predictions_top_k_test.update(recs_test)
         return predictions_top_k_val, predictions_top_k_test
