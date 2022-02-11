@@ -19,7 +19,9 @@ class DeepCoNNModel(tf.keras.Model, ABC):
                  num_items,
                  learning_rate,
                  l_w,
-                 vocabulary_features,
+                 users_vocabulary_features,
+                 items_vocabulary_features,
+                 textual_words_feature_shape,
                  user_review_cnn_kernel,
                  user_review_cnn_features,
                  item_review_cnn_kernel,
@@ -44,9 +46,10 @@ class DeepCoNNModel(tf.keras.Model, ABC):
         self.latent_size = latent_size
         self.dropout_rate = dropout_rate
 
-        self.V = tf.expand_dims(tf.convert_to_tensor(vocabulary_features, dtype=tf.float32), -1)
+        self.Vu = tf.expand_dims(tf.convert_to_tensor(users_vocabulary_features, dtype=tf.float32), -1)
+        self.Vi = tf.expand_dims(tf.convert_to_tensor(items_vocabulary_features, dtype=tf.float32), -1)
 
-        self.textual_words_feature_shape = self.V.shape[-1]
+        self.textual_words_feature_shape = textual_words_feature_shape
 
         self.initializer = tf.initializers.GlorotUniform()
 
@@ -102,7 +105,7 @@ class DeepCoNNModel(tf.keras.Model, ABC):
 
     @tf.function
     def conv_users(self, user_reviews):
-        user_reviews_features = tf.nn.embedding_lookup(self.V, user_reviews)
+        user_reviews_features = tf.nn.embedding_lookup(self.Vu, user_reviews)
 
         out_users = []
         for layer in range(len(self.user_review_cnn_network)):
@@ -117,7 +120,7 @@ class DeepCoNNModel(tf.keras.Model, ABC):
 
     @tf.function
     def conv_items(self, item_reviews):
-        item_reviews_features = tf.nn.embedding_lookup(self.V, item_reviews)
+        item_reviews_features = tf.nn.embedding_lookup(self.Vi, item_reviews)
 
         out_items = []
         for layer in range(len(self.item_review_cnn_network)):
