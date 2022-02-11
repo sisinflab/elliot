@@ -149,6 +149,10 @@ class DeepCoNNModel(tf.keras.Model, ABC):
         user_reviews_features = tf.nn.embedding_lookup(self.Vu, user_reviews)
         item_reviews_features = tf.nn.embedding_lookup(self.Vi, item_reviews)
 
+        print(user_reviews_features.shape)
+        print(item_reviews_features.shape)
+        exit()
+
         out_users = []
         for layer in range(len(self.user_review_cnn_network)):
             out = tf.nn.max_pool(
