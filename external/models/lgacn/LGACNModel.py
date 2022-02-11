@@ -131,7 +131,7 @@ class LGACNModel(torch.nn.Module, ABC):
                                torch.stack(
                                    [torch.norm(value, 2) for value in self.attention_propagation_network.parameters()],
                                    dim=0).sum(dim=0)
-                               ) * 2
+                               )
         loss += reg_loss
 
         self.optimizer.zero_grad()

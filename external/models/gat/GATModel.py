@@ -153,7 +153,7 @@ class GATModel(torch.nn.Module, ABC):
         reg_loss = self.l_w * (torch.norm(self.Gu, 2) +
                                torch.norm(self.Gi, 2) +
                                torch.stack([torch.norm(value, 2) for value in self.propagation_network.parameters()],
-                                           dim=0).sum(dim=0)) * 2
+                                           dim=0).sum(dim=0))
         loss += reg_loss
 
         self.optimizer.zero_grad()

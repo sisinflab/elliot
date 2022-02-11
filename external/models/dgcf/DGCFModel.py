@@ -211,7 +211,7 @@ class DGCFModel(torch.nn.Module, ABC):
         difference = torch.clamp(xu_pos - xu_neg, -80.0, 1e8)
         loss_bpr = torch.sum(self.softplus(-difference))
         reg_loss = self.l_w_bpr * (torch.norm(self.Gu, 2) +
-                                   torch.norm(self.Gi, 2)) * 2
+                                   torch.norm(self.Gi, 2))
         loss_bpr += reg_loss
 
         # sum and optimize according to the overall loss

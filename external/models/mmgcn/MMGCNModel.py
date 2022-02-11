@@ -162,7 +162,7 @@ class MMGCNModel(torch.nn.Module, ABC):
                                torch.norm(self.Gi, 2) +
                                torch.stack([torch.norm(value, 2) for _, value in self.Gum.items()], dim=0).sum(dim=0) +
                                torch.stack([torch.norm(value, 2) for _, value in self.Gim.items()], dim=0).sum(dim=0) +
-                               torch.stack(multimodal_networks_parameters, dim=0).sum(dim=0)) * 2
+                               torch.stack(multimodal_networks_parameters, dim=0).sum(dim=0))
         loss += reg_loss
 
         self.optimizer.zero_grad()

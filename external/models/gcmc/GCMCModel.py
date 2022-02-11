@@ -165,7 +165,7 @@ class GCMCModel(torch.nn.Module, ABC):
                                torch.stack([torch.norm(value, 2) for value in self.convolutional_network.parameters()],
                                            dim=0).sum(dim=0) +
                                torch.stack([torch.norm(value, 2) for value in self.dense_network.parameters()],
-                                           dim=0).sum(dim=0)) * 2
+                                           dim=0).sum(dim=0))
         loss += reg_loss
 
         self.optimizer.zero_grad()
