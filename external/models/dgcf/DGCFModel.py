@@ -82,7 +82,7 @@ class DGCFModel(torch.nn.Module, ABC):
         all_embeddings = [ego_embeddings]
         current_egde_index = self.edge_index.clone()
         row, col = current_egde_index
-        col -= self.num_users
+        col[:col.shape[0] // 2] -= self.num_users
 
         for layer in range(self.n_layers):
             current_edge_index_intents = self.edge_index_intents.to(self.device)
