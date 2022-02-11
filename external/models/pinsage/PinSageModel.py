@@ -32,7 +32,7 @@ class PinSageModel(torch.nn.Module, ABC):
                  t_top_nodes,
                  n_layers,
                  delta,
-                 edge_index,
+                 adj,
                  random_seed,
                  name="PinSage",
                  **kwargs
@@ -63,7 +63,7 @@ class PinSageModel(torch.nn.Module, ABC):
         self.message_weight_size_list = [self.embed_k] + self.message_weight_size
         self.convolution_weight_size_list = list(self.convolution_weight_size)
         self.out_weight_size_list = list(self.out_weight_size)
-        self.edge_index = torch.tensor(edge_index, dtype=torch.int64)
+        self.adj = adj
 
         self.Gu = torch.nn.Parameter(
             torch.nn.init.zeros_(torch.empty((self.num_users, self.embed_k))))
@@ -119,11 +119,11 @@ class PinSageModel(torch.nn.Module, ABC):
                 with torch.no_grad():
                     current_embeddings = list(
                         self.propagation_network.children()
-                    )[layer](current_embeddings.to(self.device), self.edge_index.to(self.device))
+                    )[layer](current_embeddings.to(self.device), self.adj.to(self.device))
             else:
                 current_embeddings = list(
                     self.propagation_network.children()
-                )[layer](current_embeddings.to(self.device), self.edge_index.to(self.device))
+                )[layer](current_embeddings.to(self.device), self.adj.to(self.device))
 
         if evaluate:
             self.out_network.eval()

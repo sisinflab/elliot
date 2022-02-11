@@ -14,6 +14,7 @@ import numpy as np
 import networkx as nx
 import torch
 import os
+from torch_sparse import SparseTensor
 
 from elliot.utils.write import store_recommendation
 from elliot.dataset.samplers import custom_sampler as cs
@@ -89,7 +90,11 @@ class PinSage(RecMixin, BaseRecommenderModel):
         self._n_layers = len(self._message_weight_size)
         row, col = data.sp_i_train.nonzero()
         col = [c + self._num_users for c in col]
-        self.edge_index = np.array([row, col])
+        edge_index = np.array([row, col])
+        self.adj = SparseTensor(row=torch.cat([edge_index[0], edge_index[1]], dim=0),
+                                col=torch.cat([edge_index[1], edge_index[0]], dim=0),
+                                sparse_sizes=(self._num_users + self._num_items,
+                                              self._num_users + self._num_items))
 
         # Build graph with networkx for personalized page rank
         # G = nx.Graph()
@@ -109,7 +114,7 @@ class PinSage(RecMixin, BaseRecommenderModel):
             t_top_nodes=self._t_top_nodes,
             n_layers=self._n_layers,
             delta=self._delta,
-            edge_index=self.edge_index,
+            adj=self.adj,
             random_seed=self._seed
         )
 
