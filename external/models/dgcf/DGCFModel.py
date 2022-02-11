@@ -84,7 +84,7 @@ class DGCFModel(torch.nn.Module, ABC):
         row, col = current_egde_index[:, :current_egde_index.shape[1] // 2]
         col -= self.num_users
 
-        print(ego_embeddings[row])
+        print(row.max())
         exit()
 
         for layer in range(self.n_layers):
