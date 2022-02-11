@@ -176,7 +176,7 @@ class DeepCoNNModel(tf.keras.Model, ABC):
         out_items = self.dropout(self.item_fully_connected(out_items), training=training)
 
         out = tf.nn.relu(tf.concat([out_users, out_items], axis=-1))
-        one = tf.expand_dims(tf.matmul(out, self.W1), -1)
+        one = tf.matmul(out, self.W1)
 
         out_1 = tf.matmul(out, self.W2)
         out_2 = tf.matmul(tf.square(out), tf.square(self.W2))
@@ -193,17 +193,13 @@ class DeepCoNNModel(tf.keras.Model, ABC):
                                     tf.tile(out_items, multiples=tf.constant([out_users.shape[0], 1], tf.int32))],
                                    axis=-1))
 
-        one = tf.expand_dims(tf.matmul(out, self.W1), -1)
+        one = tf.matmul(out, self.W1)
 
         out_1 = tf.matmul(out, self.W2)
         out_2 = tf.matmul(tf.square(out), tf.square(self.W2))
 
         out_inter = self.dropout(tf.constant(0.5) * (tf.square(out_1) - out_2), training=False)
         out_inter = tf.reduce_sum(out_inter, -1, keepdims=True)
-        print(out_inter.shape)
-        print(self.B.shape)
-        print(one.shape)
-        exit()
         rui = tf.squeeze(self.sigmoid(self.B + out_inter + one))
 
         return tf.reshape(rui, [out_users.shape[0], out_items.shape[0]])
