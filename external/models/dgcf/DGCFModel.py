@@ -103,6 +103,8 @@ class DGCFModel(torch.nn.Module, ABC):
                         items_users = torch.sum(
                             current_t_gi[col].to(self.device) * torch.tanh(current_0_gu[row].to(self.device)).to(
                                 self.device), dim=-1)
+                        print(users_items.shape)
+                        print(items_users.shape)
                         all_interactions = torch.cat([users_items, items_users], dim=1)
                         current_edge_index_intents = current_edge_index_intents.clone() + all_interactions.permute(1, 0)
                 else:
