@@ -176,12 +176,12 @@ class DeepCoNNModel(tf.keras.Model, ABC):
         out_items = self.dropout(self.item_fully_connected(out_items), training=training)
 
         out = tf.nn.relu(tf.concat([out_users, out_items], axis=-1))
-        one = tf.matmul(out, self.W1)
+        one = tf.expand_dims(tf.matmul(out, self.W1), -1)
 
         out_1 = tf.matmul(out, self.W2)
-        out_2 = tf.matmul(tf.math.pow(out, 2), tf.math.pow(self.W2, 2))
+        out_2 = tf.matmul(tf.square(out), tf.square(self.W2))
 
-        out_inter = self.dropout(tf.constant(0.5) * (tf.square(out_1) - out_2), training=True)
+        out_inter = self.dropout(tf.constant(0.5) * (tf.square(out_1) - out_2), training=training)
         out_final = tf.squeeze(self.sigmoid(self.B + out_inter + one))
 
         return out_final
@@ -191,10 +191,10 @@ class DeepCoNNModel(tf.keras.Model, ABC):
         out = tf.nn.relu(tf.concat([tf.repeat(out_users, repeats=out_items.shape[0], axis=0),
                                     tf.tile(out_items, multiples=tf.constant([out_users.shape[0], 1], tf.int32))],
                                    axis=-1))
-        one = tf.matmul(out, self.W1)
+        one = tf.expand_dims(tf.matmul(out, self.W1), -1)
 
         out_1 = tf.matmul(out, self.W2)
-        out_2 = tf.matmul(tf.math.pow(out, 2), tf.math.pow(self.W2, 2))
+        out_2 = tf.matmul(tf.square(out), tf.square(self.W2))
 
         out_inter = self.dropout(tf.constant(0.5) * (tf.square(out_1) - out_2), training=False)
         rui = tf.squeeze(self.sigmoid(self.B + out_inter + one))
