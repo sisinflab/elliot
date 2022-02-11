@@ -69,8 +69,8 @@ class DeepCoNNModel(tf.keras.Model, ABC):
                                                           self.user_review_cnn_features[layer]], stddev=0.1)),
                                                  tf.Variable(initial_value=tf.constant(0.1,
                                                                                        shape=[1,
-                                                                                        self.user_review_cnn_features[
-                                                                                            layer]]))))
+                                                                                              self.user_review_cnn_features[
+                                                                                                  layer]]))))
         self.item_review_cnn_network = []
         self.item_review_cnn_network.append(
             (tf.Variable(
@@ -88,22 +88,22 @@ class DeepCoNNModel(tf.keras.Model, ABC):
                                                           self.item_review_cnn_features[layer]], stddev=0.1)),
                                                  tf.Variable(initial_value=tf.constant(0.1,
                                                                                        shape=[1,
-                                                                                        self.item_review_cnn_features[
-                                                                                            layer]]))))
+                                                                                              self.item_review_cnn_features[
+                                                                                                  layer]]))))
 
         # fully-connected layer for users and items
         self.user_fully_connected = tf.keras.layers.Dense(units=self.latent_size, use_bias=True)
         self.item_fully_connected = tf.keras.layers.Dense(units=self.latent_size, use_bias=True)
 
         # parameter for FM
-        self.W = tf.Variable(tf.random.normal([self.latent_size * 2, 8]))
-        self.fm_fully_connected = tf.keras.layers.Dense(1)
-        self.B = tf.Variable(tf.zeros(1))
+        self.W1 = tf.Variable(tf.random.uniform(minval=-0.1, maxval=0.1, shape=[self.latent_size * 2, 1]))
+        self.W2 = tf.Variable(tf.random.uniform(minval=-0.1, maxval=0.1, shape=[self.latent_size * 2, 8]))
+        self.B = tf.Variable(tf.constant(0.1))
 
         self.sigmoid = tf.keras.layers.Activation(tf.nn.sigmoid)
         self.dropout = tf.keras.layers.Dropout(self.dropout_rate)
 
-        self.optimizer = tf.optimizers.RMSprop(self.learning_rate)
+        self.optimizer = tf.optimizers.Adam(self.learning_rate)
 
     @tf.function
     def conv_users(self, user_reviews):
@@ -175,27 +175,29 @@ class DeepCoNNModel(tf.keras.Model, ABC):
         out_items = tf.reshape(tf.concat(out_items, axis=1), [user.shape[0], -1])
         out_items = self.dropout(self.item_fully_connected(out_items), training=training)
 
-        out = tf.concat([out_users, out_items], axis=-1)
+        out = tf.nn.relu(tf.concat([out_users, out_items], axis=-1))
+        one = tf.matmul(out, self.W1)
 
-        out_1 = tf.reduce_sum(tf.math.pow(tf.matmul(out, self.W), 2), 1, keepdims=True)
-        out_2 = tf.reduce_sum(tf.matmul(tf.math.pow(out, 2), tf.math.pow(self.W, 2)), 1, keepdims=True)
+        out_1 = tf.matmul(out, self.W2)
+        out_2 = tf.matmul(tf.math.pow(out, 2), tf.math.pow(self.W2, 2))
 
-        out_inter = tf.constant(0.5) * (out_1 - out_2)
-        out_lin = self.fm_fully_connected(out)
-        out_final = tf.squeeze(self.sigmoid(self.B + out_inter + out_lin))
+        out_inter = self.dropout(tf.constant(0.5) * (tf.square(out_1) - out_2), training=True)
+        out_final = tf.squeeze(self.sigmoid(self.B + out_inter + one))
 
         return out_final
 
     @tf.function
     def predict(self, out_users, out_items):
-        out = tf.concat([tf.repeat(out_users, repeats=out_items.shape[0], axis=0),
-                         tf.tile(out_items, multiples=tf.constant([out_users.shape[0], 1], tf.int32))], axis=-1)
-        out_1 = tf.reduce_sum(tf.math.pow(tf.matmul(out, self.W), 2), 1, keepdims=True)
-        out_2 = tf.reduce_sum(tf.matmul(tf.math.pow(out, 2), tf.math.pow(self.W, 2)), 1, keepdims=True)
+        out = tf.nn.relu(tf.concat([tf.repeat(out_users, repeats=out_items.shape[0], axis=0),
+                                    tf.tile(out_items, multiples=tf.constant([out_users.shape[0], 1], tf.int32))],
+                                   axis=-1))
+        one = tf.matmul(out, self.W1)
 
-        out_inter = tf.constant(0.5) * (out_1 - out_2)
-        out_lin = self.fm_fully_connected(out)
-        rui = tf.squeeze(self.sigmoid(self.B + out_inter + out_lin))
+        out_1 = tf.matmul(out, self.W2)
+        out_2 = tf.matmul(tf.math.pow(out, 2), tf.math.pow(self.W2, 2))
+
+        out_inter = self.dropout(tf.constant(0.5) * (tf.square(out_1) - out_2), training=False)
+        rui = tf.squeeze(self.sigmoid(self.B + out_inter + one))
         return tf.reshape(rui, [out_users.shape[0], out_items.shape[0]])
 
     @tf.function
