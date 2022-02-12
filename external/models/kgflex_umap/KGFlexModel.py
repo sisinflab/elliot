@@ -73,7 +73,7 @@ class KGFlexModel(keras.Model):
         inter_ui = k_u * s_ui
         # x_ui = tf.add(tf.reduce_sum(inter_ui, axis=-1), i_b)
         # x_ui = tf.reduce_sum(inter_ui, axis=-1)
-        x_ui = tf.reduce_mean(inter_ui, axis=-1)
+        x_ui = tf.reduce_sum(inter_ui, axis=-1)
 
         return x_ui
 
