@@ -10,17 +10,18 @@ from collections import OrderedDict, Counter
 DEFAULT_FEATURE_WEIGHT = 'info_gain'
 
 
-def worker(user, user_items, neg_items, if1, if2, fol, sol, npr, seed):
+def worker(user, user_items, neg_items, if1, if2, fol, sol, npr, candidate_items, seed):
     random.seed(seed)
     counters = dict()
-    counters[1] = user_features_counter(user_items, neg_items, if1, npr)
-    counters[2] = user_features_counter(user_items, neg_items, if2, npr)
+    counters[1] = user_features_counter(user_items, neg_items, if1, npr, candidate_items)
+    counters[2] = user_features_counter(user_items, neg_items, if2, npr, candidate_items)
     return user, limited_second_order_selection(counters, fol, sol)
 
 
 class UserFeatureMapper:
     def __init__(self, data, item_features: dict, item_features2=None,
-                 first_order_limit=100, second_order_limit=100, negative_positive_ratio=1):
+                 first_order_limit=100, second_order_limit=100, negative_positive_ratio=1,
+                 candidate_items=None):
         # for all the users compute the information for each feature
         self._data = data
         self._item_features = item_features
@@ -31,6 +32,7 @@ class UserFeatureMapper:
         self._items = set(self._data.private_items.keys())
         self._depth = 2
         self._npr = negative_positive_ratio
+        self._candidate_items = candidate_items
 
         self.users_features = self.user_features_selected_MP()
 
@@ -43,6 +45,7 @@ class UserFeatureMapper:
                      self._first_order_limit,
                      self._second_order_limit,
                      self._npr,
+                     set(self._candidate_items),
                      random.randint(0, 100000)) for u in self._users)
 
         # arguments = args()
@@ -59,9 +62,11 @@ class UserFeatureMapper:
 
         return {u: f for u, f in results}
 
+    # QUESTA FUNZIONE SEMBRA NON ESSERE UTILIZZATA, POTREBBE ESSERE RIMOSSA
     def user_features_selected(self, user):
         user_items = set(self._data.i_train_dict[user].keys())
         neg_items = set.difference(self._items, user_items)
+
         counters = dict()
         counters[1] = user_features_counter(user_items, neg_items, self._item_features)
         counters[2] = user_features_counter(user_items, neg_items, self._item_features2)
@@ -69,7 +74,7 @@ class UserFeatureMapper:
         return user, limited_second_order_selection(counters, self._first_order_limit, self._second_order_limit)
 
 
-def user_features_counter(user_items, neg_items, item_features_, npr):
+def user_features_counter(user_items, neg_items, item_features_, npr, candidate_items):
     def count_features(item_features_):
         """
         Given a list of positive and negative items retrieves all them features and then counts them.
@@ -93,8 +98,12 @@ def user_features_counter(user_items, neg_items, item_features_, npr):
         return pos_counter, neg_counter
 
     # for each postive item pick a negative
-    negatives = random.choices(list(neg_items), k=npr * len(user_items))
-    positives = user_items
+    if candidate_items:
+        positives = set.intersection(candidate_items, user_items)
+        negatives = random.choices(list(set.difference(candidate_items, neg_items)), k=npr * len(positives))
+    else:
+        negatives = random.choices(list(neg_items), k=npr * len(user_items))
+        positives = user_items
 
     # count positive feature and negative features
     pos_c, neg_c = count_features(item_features_)
