@@ -79,15 +79,14 @@ class KGFlexUmap(RecMixin, BaseRecommenderModel):
         self.item_features = pd.concat([item_features_df1, item_features_df2]).groupby('item')['f'].apply(set).to_dict()
 
         # ------------------------------ USER FEATURES ------------------------------
-        candidate_items = np.where(np.bincount(self._data.sp_i_train.indices) > self._data.num_users * 0.01)[0]
+        # candidate_items = np.where(np.bincount(self._data.sp_i_train.indices) > self._data.num_users * 0.01)[0]
 
         self.user_feature_mapper = UserFeatureMapper(data=self._data,
                                                      item_features=self.item_features1,
                                                      item_features2=self.item_features2,
                                                      first_order_limit=first_order_limit,
                                                      second_order_limit=second_order_limit,
-                                                     negative_positive_ratio=self._npr,
-                                                     candidate_items=candidate_items)
+                                                     negative_positive_ratio=self._npr)
 
         # ------------------------------ MODEL FEATURES ------------------------------
         self.logger.info('Features mapping started')

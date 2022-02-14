@@ -89,9 +89,10 @@ class KGFlexModel(keras.Model):
             loss = tf.reduce_sum(tf.nn.softplus(-difference))
             # Regularization Component
             # reg_loss = self._l_w * tf.reduce_sum([tf.nn.l2_loss(inter_pos),
-            #                                       tf.nn.l2_loss(inter_neg)]) + self._l_b * tf.nn.l2_loss(
-            #     i_b_pos) + self._l_b * tf.nn.l2_loss(i_b_neg) / 10
-            #
+            #                                       tf.nn.l2_loss(inter_neg)])
+                #        + self._l_b * tf.nn.l2_loss(
+                # i_b_pos) + self._l_b * tf.nn.l2_loss(i_b_neg) / 10
+
             # # Loss to be optimized
             # loss += reg_loss
 
@@ -112,14 +113,14 @@ class KGFlexModel(keras.Model):
 
     @tf.function
     def get_all_recs(self):
-        print('get all recs')
         # Z = self.H @ tf.transpose(self.G)
         Z = tf.add((self.H @ tf.transpose(self.G)), self.F_B)
         # return tf.add(tf.transpose(
         #     tf.squeeze(tf.py_function(self.scipy_matmul, [tf.transpose(self.K * Z)], Tout=[tf.float32]))), self.I_B)
+        # result = tf.transpose(
+        #     tf.squeeze(tf.py_function(self.scipy_matmul, [tf.transpose(self.K * Z)], Tout=[tf.float32])))
         result = tf.transpose(
-            tf.squeeze(tf.py_function(self.scipy_matmul, [tf.transpose(self.K * Z)], Tout=[tf.float32])))
-        print('get all recs done')
+            tf.squeeze(tf.py_function(self.scipy_matmul, [tf.transpose(self. K * Z)], Tout=[tf.float32])))
         return result
 
     def get_all_topks(self, predictions, mask, k, user_map, item_map):
