@@ -15,7 +15,7 @@ def worker(user, user_items, neg_items, if1, if2, fol, sol, npr, seed):
     counters = dict()
     counters[1] = user_features_counter(user_items, neg_items, if1, npr)
     counters[2] = user_features_counter(user_items, neg_items, if2, npr)
-    return user, limited_second_order_selection(counters, fol, sol)
+    return user, limited_second_order_selection(counters, fol, sol, npr)
 
 
 class UserFeatureMapper:
@@ -59,15 +59,6 @@ class UserFeatureMapper:
 
         return {u: f for u, f in results}
 
-    def user_features_selected(self, user):
-        user_items = set(self._data.i_train_dict[user].keys())
-        neg_items = set.difference(self._items, user_items)
-        counters = dict()
-        counters[1] = user_features_counter(user_items, neg_items, self._item_features)
-        counters[2] = user_features_counter(user_items, neg_items, self._item_features2)
-
-        return user, limited_second_order_selection(counters, self._first_order_limit, self._second_order_limit)
-
 
 def user_features_counter(user_items, neg_items, item_features_, npr):
     def count_features(item_features_):
@@ -98,10 +89,11 @@ def user_features_counter(user_items, neg_items, item_features_, npr):
 
     # count positive feature and negative features
     pos_c, neg_c = count_features(item_features_)
+    #return pos_c, neg_c, len(positives), len(negatives)
     return pos_c, neg_c, len(positives), len(negatives)
 
 
-def feature_entropy(pos_counter, neg_counter, n_pos_items, n_neg_items):
+def feature_entropy(pos_counter, neg_counter, n_pos_items, n_neg_items, npr):
     """
     :param pos_counter: number of times in which feature is true and target is true
     :param neg_counter: number of times in which feature is true and target is false
@@ -132,11 +124,11 @@ def feature_entropy(pos_counter, neg_counter, n_pos_items, n_neg_items):
 
     attribute_entropies = dict()
     for positive_feature in pos_counter:
-        ig = info_gain(pos_counter[positive_feature], neg_counter[positive_feature], n_pos_items, n_neg_items)
+        ig = info_gain(pos_counter[positive_feature]*npr, neg_counter[positive_feature], n_pos_items*npr, n_neg_items)
         if ig > 0:
             attribute_entropies[positive_feature] = ig
     for negative_feature in neg_counter:
-        ig = info_gain(pos_counter[negative_feature], neg_counter[negative_feature], n_pos_items, n_neg_items)
+        ig = info_gain(pos_counter[negative_feature]*npr, neg_counter[negative_feature], n_pos_items*npr, n_neg_items)
         if ig > 0:
             attribute_entropies[negative_feature] = ig
 
@@ -251,30 +243,30 @@ def feature_gini(pos_counter, neg_counter, n_pos_items, n_neg_items):
 #     return feature_weight(pos_f, neg_f, counter_2)
 
 
-def limited_second_order_selection(counters, limit_first, limit_second):
+def limited_second_order_selection(counters, limit_first, limit_second, npr):
     # 1st-order-features
     pos_1, neg_1, num_pos_items_1, num_neg_items_1 = counters[1]
     # 2nd-order-features
     pos_2, neg_2, num_pos_items_2, num_neg_items_2 = counters[2]
 
-    entropies_1 = feature_weight(pos_1, neg_1, num_pos_items_1, num_neg_items_1)
-    entropies_2 = feature_weight(pos_2, neg_2, num_pos_items_2, num_neg_items_2)
+    entropies_1 = feature_weight(pos_1, neg_1, num_pos_items_1, num_neg_items_1, npr)
+    entropies_2 = feature_weight(pos_2, neg_2, num_pos_items_2, num_neg_items_2, npr)
     entropies = {**entropies_1, **entropies_2}
 
     attributes_dict = OrderedDict(islice(sorted(entropies.items(), key=itemgetter(1, 0), reverse=True), limit_first))
 
-    # mn = min(attributes_dict.values())
-    # mx = max(attributes_dict.values())
+    # mn = min(entropies.values())
+    # mx = max(entropies.values())
     # diff = mx - mn
     #
     # if diff:
-    #     for k, v in attributes_dict.items():
-    #         attributes_dict[k] = (v - mn) / diff
+    #     for k, v in entropies.items():
+    #         entropies[k] = (v - mn) / diff
 
     return attributes_dict
 
-def feature_weight(pos_counter, neg_counter, num_pos_items, num_neg_items, type=DEFAULT_FEATURE_WEIGHT):
+def feature_weight(pos_counter, neg_counter, num_pos_items, num_neg_items, npr, type=DEFAULT_FEATURE_WEIGHT):
     if type == 'info_gain':
-        return feature_entropy(pos_counter, neg_counter, num_pos_items, num_neg_items)
+        return feature_entropy(pos_counter, neg_counter, num_pos_items, num_neg_items, npr)
     elif type == 'gini':
         return feature_gini(pos_counter, neg_counter, num_pos_items, num_neg_items)

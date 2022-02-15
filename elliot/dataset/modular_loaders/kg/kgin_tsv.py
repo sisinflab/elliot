@@ -6,7 +6,7 @@ import pandas as pd
 from elliot.dataset.modular_loaders.abstract_loader import AbstractLoader
 
 
-class KGINLoader(AbstractLoader):
+class KGINTSVLoader(AbstractLoader):
     def __init__(self, users: t.Set, items: t.Set, ns: SimpleNamespace, logger: object):
         self.logger = logger
         self.attribute_file = getattr(ns, "attributes", None)
@@ -18,13 +18,8 @@ class KGINLoader(AbstractLoader):
             self.map_ = self.read_triplets(self.attribute_file)
             # self.items = self.items & set(self.map_.keys())
 
-        self.entities = set()
-
-        with open(self.entities_file) as f:
-            # next(f)     # considers the header
-            for line in f:
-                self.entities.add(int(line.split(' ')[-1]))
-                # self.entities.add(int(line.split('\n')[-1]))
+        entities = pd.read_csv(self.entities_file, sep='\t', header=0, names=['id', 'remap'])
+        self.entities = set(entities.remap.unique())
 
         # TODO: in realtà sarebbe interessante capire quali item sono stati eliminati, per rimuoverli anche da entities
         self.entity_list = set.difference(self.entities, self.items)
@@ -41,7 +36,7 @@ class KGINLoader(AbstractLoader):
 
     def create_namespace(self):
         ns = SimpleNamespace()
-        ns.__name__ = "KGINLoader"
+        ns.__name__ = "KGINTSVLoader"
         ns.object = self
         ns.__dict__.update(self.__dict__)
         ns.feature_map = self.map_
@@ -57,21 +52,5 @@ class KGINLoader(AbstractLoader):
         return ns
 
     def read_triplets(self, file_name):
-        can_triplets_np = np.loadtxt(file_name, dtype=np.int32)
-        can_triplets_np = np.unique(can_triplets_np, axis=0)
-
-        # # get triplets with inverse direction like <entity, is-aspect-of, item>
-        # inv_triplets_np = can_triplets_np.copy()
-        # inv_triplets_np[:, 0] = can_triplets_np[:, 2]
-        # inv_triplets_np[:, 2] = can_triplets_np[:, 0]
-        # inv_triplets_np[:, 1] = can_triplets_np[:, 1] + max(can_triplets_np[:, 1]) + 1
-        # # consider two additional relations --- 'interact' and 'be interacted'
-        # can_triplets_np[:, 1] = can_triplets_np[:, 1] + 1
-        # inv_triplets_np[:, 1] = inv_triplets_np[:, 1] + 1
-        # # get full version of knowledge graph
-        # triplets = np.concatenate((can_triplets_np, inv_triplets_np), axis=0)
-
-        # consider two additional relations --- 'interact'.
-        triplets = can_triplets_np.copy()
-
-        return triplets
+        kg = pd.read_csv(file_name, sep='\t', header=None)
+        return np.array(kg)
