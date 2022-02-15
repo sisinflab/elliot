@@ -10,7 +10,11 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 import math
 
 import numpy as np
+import random
+import os
 from tqdm import tqdm
+import tensorflow as tf
+
 
 from .ConvMFCNN import CNN_module
 
@@ -35,7 +39,15 @@ class convMF(object):
                  random_seed,
                  name="ConvMF",
                  **kwargs):
+
+        os.environ['PYTHONHASHSEED'] = str(random_seed)
+        random.seed(random_seed)
         np.random.seed(random_seed)
+        tf.random.set_seed(random_seed)
+        os.environ['TF_DETERMINISTIC_OPS'] = '1'
+        os.environ['TF_CUDNN_DETERMINISTIC'] = '1'
+        tf.config.threading.set_inter_op_parallelism_threads(1)
+        tf.config.threading.set_intra_op_parallelism_threads(1)
 
         self.a = 1
         self.b = 0

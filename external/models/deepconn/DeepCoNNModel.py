@@ -11,6 +11,8 @@ from abc import ABC
 
 import tensorflow as tf
 import numpy as np
+import os
+import random
 
 
 class DeepCoNNModel(tf.keras.Model, ABC):
@@ -33,7 +35,15 @@ class DeepCoNNModel(tf.keras.Model, ABC):
                  **kwargs
                  ):
         super().__init__()
+
+        os.environ['PYTHONHASHSEED'] = str(random_seed)
+        random.seed(random_seed)
+        np.random.seed(random_seed)
         tf.random.set_seed(random_seed)
+        os.environ['TF_DETERMINISTIC_OPS'] = '1'
+        os.environ['TF_CUDNN_DETERMINISTIC'] = '1'
+        tf.config.threading.set_inter_op_parallelism_threads(1)
+        tf.config.threading.set_intra_op_parallelism_threads(1)
 
         self.num_users = num_users
         self.num_items = num_items

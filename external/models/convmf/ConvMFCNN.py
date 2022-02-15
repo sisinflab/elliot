@@ -2,13 +2,24 @@ import numpy as np
 
 import tensorflow as tf
 from tensorflow import keras
+import os
+import random
 
 
 class CNN_module():
 
     def __init__(self, output_dimesion, vocab_size, dropout_rate, batch_size, emb_dim, max_len, nb_filters, init_W,
                  random_seed, **kwargs):
+
+        os.environ['PYTHONHASHSEED'] = str(random_seed)
+        random.seed(random_seed)
+        np.random.seed(random_seed)
         tf.random.set_seed(random_seed)
+        os.environ['TF_DETERMINISTIC_OPS'] = '1'
+        os.environ['TF_CUDNN_DETERMINISTIC'] = '1'
+        tf.config.threading.set_inter_op_parallelism_threads(1)
+        tf.config.threading.set_intra_op_parallelism_threads(1)
+
         self.max_len = max_len
         self.batch_size = batch_size
         self.epochs = 5
