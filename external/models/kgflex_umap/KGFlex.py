@@ -43,7 +43,7 @@ class KGFlexUmap(RecMixin, BaseRecommenderModel):
             ("_second_order_limit", "second_order_limit", "sol", -1, None, None),
             ("_l_w", "l_w", "l_w", 0.1, float, None),
             ("_l_b", "l_b", "l_b", 0.001, float, None),
-            ("_loader", "loader", "load", "KGRec", None, None),
+            ("_loader", "loader", "load", "KGFlex", None, None),
             ("_npr", "npr", "npr", 1, int, None)
         ]
         self.autoset_params()
