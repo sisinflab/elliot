@@ -14,8 +14,6 @@ experiment:
   prefiltering:
     - strategy: global_threshold
       threshold: 3
-    - strategy: iterative_k_core
-      core: 10
   splitting:
     # save_on_disk: False
     # save_folder: ../data/{0}/5-core/
