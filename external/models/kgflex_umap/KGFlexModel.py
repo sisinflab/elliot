@@ -113,6 +113,7 @@ class KGFlexModel(keras.Model):
 
     @tf.function
     def get_all_recs(self):
+        print('begin all recs')
         # Z = self.H @ tf.transpose(self.G)
         Z = tf.add((self.H @ tf.transpose(self.G)), self.F_B)
         # return tf.add(tf.transpose(
@@ -121,6 +122,7 @@ class KGFlexModel(keras.Model):
         #     tf.squeeze(tf.py_function(self.scipy_matmul, [tf.transpose(self.K * Z)], Tout=[tf.float32])))
         result = tf.transpose(
             tf.squeeze(tf.py_function(self.scipy_matmul, [tf.transpose(self. K * Z)], Tout=[tf.float32])))
+        print('done all recs')
         return result
 
     def get_all_topks(self, predictions, mask, k, user_map, item_map):
