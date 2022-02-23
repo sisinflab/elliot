@@ -125,7 +125,7 @@ class KGIN(RecMixin, BaseRecommenderModel):
 
     @property
     def name(self):
-        return "KaHFMEmbeddings" \
+        return "KGIN" \
                + f"_{self.get_base_params_shortcut()}" \
                + f"_{self.get_params_shortcut()}"
 
