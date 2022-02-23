@@ -44,3 +44,4 @@ for _backend in sys.modules["external"].backend:
         from .lightegcf.LightEGCF import LightEGCF
         from .gcn.GCN import GCN
         from .egcfv2.EGCFv2 import EGCFv2
+        from .bprmf.BPRMF import BPRMF
