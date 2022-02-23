@@ -87,7 +87,7 @@ class NGCFModel(torch.nn.Module, ABC):
         self.propagation_network.to(self.device)
         self.softplus = torch.nn.Softplus()
 
-        self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
+        self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate, weight_decay=self.l_w)
 
     def propagate_embeddings(self, evaluate=False):
         ego_embeddings = torch.cat((self.Gu.to(self.device), self.Gi.to(self.device)), 0)
@@ -142,11 +142,6 @@ class NGCFModel(torch.nn.Module, ABC):
 
         difference = torch.clamp(xu_pos - xu_neg, -80.0, 1e8)
         loss = torch.sum(self.softplus(-difference))
-        reg_loss = self.l_w * (torch.norm(self.Gu, 2) +
-                               torch.norm(self.Gi, 2) +
-                               torch.stack([torch.norm(value, 2) for value in self.propagation_network.parameters()],
-                                           dim=0).sum(dim=0))
-        loss += reg_loss
 
         self.optimizer.zero_grad()
         loss.backward()
