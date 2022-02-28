@@ -14,15 +14,17 @@ import numpy as np
 import random
 
 
-class BPRMFModel(torch.nn.Module, ABC):
+class VBPRModel(torch.nn.Module, ABC):
     def __init__(self,
                  num_users,
                  num_items,
                  learning_rate,
                  embed_k,
+                 embed_d,
                  l_w,
+                 features,
                  random_seed,
-                 name="BPRMF",
+                 name="VBPR",
                  **kwargs
                  ):
         super().__init__()
@@ -40,6 +42,7 @@ class BPRMFModel(torch.nn.Module, ABC):
         self.num_users = num_users
         self.num_items = num_items
         self.embed_k = embed_k
+        self.embed_d = embed_d
         self.learning_rate = learning_rate
         self.l_w = l_w
 
@@ -49,6 +52,15 @@ class BPRMFModel(torch.nn.Module, ABC):
         self.Gi = torch.nn.Parameter(
             torch.nn.init.xavier_normal_(torch.empty((self.num_items, self.embed_k))))
         self.Gi.to(self.device)
+
+        self.F = torch.tensor(features, dtype=torch.float32, device=self.device)
+        self.feature_size = self.F.shape[1]
+        self.Tu = torch.nn.Parameter(
+            torch.nn.init.xavier_normal_(torch.empty((self.num_users, self.embed_d))))
+        self.Tu.to(self.device)
+        self.E = torch.nn.Parameter(
+            torch.nn.init.xavier_normal_(torch.empty((self.feature_size, self.embed_d))))
+        self.E.to(self.device)
 
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
         self.lr_scheduler = self.set_lr_scheduler()
@@ -61,24 +73,31 @@ class BPRMFModel(torch.nn.Module, ABC):
         users, items = inputs
         gamma_u = torch.squeeze(self.Gu[users]).to(self.device)
         gamma_i = torch.squeeze(self.Gi[items]).to(self.device)
+        theta_u = torch.squeeze(self.Tu[users]).to(self.device)
+        effe_i = torch.squeeze(self.F[items]).to(self.device)
 
-        xui = torch.sum(gamma_u * gamma_i, 1)
+        xui = torch.sum(gamma_u * gamma_i, 1) + torch.sum(theta_u * effe_i.mm(self.E), 1)
 
-        return xui, gamma_u, gamma_i
+        return xui, gamma_u, gamma_i, theta_u, effe_i
 
-    def predict(self, start, stop, **kwargs):
-        return torch.matmul(self.Gu[start:stop].to(self.device),
-                            torch.transpose(self.Gi.to(self.device), 0, 1))
+    def predict(self, start_user, stop_user, start_item, stop_item, **kwargs):
+        return torch.matmul(self.Gu[start_user:stop_user].to(self.device),
+                            torch.transpose(self.Gi[start_item:stop_item].to(self.device), 0, 1)) + \
+               torch.matmul(self.Tu[stop_user:stop_user].to(self.device),
+                            torch.transpose(torch.matmul(self.F[start_item:stop_item].to(self.device), self.E), 0, 1))
 
     def train_step(self, batch):
         user, pos, neg = batch
-        xu_pos, gamma_u, gamma_i_pos = self.forward(inputs=(user, pos))
-        xu_neg, _, gamma_i_neg = self.forward(inputs=(user, neg))
+        xu_pos, gamma_u, gamma_i_pos, theta_u, effe_i_pos = self.forward(inputs=(user, pos))
+        xu_neg, _, gamma_i_neg, _, effe_i_neg = self.forward(inputs=(user, neg))
 
         loss = torch.mean(torch.nn.functional.logsigmoid(xu_neg - xu_pos))
         reg_loss = self.l_w * (1 / 2) * (gamma_u.norm(2).pow(2) +
+                                         theta_u.norm(2).pow(2) +
                                          gamma_i_pos.norm(2).pow(2) +
-                                         gamma_i_neg.norm(2).pow(2)) / user.shape[0]
+                                         gamma_i_neg.norm(2).pow(2) +
+                                         effe_i_pos.norm(2).pow(2) +
+                                         effe_i_neg.norm(2).pow(2)) / user.shape[0]
         loss += reg_loss
 
         self.optimizer.zero_grad()

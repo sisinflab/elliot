@@ -85,9 +85,13 @@ class NGCFModel(torch.nn.Module, ABC):
 
         self.propagation_network = torch_geometric.nn.Sequential('x, edge_index', propagation_network_list)
         self.propagation_network.to(self.device)
-        self.softplus = torch.nn.Softplus()
 
-        self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate, weight_decay=self.l_w)
+        self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
+        self.lr_scheduler = self.set_lr_scheduler()
+
+    def set_lr_scheduler(self):
+        scheduler = torch.optim.lr_scheduler.LambdaLR(self.optimizer, lr_lambda=lambda epoch: 0.96 ** (epoch / 50))
+        return scheduler
 
     def propagate_embeddings(self, evaluate=False):
         ego_embeddings = torch.cat((self.Gu.to(self.device), self.Gi.to(self.device)), 0)
@@ -129,7 +133,7 @@ class NGCFModel(torch.nn.Module, ABC):
 
         xui = torch.sum(gamma_u * gamma_i, 1)
 
-        return xui
+        return xui, gamma_u, gamma_i
 
     def predict(self, gu, gi, **kwargs):
         return torch.matmul(gu.to(self.device), torch.transpose(gi.to(self.device), 0, 1))
@@ -137,11 +141,14 @@ class NGCFModel(torch.nn.Module, ABC):
     def train_step(self, batch):
         gu, gi = self.propagate_embeddings()
         user, pos, neg = batch
-        xu_pos = self.forward(inputs=(gu[user[:, 0]], gi[pos[:, 0]]))
-        xu_neg = self.forward(inputs=(gu[user[:, 0]], gi[neg[:, 0]]))
+        xu_pos, gamma_u, gamma_i_pos = self.forward(inputs=(gu[user], gi[pos]))
+        xu_neg, _, gamma_i_neg = self.forward(inputs=(gu[user], gi[neg]))
 
-        difference = torch.clamp(xu_pos - xu_neg, -80.0, 1e8)
-        loss = torch.sum(self.softplus(-difference))
+        loss = torch.mean(torch.nn.functional.logsigmoid(xu_neg - xu_pos))
+        reg_loss = self.l_w * (1 / 2) * (gamma_u.norm(2).pow(2) +
+                                         gamma_i_pos.norm(2).pow(2) +
+                                         gamma_i_neg.norm(2).pow(2)) / user.shape[0]
+        loss += reg_loss
 
         self.optimizer.zero_grad()
         loss.backward()
