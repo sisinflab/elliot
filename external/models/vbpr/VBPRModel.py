@@ -84,7 +84,9 @@ class VBPRModel(torch.nn.Module, ABC):
         return torch.matmul(self.Gu[start_user:stop_user].to(self.device),
                             torch.transpose(self.Gi[start_item:stop_item].to(self.device), 0, 1)) + \
                torch.matmul(self.Tu[start_user:stop_user].to(self.device),
-                            torch.transpose(torch.matmul(self.F[start_item:stop_item].to(self.device), self.E), 0, 1))
+                            torch.transpose(
+                                torch.matmul(self.F[start_item:stop_item].to(self.device), self.E.to(self.device)), 0,
+                                1))
 
     def train_step(self, batch):
         user, pos, neg = batch
