@@ -4,10 +4,8 @@ Module description:
 """
 
 __version__ = '0.3.0'
-__author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta, Felice Antonio Merra'
-__email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malitesta@poliba.it, felice.merra@poliba.it'
-
-from ast import literal_eval as make_tuple
+__author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta'
+__email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malitesta@poliba.it'
 
 from tqdm import tqdm
 import numpy as np
@@ -68,16 +66,12 @@ class NGCF(RecMixin, BaseRecommenderModel):
             ("_learning_rate", "lr", "lr", 0.0005, float, None),
             ("_factors", "factors", "factors", 64, int, None),
             ("_l_w", "l_w", "l_w", 0.01, float, None),
-            ("_weight_size", "weight_size", "weight_size", "(64,)", lambda x: list(make_tuple(x)),
-             lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
-            ("_node_dropout", "node_dropout", "node_dropout", "()", lambda x: list(make_tuple(x)),
-             lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
-            ("_message_dropout", "message_dropout", "message_dropout", "()", lambda x: list(make_tuple(x)),
-             lambda x: self._batch_remove(str(x), " []").replace(",", "-"))
+            ("_n_layers", "n_layers", "n_layers", 3, int, None),
+            ("_weight_size", "weight_size", "weight_size", 64, int, None),
+            ("_node_dropout", "node_dropout", "node_dropout", 0.0, float, None),
+            ("_message_dropout", "message_dropout", "message_dropout", 0.5, float, None)
         ]
         self.autoset_params()
-
-        self._n_layers = len(self._weight_size)
 
         row, col = data.sp_i_train.nonzero()
         col = [c + self._num_users for c in col]

@@ -4,8 +4,8 @@ Module description:
 """
 
 __version__ = '0.3.0'
-__author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta, Felice Antonio Merra'
-__email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malitesta@poliba.it, felice.merra@poliba.it'
+__author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta'
+__email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malitesta@poliba.it'
 
 from abc import ABC
 
@@ -54,9 +54,9 @@ class NGCFModel(torch.nn.Module, ABC):
         self.l_w = l_w
         self.weight_size = weight_size
         self.n_layers = n_layers
-        self.node_dropout = node_dropout if node_dropout else [0.0] * self.n_layers
-        self.message_dropout = message_dropout if message_dropout else [0.0] * self.n_layers
-        self.weight_size_list = [self.embed_k] + self.weight_size
+        self.node_dropout = node_dropout
+        self.message_dropout = message_dropout
+        self.weight_size_list = [self.embed_k] + ([self.weight_size] * self.n_layers)
         self.edge_index = torch.tensor(edge_index, dtype=torch.int64)
 
         self.adj = SparseTensor(row=torch.cat([self.edge_index[0], self.edge_index[1]], dim=0),
@@ -75,13 +75,13 @@ class NGCFModel(torch.nn.Module, ABC):
         self.dropout_layers = []
 
         for layer in range(self.n_layers):
-            propagation_network_list.append((NodeDropout(self.node_dropout[layer],
+            propagation_network_list.append((NodeDropout(self.node_dropout,
                                                          self.num_users,
                                                          self.num_items),
                                              'edge_index -> edge_index'))
             propagation_network_list.append((NGCFLayer(self.weight_size_list[layer],
                                                        self.weight_size_list[layer + 1]), 'x, edge_index -> x'))
-            self.dropout_layers.append(torch.nn.Dropout(p=self.message_dropout[layer]))
+            self.dropout_layers.append(torch.nn.Dropout(p=self.message_dropout))
 
         self.propagation_network = torch_geometric.nn.Sequential('x, edge_index', propagation_network_list)
         self.propagation_network.to(self.device)
