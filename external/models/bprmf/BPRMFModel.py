@@ -59,10 +59,10 @@ class BPRMFModel(torch.nn.Module, ABC):
 
     def forward(self, inputs, **kwargs):
         users, items = inputs
-        gamma_u = torch.squeeze(self.Gu[users]).to(self.device)
-        gamma_i = torch.squeeze(self.Gi[items]).to(self.device)
+        gamma_u = torch.squeeze(self.Gu[users[:, 0]]).to(self.device)
+        gamma_i = torch.squeeze(self.Gi[items[:, 0]]).to(self.device)
 
-        xui = torch.sum(gamma_u.to(self.device) * gamma_i.to(self.device), 1)
+        xui = torch.sum(gamma_u.to(self.device) * gamma_i.to(self.device), 1).to(self.device)
 
         return xui, gamma_u, gamma_i
 
