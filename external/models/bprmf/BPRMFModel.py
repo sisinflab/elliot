@@ -64,7 +64,7 @@ class BPRMFModel(torch.nn.Module, ABC):
 
         xui = torch.sum(torch.mul(gamma_u, gamma_i), 1)
 
-        print(xui.device())
+        print(xui.device)
         exit()
 
         return xui, gamma_u, gamma_i
