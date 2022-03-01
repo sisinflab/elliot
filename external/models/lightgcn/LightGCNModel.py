@@ -114,7 +114,8 @@ class LightGCNModel(torch.nn.Module, ABC):
         xu_pos, gamma_u, gamma_i_pos = self.forward(inputs=(gu[user], gi[pos]))
         xu_neg, _, gamma_i_neg = self.forward(inputs=(gu[user], gi[neg]))
 
-        loss = torch.mean(torch.nn.functional.logsigmoid(xu_neg - xu_pos))
+        difference = torch.clamp(xu_pos - xu_neg, -80.0, 1e8)
+        loss = torch.mean(torch.nn.functional.softplus(-difference))
         reg_loss = self.l_w * (1 / 2) * (gamma_u.norm(2).pow(2) +
                                          gamma_i_pos.norm(2).pow(2) +
                                          gamma_i_neg.norm(2).pow(2)) / user.shape[0]

@@ -155,7 +155,8 @@ class MMGCNModel(torch.nn.Module, ABC):
         xu_pos, gamma_u_m, gamma_i_pos_m = self.forward(inputs=(gum[user], gim[pos]))
         xu_neg, _, gamma_i_neg_m = self.forward(inputs=(gum[user], gim[neg]))
 
-        loss = torch.mean(torch.nn.functional.logsigmoid(xu_neg - xu_pos))
+        difference = torch.clamp(xu_pos - xu_neg, -80.0, 1e8)
+        loss = torch.mean(torch.nn.functional.softplus(-difference))
         reg_loss = self.l_w * (1 / 2) * (gamma_u_m.norm(2).pow(2) +
                                          gamma_i_pos_m.norm(2).pow(2) +
                                          gamma_i_neg_m.norm(2).pow(2)) / user.shape[0]
