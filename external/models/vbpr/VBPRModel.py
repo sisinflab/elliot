@@ -76,7 +76,7 @@ class VBPRModel(torch.nn.Module, ABC):
         theta_u = torch.squeeze(self.Tu[users[:, 0]]).to(self.device)
         effe_i = torch.squeeze(self.F[items[:, 0]]).to(self.device)
 
-        xui = torch.sum(gamma_u * gamma_i, 1) + torch.sum(theta_u * effe_i.mm(self.E.to(self.device)), 1)
+        xui = torch.sum(gamma_u * gamma_i, 1)
 
         return xui, gamma_u, gamma_i, theta_u, effe_i
 
