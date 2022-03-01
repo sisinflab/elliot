@@ -62,10 +62,7 @@ class BPRMFModel(torch.nn.Module, ABC):
         gamma_u = torch.squeeze(self.Gu[users[:, 0]]).to(self.device)
         gamma_i = torch.squeeze(self.Gi[items[:, 0]]).to(self.device)
 
-        xui = torch.sum(torch.mul(gamma_u, gamma_i), 1)
-
-        print(xui.device)
-        exit()
+        xui = torch.sum(gamma_u * gamma_i, 1)
 
         return xui, gamma_u, gamma_i
 
