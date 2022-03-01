@@ -81,7 +81,7 @@ class MMGCN(RecMixin, BaseRecommenderModel):
              lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
             ("_aggregation", "aggregation", "aggregation", 'mean', str, None),
             ("_combination", "combination", "combination", 'co', str, None),
-            ("_loaders", "loaders", "loads", "('VisualAttributes','TextualAttributes')", lambda x: list(make_tuple(x)),
+            ("_loaders", "loaders", "loads", "('VisualAttribute','TextualAttribute')", lambda x: list(make_tuple(x)),
              lambda x: self._batch_remove(str(x), " []").replace(",", "-"))
         ]
         self.autoset_params()
@@ -93,6 +93,7 @@ class MMGCN(RecMixin, BaseRecommenderModel):
         row, col = data.sp_i_train.nonzero()
         col = [c + self._num_users for c in col]
         edge_index = np.array([row, col])
+        edge_index = torch.tensor(edge_index, dtype=torch.int64)
         self.adj = SparseTensor(row=torch.cat([edge_index[0], edge_index[1]], dim=0),
                                 col=torch.cat([edge_index[1], edge_index[0]], dim=0),
                                 sparse_sizes=(self._num_users + self._num_items,
@@ -134,6 +135,7 @@ class MMGCN(RecMixin, BaseRecommenderModel):
                     loss += self._model.train_step(batch)
                     t.set_postfix({'loss': f'{loss / steps:.5f}'})
                     t.update()
+                self._model.lr_scheduler.step()
 
             self.evaluate(it, loss / (it + 1))
 

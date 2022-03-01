@@ -45,3 +45,4 @@ for _backend in sys.modules["external"].backend:
         from .gcn.GCN import GCN
         from .egcfv2.EGCFv2 import EGCFv2
         from .bprmf.BPRMF import BPRMF
+        from .vbpr.VBPR import VBPR

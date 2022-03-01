@@ -71,10 +71,10 @@ class VBPRModel(torch.nn.Module, ABC):
 
     def forward(self, inputs, **kwargs):
         users, items = inputs
-        gamma_u = torch.squeeze(self.Gu[users]).to(self.device)
-        gamma_i = torch.squeeze(self.Gi[items]).to(self.device)
-        theta_u = torch.squeeze(self.Tu[users]).to(self.device)
-        effe_i = torch.squeeze(self.F[items]).to(self.device)
+        gamma_u = torch.squeeze(self.Gu[users[:, 0]]).to(self.device)
+        gamma_i = torch.squeeze(self.Gi[items[:, 0]]).to(self.device)
+        theta_u = torch.squeeze(self.Tu[users[:, 0]]).to(self.device)
+        effe_i = torch.squeeze(self.F[items[:, 0]]).to(self.device)
 
         xui = torch.sum(gamma_u * gamma_i, 1) + torch.sum(theta_u * effe_i.mm(self.E), 1)
 
@@ -83,7 +83,7 @@ class VBPRModel(torch.nn.Module, ABC):
     def predict(self, start_user, stop_user, start_item, stop_item, **kwargs):
         return torch.matmul(self.Gu[start_user:stop_user].to(self.device),
                             torch.transpose(self.Gi[start_item:stop_item].to(self.device), 0, 1)) + \
-               torch.matmul(self.Tu[stop_user:stop_user].to(self.device),
+               torch.matmul(self.Tu[start_user:stop_user].to(self.device),
                             torch.transpose(torch.matmul(self.F[start_item:stop_item].to(self.device), self.E), 0, 1))
 
     def train_step(self, batch):
@@ -107,5 +107,6 @@ class VBPRModel(torch.nn.Module, ABC):
         return loss.detach().cpu().numpy()
 
     def get_top_k(self, preds, train_mask, k=100):
-        return torch.topk(torch.where(torch.tensor(train_mask).to(self.device), preds.to(self.device),
+        return torch.topk(torch.where(torch.tensor(train_mask).to(self.device),
+                                      torch.tensor(preds, dtype=torch.float32).to(self.device),
                                       torch.tensor(-np.inf).to(self.device)), k=k, sorted=True)

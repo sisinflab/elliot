@@ -36,7 +36,7 @@ class BPRMF(RecMixin, BaseRecommenderModel):
     .. code:: yaml
 
       models:
-        BPRMF_batch:
+        BPRMF:
           meta:
             save_recs: True
           epochs: 10

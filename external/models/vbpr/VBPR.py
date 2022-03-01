@@ -11,6 +11,7 @@ import torch
 import os
 import numpy as np
 from tqdm import tqdm
+from ast import literal_eval as make_tuple
 
 from elliot.dataset.samplers import custom_sampler as cs
 from elliot.utils.write import store_recommendation
@@ -60,16 +61,37 @@ class VBPR(RecMixin, BaseRecommenderModel):
             ("_factors_d", "factors_d", "factors_d", 20, int, None),
             ("_batch_eval", "batch_eval", "batch_eval", 1024, int, None),
             ("_learning_rate", "lr", "lr", 0.001, float, None),
-            ("_l_w", "l_w", "l_w", 0.1, float, None)
+            ("_combine_modalities", "comb_mod", "comb_mod", 'concat', str, None),
+            ("_modalities", "modalities", "modalites", "('visual','textual')", lambda x: list(make_tuple(x)),
+             lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
+            ("_l_w", "l_w", "l_w", 0.1, float, None),
+            ("_loaders", "loaders", "loads", "('VisualAttribute','TextualAttribute')", lambda x: list(make_tuple(x)),
+             lambda x: self._batch_remove(str(x), " []").replace(",", "-"))
         ]
         self.autoset_params()
 
         if self._batch_size < 1:
             self._batch_size = self._data.transactions
 
-        self._ratings = self._data.train_dict
-
         self._sampler = cs.Sampler(self._data.i_train_dict)
+
+        for m_id, m in enumerate(self._modalities):
+            self.__setattr__(f'''_side_{m}''',
+                             self._data.side_information.__getattribute__(f'''{self._loaders[m_id]}'''))
+
+        if type(self._modalities) == list:
+            if self._combine_modalities == 'concat':
+                all_multimodal_features = self.__getattribute__(
+                    f'''_side_{self._modalities[0]}''').object.get_all_features()
+                for m in self._modalities[1:]:
+                    all_multimodal_features = np.concatenate((all_multimodal_features,
+                                                              self.__getattribute__(
+                                                                  f'''_side_{m}''').object.get_all_features()),
+                                                             axis=-1)
+            else:
+                raise NotImplementedError('This combination of multimodal features has not been implemented yet!')
+        else:
+            all_multimodal_features = self._side_visual.object.get_all_features()
 
         self._model = VBPRModel(self._num_users,
                                 self._num_items,
@@ -77,7 +99,7 @@ class VBPR(RecMixin, BaseRecommenderModel):
                                 self._factors,
                                 self._factors_d,
                                 self._l_w,
-                                self.features,
+                                all_multimodal_features,
                                 self._seed)
 
     @property
@@ -109,10 +131,10 @@ class VBPR(RecMixin, BaseRecommenderModel):
         for index, offset in enumerate(range(0, self._num_users, self._batch_size)):
             offset_stop = min(offset + self._batch_size, self._num_users)
             predictions = np.empty((offset_stop - offset, self._num_items))
-            for idx, start_items in range(0, self._num_items, self._batch_eval):
+            for idx, start_items in enumerate(range(0, self._num_items, self._batch_eval)):
                 stop_items = min(start_items + self._batch_eval, self._num_items)
                 predictions[:, start_items: stop_items] = self._model.predict(offset, offset_stop, start_items,
-                                                                              stop_items)
+                                                                              stop_items).detach().cpu().numpy()
             recs_val, recs_test = self.process_protocol(k, predictions, offset, offset_stop)
             predictions_top_k_val.update(recs_val)
             predictions_top_k_test.update(recs_test)

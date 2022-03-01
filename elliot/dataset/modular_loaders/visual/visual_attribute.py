@@ -37,7 +37,7 @@ class VisualAttribute(AbstractLoader):
 
     def create_namespace(self) -> SimpleNamespace:
         ns = SimpleNamespace()
-        ns.__name__ = "VisualAttributes"
+        ns.__name__ = "VisualAttribute"
         ns.object = self
         ns.visual_feature_folder_path = self.visual_feature_folder_path
         ns.visual_pca_feature_folder_path = self.visual_pca_feature_folder_path
@@ -78,15 +78,27 @@ class VisualAttribute(AbstractLoader):
             self.item_mapping = {item: val for val, item in enumerate(items)}
         return items
 
-    def get_all_features(self, evaluate=False):
-        if evaluate:
-            files = os.listdir(self.visual_feature_folder_path)
-            all_features = np.empty((len(files), self.visual_features_shape))
-            for f in files:
-                all_features[int(f.split('.')[0])] = np.load(self.visual_feature_folder_path + '/' + f)
-            return all_features
-        else:
-            all_features = np.empty((len(self.items), self.visual_features_shape))
-            for i, file in enumerate(list(self.items)):
-                all_features[i] = np.load(self.visual_feature_folder_path + '/' + str(file) + '.npy')
-            return all_features
+    def get_all_features(self):
+        return self.get_all_visual_features()
+
+    def get_all_visual_features(self):
+        all_features = np.empty((len(self.items), self.visual_features_shape))
+        if self.visual_feature_folder_path:
+            for key, value in self.item_mapping.items():
+                all_features[value] = np.load(self.visual_feature_folder_path + '/' + str(key) + '.npy')
+        return all_features
+
+    def get_all_visual_pca_features(self):
+        all_features = np.empty((len(self.items), self.visual_pca_features_shape))
+        if self.visual_pca_feature_folder_path:
+            for key, value in self.item_mapping.items():
+                all_features[value] = np.load(self.visual_pca_feature_folder_path + '/' + str(key) + '.npy')
+        return all_features
+
+    def get_all_visual_feat_map_features(self):
+        all_features = np.empty((len(self.items), self.visual_feat_map_features_shape))
+        if self.visual_feat_map_feature_folder_path:
+            for key, value in self.item_mapping.items():
+                all_features[value] = np.load(self.visual_feat_map_feature_folder_path + '/' + str(key) + '.npy')
+        return all_features
+
