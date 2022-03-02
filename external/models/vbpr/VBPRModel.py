@@ -59,6 +59,7 @@ class VBPRModel(torch.nn.Module, ABC):
             torch.nn.init.xavier_normal_(torch.empty((self.num_users, self.embed_d))))
         self.Tu.to(self.device)
         self.projection = torch.nn.Linear(in_features=self.feature_size, out_features=self.embed_d)
+        self.projection.to(self.device)
 
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
         self.lr_scheduler = self.set_lr_scheduler()
@@ -74,7 +75,7 @@ class VBPRModel(torch.nn.Module, ABC):
         theta_u = torch.squeeze(self.Tu[users[:, 0]]).to(self.device)
         effe_i = torch.squeeze(self.F[items[:, 0]]).to(self.device)
 
-        xui = torch.sum(gamma_u * gamma_i, 1) + torch.sum(theta_u * self.projection(effe_i).to(self.device), 1)
+        xui = torch.sum(gamma_u * gamma_i, 1) + torch.sum(theta_u * self.projection(effe_i), 1)
 
         return xui, gamma_u, gamma_i, theta_u, effe_i
 
@@ -83,7 +84,7 @@ class VBPRModel(torch.nn.Module, ABC):
                             torch.transpose(self.Gi.to(self.device), 0, 1)) + \
                torch.matmul(self.Tu[start_user:stop_user].to(self.device),
                             torch.transpose(
-                                self.projection(self.F.to(self.device)).to(self.device), 0, 1))
+                                self.projection(self.F.to(self.device)), 0, 1))
 
     def train_step(self, batch):
         user, pos, neg = batch
