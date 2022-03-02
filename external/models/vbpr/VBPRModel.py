@@ -53,14 +53,12 @@ class VBPRModel(torch.nn.Module, ABC):
             torch.nn.init.xavier_normal_(torch.empty((self.num_items, self.embed_k))))
         self.Gi.to(self.device)
 
-        self.F = torch.tensor(features, dtype=torch.float32, device=self.device)
+        self.F = torch.nn.Parameter(torch.tensor(features, dtype=torch.float32, device=self.device))
         self.feature_size = self.F.shape[1]
         self.Tu = torch.nn.Parameter(
             torch.nn.init.xavier_normal_(torch.empty((self.num_users, self.embed_d))))
         self.Tu.to(self.device)
-        self.E = torch.nn.Parameter(
-            torch.nn.init.xavier_normal_(torch.empty((self.feature_size, self.embed_d))))
-        self.E.to(self.device)
+        self.projection = torch.nn.Linear(in_features=self.feature_size, out_features=self.embed_d)
 
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
         self.lr_scheduler = self.set_lr_scheduler()
@@ -76,7 +74,7 @@ class VBPRModel(torch.nn.Module, ABC):
         theta_u = torch.squeeze(self.Tu[users[:, 0]]).to(self.device)
         effe_i = torch.squeeze(self.F[items[:, 0]]).to(self.device)
 
-        xui = torch.sum(gamma_u * gamma_i, 1) + torch.sum(theta_u * effe_i.mm(self.E.to(self.device)), 1)
+        xui = torch.sum(gamma_u * gamma_i, 1) + torch.sum(theta_u * self.projection(effe_i), 1)
 
         return xui, gamma_u, gamma_i, theta_u, effe_i
 
@@ -85,7 +83,7 @@ class VBPRModel(torch.nn.Module, ABC):
                             torch.transpose(self.Gi.to(self.device), 0, 1)) + \
                torch.matmul(self.Tu[start_user:stop_user].to(self.device),
                             torch.transpose(
-                                torch.matmul(self.F.to(self.device), self.E.to(self.device)), 0, 1))
+                                self.projection(self.F.to(self.device)), 0, 1))
 
     def train_step(self, batch):
         user, pos, neg = batch
