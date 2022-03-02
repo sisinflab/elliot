@@ -34,7 +34,6 @@ class VBPR(RecMixin, BaseRecommenderModel):
         factors: Number of latent factors
         factors_d: Dimension of visual factors
         batch_size: Batch size
-        batch_eval: Batch for evaluation
         l_w: Regularization coefficient
 
     To include the recommendation model, add it to the config file adopting the following pattern:
@@ -50,7 +49,6 @@ class VBPR(RecMixin, BaseRecommenderModel):
           factors: 100
           factors_d: 20
           batch_size: 128
-          batch_eval: 128
           l_w: 0.000025
     """
 
@@ -59,7 +57,6 @@ class VBPR(RecMixin, BaseRecommenderModel):
         self._params_list = [
             ("_factors", "factors", "factors", 10, int, None),
             ("_factors_d", "factors_d", "factors_d", 20, int, None),
-            ("_batch_eval", "batch_eval", "batch_eval", 1024, int, None),
             ("_learning_rate", "lr", "lr", 0.001, float, None),
             ("_combine_modalities", "comb_mod", "comb_mod", 'concat', str, None),
             ("_modalities", "modalities", "modalites", "('visual','textual')", lambda x: list(make_tuple(x)),
