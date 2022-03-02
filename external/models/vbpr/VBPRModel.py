@@ -109,6 +109,5 @@ class VBPRModel(torch.nn.Module, ABC):
         return loss.detach().cpu().numpy()
 
     def get_top_k(self, preds, train_mask, k=100):
-        return torch.topk(torch.where(torch.tensor(train_mask).to(self.device),
-                                      torch.tensor(preds, dtype=torch.float32).to(self.device),
+        return torch.topk(torch.where(torch.tensor(train_mask).to(self.device), preds.to(self.device),
                                       torch.tensor(-np.inf).to(self.device)), k=k, sorted=True)
