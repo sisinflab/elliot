@@ -130,11 +130,7 @@ class VBPR(RecMixin, BaseRecommenderModel):
         predictions_top_k_val = {}
         for index, offset in enumerate(range(0, self._num_users, self._batch_size)):
             offset_stop = min(offset + self._batch_size, self._num_users)
-            predictions = np.empty((offset_stop - offset, self._num_items))
-            for idx, start_items in enumerate(range(0, self._num_items, self._batch_eval)):
-                stop_items = min(start_items + self._batch_eval, self._num_items)
-                predictions[:, start_items: stop_items] = self._model.predict(offset, offset_stop, start_items,
-                                                                              stop_items).detach().cpu().numpy()
+            predictions = self._model.predict(offset, offset_stop)
             recs_val, recs_test = self.process_protocol(k, predictions, offset, offset_stop)
             predictions_top_k_val.update(recs_val)
             predictions_top_k_test.update(recs_test)
