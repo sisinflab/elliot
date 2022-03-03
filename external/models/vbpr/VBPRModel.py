@@ -53,7 +53,7 @@ class VBPRModel(torch.nn.Module, ABC):
             torch.nn.init.xavier_normal_(torch.empty((self.num_items, self.embed_k))))
         self.Gi.to(self.device)
 
-        self.F = torch.nn.Parameter(torch.tensor(features, dtype=torch.float32, device=self.device))
+        self.F = torch.nn.functional.normalize(torch.tensor(features, dtype=torch.float32, device=self.device))
         self.feature_size = self.F.shape[1]
         self.Tu = torch.nn.Parameter(
             torch.nn.init.xavier_normal_(torch.empty((self.num_users, self.embed_d))))

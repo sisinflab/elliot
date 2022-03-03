@@ -76,7 +76,7 @@ class MMGCNModel(torch.nn.Module, ABC):
             )
             self.Gum[m].to(self.device)
             self.Gim[m] = torch.nn.Parameter(
-                torch.tensor(multimodal_features[m_id], dtype=torch.float32)
+                torch.nn.functional.normalize(torch.tensor(multimodal_features[m_id], dtype=torch.float32))
             )
             self.Gim[m].to(self.device)
 
