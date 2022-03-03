@@ -32,7 +32,6 @@ class VBPR(RecMixin, BaseRecommenderModel):
         lr: Learning rate
         epochs: Number of epochs
         factors: Number of latent factors
-        factors_d: Dimension of visual factors
         batch_size: Batch size
         l_w: Regularization coefficient
 
@@ -47,7 +46,6 @@ class VBPR(RecMixin, BaseRecommenderModel):
           lr: 0.0005
           epochs: 50
           factors: 100
-          factors_d: 20
           batch_size: 128
           l_w: 0.000025
     """
@@ -56,7 +54,6 @@ class VBPR(RecMixin, BaseRecommenderModel):
     def __init__(self, data, config, params, *args, **kwargs):
         self._params_list = [
             ("_factors", "factors", "factors", 10, int, None),
-            ("_factors_d", "factors_d", "factors_d", 20, int, None),
             ("_learning_rate", "lr", "lr", 0.001, float, None),
             ("_combine_modalities", "comb_mod", "comb_mod", 'concat', str, None),
             ("_modalities", "modalities", "modalites", "('visual','textual')", lambda x: list(make_tuple(x)),
@@ -94,7 +91,6 @@ class VBPR(RecMixin, BaseRecommenderModel):
                                 self._num_items,
                                 self._learning_rate,
                                 self._factors,
-                                self._factors_d,
                                 self._l_w,
                                 all_multimodal_features,
                                 self._seed)

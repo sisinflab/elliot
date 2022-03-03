@@ -20,9 +20,8 @@ class VBPRModel(torch.nn.Module, ABC):
                  num_items,
                  learning_rate,
                  embed_k,
-                 embed_d,
                  l_w,
-                 features,
+                 multimodal_features,
                  random_seed,
                  name="VBPR",
                  **kwargs
@@ -42,7 +41,6 @@ class VBPRModel(torch.nn.Module, ABC):
         self.num_users = num_users
         self.num_items = num_items
         self.embed_k = embed_k
-        self.embed_d = embed_d
         self.learning_rate = learning_rate
         self.l_w = l_w
 
@@ -53,13 +51,13 @@ class VBPRModel(torch.nn.Module, ABC):
             torch.nn.init.xavier_normal_(torch.empty((self.num_items, self.embed_k))))
         self.Gi.to(self.device)
 
-        self.F = torch.nn.functional.normalize(torch.tensor(features, dtype=torch.float32, device=self.device))
-        self.feature_size = self.F.shape[1]
-        self.Tu = torch.nn.Parameter(
-            torch.nn.init.xavier_normal_(torch.empty((self.num_users, self.embed_d))))
-        self.Tu.to(self.device)
-        self.projection = torch.nn.Linear(in_features=self.feature_size, out_features=self.embed_d)
-        self.projection.to(self.device)
+        # multimodal
+        self.F = torch.nn.functional.normalize(
+            torch.tensor(multimodal_features, dtype=torch.float32, device=self.device))
+        self.F.to(self.device)
+        self.feature_shape = self.F.shape[1]
+        self.proj = torch.nn.Linear(in_features=self.feature_shape, out_features=self.embed_k)
+        self.proj.to(self.device)
 
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
         self.lr_scheduler = self.set_lr_scheduler()
@@ -72,34 +70,30 @@ class VBPRModel(torch.nn.Module, ABC):
         users, items = inputs
         gamma_u = torch.squeeze(self.Gu[users[:, 0]]).to(self.device)
         gamma_i = torch.squeeze(self.Gi[items[:, 0]]).to(self.device)
-        theta_u = torch.squeeze(self.Tu[users[:, 0]]).to(self.device)
         effe_i = torch.squeeze(self.F[items[:, 0]]).to(self.device)
-        theta_i = torch.nn.functional.leaky_relu(self.projection(effe_i))
+        proj_i = torch.nn.functional.leaky_relu(self.proj(effe_i)).to(self.device)
+        gamma_i += proj_i
 
-        xui = torch.sum(gamma_u * gamma_i, 1) + torch.sum(theta_u * theta_i, 1)
+        xui = torch.sum(gamma_u * gamma_i, 1)
 
-        return xui, gamma_u, gamma_i, theta_u, theta_i
+        return xui, gamma_u, gamma_i
 
     def predict(self, start_user, stop_user, **kwargs):
         return torch.matmul(self.Gu[start_user:stop_user].to(self.device),
-                            torch.transpose(self.Gi.to(self.device), 0, 1)) + \
-               torch.matmul(self.Tu[start_user:stop_user].to(self.device),
                             torch.transpose(
-                                torch.nn.functional.leaky_relu(self.projection(self.F.to(self.device))), 0, 1))
+                                self.Gi.to(self.device) + torch.nn.functional.leaky_relu(self.proj(self.F)).to(
+                                    self.device), 0, 1))
 
     def train_step(self, batch):
         user, pos, neg = batch
-        xu_pos, gamma_u, gamma_i_pos, theta_u, theta_i_pos = self.forward(inputs=(user, pos))
-        xu_neg, _, gamma_i_neg, _, theta_i_neg = self.forward(inputs=(user, neg))
+        xu_pos, gamma_u, gamma_i_pos = self.forward(inputs=(user, pos))
+        xu_neg, _, gamma_i_neg = self.forward(inputs=(user, neg))
 
         difference = torch.clamp(xu_pos - xu_neg, -80.0, 1e8)
         loss = torch.mean(torch.nn.functional.softplus(-difference))
         reg_loss = self.l_w * (1 / 2) * (gamma_u.norm(2).pow(2) +
-                                         theta_u.norm(2).pow(2) +
                                          gamma_i_pos.norm(2).pow(2) +
-                                         gamma_i_neg.norm(2).pow(2) +
-                                         theta_i_pos.norm(2).pow(2) +
-                                         theta_i_neg.norm(2).pow(2)) / user.shape[0]
+                                         gamma_i_neg.norm(2).pow(2)) / user.shape[0]
         loss += reg_loss
 
         self.optimizer.zero_grad()
