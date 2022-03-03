@@ -75,7 +75,8 @@ class VBPRModel(torch.nn.Module, ABC):
         theta_u = torch.squeeze(self.Tu[users[:, 0]]).to(self.device)
         effe_i = torch.squeeze(self.F[items[:, 0]]).to(self.device)
 
-        xui = torch.sum(gamma_u * gamma_i, 1) + torch.sum(theta_u * self.projection(effe_i), 1)
+        xui = torch.sum(gamma_u * gamma_i, 1) + torch.sum(
+            theta_u * torch.nn.functional.leaky_relu(self.projection(effe_i)), 1)
 
         return xui, gamma_u, gamma_i, theta_u, effe_i
 
@@ -84,7 +85,7 @@ class VBPRModel(torch.nn.Module, ABC):
                             torch.transpose(self.Gi.to(self.device), 0, 1)) + \
                torch.matmul(self.Tu[start_user:stop_user].to(self.device),
                             torch.transpose(
-                                self.projection(self.F.to(self.device)), 0, 1))
+                                torch.nn.functional.leaky_relu(self.projection(self.F.to(self.device))), 0, 1))
 
     def train_step(self, batch):
         user, pos, neg = batch
