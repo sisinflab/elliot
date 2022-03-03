@@ -72,7 +72,7 @@ class VBPRModel(torch.nn.Module, ABC):
         gamma_i = torch.squeeze(self.Gi[items[:, 0]]).to(self.device)
         effe_i = torch.squeeze(self.F[items[:, 0]]).to(self.device)
         proj_i = self.proj(effe_i).to(self.device)
-        gamma_i += (proj_i / torch.norm(proj_i, p=2, dim=-1))
+        gamma_i += (proj_i / torch.norm(proj_i, p=2, dim=-1, keepdim=True))
 
         xui = torch.sum(gamma_u * gamma_i, 1)
 
