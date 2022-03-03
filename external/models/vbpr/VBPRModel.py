@@ -53,8 +53,7 @@ class VBPRModel(torch.nn.Module, ABC):
             torch.nn.init.xavier_normal_(torch.empty((self.num_items, self.embed_k))))
         self.Gi.to(self.device)
 
-        self.F = torch.nn.Parameter(
-            torch.nn.functional.normalize(torch.tensor(features, dtype=torch.float32, device=self.device)))
+        self.F = torch.nn.functional.normalize(torch.tensor(features, dtype=torch.float32, device=self.device))
         self.feature_size = self.F.shape[1]
         self.Tu = torch.nn.Parameter(
             torch.nn.init.xavier_normal_(torch.empty((self.num_users, self.embed_d))))
@@ -75,11 +74,11 @@ class VBPRModel(torch.nn.Module, ABC):
         gamma_i = torch.squeeze(self.Gi[items[:, 0]]).to(self.device)
         theta_u = torch.squeeze(self.Tu[users[:, 0]]).to(self.device)
         effe_i = torch.squeeze(self.F[items[:, 0]]).to(self.device)
+        theta_i = torch.nn.functional.leaky_relu(self.projection(effe_i))
 
-        xui = torch.sum(gamma_u * gamma_i, 1) + torch.sum(
-            theta_u * torch.nn.functional.leaky_relu(self.projection(effe_i)), 1)
+        xui = torch.sum(gamma_u * gamma_i, 1) + torch.sum(theta_u * theta_i, 1)
 
-        return xui, gamma_u, gamma_i, theta_u, effe_i
+        return xui, gamma_u, gamma_i, theta_u, theta_i
 
     def predict(self, start_user, stop_user, **kwargs):
         return torch.matmul(self.Gu[start_user:stop_user].to(self.device),
@@ -90,8 +89,8 @@ class VBPRModel(torch.nn.Module, ABC):
 
     def train_step(self, batch):
         user, pos, neg = batch
-        xu_pos, gamma_u, gamma_i_pos, theta_u, effe_i_pos = self.forward(inputs=(user, pos))
-        xu_neg, _, gamma_i_neg, _, effe_i_neg = self.forward(inputs=(user, neg))
+        xu_pos, gamma_u, gamma_i_pos, theta_u, theta_i_pos = self.forward(inputs=(user, pos))
+        xu_neg, _, gamma_i_neg, _, theta_i_neg = self.forward(inputs=(user, neg))
 
         difference = torch.clamp(xu_pos - xu_neg, -80.0, 1e8)
         loss = torch.mean(torch.nn.functional.softplus(-difference))
@@ -99,8 +98,8 @@ class VBPRModel(torch.nn.Module, ABC):
                                          theta_u.norm(2).pow(2) +
                                          gamma_i_pos.norm(2).pow(2) +
                                          gamma_i_neg.norm(2).pow(2) +
-                                         effe_i_pos.norm(2).pow(2) +
-                                         effe_i_neg.norm(2).pow(2)) / user.shape[0]
+                                         theta_i_pos.norm(2).pow(2) +
+                                         theta_i_neg.norm(2).pow(2)) / user.shape[0]
         loss += reg_loss
 
         self.optimizer.zero_grad()
