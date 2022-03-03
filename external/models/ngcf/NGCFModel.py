@@ -107,15 +107,15 @@ class NGCFModel(torch.nn.Module, ABC):
                                    col=torch.cat([dropout_edge_index[1], dropout_edge_index[0]], dim=0),
                                    sparse_sizes=(self.num_users + self.num_items,
                                                  self.num_users + self.num_items))
-                all_embeddings += [self.dropout_layers[embedding_idx](list(
+                all_embeddings += [torch.nn.functional.normalize(self.dropout_layers[embedding_idx](list(
                     self.propagation_network.children()
-                )[layer + 1](all_embeddings[embedding_idx].to(self.device), adj.to(self.device)))]
+                )[layer + 1](all_embeddings[embedding_idx].to(self.device), adj.to(self.device))), dim=-1)]
             else:
                 self.propagation_network.eval()
                 with torch.no_grad():
-                    all_embeddings += [list(
+                    all_embeddings += [torch.nn.functional.normalize(list(
                         self.propagation_network.children()
-                    )[layer + 1](all_embeddings[embedding_idx].to(self.device), self.adj.to(self.device))]
+                    )[layer + 1](all_embeddings[embedding_idx].to(self.device), self.adj.to(self.device)), dim=-1)]
 
             embedding_idx += 1
 

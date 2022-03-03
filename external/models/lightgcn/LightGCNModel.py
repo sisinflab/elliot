@@ -81,13 +81,13 @@ class LightGCNModel(torch.nn.Module, ABC):
             if evaluate:
                 self.propagation_network.eval()
                 with torch.no_grad():
-                    all_embeddings += [list(
+                    all_embeddings += [torch.nn.functional.normalize(list(
                         self.propagation_network.children()
-                    )[layer](all_embeddings[layer].to(self.device), self.adj.to(self.device))]
+                    )[layer](all_embeddings[layer].to(self.device), self.adj.to(self.device)), dim=-1)]
             else:
-                all_embeddings += [list(
+                all_embeddings += [torch.nn.functional.normalize(list(
                     self.propagation_network.children()
-                )[layer](all_embeddings[layer].to(self.device), self.adj.to(self.device))]
+                )[layer](all_embeddings[layer].to(self.device), self.adj.to(self.device)), dim=-1)]
 
         if evaluate:
             self.propagation_network.train()
