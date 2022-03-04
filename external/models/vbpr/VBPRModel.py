@@ -72,7 +72,7 @@ class VBPRModel(torch.nn.Module, ABC):
         gamma_i = torch.squeeze(self.Gi[items[:, 0]]).to(self.device)
         effe_i = torch.squeeze(self.F[items[:, 0]]).to(self.device)
         proj_i = self.proj(effe_i).to(self.device)
-        gamma_i += torch.nn.functional.normalize(proj_i, dim=-1)
+        gamma_i += torch.nn.functional.normalize(proj_i)
 
         xui = torch.sum(gamma_u * gamma_i, 1)
 
@@ -80,7 +80,7 @@ class VBPRModel(torch.nn.Module, ABC):
 
     def predict(self, start_user, stop_user, **kwargs):
         proj_i = self.proj(self.F).to(self.device)
-        gamma_i = self.Gi.to(self.device) + torch.nn.functional.normalize(proj_i, dim=-1)
+        gamma_i = self.Gi.to(self.device) + torch.nn.functional.normalize(proj_i)
         return torch.matmul(self.Gu[start_user:stop_user].to(self.device), torch.transpose(gamma_i, 0, 1))
 
     def train_step(self, batch):
