@@ -123,57 +123,88 @@ class GRCNModel(torch.nn.Module, ABC):
         scheduler = torch.optim.lr_scheduler.LambdaLR(self.optimizer, lr_lambda=lambda epoch: 0.96 ** (epoch / 50))
         return scheduler
 
-    def propagate_embeddings(self, evaluate=False):
+    def propagate_embeddings(self):
+        # Graph Refining Layers
+        x_all_m = dict()
+        alphas_m = dict()
         gum = torch.empty((len(self.modalities), self.num_users, self.embed_k_multimod))
         gim = torch.empty((len(self.modalities), self.num_items, self.embed_k_multimod))
         for m_id, m in enumerate(self.modalities):
-            gum[m_id] = torch.nn.functional.normalize(self.Gum[m_id].to(self.device))
+            gum[m_id] = torch.nn.functional.normalize(self.Gum[m].to(self.device))
             gim[m_id] = torch.nn.functional.normalize(
-                torch.nn.functional.leaky_relu(self.projection_multimodal[m_id](self.Gim[m_id])).to(self.device))
-            cols_attr = gim[m_id][self.cols]
+                torch.nn.functional.leaky_relu(self.projection_multimodal[m](self.Gim[m])).to(self.device))
+            cols_attr = gim[m_id][self.cols - self.num_users]
 
             for t in range(self.n_routings):
                 rows_attr = gum[m_id][self.rows]
-                all_x_m = torch.cat((gum[m_id], gim[m_id]), dim=0)
-                all_x_hat_m = list(
-                    self.propagation_graph_refining_network[m_id].children()
-                )[t](all_x_m.to(self.device), rows_attr.to(self.device), cols_attr.to(self.device),
+                x_all_m[m] = torch.cat((gum[m_id], gim[m_id]), dim=0)
+                x_all_hat_m = list(
+                    self.propagation_graph_refining_network[m].children()
+                )[t](x_all_m[m].to(self.device), rows_attr.to(self.device), cols_attr.to(self.device),
                      self.adj_user.to(self.device))
-                gum[m_id] += all_x_hat_m[:self.num_users]
+                gum[m_id] += x_all_hat_m[:self.num_users]
                 gum[m_id] = torch.nn.functional.normalize(gum[m_id])
 
-            rows_attr = gum[m_id][self.rows]
-            all_x_m = torch.cat((gum[m_id], gim[m_id]), dim=0)
-            all_x_hat_m = list(
-                self.propagation_graph_refining_network[m_id].children()
-            )[self.n_routings](all_x_m.to(self.device), rows_attr.to(self.device), cols_attr.to(self.device),
+            rows_attr = torch.cat((gum[m_id][self.rows], gim[m_id][self.cols - self.num_users]), dim=0)
+            cols_attr = torch.cat((gim[m_id][self.cols - self.num_users], gum[m_id][self.rows]), dim=0)
+            x_all_m[m] = torch.cat((gum[m_id], gim[m_id]), dim=0)
+            x_all_hat_m = list(
+                self.propagation_graph_refining_network[m].children()
+            )[self.n_routings](x_all_m[m].to(self.device), rows_attr.to(self.device), cols_attr.to(self.device),
                                self.adj.to(self.device))
-            all_x_m += all_x_hat_m
-            return all_x_m
+            x_all_m[m] += x_all_hat_m
+            alphas_m[m] = list(self.propagation_graph_refining_network[m].children())[-1].alpha
+
+        # Graph Convolutional Layers
+        x_all = torch.cat([value for _, value in x_all_m.items()], dim=1)
+        if self.weight_mode == 'mean':
+            alphas = torch.cat([torch.unsqueeze(value, dim=0) for _, value in alphas_m.items()], dim=0)
+            alphas = torch.sum(alphas, dim=0) / len(self.modalities)
+        elif self.weight_mode == 'max':
+            alphas = torch.cat([torch.unsqueeze(value, dim=0) for _, value in alphas_m.items()], dim=0)
+            alphas, _ = torch.max(alphas, dim=0)
+        else:
+            raise NotImplementedError('This weight mode has not been implemented yet!')
+
+        alphas = torch.relu(alphas)
+
+        ego_embeddings = torch.cat((self.Gu.to(self.device), self.Gi.to(self.device)), 0)
+        all_embeddings = [torch.nn.functional.normalize(ego_embeddings)]
+        for layer in range(self.n_layers):
+            all_embeddings += [torch.nn.functional.normalize(
+                list(self.propagation_graph_convolutional_network.children())[layer](
+                    all_embeddings[layer].to(self.device),
+                    self.adj.to(self.device),
+                    alphas.to(self.device)))]
+        all_embeddings = torch.cat([torch.unsqueeze(value, dim=0) for value in all_embeddings])
+        all_embeddings = torch.sum(all_embeddings, dim=0)
+        x = torch.cat([all_embeddings, x_all], dim=1)
+        gu, gi = torch.split(x, [self.num_users, self.num_items], 0)
+        return gu, gi
 
     def forward(self, inputs, **kwargs):
-        gum, gim = inputs
-        gamma_u_m = torch.squeeze(gum).to(self.device)
-        gamma_i_m = torch.squeeze(gim).to(self.device)
+        gu, gi = inputs
+        gamma_u = torch.squeeze(gu).to(self.device)
+        gamma_i = torch.squeeze(gi).to(self.device)
 
-        xui = torch.sum(gamma_u_m * gamma_i_m, 1)
+        xui = torch.sum(gamma_u * gamma_i, 1)
 
-        return xui, gamma_u_m, gamma_i_m
+        return xui, gamma_u, gamma_i
 
-    def predict(self, gum, gim, **kwargs):
-        return torch.matmul(gum.to(self.device), torch.transpose(gim.to(self.device), 0, 1))
+    def predict(self, gu, gi, **kwargs):
+        return torch.matmul(gu.to(self.device), torch.transpose(gi.to(self.device), 0, 1))
 
     def train_step(self, batch):
         gu, gi = self.propagate_embeddings()
         user, pos, neg = batch
-        xu_pos, gamma_u_m, gamma_i_pos_m = self.forward(inputs=(gu[user], gi[pos]))
-        xu_neg, _, gamma_i_neg_m = self.forward(inputs=(gu[user], gi[neg]))
+        xu_pos, gamma_u, gamma_i_pos = self.forward(inputs=(gu[user], gi[pos]))
+        xu_neg, _, gamma_i_neg = self.forward(inputs=(gu[user], gi[neg]))
 
         difference = torch.clamp(xu_pos - xu_neg, -80.0, 1e8)
         loss = torch.mean(torch.nn.functional.softplus(-difference))
-        reg_loss = self.l_w * (1 / 2) * (gamma_u_m.norm(2).pow(2) +
-                                         gamma_i_pos_m.norm(2).pow(2) +
-                                         gamma_i_neg_m.norm(2).pow(2)) / user.shape[0]
+        reg_loss = self.l_w * (1 / 2) * (gamma_u.norm(2).pow(2) +
+                                         gamma_i_pos.norm(2).pow(2) +
+                                         gamma_i_neg.norm(2).pow(2)) / user.shape[0]
         loss += reg_loss
 
         self.optimizer.zero_grad()
