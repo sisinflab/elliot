@@ -95,7 +95,7 @@ class NGCFModel(torch.nn.Module, ABC):
 
     def propagate_embeddings(self, evaluate=False):
         ego_embeddings = torch.cat((self.Gu.to(self.device), self.Gi.to(self.device)), 0)
-        all_embeddings = [ego_embeddings]
+        all_embeddings = [torch.nn.functional.normalize(ego_embeddings)]
         embedding_idx = 0
 
         for layer in range(0, self.n_layers * 2, 2):
@@ -107,15 +107,15 @@ class NGCFModel(torch.nn.Module, ABC):
                                    col=torch.cat([dropout_edge_index[1], dropout_edge_index[0]], dim=0),
                                    sparse_sizes=(self.num_users + self.num_items,
                                                  self.num_users + self.num_items))
-                all_embeddings += [self.dropout_layers[embedding_idx](list(
+                all_embeddings += [torch.nn.functional.normalize(self.dropout_layers[embedding_idx](list(
                     self.propagation_network.children()
-                )[layer + 1](all_embeddings[embedding_idx].to(self.device), adj.to(self.device)))]
+                )[layer + 1](all_embeddings[embedding_idx].to(self.device), adj.to(self.device))))]
             else:
                 self.propagation_network.eval()
                 with torch.no_grad():
-                    all_embeddings += [list(
+                    all_embeddings += [torch.nn.functional.normalize(list(
                         self.propagation_network.children()
-                    )[layer + 1](all_embeddings[embedding_idx].to(self.device), self.adj.to(self.device))]
+                    )[layer + 1](all_embeddings[embedding_idx].to(self.device), self.adj.to(self.device)))]
 
             embedding_idx += 1
 

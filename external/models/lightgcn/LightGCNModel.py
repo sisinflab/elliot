@@ -75,19 +75,19 @@ class LightGCNModel(torch.nn.Module, ABC):
 
     def propagate_embeddings(self, evaluate=False):
         ego_embeddings = torch.cat((self.Gu.to(self.device), self.Gi.to(self.device)), 0)
-        all_embeddings = [ego_embeddings]
+        all_embeddings = [torch.nn.functional.normalize(ego_embeddings)]
 
         for layer in range(0, self.n_layers):
             if evaluate:
                 self.propagation_network.eval()
                 with torch.no_grad():
-                    all_embeddings += [list(
+                    all_embeddings += [torch.nn.functional.normalize(list(
                         self.propagation_network.children()
-                    )[layer](all_embeddings[layer].to(self.device), self.adj.to(self.device))]
+                    )[layer](all_embeddings[layer].to(self.device), self.adj.to(self.device)))]
             else:
-                all_embeddings += [list(
+                all_embeddings += [torch.nn.functional.normalize(list(
                     self.propagation_network.children()
-                )[layer](all_embeddings[layer].to(self.device), self.adj.to(self.device))]
+                )[layer](all_embeddings[layer].to(self.device), self.adj.to(self.device)))]
 
         if evaluate:
             self.propagation_network.train()
