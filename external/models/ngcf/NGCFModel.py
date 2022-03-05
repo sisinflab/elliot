@@ -122,8 +122,7 @@ class NGCFModel(torch.nn.Module, ABC):
         if evaluate:
             self.propagation_network.train()
 
-        all_embeddings = torch.cat([torch.unsqueeze(embedding, 0) for embedding in all_embeddings], 0)
-        all_embeddings = torch.mean(all_embeddings, dim=0)
+        all_embeddings = torch.cat(all_embeddings, 1)
         gu, gi = torch.split(all_embeddings, [self.num_users, self.num_items], 0)
         return gu, gi
 
