@@ -122,8 +122,8 @@ class NGCFModel(torch.nn.Module, ABC):
         if evaluate:
             self.propagation_network.train()
 
-        all_embeddings = torch.cat(all_embeddings, 1)
-        all_embeddings = torch.mean(all_embeddings, dim=1)
+        all_embeddings = torch.cat([torch.unsqueeze(embedding, 0) for embedding in all_embeddings], 0)
+        all_embeddings = torch.mean(all_embeddings, dim=0)
         gu, gi = torch.split(all_embeddings, [self.num_users, self.num_items], 0)
         return gu, gi
 
@@ -141,8 +141,6 @@ class NGCFModel(torch.nn.Module, ABC):
 
     def train_step(self, batch):
         gu, gi = self.propagate_embeddings()
-        print(gu.shape)
-        print(gi.shape)
         user, pos, neg = batch
         xu_pos, gamma_u, gamma_i_pos = self.forward(inputs=(gu[user], gi[pos]))
         xu_neg, _, gamma_i_neg = self.forward(inputs=(gu[user], gi[neg]))
