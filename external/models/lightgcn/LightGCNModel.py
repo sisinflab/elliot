@@ -50,6 +50,7 @@ class LightGCNModel(torch.nn.Module, ABC):
         self.weight_size_list = [self.embed_k] * (self.n_layers + 1)
         self.alpha = torch.unsqueeze(
             torch.unsqueeze(torch.tensor([1 / (k + 1) for k in range(len(self.weight_size_list))]), -1), -1)
+        self.alpha.to(self.device)
         self.adj = adj
 
         self.Gu = torch.nn.Parameter(
