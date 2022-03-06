@@ -46,3 +46,4 @@ for _backend in sys.modules["external"].backend:
         from .egcfv2.EGCFv2 import EGCFv2
         from .bprmf.BPRMF import BPRMF
         from .vbpr.VBPR import VBPR
+        from .lattice.LATTICE import LATTICE
