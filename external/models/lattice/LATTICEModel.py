@@ -175,7 +175,7 @@ class LATTICEModel(torch.nn.Module, ABC):
 
         item_embedding = self.Gi
         for layer in range(self.n_layers):
-            item_embedding = list(self.propagation_network.children())[0][layer](item_embedding.to(self.device),
+            item_embedding = list(self.propagation_network.children())[layer](item_embedding.to(self.device),
                                                                                  self.Si)
 
         return self.Gi.to(self.device) + torch.nn.functional.normalize(item_embedding.to(self.device), p=2, dim=1)
