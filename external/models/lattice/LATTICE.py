@@ -77,7 +77,7 @@ class LATTICE(RecMixin, BaseRecommenderModel):
             ("_factors_multimod", "factors_multimod", "factors_multimod", 64, int, None),
             ("_modalities", "modalities", "modalites", "('visual','textual')", lambda x: list(make_tuple(x)),
              lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
-            ("_lambda", "lm", "lm", 0.1, float, None),
+            ("_lambda", "l_m", "l_m", 0.1, float, None),
             ("_loaders", "loaders", "loads", "('VisualAttribute','TextualAttribute')", lambda x: list(make_tuple(x)),
              lambda x: self._batch_remove(str(x), " []").replace(",", "-"))
         ]
