@@ -6,7 +6,9 @@ from itertools import islice
 from operator import itemgetter
 from collections import OrderedDict, Counter
 
-#mp.set_start_method("fork")
+from sys import platform
+if platform == 'darwin':
+    mp.set_start_method("fork")
 
 
 def worker(user, user_items, neg_items, if1, if2, fol, sol, seed):
