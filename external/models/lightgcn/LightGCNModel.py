@@ -62,7 +62,7 @@ class LightGCNModel(torch.nn.Module, ABC):
         propagation_network_list = []
 
         for layer in range(self.n_layers):
-            propagation_network_list.append((LGConv(), 'x, edge_index -> x'))
+            propagation_network_list.append((LGConv(normalize=False), 'x, edge_index -> x'))
 
         self.propagation_network = torch_geometric.nn.Sequential('x, edge_index', propagation_network_list)
         self.propagation_network.to(self.device)
