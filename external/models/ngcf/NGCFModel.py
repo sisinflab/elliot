@@ -65,10 +65,10 @@ class NGCFModel(torch.nn.Module, ABC):
                                               self.num_users + self.num_items))
 
         self.Gu = torch.nn.Parameter(
-            torch.nn.init.xavier_normal_(torch.empty((self.num_users, self.embed_k))))
+            torch.nn.init.xavier_uniform_(torch.empty((self.num_users, self.embed_k))))
         self.Gu.to(self.device)
         self.Gi = torch.nn.Parameter(
-            torch.nn.init.xavier_normal_(torch.empty((self.num_items, self.embed_k))))
+            torch.nn.init.xavier_uniform_(torch.empty((self.num_items, self.embed_k))))
         self.Gi.to(self.device)
 
         propagation_network_list = []
