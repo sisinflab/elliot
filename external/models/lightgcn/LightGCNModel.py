@@ -48,6 +48,8 @@ class LightGCNModel(torch.nn.Module, ABC):
         self.l_w = l_w
         self.n_layers = n_layers
         self.weight_size_list = [self.embed_k] * (self.n_layers + 1)
+        self.alpha = torch.unsqueeze(
+            torch.unsqueeze(torch.tensor([1 / (k + 1) for k in range(len(self.weight_size_list))]), -1), -1)
         self.adj = adj
 
         self.Gu = torch.nn.Parameter(
@@ -91,8 +93,8 @@ class LightGCNModel(torch.nn.Module, ABC):
         if evaluate:
             self.propagation_network.train()
 
-        all_embeddings = torch.stack(all_embeddings, dim=1)
-        all_embeddings = torch.mean(all_embeddings, dim=1)
+        all_embeddings = torch.cat([torch.unsqueeze(embedding, 0) for embedding in all_embeddings], 0)
+        all_embeddings = torch.sum(all_embeddings * self.alpha.to(self.device), dim=0)
         gu, gi = torch.split(all_embeddings, [self.num_users, self.num_items], 0)
         return gu, gi
 
