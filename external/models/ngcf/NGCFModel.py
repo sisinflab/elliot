@@ -95,7 +95,7 @@ class NGCFModel(torch.nn.Module, ABC):
         return scheduler
 
     def propagate_embeddings(self, evaluate=False):
-        ego_embeddings = torch.cat((self.Gu.to(self.device), self.Gi.to(self.device)), 0)
+        ego_embeddings = torch.cat((self.Gu.weight.to(self.device), self.Gi.weight.to(self.device)), 0)
         all_embeddings = [ego_embeddings]
         embedding_idx = 0
 
