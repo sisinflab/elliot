@@ -43,11 +43,11 @@ class BPRMFModel(torch.nn.Module, ABC):
         self.learning_rate = learning_rate
         self.l_w = l_w
 
-        self.Gu = torch.nn.Parameter(
-            torch.nn.init.xavier_normal_(torch.empty((self.num_users, self.embed_k))))
+        self.Gu = torch.nn.Embedding(self.num_users, self.embed_k)
+        torch.nn.init.xavier_uniform_(self.Gu.weight)
         self.Gu.to(self.device)
-        self.Gi = torch.nn.Parameter(
-            torch.nn.init.xavier_normal_(torch.empty((self.num_items, self.embed_k))))
+        self.Gi = torch.nn.Embedding(self.num_items, self.embed_k)
+        torch.nn.init.xavier_uniform_(self.Gi.weight)
         self.Gi.to(self.device)
 
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
@@ -59,8 +59,8 @@ class BPRMFModel(torch.nn.Module, ABC):
 
     def forward(self, inputs, **kwargs):
         users, items = inputs
-        gamma_u = torch.squeeze(self.Gu[users[:, 0]]).to(self.device)
-        gamma_i = torch.squeeze(self.Gi[items[:, 0]]).to(self.device)
+        gamma_u = torch.squeeze(self.Gu[users]).to(self.device)
+        gamma_i = torch.squeeze(self.Gi[items]).to(self.device)
 
         xui = torch.sum(gamma_u * gamma_i, 1)
 

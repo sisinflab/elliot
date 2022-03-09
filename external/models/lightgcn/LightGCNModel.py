@@ -48,15 +48,13 @@ class LightGCNModel(torch.nn.Module, ABC):
         self.l_w = l_w
         self.n_layers = n_layers
         self.weight_size_list = [self.embed_k] * (self.n_layers + 1)
-        self.alpha = torch.unsqueeze(
-            torch.unsqueeze(torch.tensor([1 / (k + 1) for k in range(len(self.weight_size_list))]), -1), -1)
         self.adj = adj
 
-        self.Gu = torch.nn.Parameter(
-            torch.nn.init.xavier_normal_(torch.empty((self.num_users, self.embed_k))))
+        self.Gu = torch.nn.Embedding(self.num_users, self.embed_k)
+        torch.nn.init.xavier_uniform_(self.Gu.weight)
         self.Gu.to(self.device)
-        self.Gi = torch.nn.Parameter(
-            torch.nn.init.xavier_normal_(torch.empty((self.num_items, self.embed_k))))
+        self.Gi = torch.nn.Embedding(self.num_items, self.embed_k)
+        torch.nn.init.xavier_uniform_(self.Gi.weight)
         self.Gi.to(self.device)
 
         propagation_network_list = []
@@ -76,7 +74,7 @@ class LightGCNModel(torch.nn.Module, ABC):
 
     def propagate_embeddings(self, evaluate=False):
         ego_embeddings = torch.cat((self.Gu.to(self.device), self.Gi.to(self.device)), 0)
-        all_embeddings = [torch.nn.functional.normalize(ego_embeddings, p=2, dim=1)]
+        all_embeddings = [ego_embeddings]
 
         for layer in range(0, self.n_layers):
             if evaluate:

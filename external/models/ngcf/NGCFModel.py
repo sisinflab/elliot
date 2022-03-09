@@ -64,11 +64,11 @@ class NGCFModel(torch.nn.Module, ABC):
                                 sparse_sizes=(self.num_users + self.num_items,
                                               self.num_users + self.num_items))
 
-        self.Gu = torch.nn.Parameter(
-            torch.nn.init.xavier_normal_(torch.empty((self.num_users, self.embed_k))))
+        self.Gu = torch.nn.Embedding(self.num_users, self.embed_k)
+        torch.nn.init.xavier_uniform_(self.Gu.weight)
         self.Gu.to(self.device)
-        self.Gi = torch.nn.Parameter(
-            torch.nn.init.xavier_normal_(torch.empty((self.num_items, self.embed_k))))
+        self.Gi = torch.nn.Embedding(self.num_items, self.embed_k)
+        torch.nn.init.xavier_uniform_(self.Gi.weight)
         self.Gi.to(self.device)
 
         propagation_network_list = []
@@ -79,22 +79,8 @@ class NGCFModel(torch.nn.Module, ABC):
                                                          self.num_users,
                                                          self.num_items),
                                              'edge_index -> edge_index'))
-            weights = [
-                torch.nn.Parameter(torch.nn.init.xavier_normal_(torch.empty((self.weight_size_list[layer],
-                                                                             self.weight_size_list[
-                                                                                 layer + 1])))),
-                torch.nn.Parameter(torch.nn.init.xavier_normal_(torch.empty((self.weight_size_list[layer],
-                                                                             self.weight_size_list[
-                                                                                 layer + 1]))))
-            ]
-            bias = [
-                torch.nn.Parameter(torch.nn.init.xavier_normal_(torch.empty((self.weight_size_list[
-                                                                                 layer + 1], 1)))),
-                torch.nn.Parameter(torch.nn.init.xavier_normal_(torch.empty((self.weight_size_list[
-                                                                                 layer + 1], 1))))
-            ]
-            propagation_network_list.append((NGCFLayer(weights,
-                                                       bias,
+            propagation_network_list.append((NGCFLayer(self.weight_size_list[layer],
+                                                       self.weight_size_list[layer + 1],
                                                        normalize=False), 'x, edge_index -> x'))
             self.dropout_layers.append(torch.nn.Dropout(p=self.message_dropout))
 
@@ -110,7 +96,7 @@ class NGCFModel(torch.nn.Module, ABC):
 
     def propagate_embeddings(self, evaluate=False):
         ego_embeddings = torch.cat((self.Gu.to(self.device), self.Gi.to(self.device)), 0)
-        all_embeddings = [torch.nn.functional.normalize(ego_embeddings, p=2, dim=1)]
+        all_embeddings = [ego_embeddings]
         embedding_idx = 0
 
         for layer in range(0, self.n_layers * 2, 2):
