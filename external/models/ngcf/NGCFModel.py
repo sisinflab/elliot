@@ -65,10 +65,10 @@ class NGCFModel(torch.nn.Module, ABC):
                                               self.num_users + self.num_items))
 
         self.Gu = torch.nn.Parameter(
-            torch.nn.init.xavier_uniform_(torch.empty((self.num_users, self.embed_k))))
+            torch.nn.init.xavier_normal_(torch.empty((self.num_users, self.embed_k))))
         self.Gu.to(self.device)
         self.Gi = torch.nn.Parameter(
-            torch.nn.init.xavier_uniform_(torch.empty((self.num_items, self.embed_k))))
+            torch.nn.init.xavier_normal_(torch.empty((self.num_items, self.embed_k))))
         self.Gi.to(self.device)
 
         propagation_network_list = []
@@ -79,8 +79,22 @@ class NGCFModel(torch.nn.Module, ABC):
                                                          self.num_users,
                                                          self.num_items),
                                              'edge_index -> edge_index'))
-            propagation_network_list.append((NGCFLayer(self.weight_size_list[layer],
-                                                       self.weight_size_list[layer + 1],
+            weights = [
+                torch.nn.Parameter(torch.nn.init.xavier_normal_(torch.empty((self.weight_size_list[layer],
+                                                                             self.weight_size_list[
+                                                                                 layer + 1])))),
+                torch.nn.Parameter(torch.nn.init.xavier_normal_(torch.empty((self.weight_size_list[layer],
+                                                                             self.weight_size_list[
+                                                                                 layer + 1]))))
+            ]
+            bias = [
+                torch.nn.Parameter(torch.nn.init.xavier_normal_(torch.empty((self.weight_size_list[
+                                                                                 layer + 1], 1)))),
+                torch.nn.Parameter(torch.nn.init.xavier_normal_(torch.empty((self.weight_size_list[
+                                                                                 layer + 1], 1))))
+            ]
+            propagation_network_list.append((NGCFLayer(weights,
+                                                       bias,
                                                        normalize=False), 'x, edge_index -> x'))
             self.dropout_layers.append(torch.nn.Dropout(p=self.message_dropout))
 
