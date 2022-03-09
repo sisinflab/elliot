@@ -59,16 +59,16 @@ class BPRMFModel(torch.nn.Module, ABC):
 
     def forward(self, inputs, **kwargs):
         users, items = inputs
-        gamma_u = torch.squeeze(self.Gu[users]).to(self.device)
-        gamma_i = torch.squeeze(self.Gi[items]).to(self.device)
+        gamma_u = torch.squeeze(self.Gu.weight[users]).to(self.device)
+        gamma_i = torch.squeeze(self.Gi.weight[items]).to(self.device)
 
         xui = torch.sum(gamma_u * gamma_i, 1)
 
         return xui, gamma_u, gamma_i
 
     def predict(self, start, stop, **kwargs):
-        return torch.matmul(self.Gu[start:stop].to(self.device),
-                            torch.transpose(self.Gi.to(self.device), 0, 1))
+        return torch.matmul(self.Gu.weight[start:stop].to(self.device),
+                            torch.transpose(self.Gi.weight.to(self.device), 0, 1))
 
     def train_step(self, batch):
         user, pos, neg = batch
