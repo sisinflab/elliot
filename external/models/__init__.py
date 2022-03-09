@@ -42,7 +42,7 @@ for _backend in sys.modules["external"].backend:
         from .dgcf.DGCF import DGCF
         from .egcf.EGCF import EGCF
         from .lgacn.LGACN import LGACN
-        from .kgcn.KGCN import KGCN
+        # from .kgcn.KGCN import KGCN
         from .lightegcf.LightEGCF import LightEGCF
         from .gcn.GCN import GCN
         from .egcfv2.EGCFv2 import EGCFv2
