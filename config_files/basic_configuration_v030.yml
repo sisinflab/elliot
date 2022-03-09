@@ -3,7 +3,7 @@ experiment:
   dataset: cat_dbpedia_movielens_1m
   data_config:
     strategy: dataset
-    dataset_path: ../data/cat_dbpedia_movielens_1m/dataset.tsv
+    dataset_path: ../data/movielens_1m/dataset.tsv
     side_information:
       - dataloader: ChainedKG
         map: ../data/cat_dbpedia_movielens_1m/map.tsv
