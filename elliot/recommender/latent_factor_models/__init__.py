@@ -26,3 +26,4 @@ from .FISM import FISM
 from .SVDpp import SVDpp
 from .iALS import iALS
 from .MF2020 import MF2020
+from .MF2020_batch import MF2020_batch

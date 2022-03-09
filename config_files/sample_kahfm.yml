@@ -1,33 +1,93 @@
 experiment:
   version: 0.3.1
   backend: tensorflow
+  dataset: ml1m_ktup
   data_config:
     strategy: fixed
-    train_path: ../data/{0}/train.dat
-    validation_path: ../data/{0}/valid.dat
-    test_path: ../data/{0}/test.dat
+    train_path: ../data/{0}/train.tsv
+    validation_path: ../data/{0}/val.tsv
+    test_path: ../data/{0}/test.tsv
     side_information:
-      - dataloader: KGRec
-        mapping: ../data/{0}/ktup_mapping.tsv
+      - dataloader: KGFlexLoader
+        mapping: ../data/{0}/mapping.tsv
         kg_train: ../data/{0}/kg_train.tsv
-        kg_dev: ../data/{0}/kg_valid.tsv
-        kg_test: ../data/{0}/kg_test.tsv
+#      - dataloader: KGINLoader
+#        attributes: ../data/{0}/kg_final.txt
+#        entities: ../data/{0}/entity_list.txt
       - dataloader: KAHFMLoader
-        threshold: 0.97
-        mapping: ../data/{0}/ktup_mapping.tsv
+        threshold: 0.99
+        mapping: ../data/{0}/mapping.tsv
         kg_train: ../data/{0}/kg_train.tsv
         kg_dev: ../data/{0}/kg_valid.tsv
         kg_test: ../data/{0}/kg_test.tsv
-  binarize: True
-  dataset: ml1m_ktup
+      - dataloader: KGRec
+        mapping: ../data/{0}/mapping.tsv
+        kg_train: ../data/{0}/kg_train.tsv
+        kg_dev: ../data/{0}/kg_valid.tsv
+        kg_test: ../data/{0}/kg_test.tsv
+  top_k: 50
+  gpu: 0
   external_models_path: ../external/models/__init__.py
-  top_k: 10
   evaluation:
     cutoffs: [10]
-    simple_metrics: [nDCG, Recall, HR]
+    simple_metrics: [nDCGRendle2020, nDCG, HR, Precision, Recall]
     relevance_threshold: 0
-  gpu: -1 # -1 is not use GPU
   models:
+#experiment:
+#  version: 0.3.1
+#  backend: tensorflow
+#  data_config:
+#    strategy: dataset
+#    dataset_path: ../data/{0}/ratings.dat
+#    side_information:
+#      - dataloader: KGRec
+#        mapping: ../data/{0}/mapping.tsv
+#        kg_train: ../data/{0}/kg_train.tsv
+#        kg_dev: ../data/{0}/kg_valid.tsv
+#        kg_test: ../data/{0}/kg_test.tsv
+#      - dataloader: KAHFMLoader
+#        threshold: 0.999
+#        mapping: ../data/{0}/mapping.tsv
+#        kg_train: ../data/{0}/kg_train.tsv
+#        kg_dev: ../data/{0}/kg_valid.tsv
+#        kg_test: ../data/{0}/kg_test.tsv
+#  splitting:
+##    save_on_disk: True
+##    save_folder: ../data/{0}/splitting/
+#    test_splitting:
+#        strategy: temporal_hold_out
+#        test_ratio: 0.2
+#  binarize: True
+#  dataset: ml1m_ktup
+#  external_models_path: ../external/models/__init__.py
+#  top_k: 10
+#  evaluation:
+#    cutoffs: [10]
+#    simple_metrics: [nDCG, Recall, HR]
+#    relevance_threshold: 0
+#  gpu: -1 # -1 is not use GPU
+#  models:
+#    MultiVAE:
+#      meta:
+##        hyper_max_evals: 3
+##        hyper_opt_alg: tpe
+#        validation_rate: 1
+#        verbose: True
+#        save_weights: True
+#        save_recs: True
+#        restore: False
+#        optimize_internal_loss: False
+#      lr: 0.002718457840118028
+#      epochs: 100
+#      intermediate_dim: 91
+#      latent_dim: 100
+#      batch_size: -1
+#      dropout_pkeep: 1
+#      reg_lambda: 0.01
+#      early_stopping:
+#        patience: 2
+#        verbose: True
+#        rel_val: 0.1
     external.KaVAE:
       meta:
         hyper_max_evals: 1
@@ -36,35 +96,43 @@ experiment:
         verbose: True
         save_weights: False
         save_recs: False
-      lr: 0.001
+#      lr: 0.001
+#      epochs: 100
+#      intermediate_dim: 300
+#      latent_dim: 100
+#      batch_size: 128
+#      dropout_pkeep: 0.8
+#      reg_lambda: 0
+      lr: 0.005
       epochs: 100
-      intermediate_dim: 300
-      latent_dim: 100
-      batch_size: 128
+      intermediate_dim: 250
+      latent_dim: 250
+      batch_size: 1024
       dropout_pkeep: 0.8
       reg_lambda: 0
-#      lr: [loguniform, -10, -1]
-#      epochs: 10
+      alpha: 2.0
+#      lr: [loguniform, -15, -1]
+#      epochs: 2
 #      intermediate_dim: [uniform,50,300]
 #      latent_dim: [uniform,50,300]
-#      batch_size: 64
-#      dropout_pkeep: 1
+#      batch_size: 1024
+#      dropout_pkeep: 0.9
 #      reg_lambda: [0, 0.01, 0.001]
-#    external.KTUP:
-#      meta:
-#        hyper_max_evals: 1
-#        hyper_opt_alg: tpe
-#        validation_rate: 1
-#        verbose: True
-#        save_weights: False
-#        save_recs: False
-#      learning_rate: 0.001
-#      embedding_size: 100
-#      l2_lambda: 0.0
-#      epochs: 3
-#      batch_size: 200
-#      joint_ratio: 0.7
-#      use_st_gumbel: False
+##    external.KTUP:
+##      meta:
+##        hyper_max_evals: 1
+##        hyper_opt_alg: tpe
+##        validation_rate: 1
+##        verbose: True
+##        save_weights: False
+##        save_recs: False
+##      learning_rate: 0.001
+##      embedding_size: 100
+##      l2_lambda: 0.0
+##      epochs: 3
+##      batch_size: 200
+##      joint_ratio: 0.7
+##      use_st_gumbel: False
 #    KaHFMEmbeddings:
 #      meta:
 #        hyper_max_evals: 1
@@ -80,3 +148,25 @@ experiment:
 #      epochs: 100
 #      l_b: 0
 #      l_w: 0.00025
+#    external.MF2020var: # from original paper
+#      meta:
+#        hyper_max_evals: 20
+#        hyper_opt_alg: tpe
+#        verbose: True
+#        save_recs: False
+#      epochs: 50 # 256 original paper but 50 comes from NeuMF paper
+#      factors: 100 #[8, 16, 32, 64, 128, 256]
+#      lr: 0.01 #[0.001, 0.003, 0.01]
+#      reg: 0 #[0.001, 0.003, 0.01]
+#      m: 8 #[4,6,8]
+#    external.MF2020var: # from original paper
+#      meta:
+#        hyper_max_evals: 20
+#        hyper_opt_alg: tpe
+#        verbose: True
+#        save_recs: False
+#      epochs: 50 # 256 original paper but 50 comes from NeuMF paper
+#      factors: 1 #[8, 16, 32, 64, 128, 256]
+#      lr: [0.001, 0.003, 0.01]
+#      reg: [0.001, 0.003, 0.01]
+#      m: [4,6,8]

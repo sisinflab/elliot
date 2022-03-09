@@ -91,13 +91,15 @@ class KnowledgeAwareVariationalAutoEncoder(keras.Model):
                  learning_rate=0.001,
                  dropout_rate=0,
                  regularization_lambda=0.01,
+                 alpha=1.0,
                  name="KnowledgeAwareVariationalAutoEncoder",
                  **kwargs):
         super().__init__(name=name, **kwargs)
         tf.random.set_seed(42)
 
+        self.alpha = alpha
         self.item_embedding = keras.layers.Embedding(input_dim=item_factors.shape[0], output_dim=item_factors.shape[1],
-                                                     weights=[item_factors],
+                                                     weights=[tf.linalg.l2_normalize(item_factors)],
                                                      embeddings_regularizer=keras.regularizers.l2(regularization_lambda),
                                                      trainable=True, dtype=tf.float32)
         # needed for initialization
@@ -118,7 +120,7 @@ class KnowledgeAwareVariationalAutoEncoder(keras.Model):
     def convert_function(self, row):
         return tf.math.reduce_mean(self.item_embedding.weights[0][row > 0], axis=0)
 
-    # @tf.function
+    @tf.function
     def call(self, inputs, training=None, **kwargs):
         # tensor_list = tf.map_fn(lambda row: tf.math.reduce_mean(self.item_embedding.weights[0][row > 0], axis=0), inputs)
         # a = tf.where(tf.not_equal(inputs, 0))
@@ -128,7 +130,16 @@ class KnowledgeAwareVariationalAutoEncoder(keras.Model):
         #     tensor_list.append(tf.math.reduce_mean(b[a[:, 0] == p], axis=0))
         # new_input = tf.convert_to_tensor(tensor_list)
 
-        self.z_mean, self.z_log_var, self.z = self.encoder(tf.map_fn(lambda row: tf.math.reduce_mean(self.item_embedding.weights[0][row > 0], axis=0), inputs), training=training)
+        # self.z_mean, self.z_log_var, self.z = self.encoder(tf.map_fn(lambda row: tf.math.reduce_mean(self.item_embedding.weights[0][row > 0], axis=0), inputs), training=training)
+        # self.z_mean, self.z_log_var, self.z = self.encoder(tf.concat([tf.linalg.l2_normalize(inputs, axis=-1), self.alpha * tf.linalg.l2_normalize(tf.map_fn(lambda row: tf.math.reduce_mean(self.item_embedding.weights[0][row > 0], axis=0), inputs), axis=-1)], -1), training=training)
+
+        self.z_mean, self.z_log_var, self.z = self.encoder(tf.concat([inputs,
+                                                                      self.alpha * tf.linalg.l2_normalize(tf.map_fn(
+                                                                          lambda row: tf.math.reduce_mean(
+                                                                              self.item_embedding.weights[0][row > 0],
+                                                                              axis=0), inputs), axis=-1)], -1),
+                                                           training=training)
+
         self.reconstructed = self.decoder(self.z)
         # # Add KL divergence regularization loss.
         self.kl_loss = -0.5 * tf.reduce_mean(
@@ -138,7 +149,7 @@ class KnowledgeAwareVariationalAutoEncoder(keras.Model):
         # self.add_loss(kl_loss)
         return self.reconstructed, self.kl_loss
 
-    # @tf.function
+    @tf.function
     def train_step(self, batch, anneal_ph=0.0, **kwargs):
         with tf.GradientTape() as tape:
 

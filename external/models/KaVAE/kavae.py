@@ -37,6 +37,7 @@ class KaVAE(RecMixin, BaseRecommenderModel):
 
         # autoset params
         self._params_list = [
+            ("_alpha", "alpha", "alpha", 1, float, None),
             ("_intermediate_dim", "intermediate_dim", "intermediate_dim", 600, int, None),
             ("_latent_dim", "latent_dim", "latent_dim", 200, int, None),
             ("_lambda", "reg_lambda", "reg_lambda", 0.01, None, None),

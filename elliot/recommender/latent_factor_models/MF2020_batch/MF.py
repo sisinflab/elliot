@@ -16,7 +16,7 @@ from elliot.recommender.base_recommender_model import init_charger
 from elliot.recommender.recommender_utils_mixin import RecMixin
 from elliot.utils.write import store_recommendation
 
-from elliot.recommender.latent_factor_models.MF2020.MF_model import MFModel
+from elliot.recommender.latent_factor_models.MF2020_batch.MF_model import MFModel
 
 
 class MF2020_batch(RecMixin, BaseRecommenderModel):

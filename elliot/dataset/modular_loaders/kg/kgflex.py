@@ -40,8 +40,27 @@ class KGFlexLoader(AbstractLoader):
         self.second_hop = pd.DataFrame(columns=['uri', 'predicate', 'object'])\
             .astype(dtype={'uri': str, 'predicate': str, 'object': str})
         if self.second_hop_path:
-            self.second_hop = pd.read_csv(self.second_hop_path, sep='\t', names=['uri', 'predicate', 'object'],
+            import time
+            if self.second_hop_path.endswith("tar.gz"):
+                start = time.time()
+                self.second_hop = pd.read_csv(self.second_hop_path, compression='gzip', sep='\t', names=['uri', 'predicate', 'object'],
                                     dtype={'uri': str, 'predicate': str, 'object': str})
+                self.logger.info(f"Time taken to load Second Hop: {time.time() - start}")
+            elif self.second_hop_path.endswith("tar.bz2"):
+                start = time.time()
+                self.second_hop = pd.read_csv(self.second_hop_path, compression='bz2', sep='\t', names=['uri', 'predicate', 'object'],
+                                    dtype={'uri': str, 'predicate': str, 'object': str})
+                self.logger.info(f"Time taken to load Second Hop: {time.time() - start}")
+            elif self.second_hop_path.endswith("tar.xz"):
+                start = time.time()
+                self.second_hop = pd.read_csv(self.second_hop_path, compression='xz', sep='\t', names=['uri', 'predicate', 'object'],
+                                    dtype={'uri': str, 'predicate': str, 'object': str})
+                self.logger.info(f"Time taken to load Second Hop: {time.time() - start}")
+            else:
+                start = time.time()
+                self.second_hop = pd.read_csv(self.second_hop_path, sep='\t', names=['uri', 'predicate', 'object'],
+                                              dtype={'uri': str, 'predicate': str, 'object': str})
+                self.logger.info(f"Time taken to load Second Hop: {time.time() - start}")
 
         if self.properties:
             if self.additive:
