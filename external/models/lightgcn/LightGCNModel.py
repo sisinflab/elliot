@@ -91,8 +91,8 @@ class LightGCNModel(torch.nn.Module, ABC):
         if evaluate:
             self.propagation_network.train()
 
-        all_embeddings = torch.cat([torch.unsqueeze(embedding, 0) for embedding in all_embeddings], 0)
-        all_embeddings = torch.sum(all_embeddings * self.alpha.to(self.device), dim=0)
+        all_embeddings = torch.stack(all_embeddings, dim=1)
+        all_embeddings = all_embeddings.mean(dim=1, keepdim=False)
         gu, gi = torch.split(all_embeddings, [self.num_users, self.num_items], 0)
         return gu, gi
 
