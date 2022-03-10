@@ -79,7 +79,7 @@ class VBPRModel(torch.nn.Module, ABC):
 
         xui = torch.sum(gamma_u * gamma_i, 1) + torch.sum(theta_u * proj_i, 1)
 
-        return xui, gamma_u, gamma_i
+        return xui, gamma_u, gamma_i, theta_u, proj_i
 
     def predict(self, start_user, stop_user, **kwargs):
         P = torch.nn.functional.normalize(self.proj(self.F.weight).to(self.device), p=2, dim=1)
@@ -90,14 +90,17 @@ class VBPRModel(torch.nn.Module, ABC):
 
     def train_step(self, batch):
         user, pos, neg = batch
-        xu_pos, gamma_u, gamma_i_pos = self.forward(inputs=(user, pos))
-        xu_neg, _, gamma_i_neg = self.forward(inputs=(user, neg))
+        xu_pos, gamma_u, gamma_i_pos, theta_u, proj_i_pos = self.forward(inputs=(user, pos))
+        xu_neg, _, gamma_i_neg, _, proj_i_neg = self.forward(inputs=(user, neg))
 
         difference = torch.clamp(xu_pos - xu_neg, -80.0, 1e8)
         loss = torch.mean(torch.nn.functional.softplus(-difference))
         reg_loss = self.l_w * (1 / 2) * (gamma_u.norm(2).pow(2) +
                                          gamma_i_pos.norm(2).pow(2) +
-                                         gamma_i_neg.norm(2).pow(2)) / user.shape[0]
+                                         gamma_i_neg.norm(2).pow(2) +
+                                         theta_u.norm(2).pow(2) +
+                                         proj_i_pos.norm(2).pow(2) +
+                                         proj_i_neg.norm(2).pow(2)) / user.shape[0]
         loss += reg_loss
 
         self.optimizer.zero_grad()
