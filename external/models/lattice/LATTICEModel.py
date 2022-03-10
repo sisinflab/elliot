@@ -59,11 +59,11 @@ class LATTICEModel(torch.nn.Module, ABC):
         self.n_layers = num_layers
 
         # collaborative embeddings
-        self.Gu = torch.nn.Parameter(
-            torch.nn.init.xavier_normal_(torch.empty((self.num_users, self.embed_k))))
+        self.Gu = torch.nn.Embedding(self.num_users, self.embed_k)
+        torch.nn.init.xavier_uniform_(self.Gu.weight)
         self.Gu.to(self.device)
-        self.Gi = torch.nn.Parameter(
-            torch.nn.init.xavier_normal_(torch.empty((self.num_items, self.embed_k))))
+        self.Gi = torch.nn.Embedding(self.num_items, self.embed_k)
+        torch.nn.init.xavier_uniform_(self.Gi.weight)
         self.Gi.to(self.device)
 
         # multimodal features
@@ -76,10 +76,10 @@ class LATTICEModel(torch.nn.Module, ABC):
         ir = torch.tensor(list(range(self.num_items)), dtype=torch.int64, device=self.device)
         self.items_rows = torch.repeat_interleave(ir, self.top_k).to(self.device)
         for m_id, m in enumerate(modalities):
-            self.Gim[m] = torch.nn.Parameter(
-                torch.nn.functional.normalize(torch.tensor(multimodal_features[m_id], dtype=torch.float32))
+            self.Gim[m] = torch.nn.Embedding.from_pretrained(torch.nn.functional.normalize(
+            torch.tensor(multimodal_features[m_id], dtype=torch.float32, device=self.device), p=2, dim=1), freeze=False
             )
-            self.Gim[m].to(self.device)
+            self.Gim[m].weight.to(self.device)
             current_feature = torch.tensor(multimodal_features[m_id], dtype=torch.float32)
             current_feature = current_feature / torch.norm(current_feature, p=2, dim=-1, keepdim=True)
             current_sim = torch.mm(current_feature, current_feature.transpose(1, 0))
@@ -131,7 +131,7 @@ class LATTICEModel(torch.nn.Module, ABC):
     def propagate_embeddings(self, build_item_graph=False):
         projected_m = dict()
         for m_id, m in enumerate(self.modalities):
-            projected_m[m] = self.projection_m[m](self.Gim[m].to(self.device))
+            projected_m[m] = self.projection_m[m](self.Gim[m].weight.to(self.device))
         if build_item_graph:
             weights = torch.cat([torch.unsqueeze(w, 0) for w in self.importance_weights_m], dim=0)
             softmax_weights = torch.softmax(weights, dim=0)
@@ -173,12 +173,12 @@ class LATTICEModel(torch.nn.Module, ABC):
         else:
             self.Si = self.Si.detach()
 
-        item_embedding = self.Gi
+        item_embedding = self.Gi.weight
         for layer in range(self.n_layers):
             item_embedding = list(self.propagation_network.children())[layer](item_embedding.to(self.device),
                                                                                  self.Si)
 
-        return self.Gi.to(self.device) + torch.nn.functional.normalize(item_embedding.to(self.device), p=2, dim=1)
+        return self.Gi.weight.to(self.device) + torch.nn.functional.normalize(item_embedding.to(self.device), p=2, dim=1)
 
     def forward(self, inputs, **kwargs):
         gum, gim = inputs
@@ -190,13 +190,13 @@ class LATTICEModel(torch.nn.Module, ABC):
         return xui, gamma_u_m, gamma_i_m
 
     def predict(self, start, stop, gim, **kwargs):
-        return torch.matmul(self.Gu[start: stop].to(self.device), torch.transpose(gim.to(self.device), 0, 1))
+        return torch.matmul(self.Gu.weight[start: stop].to(self.device), torch.transpose(gim.to(self.device), 0, 1))
 
     def train_step(self, batch, build_item_graph):
         gim = self.propagate_embeddings(build_item_graph)
         user, pos, neg = batch
-        xu_pos, gamma_u_m, gamma_i_pos_m = self.forward(inputs=(self.Gu[user], gim[pos]))
-        xu_neg, _, gamma_i_neg_m = self.forward(inputs=(self.Gu[user], gim[neg]))
+        xu_pos, gamma_u_m, gamma_i_pos_m = self.forward(inputs=(self.Gu.weight[user], gim[pos]))
+        xu_neg, _, gamma_i_neg_m = self.forward(inputs=(self.Gu.weight[user], gim[neg]))
 
         difference = torch.clamp(xu_pos - xu_neg, -80.0, 1e8)
         loss = torch.mean(torch.nn.functional.softplus(-difference))
