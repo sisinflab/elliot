@@ -82,8 +82,6 @@ class NGCFModel(torch.nn.Module, ABC):
             propagation_network_list.append((NGCFLayer(self.weight_size_list[layer],
                                                        self.weight_size_list[layer + 1],
                                                        normalize=False), 'x, edge_index -> x'))
-            torch.nn.init.xavier_uniform_(propagation_network_list[-1][0].w1)
-            torch.nn.init.xavier_uniform_(propagation_network_list[-1][0].w2)
             self.dropout_layers.append(torch.nn.Dropout(p=self.message_dropout))
 
         self.propagation_network = torch_geometric.nn.Sequential('x, edge_index', propagation_network_list)
