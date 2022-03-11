@@ -70,19 +70,19 @@ class LATTICEModel(torch.nn.Module, ABC):
         self.Gi.to(self.device)
 
         # multimodal features
-        self.Gim = dict()
+        self.Gim = torch.nn.ParameterDict()
         self.Sim = dict()
         self.Si = None
-        self.projection_m = dict()
-        self.importance_weights_m = []
+        self.projection_m = torch.nn.ModuleDict()
+        self.importance_weights_m = torch.nn.ParameterList()
         self.multimodal_features_shapes = [mf.shape[1] for mf in multimodal_features]
         ir = torch.tensor(list(range(self.num_items)), dtype=torch.int64, device=self.device)
         self.items_rows = torch.repeat_interleave(ir, self.top_k).to(self.device)
         for m_id, m in enumerate(modalities):
             self.Gim[m] = torch.nn.Embedding.from_pretrained(torch.nn.functional.normalize(
-            torch.tensor(multimodal_features[m_id], dtype=torch.float32, device=self.device), p=2, dim=1), freeze=False
-            )
-            self.Gim[m].weight.to(self.device)
+                torch.tensor(multimodal_features[m_id], dtype=torch.float32, device=self.device), p=2, dim=1),
+                freeze=False).weight
+            self.Gim[m].to(self.device)
             current_feature = torch.tensor(multimodal_features[m_id], dtype=torch.float32)
             current_feature = current_feature / torch.norm(current_feature, p=2, dim=-1, keepdim=True)
             current_sim = torch.mm(current_feature, current_feature.transpose(1, 0))
@@ -142,7 +142,7 @@ class LATTICEModel(torch.nn.Module, ABC):
     def propagate_embeddings(self, build_item_graph=False, evaluate=False):
         projected_m = dict()
         for m_id, m in enumerate(self.modalities):
-            projected_m[m] = self.projection_m[m](self.Gim[m].weight.to(self.device))
+            projected_m[m] = self.projection_m[m](self.Gim[m].to(self.device))
         if build_item_graph:
             weights = torch.cat([torch.unsqueeze(w, 0) for w in self.importance_weights_m], dim=0)
             softmax_weights = torch.softmax(weights, dim=0)

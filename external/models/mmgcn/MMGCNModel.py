@@ -70,19 +70,20 @@ class MMGCNModel(torch.nn.Module, ABC):
         self.Gi.to(self.device)
 
         # multimodal collaborative embeddings
-        self.Gum = dict()
-        self.proj_multimodal = dict()
-        self.propagation_network_multimodal = dict()
-        self.linear_network_multimodal = dict()
-        self.g_linear_network_multimodal = dict()
+        self.Gum = torch.nn.ParameterDict()
+        self.proj_multimodal = torch.nn.ModuleDict()
+        self.propagation_network_multimodal = torch.nn.ModuleDict()
+        self.linear_network_multimodal = torch.nn.ModuleDict()
+        self.g_linear_network_multimodal = torch.nn.ModuleDict()
         self.multimodal_features_shapes = [mf.shape[1] for mf in multimodal_features]
         for m_id, m in enumerate(modalities):
             if self.embed_k_multimod[m_id]:
-                self.Gum[m] = torch.nn.Embedding(self.num_users, self.embed_k_multimod[m_id])
-                torch.nn.init.xavier_uniform_(self.Gum[m].weight)
+                self.Gum[m] = torch.nn.Embedding(self.num_users, self.embed_k_multimod[m_id]).weight
+                torch.nn.init.xavier_uniform_(self.Gum[m])
                 self.Gum[m].to(self.device)
                 self.proj_multimodal[m] = torch.nn.Linear(self.multimodal_features_shapes[m_id],
                                                           self.embed_k_multimod[m_id])
+                torch.nn.init.xavier_uniform_(self.proj_multimodal[m].weight)
                 self.proj_multimodal[m].to(self.device)
                 propagation_network_list = [(MMGCNLayer(self.embed_k_multimod[m_id],
                                                         self.embed_k_multimod[m_id],
@@ -96,8 +97,8 @@ class MMGCNModel(torch.nn.Module, ABC):
                                                                          self.embed_k)))]
                 torch.nn.init.xavier_uniform_(g_linear_network_list[0][1].weight)
             else:
-                self.Gum[m] = torch.nn.Embedding(self.num_users, self.multimodal_features_shapes[m_id])
-                torch.nn.init.xavier_uniform_(self.Gum[m].weight)
+                self.Gum[m] = torch.nn.Embedding(self.num_users, self.multimodal_features_shapes[m_id]).weight
+                torch.nn.init.xavier_uniform_(self.Gum[m])
                 self.Gum[m].to(self.device)
                 propagation_network_list = [(MMGCNLayer(self.multimodal_features_shapes[m_id],
                                                         self.multimodal_features_shapes[m_id],
@@ -135,10 +136,10 @@ class MMGCNModel(torch.nn.Module, ABC):
             self.g_linear_network_multimodal[m].to(self.device)
 
         # multimodal features
-        self.Fm = dict()
+        self.Fm = torch.nn.ParameterDict()
         for m_id, m in enumerate(modalities):
             self.Fm[m] = torch.nn.Embedding.from_pretrained(torch.nn.functional.normalize(
-                torch.tensor(multimodal_features[m_id], dtype=torch.float32, device=self.device), p=2, dim=1))
+                torch.tensor(multimodal_features[m_id], dtype=torch.float32, device=self.device), p=2, dim=1)).weight
             self.Fm[m].to(self.device)
 
         self.softplus = torch.nn.Softplus()
@@ -154,10 +155,10 @@ class MMGCNModel(torch.nn.Module, ABC):
         ego_embeddings = torch.cat((self.Gu.weight.to(self.device), self.Gi.weight.to(self.device)), 0)
 
         for m_id, m in enumerate(self.modalities):
-            x_all_m[m] = torch.cat((self.Gum[m].weight.to(self.device),
-                                    (self.proj_multimodal[m](self.Fm[m].weight.to(self.device)) if
+            x_all_m[m] = torch.cat((self.Gum[m].to(self.device),
+                                    (self.proj_multimodal[m](self.Fm[m].to(self.device)) if
                                      self.embed_k_multimod[m_id]
-                                     else self.Fm[m].weight.to(self.device))), 0)
+                                     else self.Fm[m].to(self.device))), 0)
             x_all_m[m] = torch.nn.functional.normalize(x_all_m[m].to(self.device), p=2, dim=1)
             for layer in range(self.n_layers):
                 if not evaluate:
@@ -223,7 +224,7 @@ class MMGCNModel(torch.nn.Module, ABC):
         loss = torch.mean(torch.nn.functional.softplus(-difference))
         reg_loss = self.l_w * ((self.Gu.weight[user].pow(2) +
                                 self.Gi.weight[pos].pow(2) +
-                                self.Gi.weight[neg].pow(2)).mean() + self.Gum[self.modalities[0]].weight.pow(2).mean())
+                                self.Gi.weight[neg].pow(2)).mean() + self.Gum[self.modalities[0]].pow(2).mean())
         loss += reg_loss
 
         self.optimizer.zero_grad()

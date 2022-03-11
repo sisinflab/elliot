@@ -70,21 +70,20 @@ class GRCNModel(torch.nn.Module, ABC):
         self.size_rows = torch.tensor(size_rows, dtype=torch.int64)
 
         # collaborative embeddings
-        self.Gu = torch.nn.Parameter(
-            torch.nn.init.xavier_normal_(torch.empty((self.num_users, self.embed_k))))
+        self.Gu = torch.nn.Embedding(self.num_users, self.embed_k)
+        torch.nn.init.xavier_uniform_(self.Gu.weight)
         self.Gu.to(self.device)
-        self.Gi = torch.nn.Parameter(
-            torch.nn.init.xavier_normal_(torch.empty((self.num_items, self.embed_k))))
+        self.Gi = torch.nn.Embedding(self.num_items, self.embed_k)
+        torch.nn.init.xavier_uniform_(self.Gi.weight)
         self.Gi.to(self.device)
 
         # multimodal collaborative embeddings
-        self.Gum = dict()
-        self.Gim = dict()
+        self.Gum = torch.nn.ParameterDict()
+        self.Gim = torch.nn.ParameterDict()
         self.multimodal_features_shapes = [mf.shape[1] for mf in multimodal_features]
         for m_id, m in enumerate(modalities):
-            self.Gum[m] = torch.nn.Parameter(
-                torch.nn.init.xavier_normal_(torch.empty((self.num_users, self.embed_k_multimod)))
-            )
+            self.Gum[m] = torch.nn.Embedding(self.num_users, self.embed_k_multimod).weight
+            torch.nn.init.xavier_uniform_(self.Gum[m])
             self.Gum[m].to(self.device)
             self.Gim[m] = torch.nn.functional.normalize(torch.tensor(multimodal_features[m_id], dtype=torch.float32))
             self.Gim[m].to(self.device)
