@@ -33,6 +33,7 @@ class LATTICEModel(torch.nn.Module, ABC):
                  l_m,
                  top_k,
                  multimodal_features,
+                 adj,
                  random_seed,
                  name="LATTICE",
                  **kwargs
@@ -60,6 +61,7 @@ class LATTICEModel(torch.nn.Module, ABC):
         self.top_k = top_k
         self.n_layers = num_layers
         self.n_ui_layers = num_ui_layers
+        self.adj = adj
 
         # collaborative embeddings
         self.Gu = torch.nn.Embedding(self.num_users, self.embed_k)

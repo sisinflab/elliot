@@ -12,12 +12,14 @@ from ast import literal_eval as make_tuple
 from tqdm import tqdm
 import torch
 import os
+import numpy as np
 
 from elliot.utils.write import store_recommendation
 from elliot.dataset.samplers import custom_sampler as cs
 from elliot.recommender import BaseRecommenderModel
 from elliot.recommender.base_recommender_model import init_charger
 from elliot.recommender.recommender_utils_mixin import RecMixin
+from torch_sparse import SparseTensor
 from .LATTICEModel import LATTICEModel
 
 
@@ -45,7 +47,7 @@ class LATTICE(RecMixin, BaseRecommenderModel):
     .. code:: yaml
 
       models:
-        MMGCN:
+        LATTICE:
           meta:
             save_recs: True
           lr: 0.0001
@@ -90,6 +92,15 @@ class LATTICE(RecMixin, BaseRecommenderModel):
             self.__setattr__(f'''_side_{m}''',
                              self._data.side_information.__getattribute__(f'''{self._loaders[m_id]}'''))
 
+        row, col = data.sp_i_train.nonzero()
+        col = [c + self._num_users for c in col]
+        edge_index = np.array([row, col])
+        edge_index = torch.tensor(edge_index, dtype=torch.int64)
+        self.adj = SparseTensor(row=torch.cat([edge_index[0], edge_index[1]], dim=0),
+                                col=torch.cat([edge_index[1], edge_index[0]], dim=0),
+                                sparse_sizes=(self._num_users + self._num_items,
+                                              self._num_users + self._num_items))
+
         self._model = LATTICEModel(
             num_users=self._num_users,
             num_items=self._num_items,
@@ -104,6 +115,7 @@ class LATTICE(RecMixin, BaseRecommenderModel):
             top_k=self._top_k,
             multimodal_features=[self.__getattribute__(f'''_side_{m}''').object.get_all_features() for m in
                                  self._modalities],
+            adj=self.adj,
             random_seed=self._seed
         )
 
