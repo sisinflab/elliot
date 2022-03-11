@@ -194,7 +194,7 @@ class LATTICEModel(torch.nn.Module, ABC):
         ego_embeddings = torch.cat((self.Gu.weight.to(self.device), self.Gi.weight.to(self.device)), 0)
         all_embeddings = [ego_embeddings]
 
-        for layer in range(self.n_layers):
+        for layer in range(self.n_ui_layers):
             if evaluate:
                 self.propagation_network_recommend.eval()
                 with torch.no_grad():
