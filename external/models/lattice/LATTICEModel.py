@@ -113,7 +113,7 @@ class LATTICEModel(torch.nn.Module, ABC):
 
         # lightgcn as user-item graph model for recommendation
         propagation_network_list = []
-        for layer in range(self.n_layers):
+        for layer in range(self.n_ui_layers):
             propagation_network_list.append((LGConv(normalize=False), 'x, edge_index -> x'))
 
         self.propagation_network_recommend = torch_geometric.nn.Sequential('x, edge_index', propagation_network_list)
@@ -194,7 +194,7 @@ class LATTICEModel(torch.nn.Module, ABC):
         ego_embeddings = torch.cat((self.Gu.weight.to(self.device), self.Gi.weight.to(self.device)), 0)
         all_embeddings = [ego_embeddings]
 
-        for layer in range(0, self.n_ui_layers):
+        for layer in range(self.n_ui_layers):
             if evaluate:
                 self.propagation_network_recommend.eval()
                 with torch.no_grad():
