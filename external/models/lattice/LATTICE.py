@@ -31,6 +31,7 @@ class LATTICE(RecMixin, BaseRecommenderModel):
         lr: Learning rate
         epochs: Number of epochs
         n_layers: Number of propagation layers for the item-item graph
+        n_ui_layers: Number of propagation layers for the user-item graph
         factors: Number of latent factors
         factors_multimod: Tuple with number of units for each modality
         batch_size: Batch size
@@ -49,7 +50,8 @@ class LATTICE(RecMixin, BaseRecommenderModel):
             save_recs: True
           lr: 0.0001
           epochs: 400
-          n_layers: 3
+          n_layers: 1
+          n_ui_layers: 3
           factors: 64
           factors_multimod: 64
           batch_size: 1024
@@ -72,7 +74,8 @@ class LATTICE(RecMixin, BaseRecommenderModel):
             ("_learning_rate", "lr", "lr", 0.0005, float, None),
             ("_factors", "factors", "factors", 64, int, None),
             ("_l_w", "l_w", "l_w", 0.01, float, None),
-            ("_n_layers", "n_layers", "n_layers", 3, int, None),
+            ("_n_layers", "n_layers", "n_layers", 1, int, None),
+            ("_n_ui_layers", "n_ui_layers", "n_ui_layers", 3, int, None),
             ("_top_k", "top_k", "top_k", 100, int, None),
             ("_factors_multimod", "factors_multimod", "factors_multimod", 64, int, None),
             ("_modalities", "modalities", "modalites", "('visual','textual')", lambda x: list(make_tuple(x)),
@@ -91,6 +94,7 @@ class LATTICE(RecMixin, BaseRecommenderModel):
             num_users=self._num_users,
             num_items=self._num_items,
             num_layers=self._n_layers,
+            num_ui_layers=self._n_ui_layers,
             learning_rate=self._learning_rate,
             embed_k=self._factors,
             embed_k_multimod=self._factors_multimod,
@@ -134,10 +138,10 @@ class LATTICE(RecMixin, BaseRecommenderModel):
         predictions_top_k_val = {}
         self._model.eval()
         with torch.no_grad():
-            gim = self._model.propagate_embeddings(build_item_graph=True)
+            gum, gim = self._model.propagate_embeddings(build_item_graph=True, evaluate=True)
             for index, offset in enumerate(range(0, self._num_users, self._batch_size)):
                 offset_stop = min(offset + self._batch_size, self._num_users)
-                predictions = self._model.predict(offset, offset_stop, gim)
+                predictions = self._model.predict(gum, gim)
                 recs_val, recs_test = self.process_protocol(k, predictions, offset, offset_stop)
                 predictions_top_k_val.update(recs_val)
                 predictions_top_k_test.update(recs_test)

@@ -10,6 +10,7 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malite
 from abc import ABC
 
 from .LATTICELayer import LATTICELayer
+from torch_geometric.nn import LGConv
 
 import torch
 import torch_geometric
@@ -23,6 +24,7 @@ class LATTICEModel(torch.nn.Module, ABC):
                  num_users,
                  num_items,
                  num_layers,
+                 num_ui_layers,
                  learning_rate,
                  embed_k,
                  embed_k_multimod,
@@ -57,6 +59,7 @@ class LATTICEModel(torch.nn.Module, ABC):
         self.l_m = l_m
         self.top_k = top_k
         self.n_layers = num_layers
+        self.n_ui_layers = num_ui_layers
 
         # collaborative embeddings
         self.Gu = torch.nn.Embedding(self.num_users, self.embed_k)
@@ -106,6 +109,14 @@ class LATTICEModel(torch.nn.Module, ABC):
         self.propagation_network = torch_geometric.nn.Sequential('x, edge_index', propagation_network_list)
         self.propagation_network.to(self.device)
 
+        # lightgcn as user-item graph model for recommendation
+        propagation_network_list = []
+        for layer in range(self.n_layers):
+            propagation_network_list.append((LGConv(normalize=False), 'x, edge_index -> x'))
+
+        self.propagation_network_recommend = torch_geometric.nn.Sequential('x, edge_index', propagation_network_list)
+        self.propagation_network_recommend.to(self.device)
+
         self.softplus = torch.nn.Softplus()
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
         self.lr_scheduler = self.set_lr_scheduler()
@@ -128,7 +139,7 @@ class LATTICEModel(torch.nn.Module, ABC):
         scheduler = torch.optim.lr_scheduler.LambdaLR(self.optimizer, lr_lambda=lambda epoch: 0.96 ** (epoch / 50))
         return scheduler
 
-    def propagate_embeddings(self, build_item_graph=False):
+    def propagate_embeddings(self, build_item_graph=False, evaluate=False):
         projected_m = dict()
         for m_id, m in enumerate(self.modalities):
             projected_m[m] = self.projection_m[m](self.Gim[m].weight.to(self.device))
@@ -178,7 +189,28 @@ class LATTICEModel(torch.nn.Module, ABC):
             item_embedding = list(self.propagation_network.children())[layer](item_embedding.to(self.device),
                                                                                  self.Si)
 
-        return self.Gi.weight.to(self.device) + torch.nn.functional.normalize(item_embedding.to(self.device), p=2, dim=1)
+        ego_embeddings = torch.cat((self.Gu.weight.to(self.device), self.Gi.weight.to(self.device)), 0)
+        all_embeddings = [ego_embeddings]
+
+        for layer in range(self.n_layers):
+            if evaluate:
+                self.propagation_network_recommend.eval()
+                with torch.no_grad():
+                    all_embeddings += [torch.nn.functional.normalize(list(
+                        self.propagation_network_recommend.children()
+                    )[layer](all_embeddings[layer].to(self.device), self.adj.to(self.device)), p=2, dim=1)]
+            else:
+                all_embeddings += [torch.nn.functional.normalize(list(
+                    self.propagation_network_recommend.children()
+                )[layer](all_embeddings[layer].to(self.device), self.adj.to(self.device)), p=2, dim=1)]
+
+        if evaluate:
+            self.propagation_network_recommend.train()
+
+        all_embeddings = torch.stack(all_embeddings, dim=1)
+        all_embeddings = all_embeddings.mean(dim=1, keepdim=False)
+        gu, gi = torch.split(all_embeddings, [self.num_users, self.num_items], 0)
+        return gu, gi + torch.nn.functional.normalize(item_embedding.to(self.device), p=2, dim=1)
 
     def forward(self, inputs, **kwargs):
         gum, gim = inputs
@@ -189,14 +221,14 @@ class LATTICEModel(torch.nn.Module, ABC):
 
         return xui, gamma_u_m, gamma_i_m
 
-    def predict(self, start, stop, gim, **kwargs):
-        return torch.matmul(self.Gu.weight[start: stop].to(self.device), torch.transpose(gim.to(self.device), 0, 1))
+    def predict(self, gum, gim, **kwargs):
+        return torch.matmul(gum.to(self.device), torch.transpose(gim.to(self.device), 0, 1))
 
     def train_step(self, batch, build_item_graph):
-        gim = self.propagate_embeddings(build_item_graph)
+        gum, gim = self.propagate_embeddings(build_item_graph)
         user, pos, neg = batch
-        xu_pos, gamma_u_m, gamma_i_pos_m = self.forward(inputs=(self.Gu.weight[user], gim[pos]))
-        xu_neg, _, gamma_i_neg_m = self.forward(inputs=(self.Gu.weight[user], gim[neg]))
+        xu_pos, gamma_u_m, gamma_i_pos_m = self.forward(inputs=(gum[user], gim[pos]))
+        xu_neg, _, gamma_i_neg_m = self.forward(inputs=(gum[user], gim[neg]))
 
         difference = torch.clamp(xu_pos - xu_neg, -80.0, 1e8)
         loss = torch.mean(torch.nn.functional.softplus(-difference))
