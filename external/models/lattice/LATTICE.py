@@ -153,8 +153,7 @@ class LATTICE(RecMixin, BaseRecommenderModel):
             gum, gim = self._model.propagate_embeddings(build_item_graph=True)
             for index, offset in enumerate(range(0, self._num_users, self._batch_size)):
                 offset_stop = min(offset + self._batch_size, self._num_users)
-                predictions = self._model.predict(gum, gim)
-                print(predictions.shape)
+                predictions = self._model.predict(gum[offset: offset_stop], gim)
                 recs_val, recs_test = self.process_protocol(k, predictions, offset, offset_stop)
                 predictions_top_k_val.update(recs_val)
                 predictions_top_k_test.update(recs_test)
