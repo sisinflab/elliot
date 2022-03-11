@@ -141,7 +141,7 @@ class LATTICEModel(torch.nn.Module, ABC):
         scheduler = torch.optim.lr_scheduler.LambdaLR(self.optimizer, lr_lambda=lambda epoch: 0.96 ** (epoch / 50))
         return scheduler
 
-    def propagate_embeddings(self, build_item_graph=False, evaluate=False):
+    def propagate_embeddings(self, build_item_graph=False):
         projected_m = dict()
         for m_id, m in enumerate(self.modalities):
             projected_m[m] = self.projection_m[m](self.Gim[m].to(self.device))
@@ -195,19 +195,9 @@ class LATTICEModel(torch.nn.Module, ABC):
         all_embeddings = [ego_embeddings]
 
         for layer in range(self.n_ui_layers):
-            if evaluate:
-                self.propagation_network_recommend.eval()
-                with torch.no_grad():
-                    all_embeddings += [torch.nn.functional.normalize(list(
-                        self.propagation_network_recommend.children()
-                    )[layer](all_embeddings[layer].to(self.device), self.adj.to(self.device)), p=2, dim=1)]
-            else:
-                all_embeddings += [torch.nn.functional.normalize(list(
-                    self.propagation_network_recommend.children()
-                )[layer](all_embeddings[layer].to(self.device), self.adj.to(self.device)), p=2, dim=1)]
-
-        if evaluate:
-            self.propagation_network_recommend.train()
+            all_embeddings += [torch.nn.functional.normalize(list(
+                self.propagation_network_recommend.children()
+            )[layer](all_embeddings[layer].to(self.device), self.adj.to(self.device)), p=2, dim=1)]
 
         all_embeddings = torch.stack(all_embeddings, dim=1)
         all_embeddings = all_embeddings.mean(dim=1, keepdim=False)
