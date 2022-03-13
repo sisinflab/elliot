@@ -138,8 +138,8 @@ class MMGCNModel(torch.nn.Module, ABC):
         # multimodal features
         self.Fm = torch.nn.ParameterDict()
         for m_id, m in enumerate(modalities):
-            self.Fm[m] = torch.nn.Embedding.from_pretrained(torch.nn.functional.normalize(
-                torch.tensor(multimodal_features[m_id], dtype=torch.float32, device=self.device), p=2, dim=1)).weight
+            self.Fm[m] = torch.nn.Embedding.from_pretrained(
+                torch.tensor(multimodal_features[m_id], dtype=torch.float32, device=self.device)).weight
             self.Fm[m].to(self.device)
 
         self.softplus = torch.nn.Softplus()
@@ -159,7 +159,6 @@ class MMGCNModel(torch.nn.Module, ABC):
                                    (self.proj_multimodal[m](self.Fm[m].to(self.device)) if
                                     self.embed_k_multimod[m_id]
                                     else self.Fm[m].to(self.device))), 0)]
-            x_all_m[m_id] = torch.nn.functional.normalize(x_all_m[m_id].to(self.device), p=2, dim=1)
             for layer in range(self.n_layers):
                 if not evaluate:
                     h = torch.nn.functional.leaky_relu(list(
@@ -198,8 +197,10 @@ class MMGCNModel(torch.nn.Module, ABC):
                     self.linear_network_multimodal[m].train()
                     self.g_linear_network_multimodal[m].train()
 
-        x_all = torch.stack(x_all_m, dim=1)
-        x_all = x_all.mean(dim=1, keepdim=False)
+        x_all = x_all_m[0]
+        for m_id in range(1, len(self.modalities)):
+            x_all += x_all_m[m_id]
+        x_all = x_all / len(self.modalities)
         gum, gim = torch.split(x_all, [self.num_users, self.num_items], 0)
         return gum, gim
 
