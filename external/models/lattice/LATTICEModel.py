@@ -10,13 +10,12 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malite
 from abc import ABC
 
 from .LATTICELayer import LATTICELayer
-from torch_geometric.nn import LGConv
 
 import torch
 import torch_geometric
 import numpy as np
 import random
-from torch_sparse import SparseTensor, mul, mul_nnz, fill_diag, sum, add
+from torch_sparse import SparseTensor, mul, mul_nnz, sum, add
 
 
 class LATTICEModel(torch.nn.Module, ABC):
@@ -76,33 +75,24 @@ class LATTICEModel(torch.nn.Module, ABC):
         self.Sim = dict()
         self.Si = None
         self.projection_m = torch.nn.ModuleDict()
-        self.importance_weights_m = torch.nn.ParameterList()
+        self.importance_weights_m = torch.nn.Parameter(
+            torch.tensor(len(self.modalities) * [float(1 / len(self.modalities))]))
+        self.importance_weights_m.to(self.device)
         self.multimodal_features_shapes = [mf.shape[1] for mf in multimodal_features]
         ir = torch.tensor(list(range(self.num_items)), dtype=torch.int64, device=self.device)
         self.items_rows = torch.repeat_interleave(ir, self.top_k).to(self.device)
         for m_id, m in enumerate(modalities):
-            self.Gim[m] = torch.nn.Embedding.from_pretrained(torch.nn.functional.normalize(
-                torch.tensor(multimodal_features[m_id], dtype=torch.float32, device=self.device), p=2, dim=1),
+            self.Gim[m] = torch.nn.Embedding.from_pretrained(
+                torch.tensor(multimodal_features[m_id], dtype=torch.float32, device=self.device),
                 freeze=False).weight
             self.Gim[m].to(self.device)
-            current_feature = torch.tensor(multimodal_features[m_id], dtype=torch.float32)
-            current_feature = current_feature / torch.norm(current_feature, p=2, dim=-1, keepdim=True)
-            current_sim = torch.mm(current_feature, current_feature.transpose(1, 0))
-            knn_val, knn_ind = torch.topk(current_sim, self.top_k, dim=-1)
-            items_cols = torch.flatten(knn_ind).to(self.device)
-            values = torch.flatten(knn_val).to(self.device)
-            weighted_adj = SparseTensor(row=self.items_rows,
-                                        col=items_cols,
-                                        value=values,
-                                        sparse_sizes=(self.num_items, self.num_items))
-            self.Sim[m] = self.apply_norm(weighted_adj, self.items_rows, items_cols)
+            current_sim = self.build_sim(self.Gim[m].detach())
+            weighted_adj = self.build_knn_neighbourhood(current_sim, self.top_k)
+            self.Sim[m] = self.compute_normalized_laplacian(weighted_adj)
             self.Sim[m].to(self.device)
             self.projection_m[m] = torch.nn.Linear(in_features=self.multimodal_features_shapes[m_id],
                                                    out_features=self.embed_k_multimod)
             self.projection_m[m].to(self.device)
-            self.importance_weights_m.append(torch.nn.Parameter(
-                torch.tensor(data=[float(1 / len(self.modalities))])))
-            self.importance_weights_m[m_id].to(self.device)
 
         # graph convolutional network for item-item multimodal graphs
         propagation_network_list = []
@@ -114,7 +104,7 @@ class LATTICEModel(torch.nn.Module, ABC):
         # lightgcn as user-item graph model for recommendation
         propagation_network_list = []
         for layer in range(self.n_ui_layers):
-            propagation_network_list.append((LGConv(normalize=False), 'x, edge_index -> x'))
+            propagation_network_list.append((LATTICELayer(), 'x, edge_index -> x'))
 
         self.propagation_network_recommend = torch_geometric.nn.Sequential('x, edge_index', propagation_network_list)
         self.propagation_network_recommend.to(self.device)
@@ -123,17 +113,28 @@ class LATTICEModel(torch.nn.Module, ABC):
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
         self.lr_scheduler = self.set_lr_scheduler()
 
-    def apply_norm(self, adj_t, items_rows, items_cols, add_self_loops=True):
-        unweighted_adj = SparseTensor(row=items_rows,
-                                      col=items_cols,
-                                      sparse_sizes=(self.num_items, self.num_items))
+    @staticmethod
+    def build_sim(context):
+        context_norm = context.div(torch.norm(context, p=2, dim=-1, keepdim=True))
+        sim = torch.mm(context_norm, context_norm.transpose(1, 0))
+        return sim
 
-        if add_self_loops:
-            adj_t = fill_diag(adj_t, 1.)
-        deg = sum(unweighted_adj, dim=1)
+    def build_knn_neighbourhood(self, adj, topk):
+        knn_val, knn_ind = torch.topk(adj, topk, dim=-1)
+        items_cols = torch.flatten(knn_ind).to(self.device)
+        values = torch.flatten(knn_val).to(self.device)
+        weighted_adj = SparseTensor(row=self.items_rows,
+                                    col=items_cols,
+                                    value=values,
+                                    sparse_sizes=(self.num_items, self.num_items))
+        return weighted_adj
+
+    @staticmethod
+    def compute_normalized_laplacian(adj):
+        deg = sum(adj, dim=-1)
         deg_inv_sqrt = deg.pow_(-0.5)
         deg_inv_sqrt.masked_fill_(deg_inv_sqrt == float('inf'), 0.)
-        adj_t = mul(adj_t, deg_inv_sqrt.view(-1, 1))
+        adj_t = mul(adj, deg_inv_sqrt.view(-1, 1))
         adj_t = mul(adj_t, deg_inv_sqrt.view(1, -1))
         return adj_t
 
@@ -142,28 +143,17 @@ class LATTICEModel(torch.nn.Module, ABC):
         return scheduler
 
     def propagate_embeddings(self, build_item_graph=False):
-        projected_m = dict()
-        for m_id, m in enumerate(self.modalities):
-            projected_m[m] = self.projection_m[m](self.Gim[m].to(self.device))
         if build_item_graph:
             weights = torch.cat([torch.unsqueeze(w, 0) for w in self.importance_weights_m], dim=0)
             softmax_weights = torch.softmax(weights, dim=0)
-            weighted_adjs = dict()
             learned_adj_addendum = []
             original_adj_addendum = []
             for m_id, m in enumerate(self.modalities):
-                projected_m[m] = projected_m[m] / torch.norm(projected_m[m], p=2, dim=-1, keepdim=True)
-                current_sim = torch.mm(projected_m[m], projected_m[m].transpose(1, 0))
-                knn_val, knn_ind = torch.topk(current_sim, self.top_k, dim=-1)
-                items_cols = torch.flatten(knn_ind).to(self.device)
-                values = torch.flatten(knn_val).to(self.device)
-                weighted_adj = SparseTensor(row=self.items_rows,
-                                            col=items_cols,
-                                            value=values,
-                                            sparse_sizes=(self.num_items, self.num_items))
-                weighted_adjs[m] = self.apply_norm(weighted_adj, self.items_rows, items_cols)
-                learned_adj_addendum.append(mul_nnz(weighted_adjs[m],
-                                                    softmax_weights[m_id].repeat((weighted_adjs[m].nnz(),)).to(
+                projected_m = self.projection_m[m](self.Gim[m].to(self.device))
+                current_sim = self.build_sim(projected_m)
+                weighted_adj = self.build_knn_neighbourhood(current_sim, self.top_k)
+                learned_adj_addendum.append(mul_nnz(weighted_adj,
+                                                    softmax_weights[m_id].repeat((weighted_adj.nnz(),)).to(
                                                         self.device),
                                                     layout='coo'))
                 original_adj_addendum.append(mul_nnz(self.Sim[m],
@@ -173,11 +163,10 @@ class LATTICEModel(torch.nn.Module, ABC):
             learned_adj = learned_adj_addendum[0]
             for i in range(1, len(learned_adj_addendum)):
                 learned_adj = add(learned_adj, learned_adj_addendum[i])
-            learned_adj = self.apply_norm(learned_adj, learned_adj.storage.row(), learned_adj.storage.col())
+            learned_adj = self.compute_normalized_laplacian(learned_adj)
             original_adj = original_adj_addendum[0]
             for i in range(1, len(original_adj_addendum)):
                 original_adj = add(original_adj, original_adj_addendum[i])
-            original_adj = self.apply_norm(original_adj, original_adj.storage.row(), original_adj.storage.col())
             first = mul_nnz(learned_adj, torch.tensor([1 - self.l_m]).repeat((learned_adj.nnz(),)).to(self.device),
                             layout='coo')
             second = mul_nnz(original_adj, torch.tensor([self.l_m]).repeat((original_adj.nnz(),)).to(self.device),
@@ -189,7 +178,7 @@ class LATTICEModel(torch.nn.Module, ABC):
         item_embedding = self.Gi.weight
         for layer in range(self.n_layers):
             item_embedding = list(self.propagation_network.children())[layer](item_embedding.to(self.device),
-                                                                                 self.Si)
+                                                                              self.Si)
 
         ego_embeddings = torch.cat((self.Gu.weight.to(self.device), self.Gi.weight.to(self.device)), 0)
         all_embeddings = [ego_embeddings]
