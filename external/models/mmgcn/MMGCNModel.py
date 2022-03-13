@@ -83,7 +83,6 @@ class MMGCNModel(torch.nn.Module, ABC):
                 self.Gum[m].to(self.device)
                 self.proj_multimodal[m] = torch.nn.Linear(self.multimodal_features_shapes[m_id],
                                                           self.embed_k_multimod[m_id])
-                torch.nn.init.xavier_uniform_(self.proj_multimodal[m].weight)
                 self.proj_multimodal[m].to(self.device)
                 propagation_network_list = [(MMGCNLayer(self.embed_k_multimod[m_id],
                                                         self.embed_k_multimod[m_id],
@@ -153,15 +152,15 @@ class MMGCNModel(torch.nn.Module, ABC):
         ego_embeddings = torch.cat((self.Gu.weight.to(self.device), self.Gi.weight.to(self.device)), 0)
 
         for m_id, m in enumerate(self.modalities):
-            x_all_m += [torch.cat((self.Gum[m].to(self.device),
-                                   (self.proj_multimodal[m](self.Fm[m].to(self.device)) if
-                                    self.embed_k_multimod[m_id]
-                                    else self.Fm[m].to(self.device))), 0)]
+            x_all_m += [torch.nn.functional.normalize(torch.cat((self.Gum[m].to(self.device),
+                                                                 (self.proj_multimodal[m](self.Fm[m].to(self.device)) if
+                                                                  self.embed_k_multimod[m_id]
+                                                                  else self.Fm[m].to(self.device))), 0))]
             for layer in range(self.n_layers):
                 if not evaluate:
                     h = torch.nn.functional.leaky_relu(list(
                         self.propagation_network_multimodal[m].children()
-                    )[layer](x_all_m[m_id].to(self.device), self.adj.to(self.device)))
+                    )[0][layer](x_all_m[m_id].to(self.device), self.adj.to(self.device)))
                     x_hat = (torch.nn.functional.leaky_relu(
                         list(self.linear_network_multimodal[m].children())[layer](
                             x_all_m[m_id].to(self.device))) + ego_embeddings) if \
@@ -179,7 +178,7 @@ class MMGCNModel(torch.nn.Module, ABC):
                     with torch.no_grad():
                         h = torch.nn.functional.leaky_relu(list(
                             self.propagation_network_multimodal[m].children()
-                        )[layer](x_all_m[m_id].to(self.device), self.adj.to(self.device)))
+                        )[0][layer](x_all_m[m_id].to(self.device), self.adj.to(self.device)))
                         x_hat = (torch.nn.functional.leaky_relu(
                             list(self.linear_network_multimodal[m].children())[layer](
                                 x_all_m[m_id].to(self.device))) + ego_embeddings) if \
