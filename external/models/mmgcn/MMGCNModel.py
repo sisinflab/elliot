@@ -158,8 +158,6 @@ class MMGCNModel(torch.nn.Module, ABC):
                                                                   else self.Fm[m].to(self.device))), 0))]
             for layer in range(self.n_layers):
                 if not evaluate:
-                    print(self.propagation_network_multimodal[m])
-                    exit()
                     h = torch.nn.functional.leaky_relu(list(
                         self.propagation_network_multimodal[m].children()
                     )[layer](x_all_m[m_id].to(self.device), self.adj.to(self.device)))
