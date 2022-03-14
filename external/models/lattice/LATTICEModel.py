@@ -87,8 +87,8 @@ class LATTICEModel(torch.nn.Module, ABC):
                 freeze=False).weight
             self.Gim[m].to(self.device)
             current_sim = self.build_sim(self.Gim[m].detach())
-            self.Sim[m] = self.build_knn_neighbourhood(current_sim, self.top_k)
-            # self.Sim[m] = self.compute_normalized_laplacian(weighted_adj)
+            weighted_adj = self.build_knn_neighbourhood(current_sim, self.top_k)
+            self.Sim[m] = self.compute_normalized_laplacian(weighted_adj)
             self.Sim[m].to(self.device)
             self.projection_m[m] = torch.nn.Linear(in_features=self.multimodal_features_shapes[m_id],
                                                    out_features=self.embed_k_multimod)
@@ -163,7 +163,7 @@ class LATTICEModel(torch.nn.Module, ABC):
             learned_adj = learned_adj_addendum[0]
             for i in range(1, len(learned_adj_addendum)):
                 learned_adj = add(learned_adj, learned_adj_addendum[i])
-            # learned_adj = self.compute_normalized_laplacian(learned_adj)
+            learned_adj = self.compute_normalized_laplacian(learned_adj)
             original_adj = original_adj_addendum[0]
             for i in range(1, len(original_adj_addendum)):
                 original_adj = add(original_adj, original_adj_addendum[i])
