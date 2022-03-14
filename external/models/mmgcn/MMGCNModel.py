@@ -156,7 +156,7 @@ class MMGCNModel(torch.nn.Module, ABC):
                                                                  (self.proj_multimodal[m](
                                                                      self.Fm[m_id].to(self.device)) if
                                                                   self.embed_k_multimod[m_id]
-                                                                  else self.Fm[m_id].to(self.device))), 0), p=2, dim=1)]
+                                                                  else self.Fm[m_id].to(self.device))), 0))]
             for layer in range(self.n_layers):
                 if not evaluate:
                     h = torch.nn.functional.leaky_relu(list(
