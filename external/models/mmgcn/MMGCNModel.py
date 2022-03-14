@@ -140,7 +140,7 @@ class MMGCNModel(torch.nn.Module, ABC):
             self.Fm[m] = torch.tensor(multimodal_features[m_id], dtype=torch.float32, device=self.device)
 
         self.softplus = torch.nn.Softplus()
-        self.optimizer = torch.optim.SGD(self.parameters(), lr=self.learning_rate)
+        self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
         self.lr_scheduler = self.set_lr_scheduler()
 
     def set_lr_scheduler(self):
