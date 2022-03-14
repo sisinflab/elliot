@@ -73,7 +73,7 @@ class VBPRModel(torch.nn.Module, ABC):
         gamma_u = torch.squeeze(self.Gu.weight[users]).to(self.device)
         gamma_i = torch.squeeze(self.Gi.weight[items]).to(self.device)
         theta_u = torch.squeeze(self.Tu.weight[users]).to(self.device)
-        effe_i = torch.squeeze(self.F.weight[items]).to(self.device)
+        effe_i = torch.squeeze(self.F[items]).to(self.device)
         proj_i = torch.nn.functional.normalize(self.proj(effe_i).to(self.device), p=2, dim=1)
 
         xui = torch.sum(gamma_u * gamma_i, 1) + torch.sum(theta_u * proj_i, 1)
@@ -81,7 +81,7 @@ class VBPRModel(torch.nn.Module, ABC):
         return xui, gamma_u, gamma_i, theta_u, proj_i
 
     def predict(self, start_user, stop_user, **kwargs):
-        P = torch.nn.functional.normalize(self.proj(self.F.weight).to(self.device), p=2, dim=1)
+        P = torch.nn.functional.normalize(self.proj(self.F).to(self.device), p=2, dim=1)
         return torch.matmul(self.Gu.weight[start_user:stop_user].to(self.device),
                             torch.transpose(self.Gi.weight.to(self.device), 0, 1)) + \
                torch.matmul(self.Tu.weight[start_user:stop_user].to(self.device),
