@@ -63,10 +63,10 @@ class MMGCNModel(torch.nn.Module, ABC):
 
         # collaborative embeddings
         self.Gu = torch.nn.Embedding(self.num_users, self.embed_k)
-        torch.nn.init.xavier_uniform_(self.Gu.weight)
+        torch.nn.init.xavier_normal_(self.Gu.weight)
         self.Gu.to(self.device)
         self.Gi = torch.nn.Embedding(self.num_items, self.embed_k)
-        torch.nn.init.xavier_uniform_(self.Gi.weight)
+        torch.nn.init.xavier_normal_(self.Gi.weight)
         self.Gi.to(self.device)
 
         # multimodal collaborative embeddings
@@ -79,7 +79,7 @@ class MMGCNModel(torch.nn.Module, ABC):
         for m_id, m in enumerate(modalities):
             if self.embed_k_multimod[m_id]:
                 self.Gum[m] = torch.nn.Embedding(self.num_users, self.embed_k_multimod[m_id]).weight
-                torch.nn.init.xavier_uniform_(self.Gum[m])
+                torch.nn.init.xavier_normal_(self.Gum[m])
                 self.Gum[m].to(self.device)
                 self.proj_multimodal[m] = torch.nn.Linear(self.multimodal_features_shapes[m_id],
                                                           self.embed_k_multimod[m_id])
@@ -87,45 +87,45 @@ class MMGCNModel(torch.nn.Module, ABC):
                 propagation_network_list = [(MMGCNLayer(self.embed_k_multimod[m_id],
                                                         self.embed_k_multimod[m_id],
                                                         self.aggregation), 'x, edge_index -> x')]
-                torch.nn.init.xavier_uniform_(propagation_network_list[0][0].weight)
+                torch.nn.init.xavier_normal_(propagation_network_list[0][0].weight)
                 linear_network_list = [('linear_0', torch.nn.Linear(self.embed_k_multimod[m_id], self.embed_k))]
-                torch.nn.init.xavier_uniform_(linear_network_list[0][1].weight)
+                torch.nn.init.xavier_normal_(linear_network_list[0][1].weight)
                 g_linear_network_list = [('g_linear_0', torch.nn.Linear(self.embed_k_multimod[m_id] + self.embed_k,
                                                                         self.embed_k)) if self.concatenation else
                                          (('g_linear_0', torch.nn.Linear(self.embed_k_multimod[m_id],
                                                                          self.embed_k)))]
-                torch.nn.init.xavier_uniform_(g_linear_network_list[0][1].weight)
+                torch.nn.init.xavier_normal_(g_linear_network_list[0][1].weight)
             else:
                 self.Gum[m] = torch.nn.Embedding(self.num_users, self.multimodal_features_shapes[m_id]).weight
-                torch.nn.init.xavier_uniform_(self.Gum[m])
+                torch.nn.init.xavier_normal_(self.Gum[m])
                 self.Gum[m].to(self.device)
                 propagation_network_list = [(MMGCNLayer(self.multimodal_features_shapes[m_id],
                                                         self.multimodal_features_shapes[m_id],
                                                         self.aggregation), 'x, edge_index -> x')]
-                torch.nn.init.xavier_uniform_(propagation_network_list[0][0].weight)
+                torch.nn.init.xavier_normal_(propagation_network_list[0][0].weight)
                 linear_network_list = [('linear_0', torch.nn.Linear(self.multimodal_features_shapes[m_id],
                                                                     self.embed_k))]
-                torch.nn.init.xavier_uniform_(linear_network_list[0][1].weight)
+                torch.nn.init.xavier_normal_(linear_network_list[0][1].weight)
                 g_linear_network_list = [
                     ('g_linear_0', torch.nn.Linear(self.multimodal_features_shapes[m_id] + self.embed_k,
                                                    self.embed_k)) if self.concatenation else
                     (('g_linear_0', torch.nn.Linear(self.multimodal_features_shapes[m_id],
                                                     self.embed_k)))]
-                torch.nn.init.xavier_uniform_(g_linear_network_list[0][1].weight)
+                torch.nn.init.xavier_normal_(g_linear_network_list[0][1].weight)
             for layer in range(1, self.n_layers):
                 propagation_network_list.append((MMGCNLayer(self.embed_k,
                                                             self.embed_k,
                                                             self.aggregation), 'x, edge_index -> x'))
-                torch.nn.init.xavier_uniform_(propagation_network_list[layer][0].weight)
+                torch.nn.init.xavier_normal_(propagation_network_list[layer][0].weight)
                 linear_network_list.append(
                     (f'linear_{layer}', torch.nn.Linear(self.embed_k, self.embed_k)))
-                torch.nn.init.xavier_uniform_(linear_network_list[layer][1].weight)
+                torch.nn.init.xavier_normal_(linear_network_list[layer][1].weight)
                 g_linear_network_list.append((f'g_linear_{layer}', torch.nn.Linear(self.embed_k + self.embed_k,
                                                                                    self.embed_k))
                                              if self.concatenation else
                                              (f'g_linear_{layer}', torch.nn.Linear(self.embed_k,
                                                                                    self.embed_k)))
-                torch.nn.init.xavier_uniform_(g_linear_network_list[layer][1].weight)
+                torch.nn.init.xavier_normal_(g_linear_network_list[layer][1].weight)
             self.propagation_network_multimodal[m] = torch_geometric.nn.Sequential('x, edge_index',
                                                                                    propagation_network_list)
             self.propagation_network_multimodal[m].to(self.device)
@@ -140,7 +140,7 @@ class MMGCNModel(torch.nn.Module, ABC):
             self.Fm[m] = torch.tensor(multimodal_features[m_id], dtype=torch.float32, device=self.device)
 
         self.softplus = torch.nn.Softplus()
-        self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
+        self.optimizer = torch.optim.SGD(self.parameters(), lr=self.learning_rate)
         self.lr_scheduler = self.set_lr_scheduler()
 
     def set_lr_scheduler(self):
