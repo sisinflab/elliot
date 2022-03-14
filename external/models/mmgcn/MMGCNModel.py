@@ -159,45 +159,37 @@ class MMGCNModel(torch.nn.Module, ABC):
                                                                   else self.Fm[m_id].to(self.device))), 0), p=2, dim=1)]
             for layer in range(self.n_layers):
                 if not evaluate:
-                    h = torch.nn.functional.normalize(torch.nn.functional.leaky_relu(list(
+                    h = torch.nn.functional.leaky_relu(list(
                         self.propagation_network_multimodal[m].children()
-                    )[layer](x_all_m[m_id].to(self.device), self.adj.to(self.device))), p=2, dim=1)
-                    x_hat = torch.nn.functional.normalize((torch.nn.functional.leaky_relu(
+                    )[layer](x_all_m[m_id].to(self.device), self.adj.to(self.device)))
+                    x_hat = (torch.nn.functional.leaky_relu(
                         list(self.linear_network_multimodal[m].children())[layer](
                             x_all_m[m_id].to(self.device))) + ego_embeddings) if \
-                                                              self.has_id else (torch.nn.functional.leaky_relu(
-                        list(self.linear_network_multimodal[m].children())[layer](x_all_m[m_id].to(self.device)))), p=2,
-                                                          dim=1)
-                    x_all_m[m_id] = torch.nn.functional.normalize((torch.nn.functional.leaky_relu(
+                        self.has_id else (torch.nn.functional.leaky_relu(
+                        list(self.linear_network_multimodal[m].children())[layer](x_all_m[m_id].to(self.device))))
+                    x_all_m[m_id] = (torch.nn.functional.leaky_relu(
                         list(self.g_linear_network_multimodal[m].children())[layer](
                             torch.cat((h.to(self.device), x_hat.to(self.device)), dim=1)))) if \
-                                                                      self.concatenation else (
-                    torch.nn.functional.leaky_relu(
-                        list(self.g_linear_network_multimodal[m].children())[layer](h) + x_hat.to(self.device))), p=2,
-                                                                  dim=1)
+                        self.concatenation else (torch.nn.functional.leaky_relu(
+                        list(self.g_linear_network_multimodal[m].children())[layer](h) + x_hat.to(self.device)))
                 else:
                     self.propagation_network_multimodal[m].eval()
                     self.linear_network_multimodal[m].eval()
                     self.g_linear_network_multimodal[m].eval()
                     with torch.no_grad():
-                        h = torch.nn.functional.normalize(torch.nn.functional.leaky_relu(list(
+                        h = torch.nn.functional.leaky_relu(list(
                             self.propagation_network_multimodal[m].children()
-                        )[layer](x_all_m[m_id].to(self.device), self.adj.to(self.device))), p=2, dim=1)
-                        x_hat = torch.nn.functional.normalize((torch.nn.functional.leaky_relu(
+                        )[layer](x_all_m[m_id].to(self.device), self.adj.to(self.device)))
+                        x_hat = (torch.nn.functional.leaky_relu(
                             list(self.linear_network_multimodal[m].children())[layer](
                                 x_all_m[m_id].to(self.device))) + ego_embeddings) if \
-                                                                  self.has_id else (torch.nn.functional.leaky_relu(
-                            list(self.linear_network_multimodal[m].children())[layer](x_all_m[m_id].to(self.device)))),
-                                                              p=2,
-                                                              dim=1)
-                        x_all_m[m_id] = torch.nn.functional.normalize((torch.nn.functional.leaky_relu(
+                            self.has_id else (torch.nn.functional.leaky_relu(
+                            list(self.linear_network_multimodal[m].children())[layer](x_all_m[m_id].to(self.device))))
+                        x_all_m[m_id] = (torch.nn.functional.leaky_relu(
                             list(self.g_linear_network_multimodal[m].children())[layer](
                                 torch.cat((h.to(self.device), x_hat.to(self.device)), dim=1)))) if \
-                                                                          self.concatenation else (
-                            torch.nn.functional.leaky_relu(
-                                list(self.g_linear_network_multimodal[m].children())[layer](h) + x_hat.to(
-                                    self.device))), p=2,
-                                                                      dim=1)
+                            self.concatenation else (torch.nn.functional.leaky_relu(
+                            list(self.g_linear_network_multimodal[m].children())[layer](h) + x_hat.to(self.device)))
                 if evaluate:
                     self.propagation_network_multimodal[m].train()
                     self.linear_network_multimodal[m].train()
