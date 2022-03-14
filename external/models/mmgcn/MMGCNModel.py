@@ -170,8 +170,8 @@ class MMGCNModel(torch.nn.Module, ABC):
                     x_all_m[m_id] = (
                         list(self.g_linear_network_multimodal[m].children())[layer](
                             torch.cat((h.to(self.device), x_hat.to(self.device)), dim=1))) if \
-                        self.concatenation else (torch.nn.functional.leaky_relu(
-                        list(self.g_linear_network_multimodal[m].children())[layer](h) + x_hat.to(self.device)))
+                        self.concatenation else (
+                        list(self.g_linear_network_multimodal[m].children())[layer](h) + x_hat.to(self.device))
                 else:
                     self.propagation_network_multimodal[m].eval()
                     self.linear_network_multimodal[m].eval()
@@ -188,8 +188,8 @@ class MMGCNModel(torch.nn.Module, ABC):
                         x_all_m[m_id] = (
                             list(self.g_linear_network_multimodal[m].children())[layer](
                                 torch.cat((h.to(self.device), x_hat.to(self.device)), dim=1))) if \
-                            self.concatenation else (torch.nn.functional.leaky_relu(
-                            list(self.g_linear_network_multimodal[m].children())[layer](h) + x_hat.to(self.device)))
+                            self.concatenation else (
+                            list(self.g_linear_network_multimodal[m].children())[layer](h) + x_hat.to(self.device))
                 if evaluate:
                     self.propagation_network_multimodal[m].train()
                     self.linear_network_multimodal[m].train()
