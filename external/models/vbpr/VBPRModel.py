@@ -55,8 +55,7 @@ class VBPRModel(torch.nn.Module, ABC):
         self.Tu = torch.nn.Embedding(self.num_users, self.embed_k)
         torch.nn.init.xavier_uniform_(self.Gu.weight)
         self.Tu.to(self.device)
-        self.F = torch.nn.Embedding.from_pretrained(torch.nn.functional.normalize(
-            torch.tensor(multimodal_features, dtype=torch.float32, device=self.device), p=2, dim=1))
+        self.F = torch.tensor(multimodal_features, dtype=torch.float32, device=self.device)
         self.F.to(self.device)
         self.feature_shape = multimodal_features.shape[1]
         self.proj = torch.nn.Linear(in_features=self.feature_shape, out_features=self.embed_k)
