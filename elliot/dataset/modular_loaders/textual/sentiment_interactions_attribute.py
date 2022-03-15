@@ -2,6 +2,7 @@ import typing as t
 import os
 import numpy as np
 import torch
+import json
 from types import SimpleNamespace
 
 from elliot.dataset.modular_loaders.abstract_loader import AbstractLoader
@@ -10,11 +11,10 @@ from elliot.dataset.modular_loaders.abstract_loader import AbstractLoader
 class SentimentInteractionsTextualAttributes(AbstractLoader):
     def __init__(self, users: t.Set, items: t.Set, ns: SimpleNamespace, logger: object):
         self.logger = logger
-        self.interactions_feature_folder_path = getattr(ns, "interactions_features", None)
+        self.interactions_sim = getattr(ns, "interactions_sim", None)
 
         self.item_mapping = {}
         self.user_mapping = {}
-        self.interactions_features_shape = None
 
         inner_items = self.check_interactions_in_folder()
 
@@ -32,26 +32,22 @@ class SentimentInteractionsTextualAttributes(AbstractLoader):
         ns = SimpleNamespace()
         ns.__name__ = "SentimentInteractionsTextualAttributes"
         ns.object = self
-        ns.textual_feature_folder_path = self.interactions_feature_folder_path
+        ns.textual_interactions_sim = self.interactions_sim
 
         ns.user_mapping = self.user_mapping
         ns.item_mapping = self.item_mapping
-
-        ns.interactions_features_shape = self.interactions_features_shape
 
         return ns
 
     def check_interactions_in_folder(self) -> (t.Set[int]):
         items = set()
-        if self.interactions_feature_folder_path:
-            items_from_folder = [[int(os.path.splitext(filename)[0].split('_')[0]),
-                                  int(os.path.splitext(filename)[0].split('_')[1])] for filename in
-                                 os.listdir(self.interactions_feature_folder_path)]
-            items_from_folder = [item for sublist in items_from_folder for item in sublist]
-            items = items.union(items_from_folder)
-            self.interactions_features_shape = np.load(os.path.join(self.interactions_feature_folder_path,
-                                                                    os.listdir(self.interactions_feature_folder_path)[
-                                                                        0])).shape[-1]
+        if self.interactions_sim:
+            with open(self.interactions_sim, 'r') as f:
+                int_sim = json.load(f)
+            items_from_json = [[int(k.split('_')[0]), int(k.split('_')[1])] for k in int_sim]
+            items_from_json = set([item for sublist in items_from_json for item in sublist])
+            items = items.union(items_from_json)
+
         if items:
             self.item_mapping = {item: val for val, item in enumerate(items)}
 
@@ -61,14 +57,14 @@ class SentimentInteractionsTextualAttributes(AbstractLoader):
         def add_zero(s):
             zeros_to_add = num_digits - len(s)
             return ''.join(['0' for _ in range(zeros_to_add)]) + s
+        with open(self.interactions_sim, 'r') as f:
+            int_sim = json.load(f)
         num_digits = len(str(int(list(public_items.keys())[-1])))
-        all_interactions_private = [
-            torch.from_numpy(np.load(os.path.join(self.interactions_feature_folder_path, inter))) for inter in
-            os.listdir(self.interactions_feature_folder_path)]
+        all_interactions_private = []
         all_interactions_public = ['_'.join(
             [add_zero(str(public_items[float(inter[:-4].split('_')[0])])),
              add_zero(str(public_items[float(inter[:-4].split('_')[1])]))]) for inter in
-            os.listdir(self.interactions_feature_folder_path)]
+            file_list]
         sorted_indices_public = sorted(range(len(all_interactions_public)), key=lambda k: all_interactions_public[k])
         all_interactions_private = [all_interactions_private[index] for index in sorted_indices_public]
         return all_interactions_private
