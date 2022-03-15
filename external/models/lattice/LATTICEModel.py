@@ -9,7 +9,6 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malite
 
 from abc import ABC
 
-from .LATTICELayer import LATTICELayer
 from torch_geometric.nn import LGConv
 
 import torch
@@ -98,14 +97,14 @@ class LATTICEModel(torch.nn.Module, ABC):
         # graph convolutional network for item-item multimodal graphs
         propagation_network_list = []
         for layer in range(self.n_layers):
-            propagation_network_list.append((LATTICELayer(), 'x, edge_index -> x'))
+            propagation_network_list.append((LGConv(normalize=False), 'x, edge_index -> x'))
         self.propagation_network = torch_geometric.nn.Sequential('x, edge_index', propagation_network_list)
         self.propagation_network.to(self.device)
 
         # lightgcn as user-item graph model for recommendation
         propagation_network_list = []
         for layer in range(self.n_ui_layers):
-            propagation_network_list.append((LGConv(), 'x, edge_index -> x'))
+            propagation_network_list.append((LGConv(normalize=False), 'x, edge_index -> x'))
 
         self.propagation_network_recommend = torch_geometric.nn.Sequential('x, edge_index', propagation_network_list)
         self.propagation_network_recommend.to(self.device)
