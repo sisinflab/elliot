@@ -9,13 +9,12 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malite
 
 from abc import ABC
 
-from .LATTICELayer import LATTICELayer
+from torch_geometric.nn import LGConv
 
 import torch
 import torch_geometric
 import numpy as np
 import random
-from torch_sparse import SparseTensor, mul, mul_nnz, sum, add
 
 
 class LATTICEModel(torch.nn.Module, ABC):
@@ -87,27 +86,20 @@ class LATTICEModel(torch.nn.Module, ABC):
                 freeze=False).weight
             self.Gim[m].to(self.device)
             current_sim = self.build_sim(self.Gim[m].detach())
-            weighted_adj = self.build_knn_neighbourhood(current_sim, self.top_k)
+            weighted_adj = self.build_knn_neighbourhood(current_sim)
             self.Sim[m] = self.compute_normalized_laplacian(weighted_adj)
             self.Sim[m].to(self.device)
             self.projection_m[m] = torch.nn.Linear(in_features=self.multimodal_features_shapes[m_id],
                                                    out_features=self.embed_k_multimod)
             self.projection_m[m].to(self.device)
 
-        # graph convolutional network for item-item multimodal graphs
-        propagation_network_list = []
-        for layer in range(self.n_layers):
-            propagation_network_list.append((LATTICELayer(), 'x, edge_index -> x'))
-        self.propagation_network = torch_geometric.nn.Sequential('x, edge_index', propagation_network_list)
-        self.propagation_network.to(self.device)
-
         # lightgcn as user-item graph model for recommendation
         propagation_network_list = []
         for layer in range(self.n_ui_layers):
-            propagation_network_list.append((LATTICELayer(), 'x, edge_index -> x'))
+            propagation_network_list.append((LGConv(normalize=False), 'x, edge_index -> x'))
 
-        self.propagation_network_recommend = torch_geometric.nn.Sequential('x, edge_index', propagation_network_list)
-        self.propagation_network_recommend.to(self.device)
+        self.propagation_network = torch_geometric.nn.Sequential('x, edge_index', propagation_network_list)
+        self.propagation_network.to(self.device)
 
         self.softplus = torch.nn.Softplus()
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
@@ -119,24 +111,19 @@ class LATTICEModel(torch.nn.Module, ABC):
         sim = torch.mm(context_norm, context_norm.transpose(1, 0))
         return sim
 
-    def build_knn_neighbourhood(self, adj, topk):
-        knn_val, knn_ind = torch.topk(adj, topk, dim=-1)
-        items_cols = torch.flatten(knn_ind).to(self.device)
-        values = torch.flatten(knn_val).to(self.device)
-        weighted_adj = SparseTensor(row=self.items_rows,
-                                    col=items_cols,
-                                    value=values,
-                                    sparse_sizes=(self.num_items, self.num_items))
-        return weighted_adj
+    def build_knn_neighbourhood(self, adj):
+        knn_val, knn_ind = torch.topk(adj, self.top_k, dim=-1)
+        weighted_adjacency_matrix = (torch.zeros_like(adj)).scatter_(-1, knn_ind, knn_val)
+        return weighted_adjacency_matrix
 
     @staticmethod
     def compute_normalized_laplacian(adj):
-        deg = sum(adj, dim=-1)
-        deg_inv_sqrt = deg.pow_(-0.5)
-        deg_inv_sqrt.masked_fill_(deg_inv_sqrt == float('inf'), 0.)
-        adj_t = mul(adj, deg_inv_sqrt.view(-1, 1))
-        adj_t = mul(adj_t, deg_inv_sqrt.view(1, -1))
-        return adj_t
+        rowsum = torch.sum(adj, -1)
+        d_inv_sqrt = torch.pow(rowsum, -0.5)
+        d_inv_sqrt[torch.isinf(d_inv_sqrt)] = 0.
+        d_mat_inv_sqrt = torch.diagflat(d_inv_sqrt)
+        L_norm = torch.mm(torch.mm(d_mat_inv_sqrt, adj), d_mat_inv_sqrt)
+        return L_norm
 
     def set_lr_scheduler(self):
         scheduler = torch.optim.lr_scheduler.LambdaLR(self.optimizer, lr_lambda=lambda epoch: 0.96 ** (epoch / 50))
@@ -151,41 +138,28 @@ class LATTICEModel(torch.nn.Module, ABC):
             for m_id, m in enumerate(self.modalities):
                 projected_m = self.projection_m[m](self.Gim[m].to(self.device))
                 current_sim = self.build_sim(projected_m)
-                weighted_adj = self.build_knn_neighbourhood(current_sim, self.top_k)
-                learned_adj_addendum.append(mul_nnz(weighted_adj,
-                                                    softmax_weights[m_id].repeat((weighted_adj.nnz(),)).to(
-                                                        self.device),
-                                                    layout='coo'))
-                original_adj_addendum.append(mul_nnz(self.Sim[m],
-                                                     softmax_weights[m_id].repeat((self.Sim[m].nnz(),)).to(
-                                                         self.device),
-                                                     layout='coo'))
-            learned_adj = learned_adj_addendum[0]
-            for i in range(1, len(learned_adj_addendum)):
-                learned_adj = add(learned_adj, learned_adj_addendum[i])
+                weighted_adj = self.build_knn_neighbourhood(current_sim)
+                learned_adj_addendum += [softmax_weights[m_id] * weighted_adj]
+                original_adj_addendum += [softmax_weights[m_id] * self.Sim[m]]
+            learned_adj = torch.stack(learned_adj_addendum, dim=1)
+            learned_adj = learned_adj.sum(dim=1)
             learned_adj = self.compute_normalized_laplacian(learned_adj)
-            original_adj = original_adj_addendum[0]
-            for i in range(1, len(original_adj_addendum)):
-                original_adj = add(original_adj, original_adj_addendum[i])
-            first = mul_nnz(learned_adj, torch.tensor([1 - self.l_m]).repeat((learned_adj.nnz(),)).to(self.device),
-                            layout='coo')
-            second = mul_nnz(original_adj, torch.tensor([self.l_m]).repeat((original_adj.nnz(),)).to(self.device),
-                             layout='coo')
-            self.Si = add(first, second)
+            original_adj = torch.stack(original_adj_addendum, dim=1)
+            original_adj = original_adj.sum(dim=1)
+            self.Si = (1 - self.l_m) * learned_adj + self.l_m * original_adj
         else:
             self.Si = self.Si.detach()
 
         item_embedding = self.Gi.weight
         for layer in range(self.n_layers):
-            item_embedding = list(self.propagation_network.children())[layer](item_embedding.to(self.device),
-                                                                              self.Si)
+            item_embedding = torch.mm(self.Si, item_embedding)
 
         ego_embeddings = torch.cat((self.Gu.weight.to(self.device), self.Gi.weight.to(self.device)), 0)
         all_embeddings = [ego_embeddings]
 
         for layer in range(self.n_ui_layers):
             all_embeddings += [torch.nn.functional.normalize(list(
-                self.propagation_network_recommend.children()
+                self.propagation_network.children()
             )[layer](all_embeddings[layer].to(self.device), self.adj.to(self.device)), p=2, dim=1)]
 
         all_embeddings = torch.stack(all_embeddings, dim=1)
