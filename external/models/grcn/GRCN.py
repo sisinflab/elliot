@@ -88,11 +88,11 @@ class GRCN(RecMixin, BaseRecommenderModel):
             ("_factors_multimod", "factors_multimod", "factors_multimod", 64, int, None),
             ("_modalities", "modalities", "modalites", "('visual','textual')", lambda x: list(make_tuple(x)),
              lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
-            ("_aggregation", "aggregation", "aggregation", 'concat', str, None),
-            ("_weight_mode", "weight_mode", "weight_mode", 'max', str, None),
-            ("_pruning", "pruning", "pruning", True, bool, None),
-            ("_has_act", "has_act", "has_act", False, bool, None),
-            ("_fusion_mode", "fusion_mode", "fusion_mode", 'concat', str, None),
+            ("_aggregation", "aggregation", "aggr", 'concat', str, None),
+            ("_weight_mode", "weight_mode", "w_mod", 'max', str, None),
+            ("_pruning", "pruning", "prun", True, bool, None),
+            ("_has_act", "has_act", "act", False, bool, None),
+            ("_fusion_mode", "fusion_mode", "f_mod", 'concat', str, None),
             ("_loaders", "loaders", "loads", "('VisualAttribute','TextualAttribute')", lambda x: list(make_tuple(x)),
              lambda x: self._batch_remove(str(x), " []").replace(",", "-"))
         ]
