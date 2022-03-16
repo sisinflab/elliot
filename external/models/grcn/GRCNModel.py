@@ -141,7 +141,7 @@ class GRCNModel(torch.nn.Module, ABC):
         for m_id, m in enumerate(self.modalities):
             gum = torch.nn.functional.normalize(self.Gum[m].to(self.device))
             gim = torch.nn.functional.normalize(
-                torch.nn.functional.leaky_relu(self.projection_multimodal[m](self.Fm[m_id])).to(self.device))
+                torch.nn.functional.leaky_relu(self.projection_multimodal[m](self.Fm[m_id].to(self.device))))
             x_all_m += [torch.cat((gum, gim), dim=0)]
 
             for t in range(self.n_routings):
