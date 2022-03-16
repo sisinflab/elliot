@@ -112,6 +112,7 @@ class GRCNModel(torch.nn.Module, ABC):
         for m_id, m in enumerate(self.modalities):
             self.projection_multimodal[m] = torch.nn.Linear(in_features=self.multimodal_features_shapes[m_id],
                                                             out_features=self.embed_k_multimod)
+            self.projection_multimodal[m].to(self.device)
             propagation_graph_refining_network_list = []
             for layer in range(self.n_routings + 1):
                 propagation_graph_refining_network_list.append(
