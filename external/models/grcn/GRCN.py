@@ -105,7 +105,7 @@ class GRCN(RecMixin, BaseRecommenderModel):
         row, col = data.sp_i_train.nonzero()
         col = [c + self._num_users for c in col]
         _, counts = np.unique(row, return_counts=True)
-        ptr = []
+        ptr = [0]
         c = counts.tolist()
         for i in range(len(c) - 1):
             ptr += [ptr[i] + c[i]]
