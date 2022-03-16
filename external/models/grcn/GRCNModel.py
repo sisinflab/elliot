@@ -32,6 +32,7 @@ class GRCNModel(torch.nn.Module, ABC):
                  weight_mode,
                  pruning,
                  has_act,
+                 fusion_mode,
                  multimodal_features,
                  adj,
                  adj_user,
@@ -65,6 +66,7 @@ class GRCNModel(torch.nn.Module, ABC):
         self.weight_mode = weight_mode
         self.pruning = pruning
         self.has_act = has_act
+        self.fusion_mode = fusion_mode
         self.n_layers = num_layers
         self.n_routings = num_routings
         self.adj = adj
@@ -191,7 +193,16 @@ class GRCNModel(torch.nn.Module, ABC):
                     alphas.to(self.device)))]
         all_embeddings = torch.stack(all_embeddings, dim=1)
         all_embeddings = torch.sum(all_embeddings, dim=1)
-        x = torch.cat([all_embeddings, x_all], dim=1)
+
+        if self.fusion_mode == 'concat':
+            x = torch.cat([all_embeddings, x_all], dim=1)
+        elif self.fusion_mode == 'id':
+            x = all_embeddings
+        elif self.fusion_mode == 'mean':
+            x = torch.mean(torch.stack(x_all_m + [all_embeddings]), dim=0)
+        else:
+            raise NotImplementedError('This fusion mode has not been implemented yet!')
+
         gu, gi = torch.split(x, [self.num_users, self.num_items], 0)
         return gu, gi
 

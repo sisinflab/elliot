@@ -44,6 +44,7 @@ class GRCN(RecMixin, BaseRecommenderModel):
         weight_mode: Type of weight
         pruning: Whether to pruning or not
         has_act: Whether to use activation or not
+        fusion_mode: Type of multimodal fusion
 
     To include the recommendation model, add it to the config file adopting the following pattern:
 
@@ -66,6 +67,7 @@ class GRCN(RecMixin, BaseRecommenderModel):
           weight_mode: max
           pruning: True
           has_act: False
+          fusion_mode: concat
     """
 
     @init_charger
@@ -90,6 +92,7 @@ class GRCN(RecMixin, BaseRecommenderModel):
             ("_weight_mode", "weight_mode", "weight_mode", 'max', str, None),
             ("_pruning", "pruning", "pruning", True, bool, None),
             ("_has_act", "has_act", "has_act", False, bool, None),
+            ("_fusion_mode", "fusion_mode", "fusion_mode", 'concat', str, None),
             ("_loaders", "loaders", "loads", "('VisualAttribute','TextualAttribute')", lambda x: list(make_tuple(x)),
              lambda x: self._batch_remove(str(x), " []").replace(",", "-"))
         ]
@@ -126,6 +129,7 @@ class GRCN(RecMixin, BaseRecommenderModel):
             weight_mode=self._weight_mode,
             pruning=self._pruning,
             has_act=self._has_act,
+            fusion_mode=self._fusion_mode,
             multimodal_features=[self.__getattribute__(f'''_side_{m}''').object.get_all_features() for m in
                                  self._modalities],
             adj=self.adj,
