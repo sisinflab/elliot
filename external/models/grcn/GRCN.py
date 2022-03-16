@@ -107,7 +107,7 @@ class GRCN(RecMixin, BaseRecommenderModel):
         _, counts = np.unique(row, return_counts=True)
         ptr = [0]
         c = counts.tolist()
-        for i in range(len(c) - 1):
+        for i in range(len(c)):
             ptr += [ptr[i] + c[i]]
         ptr = torch.tensor(np.array(ptr), dtype=torch.int64)
         edge_index = np.array([row, col])
