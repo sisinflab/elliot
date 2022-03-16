@@ -151,7 +151,8 @@ class GRCNModel(torch.nn.Module, ABC):
                 )[t](x_all_m[m_id].to(self.device),
                      gum[self.rows].to(self.device),
                      gim[self.cols - self.num_users].to(self.device),
-                     self.adj_user.to(self.device))
+                     self.adj_user.to(self.device),
+                     self.device)
                 gum += x_all_hat_m[:self.num_users]
                 gum = torch.nn.functional.normalize(gum)
                 x_all_m[m_id] = torch.cat((gum, gim), dim=0)
@@ -162,7 +163,8 @@ class GRCNModel(torch.nn.Module, ABC):
             )[-1](x_all_m[m_id].to(self.device),
                   torch.cat((gum[self.rows], gim[self.cols - self.num_users]), dim=0).to(self.device),
                   torch.cat((gim[self.cols - self.num_users], gum[self.rows]), dim=0).to(self.device),
-                  self.adj.to(self.device))
+                  self.adj.to(self.device),
+                  self.device)
             x_all_m[m_id] = x_all_m[m_id] + x_all_hat_m
             alphas_m += [list(self.propagation_graph_refining_network[m].children())[-1].alpha]
 

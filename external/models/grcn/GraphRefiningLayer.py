@@ -15,9 +15,9 @@ class GraphRefiningLayer(MessagePassing, ABC):
         self.has_act = has_act
         self.leaky_relu = torch.nn.LeakyReLU()
 
-    def forward(self, x, rows_attr, cols_attr, edge_index):
+    def forward(self, x, rows_attr, cols_attr, edge_index, device):
         self.alpha = torch.mul(rows_attr, cols_attr).sum(dim=-1)
-        self.alpha = softmax(self.alpha, self.rows, self.size_rows).view(-1, 1)
+        self.alpha = softmax(self.alpha, self.rows, self.size_rows.to(device)).view(-1, 1)
         edge_index = mul_nnz(edge_index, self.alpha, layout='coo')
         return self.leaky_relu(self.propagate(edge_index, x=x)) if self.has_act else self.propagate(edge_index, x=x)
 
