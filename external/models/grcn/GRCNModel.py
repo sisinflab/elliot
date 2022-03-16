@@ -72,6 +72,7 @@ class GRCNModel(torch.nn.Module, ABC):
         self.adj_user = adj_user
         self.rows = torch.tensor(rows, dtype=torch.int64)
         self.cols = torch.tensor(cols, dtype=torch.int64)
+        self.edge_index = torch.stack([self.rows, self.cols])
 
         # collaborative embeddings
         self.Gu = torch.nn.Embedding(self.num_users, self.embed_k)
@@ -114,7 +115,7 @@ class GRCNModel(torch.nn.Module, ABC):
             propagation_graph_refining_network_list = []
             for layer in range(self.n_routings + 1):
                 propagation_graph_refining_network_list.append(
-                    (GraphRefiningLayer(self.rows, self.has_act), 'x, edge_index -> x'))
+                    (GraphRefiningLayer(self.rows, self.has_act, self.edge_index.to(self.device)), 'x, edge_index -> x'))
 
             self.propagation_graph_refining_network[m] = torch_geometric.nn.Sequential(
                 'x, edge_index', propagation_graph_refining_network_list)
@@ -149,8 +150,7 @@ class GRCNModel(torch.nn.Module, ABC):
                 )[t](x_all_m[m_id].to(self.device),
                      gum[self.rows].to(self.device),
                      gim[self.cols - self.num_users].to(self.device),
-                     self.adj_user.to(self.device),
-                     self.device)
+                     self.adj_user.to(self.device))
                 gum += x_all_hat_m[:self.num_users]
                 gum = torch.nn.functional.normalize(gum)
                 x_all_m[m_id] = torch.cat((gum, gim), dim=0)
@@ -161,8 +161,7 @@ class GRCNModel(torch.nn.Module, ABC):
             )[-1](x_all_m[m_id].to(self.device),
                   torch.cat((gum[self.rows], gim[self.cols - self.num_users]), dim=0).to(self.device),
                   torch.cat((gim[self.cols - self.num_users], gum[self.rows]), dim=0).to(self.device),
-                  self.adj.to(self.device),
-                  self.device)
+                  self.adj.to(self.device))
             x_all_m[m_id] = x_all_m[m_id] + x_all_hat_m
             alphas_m += [list(self.propagation_graph_refining_network[m].children())[-1].alpha]
 
