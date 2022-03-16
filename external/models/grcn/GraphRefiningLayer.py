@@ -7,19 +7,17 @@ from torch_geometric.utils import softmax
 
 
 class GraphRefiningLayer(MessagePassing, ABC):
-    def __init__(self, rows, has_act, edge_index):
+    def __init__(self, rows, has_act, ptr):
         super(GraphRefiningLayer, self).__init__(aggr='add')
         self.rows = rows
         self.alpha = torch.repeat_interleave(torch.tensor([1]), self.rows.shape[0])
         self.has_act = has_act
-        self.ei = edge_index
+        self.ptr = ptr
         self.leaky_relu = torch.nn.LeakyReLU()
 
     def forward(self, x, rows_attr, cols_attr, edge_index):
         self.alpha = torch.mul(rows_attr, cols_attr).sum(dim=-1)
-        print(self.alpha.shape)
-        print(self.ei.shape)
-        self.alpha = softmax(src=self.alpha, ptr=self.ei).view(-1, 1)
+        self.alpha = softmax(src=self.alpha, ptr=self.ptr).view(-1, 1)
         edge_index = mul_nnz(edge_index, self.alpha, layout='coo')
         return self.leaky_relu(self.propagate(edge_index, x=x)) if self.has_act else self.propagate(edge_index, x=x)
 
