@@ -7,8 +7,9 @@ from torch_geometric.utils import softmax
 
 
 class GraphRefiningLayer(MessagePassing, ABC):
-    def __init__(self, has_act):
+    def __init__(self, rows, has_act):
         super(GraphRefiningLayer, self).__init__(aggr='add')
+        self.rows = rows
         self.alpha = torch.repeat_interleave(torch.tensor([1]), self.rows.shape[0])
         self.has_act = has_act
         self.leaky_relu = torch.nn.LeakyReLU()

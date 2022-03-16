@@ -114,7 +114,7 @@ class GRCNModel(torch.nn.Module, ABC):
             propagation_graph_refining_network_list = []
             for layer in range(self.n_routings + 1):
                 propagation_graph_refining_network_list.append(
-                    (GraphRefiningLayer(self.has_act), 'x, edge_index -> x'))
+                    (GraphRefiningLayer(self.rows, self.has_act), 'x, edge_index -> x'))
 
             self.propagation_graph_refining_network[m] = torch_geometric.nn.Sequential(
                 'x, edge_index', propagation_graph_refining_network_list)
