@@ -39,6 +39,7 @@ class GRCNModel(torch.nn.Module, ABC):
                  rows,
                  cols,
                  ptr,
+                 ptr_full,
                  random_seed,
                  name="GRCN",
                  **kwargs
@@ -74,6 +75,7 @@ class GRCNModel(torch.nn.Module, ABC):
         self.rows = torch.tensor(rows, dtype=torch.int64)
         self.cols = torch.tensor(cols, dtype=torch.int64)
         self.ptr = ptr
+        self.ptr_full = ptr_full
 
         # collaborative embeddings
         self.Gu = torch.nn.Embedding(self.num_users, self.embed_k)
@@ -114,10 +116,12 @@ class GRCNModel(torch.nn.Module, ABC):
                                                             out_features=self.embed_k_multimod)
             self.projection_multimodal[m].to(self.device)
             propagation_graph_refining_network_list = []
-            for layer in range(self.n_routings + 1):
+            for layer in range(self.n_routings):
                 propagation_graph_refining_network_list.append(
                     (GraphRefiningLayer(self.rows, self.has_act, self.ptr.to(self.device)), 'x, edge_index -> x'))
-
+            propagation_graph_refining_network_list.append(
+                (GraphRefiningLayer(self.rows, self.has_act, self.ptr.to(self.device),
+                                    self.ptr_full.to(self.device)), 'x, edge_index -> x'))
             self.propagation_graph_refining_network[m] = torch_geometric.nn.Sequential(
                 'x, edge_index', propagation_graph_refining_network_list)
             self.propagation_graph_refining_network[m].to(self.device)

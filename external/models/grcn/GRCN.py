@@ -110,6 +110,12 @@ class GRCN(RecMixin, BaseRecommenderModel):
         for i in range(len(c)):
             ptr += [ptr[i] + c[i]]
         ptr = torch.tensor(np.array(ptr), dtype=torch.int64)
+        _, counts_full = np.unique(np.concatenate(row, np.array(col)), return_counts=True)
+        ptr_full = [0]
+        c_full = counts_full.tolist()
+        for i in range(len(c_full)):
+            ptr_full += [ptr_full[i] + c_full[i]]
+        ptr_full = torch.tensor(np.array(ptr_full), dtype=torch.int64)
         edge_index = np.array([row, col])
         edge_index = torch.tensor(edge_index, dtype=torch.int64)
         self.adj = SparseTensor(row=torch.cat([edge_index[0], edge_index[1]], dim=0),
@@ -142,6 +148,7 @@ class GRCN(RecMixin, BaseRecommenderModel):
             rows=row,
             cols=col,
             ptr=ptr,
+            ptr_full=ptr_full,
             random_seed=self._seed
         )
 
