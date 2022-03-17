@@ -6,7 +6,7 @@ import torch
 import torch_geometric
 import numpy as np
 import random
-from torch_sparse import SparseTensor, mul, mul_nnz, sum, add
+from torch_sparse import SparseTensor, mul, sum
 
 
 class SLATTICEModel(torch.nn.Module, ABC):
@@ -19,12 +19,9 @@ class SLATTICEModel(torch.nn.Module, ABC):
                  embed_k,
                  embed_k_multimod,
                  l_w,
-                 item_modalities,
                  interaction_modalities,
-                 l_m,
                  top_k,
-                 item_multimodal_features,
-                 interaction_multimodal_features,
+                 sim_multimodal,
                  adj,
                  random_seed,
                  name="SLATTICE",
@@ -48,12 +45,11 @@ class SLATTICEModel(torch.nn.Module, ABC):
         self.embed_k_multimod = embed_k_multimod
         self.learning_rate = learning_rate
         self.l_w = l_w
-        self.item_modalities = item_modalities
         self.interaction_modalities = interaction_modalities
-        self.l_m = l_m
         self.top_k = top_k
         self.n_layers = num_layers
         self.n_ui_layers = num_ui_layers
+        self.sim_multimodal = sim_multimodal
         self.adj = adj
 
         # collaborative embeddings
@@ -66,26 +62,19 @@ class SLATTICEModel(torch.nn.Module, ABC):
 
         # multimodal features
         self.Gim = torch.nn.ParameterDict()
-        self.Sim = dict()
-        self.Si = None
         self.projection_m = torch.nn.ModuleDict()
-        self.importance_weights_m = torch.nn.Parameter(
-            torch.tensor(len(self.modalities) * [float(1 / len(self.modalities))]))
-        self.importance_weights_m.to(self.device)
-        self.multimodal_features_shapes = [mf.shape[1] for mf in item_multimodal_features]
+        self.Sim = dict()
         ir = torch.tensor(list(range(self.num_items)), dtype=torch.int64, device=self.device)
         self.items_rows = torch.repeat_interleave(ir, self.top_k).to(self.device)
-        for m_id, m in enumerate(item_modalities):
-            self.Gim[m] = torch.nn.Embedding.from_pretrained(
-                torch.tensor(item_multimodal_features[m_id], dtype=torch.float32, device=self.device),
-                freeze=False).weight
+        for m_id, m in enumerate(self.interaction_modalities):
+            self.Gim[m] = torch.nn.Embedding(self.num_items, self.embed_k_multimod).weight
             self.Gim[m].to(self.device)
-            current_sim = self.build_sim(self.Gim[m].detach())
+            current_sim = self.sim_multimodal[m_id].to_dense().detach()
             weighted_adj = self.build_knn_neighbourhood(current_sim, self.top_k)
             self.Sim[m] = self.compute_normalized_laplacian(weighted_adj)
             self.Sim[m].to(self.device)
-            self.projection_m[m] = torch.nn.Linear(in_features=self.multimodal_features_shapes[m_id],
-                                                   out_features=self.embed_k_multimod)
+            self.projection_m[m] = torch.nn.Linear(in_features=self.embed_k_multimod,
+                                                   out_features=self.embed_k)
             self.projection_m[m].to(self.device)
 
         # graph convolutional network for item-item multimodal graphs
@@ -106,12 +95,6 @@ class SLATTICEModel(torch.nn.Module, ABC):
         self.softplus = torch.nn.Softplus()
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
         self.lr_scheduler = self.set_lr_scheduler()
-
-    @staticmethod
-    def build_sim(context):
-        context_norm = context.div(torch.norm(context, p=2, dim=-1, keepdim=True))
-        sim = torch.mm(context_norm, context_norm.transpose(1, 0))
-        return sim
 
     def build_knn_neighbourhood(self, adj, topk):
         knn_val, knn_ind = torch.topk(adj, topk, dim=-1)
@@ -136,44 +119,17 @@ class SLATTICEModel(torch.nn.Module, ABC):
         scheduler = torch.optim.lr_scheduler.LambdaLR(self.optimizer, lr_lambda=lambda epoch: 0.96 ** (epoch / 50))
         return scheduler
 
-    def propagate_embeddings(self, build_item_graph=False):
-        if build_item_graph:
-            weights = torch.cat([torch.unsqueeze(w, 0) for w in self.importance_weights_m], dim=0)
-            softmax_weights = torch.softmax(weights, dim=0)
-            learned_adj_addendum = []
-            original_adj_addendum = []
-            for m_id, m in enumerate(self.modalities):
-                projected_m = self.projection_m[m](self.Gim[m].to(self.device))
-                current_sim = self.build_sim(projected_m)
-                weighted_adj = self.build_knn_neighbourhood(current_sim, self.top_k)
-                learned_adj_addendum.append(mul_nnz(weighted_adj,
-                                                    softmax_weights[m_id].repeat((weighted_adj.nnz(),)).to(
-                                                        self.device),
-                                                    layout='coo'))
-                original_adj_addendum.append(mul_nnz(self.Sim[m],
-                                                     softmax_weights[m_id].repeat((self.Sim[m].nnz(),)).to(
-                                                         self.device),
-                                                     layout='coo'))
-            learned_adj = learned_adj_addendum[0]
-            for i in range(1, len(learned_adj_addendum)):
-                learned_adj = add(learned_adj, learned_adj_addendum[i])
-            learned_adj = self.compute_normalized_laplacian(learned_adj)
-            original_adj = original_adj_addendum[0]
-            for i in range(1, len(original_adj_addendum)):
-                original_adj = add(original_adj, original_adj_addendum[i])
-            first = mul_nnz(learned_adj, torch.tensor([1 - self.l_m]).repeat((learned_adj.nnz(),)).to(self.device),
-                            layout='coo')
-            second = mul_nnz(original_adj, torch.tensor([self.l_m]).repeat((original_adj.nnz(),)).to(self.device),
-                             layout='coo')
-            self.Si = add(first, second)
-        else:
-            self.Si = self.Si.detach()
+    def propagate_embeddings(self):
+        item_embeddings_m = []
+        for m_id, m in enumerate(self.interaction_modalities):
+            item_embedding = self.Gim[m]
+            for layer in range(self.n_layers):
+                item_embedding = list(self.propagation_network.children())[layer](item_embedding.to(self.device),
+                                                                                  self.Sim[m].to(self.device))
+            item_embeddings_m += [self.projection_m[m](item_embedding.to(self.device))]
 
-        item_embedding = self.Gi.weight
-        for layer in range(self.n_layers):
-            item_embedding = list(self.propagation_network.children())[layer](item_embedding.to(self.device),
-                                                                              self.Si)
-
+        item_embeddings_m = torch.stack(item_embeddings_m)
+        item_embeddings_m = torch.sum(item_embeddings_m, dim=0)
         ego_embeddings = torch.cat((self.Gu.weight.to(self.device), self.Gi.weight.to(self.device)), 0)
         all_embeddings = [ego_embeddings]
 
@@ -185,7 +141,7 @@ class SLATTICEModel(torch.nn.Module, ABC):
         all_embeddings = torch.stack(all_embeddings, dim=1)
         all_embeddings = all_embeddings.mean(dim=1, keepdim=False)
         gu, gi = torch.split(all_embeddings, [self.num_users, self.num_items], 0)
-        return gu, gi + torch.nn.functional.normalize(item_embedding.to(self.device), p=2, dim=1)
+        return gu, gi + torch.nn.functional.normalize(item_embeddings_m.to(self.device), p=2, dim=1)
 
     def forward(self, inputs, **kwargs):
         gum, gim = inputs
@@ -199,8 +155,8 @@ class SLATTICEModel(torch.nn.Module, ABC):
     def predict(self, gum, gim, **kwargs):
         return torch.matmul(gum.to(self.device), torch.transpose(gim.to(self.device), 0, 1))
 
-    def train_step(self, batch, build_item_graph):
-        gum, gim = self.propagate_embeddings(build_item_graph)
+    def train_step(self, batch):
+        gum, gim = self.propagate_embeddings()
         user, pos, neg = batch
         xu_pos, gamma_u_m, gamma_i_pos_m = self.forward(inputs=(gum[user], gim[pos]))
         xu_neg, _, gamma_i_neg_m = self.forward(inputs=(gum[user], gim[neg]))

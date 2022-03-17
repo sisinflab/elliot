@@ -25,8 +25,7 @@ class SLATTICE(RecMixin, BaseRecommenderModel):
         factors_multimod: Tuple with number of units for each modality
         batch_size: Batch size
         l_w: Regularization coefficient
-        modalities: Tuple of modalities
-        lambda: Parameter for the skip connection on the adjacency matrix
+        int_mod: Tuple of modalities for interactions
         top_k: Top-k for similarity matrix
 
     To include the recommendation model, add it to the config file adopting the following pattern:
@@ -45,8 +44,7 @@ class SLATTICE(RecMixin, BaseRecommenderModel):
           factors_multimod: 64
           batch_size: 1024
           l_w: 0.000001
-          modalities: (visual, textual)
-          lambda: 0.1
+          int_mod: (textual,)
           top_k: 100
     """
 
@@ -67,15 +65,7 @@ class SLATTICE(RecMixin, BaseRecommenderModel):
             ("_n_ui_layers", "n_ui_layers", "n_ui_layers", 3, int, None),
             ("_top_k", "top_k", "top_k", 100, int, None),
             ("_factors_multimod", "factors_multimod", "factors_multimod", 64, int, None),
-            ("_it_mod", "it_mod", "it_mod", "('visual','textual')",
-             lambda x: list(make_tuple(x)),
-             lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
-            ("_int_mod", "int_mod", "int_mod", "('textual')",
-             lambda x: list(make_tuple(x)),
-             lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
-            ("_lambda", "l_m", "l_m", 0.1, float, None),
-            ("_it_loads", "it_loads", "it_loads",
-             "('VisualAttribute','TextualAttribute')",
+            ("_int_mod", "int_mod", "int_mod", "('textual',)",
              lambda x: list(make_tuple(x)),
              lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
             ("_int_loads", "int_loads", "int_loads",
@@ -85,11 +75,8 @@ class SLATTICE(RecMixin, BaseRecommenderModel):
         ]
         self.autoset_params()
 
-        for m_id, m in enumerate(self._it_mod):
-            self.__setattr__(f'''_side_items_{m}''',
-                             self._data.side_information.__getattribute__(f'''{self._it_loads[m_id]}'''))
         for m_id, m in enumerate(self._int_mod):
-            self.__setattr__(f'''_side_interactions_{m}''',
+            self.__setattr__(f'''_side_{m}''',
                              self._data.side_information.__getattribute__(f'''{self._int_loads[m_id]}'''))
 
         row, col = data.sp_i_train.nonzero()
@@ -100,6 +87,13 @@ class SLATTICE(RecMixin, BaseRecommenderModel):
                                 col=torch.cat([edge_index[1], edge_index[0]], dim=0),
                                 sparse_sizes=(self._num_users + self._num_items,
                                               self._num_users + self._num_items))
+        sim_multimodal = []
+        for m in self._int_mod:
+            values, rows, cols = self.__getattribute__(f'''_side_{m}''').object.get_all_features(
+                self._data.public_items)
+            sim_multimodal.append(SparseTensor(row=torch.tensor(np.array(rows), dtype=torch.int64),
+                                               col=torch.tensor(np.array(cols), dtype=torch.int64),
+                                               value=torch.tensor(np.array(values), dtype=torch.float32)))
 
         self._model = SLATTICEModel(
             num_users=self._num_users,
@@ -110,16 +104,9 @@ class SLATTICE(RecMixin, BaseRecommenderModel):
             embed_k=self._factors,
             embed_k_multimod=self._factors_multimod,
             l_w=self._l_w,
-            item_modalities=self._it_mod,
             interaction_modalities=self._int_mod,
-            l_m=self._lambda,
             top_k=self._top_k,
-            item_multimodal_features=[self.__getattribute__(f'''_side_items_{m}''').object.get_all_features() for m in
-                                      self._it_mod],
-            interaction_multimodal_features=[
-                self.__getattribute__(f'''_side_interactions_{m}''').object.get_all_features(self._data.public_items)
-                for m in
-                self._int_mod],
+            sim_multimodal=sim_multimodal,
             adj=self.adj,
             random_seed=self._seed
         )
@@ -137,15 +124,13 @@ class SLATTICE(RecMixin, BaseRecommenderModel):
         for it in self.iterate(self._epochs):
             loss = 0
             steps = 0
-            build_item_graph = True
             self._model.train()
             with tqdm(total=int(self._data.transactions // self._batch_size), disable=not self._verbose) as t:
                 for batch in self._sampler.step(self._data.transactions, self._batch_size):
                     steps += 1
-                    loss += self._model.train_step(batch, build_item_graph)
+                    loss += self._model.train_step(batch)
                     t.set_postfix({'loss': f'{loss / steps:.5f}'})
                     t.update()
-                    build_item_graph = False
                 self._model.lr_scheduler.step()
 
             self.evaluate(it, loss / (it + 1))
@@ -155,7 +140,7 @@ class SLATTICE(RecMixin, BaseRecommenderModel):
         predictions_top_k_val = {}
         self._model.eval()
         with torch.no_grad():
-            gum, gim = self._model.propagate_embeddings(build_item_graph=True)
+            gum, gim = self._model.propagate_embeddings()
             for index, offset in enumerate(range(0, self._num_users, self._batch_size)):
                 offset_stop = min(offset + self._batch_size, self._num_users)
                 predictions = self._model.predict(gum[offset: offset_stop], gim)

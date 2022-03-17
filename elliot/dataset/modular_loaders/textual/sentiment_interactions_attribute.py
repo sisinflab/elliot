@@ -1,7 +1,4 @@
 import typing as t
-import os
-import numpy as np
-import torch
 import json
 from types import SimpleNamespace
 
@@ -54,17 +51,27 @@ class SentimentInteractionsTextualAttributes(AbstractLoader):
         return items
 
     def get_all_features(self, public_items):
+
         def add_zero(s):
             zeros_to_add = num_digits - len(s)
             return ''.join(['0' for _ in range(zeros_to_add)]) + s
+
+        def remove_zero(s):
+            return int(s)
+
         with open(self.interactions_sim, 'r') as f:
             int_sim = json.load(f)
+            all_interactions = list(int_sim.values())
+            private_keys = list(int_sim.keys())
         num_digits = len(str(int(list(public_items.keys())[-1])))
-        all_interactions_private = []
-        all_interactions_public = ['_'.join(
-            [add_zero(str(public_items[float(inter[:-4].split('_')[0])])),
-             add_zero(str(public_items[float(inter[:-4].split('_')[1])]))]) for inter in
-            file_list]
-        sorted_indices_public = sorted(range(len(all_interactions_public)), key=lambda k: all_interactions_public[k])
-        all_interactions_private = [all_interactions_private[index] for index in sorted_indices_public]
-        return all_interactions_private
+        indices_public = ['_'.join(
+            [add_zero(str(public_items[float(inter.split('_')[0])])),
+             add_zero(str(public_items[float(inter.split('_')[1])]))]) for inter in
+            private_keys]
+        sorted_indices_public = sorted(range(len(indices_public)), key=lambda k: indices_public[k])
+        all_interactions = [all_interactions[index] for index in sorted_indices_public]
+        sorted_indices_public = sorted(indices_public)
+        sorted_indices_public = [(remove_zero(s.split('_')[0]), remove_zero(s.split('_')[1])) for s in
+                                 sorted_indices_public]
+        rows, cols = list(map(list, zip(*sorted_indices_public)))
+        return all_interactions, rows, cols
