@@ -16,12 +16,12 @@ class GraphRefiningLayer(MessagePassing, ABC):
         self.ptr_full = ptr_full
         self.leaky_relu = torch.nn.LeakyReLU()
 
-    def forward(self, x, rows_attr, cols_attr, edge_index):
+    def forward(self, x, rows_attr, cols_attr, edge_index, full=False):
         self.alpha = torch.mul(rows_attr, cols_attr).sum(dim=-1)
-        if self.ptr_full:
-            self.alpha = softmax(src=self.alpha, ptr=self.ptr_full).view(-1)
-        else:
+        if not full:
             self.alpha = softmax(src=self.alpha, ptr=self.ptr).view(-1)
+        else:
+            self.alpha = softmax(src=self.alpha, ptr=self.ptr_full).view(-1)
         edge_index = mul_nnz(edge_index, self.alpha, layout='coo')
         return self.leaky_relu(self.propagate(edge_index, x=x)) if self.has_act else self.propagate(edge_index, x=x)
 
