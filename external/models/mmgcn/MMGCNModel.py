@@ -87,14 +87,14 @@ class MMGCNModel(torch.nn.Module, ABC):
                 propagation_network_list = [(MMGCNLayer(self.embed_k_multimod[m_id],
                                                         self.embed_k_multimod[m_id],
                                                         self.aggregation), 'x, edge_index -> x')]
-                # torch.nn.init.xavier_uniform_(propagation_network_list[0][0].weight)
+                torch.nn.init.xavier_uniform_(propagation_network_list[0][0].weight)
                 linear_network_list = [('linear_0', torch.nn.Linear(self.embed_k_multimod[m_id], self.embed_k))]
-                # torch.nn.init.xavier_uniform_(linear_network_list[0][1].weight)
+                torch.nn.init.xavier_uniform_(linear_network_list[0][1].weight)
                 g_linear_network_list = [('g_linear_0', torch.nn.Linear(self.embed_k_multimod[m_id] + self.embed_k,
                                                                         self.embed_k)) if self.concatenation else
                                          (('g_linear_0', torch.nn.Linear(self.embed_k_multimod[m_id],
                                                                          self.embed_k)))]
-                # torch.nn.init.xavier_uniform_(g_linear_network_list[0][1].weight)
+                torch.nn.init.xavier_uniform_(g_linear_network_list[0][1].weight)
             else:
                 self.Gum[m] = torch.nn.Embedding(self.num_users, self.multimodal_features_shapes[m_id]).weight
                 torch.nn.init.xavier_uniform_(self.Gum[m])
@@ -102,30 +102,30 @@ class MMGCNModel(torch.nn.Module, ABC):
                 propagation_network_list = [(MMGCNLayer(self.multimodal_features_shapes[m_id],
                                                         self.multimodal_features_shapes[m_id],
                                                         self.aggregation), 'x, edge_index -> x')]
-                # torch.nn.init.xavier_uniform_(propagation_network_list[0][0].weight)
+                torch.nn.init.xavier_uniform_(propagation_network_list[0][0].weight)
                 linear_network_list = [('linear_0', torch.nn.Linear(self.multimodal_features_shapes[m_id],
                                                                     self.embed_k))]
-                # torch.nn.init.xavier_uniform_(linear_network_list[0][1].weight)
+                torch.nn.init.xavier_uniform_(linear_network_list[0][1].weight)
                 g_linear_network_list = [
                     ('g_linear_0', torch.nn.Linear(self.multimodal_features_shapes[m_id] + self.embed_k,
                                                    self.embed_k)) if self.concatenation else
                     (('g_linear_0', torch.nn.Linear(self.multimodal_features_shapes[m_id],
                                                     self.embed_k)))]
-                # torch.nn.init.xavier_uniform_(g_linear_network_list[0][1].weight)
+                torch.nn.init.xavier_uniform_(g_linear_network_list[0][1].weight)
             for layer in range(1, self.n_layers):
                 propagation_network_list.append((MMGCNLayer(self.embed_k,
                                                             self.embed_k,
                                                             self.aggregation), 'x, edge_index -> x'))
-                # torch.nn.init.xavier_uniform_(propagation_network_list[layer][0].weight)
+                torch.nn.init.xavier_uniform_(propagation_network_list[layer][0].weight)
                 linear_network_list.append(
                     (f'linear_{layer}', torch.nn.Linear(self.embed_k, self.embed_k)))
-                # torch.nn.init.xavier_uniform_(linear_network_list[layer][1].weight)
+                torch.nn.init.xavier_uniform_(linear_network_list[layer][1].weight)
                 g_linear_network_list.append((f'g_linear_{layer}', torch.nn.Linear(self.embed_k + self.embed_k,
                                                                                    self.embed_k))
                                              if self.concatenation else
                                              (f'g_linear_{layer}', torch.nn.Linear(self.embed_k,
                                                                                    self.embed_k)))
-                # torch.nn.init.xavier_uniform_(g_linear_network_list[layer][1].weight)
+                torch.nn.init.xavier_uniform_(g_linear_network_list[layer][1].weight)
             self.propagation_network_multimodal[m] = torch_geometric.nn.Sequential('x, edge_index',
                                                                                    propagation_network_list)
             self.propagation_network_multimodal[m].to(self.device)
