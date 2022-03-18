@@ -13,7 +13,7 @@ class MMGCNLayer(MessagePassing, ABC):
 
     def forward(self, x, edge_index):
         x = torch.matmul(x, self.weight)
-        return self.propagate(edge_index, x=x)
+        return self.propagate(edge_index, size=(x.size()[0], x.size()[0]), x=x)
 
     def message_and_aggregate(self, adj_t, x):
         return matmul(adj_t, x, reduce=self.aggr)

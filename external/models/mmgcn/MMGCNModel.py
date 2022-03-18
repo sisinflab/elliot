@@ -87,14 +87,14 @@ class MMGCNModel(torch.nn.Module, ABC):
                 propagation_network_list = [(MMGCNLayer(self.embed_k_multimod[m_id],
                                                         self.embed_k_multimod[m_id],
                                                         self.aggregation), 'x, edge_index -> x')]
-                torch.nn.init.xavier_uniform_(propagation_network_list[0][0].weight)
+                # torch.nn.init.xavier_uniform_(propagation_network_list[0][0].weight)
                 linear_network_list = [('linear_0', torch.nn.Linear(self.embed_k_multimod[m_id], self.embed_k))]
-                torch.nn.init.xavier_uniform_(linear_network_list[0][1].weight)
+                # torch.nn.init.xavier_uniform_(linear_network_list[0][1].weight)
                 g_linear_network_list = [('g_linear_0', torch.nn.Linear(self.embed_k_multimod[m_id] + self.embed_k,
                                                                         self.embed_k)) if self.concatenation else
                                          (('g_linear_0', torch.nn.Linear(self.embed_k_multimod[m_id],
                                                                          self.embed_k)))]
-                torch.nn.init.xavier_uniform_(g_linear_network_list[0][1].weight)
+                # torch.nn.init.xavier_uniform_(g_linear_network_list[0][1].weight)
             else:
                 self.Gum[m] = torch.nn.Embedding(self.num_users, self.multimodal_features_shapes[m_id]).weight
                 torch.nn.init.xavier_uniform_(self.Gum[m])
@@ -102,30 +102,30 @@ class MMGCNModel(torch.nn.Module, ABC):
                 propagation_network_list = [(MMGCNLayer(self.multimodal_features_shapes[m_id],
                                                         self.multimodal_features_shapes[m_id],
                                                         self.aggregation), 'x, edge_index -> x')]
-                torch.nn.init.xavier_uniform_(propagation_network_list[0][0].weight)
+                # torch.nn.init.xavier_uniform_(propagation_network_list[0][0].weight)
                 linear_network_list = [('linear_0', torch.nn.Linear(self.multimodal_features_shapes[m_id],
                                                                     self.embed_k))]
-                torch.nn.init.xavier_uniform_(linear_network_list[0][1].weight)
+                # torch.nn.init.xavier_uniform_(linear_network_list[0][1].weight)
                 g_linear_network_list = [
                     ('g_linear_0', torch.nn.Linear(self.multimodal_features_shapes[m_id] + self.embed_k,
                                                    self.embed_k)) if self.concatenation else
                     (('g_linear_0', torch.nn.Linear(self.multimodal_features_shapes[m_id],
                                                     self.embed_k)))]
-                torch.nn.init.xavier_uniform_(g_linear_network_list[0][1].weight)
+                # torch.nn.init.xavier_uniform_(g_linear_network_list[0][1].weight)
             for layer in range(1, self.n_layers):
                 propagation_network_list.append((MMGCNLayer(self.embed_k,
                                                             self.embed_k,
                                                             self.aggregation), 'x, edge_index -> x'))
-                torch.nn.init.xavier_uniform_(propagation_network_list[layer][0].weight)
+                # torch.nn.init.xavier_uniform_(propagation_network_list[layer][0].weight)
                 linear_network_list.append(
                     (f'linear_{layer}', torch.nn.Linear(self.embed_k, self.embed_k)))
-                torch.nn.init.xavier_uniform_(linear_network_list[layer][1].weight)
+                # torch.nn.init.xavier_uniform_(linear_network_list[layer][1].weight)
                 g_linear_network_list.append((f'g_linear_{layer}', torch.nn.Linear(self.embed_k + self.embed_k,
                                                                                    self.embed_k))
                                              if self.concatenation else
                                              (f'g_linear_{layer}', torch.nn.Linear(self.embed_k,
                                                                                    self.embed_k)))
-                torch.nn.init.xavier_uniform_(g_linear_network_list[layer][1].weight)
+                # torch.nn.init.xavier_uniform_(g_linear_network_list[layer][1].weight)
             self.propagation_network_multimodal[m] = torch_geometric.nn.Sequential('x, edge_index',
                                                                                    propagation_network_list)
             self.propagation_network_multimodal[m].to(self.device)
@@ -152,11 +152,26 @@ class MMGCNModel(torch.nn.Module, ABC):
         ego_embeddings = torch.cat((self.Gu.weight.to(self.device), self.Gi.weight.to(self.device)), 0)
 
         for m_id, m in enumerate(self.modalities):
-            x_all_m += [torch.nn.functional.normalize(torch.cat((self.Gum[m].to(self.device),
-                                                                 (self.proj_multimodal[m](
-                                                                     self.Fm[m_id].to(self.device)) if
-                                                                  self.embed_k_multimod[m_id]
-                                                                  else self.Fm[m_id].to(self.device))), 0))]
+            if evaluate:
+                self.propagation_network_multimodal[m].eval()
+                self.linear_network_multimodal[m].eval()
+                self.g_linear_network_multimodal[m].eval()
+                if self.embed_k_multimod[m_id]:
+                    self.proj_multimodal[m].eval()
+
+            if evaluate:
+                with torch.no_grad():
+                    x_all_m += [torch.nn.functional.normalize(torch.cat((self.Gum[m].to(self.device),
+                                                                         (self.proj_multimodal[m](
+                                                                             self.Fm[m_id].to(self.device)) if
+                                                                          self.embed_k_multimod[m_id]
+                                                                          else self.Fm[m_id].to(self.device))), 0))]
+            else:
+                x_all_m += [torch.nn.functional.normalize(torch.cat((self.Gum[m].to(self.device),
+                                                                     (self.proj_multimodal[m](
+                                                                         self.Fm[m_id].to(self.device)) if
+                                                                      self.embed_k_multimod[m_id]
+                                                                      else self.Fm[m_id].to(self.device))), 0))]
             for layer in range(self.n_layers):
                 if not evaluate:
                     h = torch.nn.functional.leaky_relu(list(
@@ -173,9 +188,6 @@ class MMGCNModel(torch.nn.Module, ABC):
                         self.concatenation else (torch.nn.functional.leaky_relu(
                         list(self.g_linear_network_multimodal[m].children())[layer](h) + x_hat.to(self.device)))
                 else:
-                    self.propagation_network_multimodal[m].eval()
-                    self.linear_network_multimodal[m].eval()
-                    self.g_linear_network_multimodal[m].eval()
                     with torch.no_grad():
                         h = torch.nn.functional.leaky_relu(list(
                             self.propagation_network_multimodal[m].children()
@@ -190,15 +202,15 @@ class MMGCNModel(torch.nn.Module, ABC):
                                 torch.cat((h.to(self.device), x_hat.to(self.device)), dim=1)))) if \
                             self.concatenation else (torch.nn.functional.leaky_relu(
                             list(self.g_linear_network_multimodal[m].children())[layer](h) + x_hat.to(self.device)))
-                if evaluate:
-                    self.propagation_network_multimodal[m].train()
-                    self.linear_network_multimodal[m].train()
-                    self.g_linear_network_multimodal[m].train()
+            if evaluate:
+                self.propagation_network_multimodal[m].train()
+                self.linear_network_multimodal[m].train()
+                self.g_linear_network_multimodal[m].train()
+                if self.embed_k_multimod[m_id]:
+                    self.proj_multimodal[m].train()
 
-        x_all = x_all_m[0]
-        for m_id in range(1, len(self.modalities)):
-            x_all += x_all_m[m_id]
-        x_all = x_all / len(self.modalities)
+        x_all = torch.stack(x_all_m)
+        x_all = torch.mean(x_all, dim=0)
         gum, gim = torch.split(x_all, [self.num_users, self.num_items], 0)
         return gum, gim
 
