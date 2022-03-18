@@ -187,7 +187,6 @@ class MMGCNModel(torch.nn.Module, ABC):
                             torch.cat((h.to(self.device), x_hat.to(self.device)), dim=1)))) if \
                         self.concatenation else (torch.nn.functional.leaky_relu(
                         list(self.g_linear_network_multimodal[m].children())[layer](h) + x_hat.to(self.device)))
-                    x_all_m[m_id] = torch.nn.functional.normalize(x_all_m[m_id])
                 else:
                     with torch.no_grad():
                         h = torch.nn.functional.leaky_relu(list(
@@ -203,7 +202,6 @@ class MMGCNModel(torch.nn.Module, ABC):
                                 torch.cat((h.to(self.device), x_hat.to(self.device)), dim=1)))) if \
                             self.concatenation else (torch.nn.functional.leaky_relu(
                             list(self.g_linear_network_multimodal[m].children())[layer](h) + x_hat.to(self.device)))
-                        x_all_m[m_id] = torch.nn.functional.normalize(x_all_m[m_id])
             if evaluate:
                 self.propagation_network_multimodal[m].train()
                 self.linear_network_multimodal[m].train()
