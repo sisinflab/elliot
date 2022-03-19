@@ -198,7 +198,6 @@ class MMGCNModel(torch.nn.Module, ABC):
                             torch.transpose(self.item_embeddings.to(self.device), 0, 1))
 
     def train_step(self, batch):
-        self.optimizer.zero_grad()
         gum, gim = self.propagate_embeddings()
         user, pos, neg = batch
         xu_pos = self.forward(inputs=(gum[user], gim[pos]))
@@ -210,6 +209,8 @@ class MMGCNModel(torch.nn.Module, ABC):
                                 self.Gi.weight[pos].pow(2) +
                                 self.Gi.weight[neg].pow(2)).mean() + self.Gum[self.modalities[0]].pow(2).mean())
         loss += reg_loss
+
+        self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
 
