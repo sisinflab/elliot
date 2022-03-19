@@ -141,19 +141,20 @@ class MMGCN(RecMixin, BaseRecommenderModel):
                     loss += self._model.train_step(batch)
                     t.set_postfix({'loss': f'{loss / steps:.5f}'})
                     t.update()
-                self._model.lr_scheduler.step()
 
             self.evaluate(it, loss / (it + 1))
 
     def get_recommendations(self, k: int = 100):
         predictions_top_k_test = {}
         predictions_top_k_val = {}
-        for index, offset in enumerate(range(0, self._num_users, self._batch_size)):
-            offset_stop = min(offset + self._batch_size, self._num_users)
-            predictions = self._model.predict(offset, offset_stop)
-            recs_val, recs_test = self.process_protocol(k, predictions, offset, offset_stop)
-            predictions_top_k_val.update(recs_val)
-            predictions_top_k_test.update(recs_test)
+        self._model.eval()
+        with torch.no_grad():
+            for index, offset in enumerate(range(0, self._num_users, self._batch_size)):
+                offset_stop = min(offset + self._batch_size, self._num_users)
+                predictions = self._model.predict(offset, offset_stop)
+                recs_val, recs_test = self.process_protocol(k, predictions, offset, offset_stop)
+                predictions_top_k_val.update(recs_val)
+                predictions_top_k_test.update(recs_test)
         return predictions_top_k_val, predictions_top_k_test
 
     def get_single_recommendation(self, mask, k, predictions, offset, offset_stop):
