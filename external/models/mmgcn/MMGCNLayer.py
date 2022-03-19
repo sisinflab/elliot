@@ -3,6 +3,7 @@ from abc import ABC
 import torch
 from torch_geometric.nn import MessagePassing
 from torch_sparse import matmul
+from torch_geometric.nn.inits import uniform
 
 
 class MMGCNLayer(MessagePassing, ABC):
@@ -10,6 +11,7 @@ class MMGCNLayer(MessagePassing, ABC):
         super(MMGCNLayer, self).__init__(aggr=aggregation)
         self.aggregation = aggregation
         self.weight = torch.nn.Parameter(torch.Tensor(in_dim, out_dim))
+        uniform(in_dim, self.weight)
 
     def forward(self, x, edge_index):
         x = torch.matmul(x, self.weight)

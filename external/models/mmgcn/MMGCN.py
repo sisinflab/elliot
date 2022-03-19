@@ -141,6 +141,7 @@ class MMGCN(RecMixin, BaseRecommenderModel):
                     loss += self._model.train_step(batch)
                     t.set_postfix({'loss': f'{loss / steps:.5f}'})
                     t.update()
+                self._model.lr_scheduler.step()
 
             self.evaluate(it, loss / (it + 1))
 
