@@ -221,7 +221,7 @@ class MMGCNModel(torch.nn.Module, ABC):
 
         xui = torch.sum(gamma_u_m * gamma_i_m, 1)
 
-        return xui
+        return xui, gamma_u_m, gamma_i_m
 
     def predict(self, gum, gim, **kwargs):
         return torch.matmul(gum.to(self.device), torch.transpose(gim.to(self.device), 0, 1))
@@ -229,14 +229,14 @@ class MMGCNModel(torch.nn.Module, ABC):
     def train_step(self, batch):
         gum, gim = self.propagate_embeddings()
         user, pos, neg = batch
-        xu_pos = self.forward(inputs=(gum[user], gim[pos]))
-        xu_neg = self.forward(inputs=(gum[user], gim[neg]))
+        xu_pos, gamma_u, gamma_i_pos = self.forward(inputs=(gum[user], gim[pos]))
+        xu_neg, _, gamma_i_neg = self.forward(inputs=(gum[user], gim[neg]))
 
         difference = torch.clamp(xu_pos - xu_neg, -80.0, 1e8)
         loss = torch.mean(torch.nn.functional.softplus(-difference))
-        reg_loss = self.l_w * ((self.Gu.weight[user].pow(2) +
-                                self.Gi.weight[pos].pow(2) +
-                                self.Gi.weight[neg].pow(2)).mean() + self.Gum[self.modalities[0]].pow(2).mean())
+        reg_loss = self.l_w * (1 / 2) * (gamma_u.norm(2).pow(2) +
+                                         gamma_i_pos.norm(2).pow(2) +
+                                         gamma_i_neg.norm(2).pow(2)) / user.shape[0]
         loss += reg_loss
 
         self.optimizer.zero_grad()
