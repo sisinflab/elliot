@@ -179,7 +179,7 @@ class MMGCNModel(torch.nn.Module, ABC):
                         torch.cat((h.to(self.device), x_hat.to(self.device)), dim=1)))) if \
                     self.concatenation else (torch.nn.functional.leaky_relu(
                     list(self.g_linear_network_multimodal[m].children())[layer](h) + x_hat.to(self.device)))
-            exit()
+        exit()
 
         x_all = torch.stack(x_all_m)
         x_all = torch.mean(x_all, dim=0)
