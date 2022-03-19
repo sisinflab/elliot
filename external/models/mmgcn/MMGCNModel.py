@@ -163,23 +163,19 @@ class MMGCNModel(torch.nn.Module, ABC):
             x_all_m += [torch.nn.functional.normalize(
                 torch.cat((self.Gum[m].to(self.device), temp_features.to(self.device)), 0))]
             for layer in range(self.n_layers):
-                print(list(self.propagation_network_multimodal[m].children())[layer])
-                print(list(self.linear_network_multimodal[m].children())[layer])
-                print(list(self.g_linear_network_multimodal[m].children())[layer])
                 h = torch.nn.functional.leaky_relu(list(
                     self.propagation_network_multimodal[m].children()
                 )[layer](x_all_m[m_id].to(self.device), self.adj.to(self.device)))
-                x_hat = (torch.nn.functional.leaky_relu(
+                x_hat = torch.nn.functional.leaky_relu(
                     list(self.linear_network_multimodal[m].children())[layer](
-                        x_all_m[m_id].to(self.device))) + ego_embeddings) if \
-                    self.has_id else (torch.nn.functional.leaky_relu(
-                    list(self.linear_network_multimodal[m].children())[layer](x_all_m[m_id].to(self.device))))
-                x_all_m[m_id] = (torch.nn.functional.leaky_relu(
+                        x_all_m[m_id].to(self.device))) + ego_embeddings if \
+                    self.has_id else torch.nn.functional.leaky_relu(
+                    list(self.linear_network_multimodal[m].children())[layer](x_all_m[m_id].to(self.device)))
+                x_all_m[m_id] = torch.nn.functional.leaky_relu(
                     list(self.g_linear_network_multimodal[m].children())[layer](
-                        torch.cat((h.to(self.device), x_hat.to(self.device)), dim=1)))) if \
-                    self.concatenation else (torch.nn.functional.leaky_relu(
-                    list(self.g_linear_network_multimodal[m].children())[layer](h) + x_hat.to(self.device)))
-        exit()
+                        torch.cat((h.to(self.device), x_hat.to(self.device)), dim=1))) if \
+                    self.concatenation else torch.nn.functional.leaky_relu(
+                    list(self.g_linear_network_multimodal[m].children())[layer](h) + x_hat.to(self.device))
 
         x_all = torch.stack(x_all_m)
         x_all = torch.mean(x_all, dim=0)
@@ -202,6 +198,7 @@ class MMGCNModel(torch.nn.Module, ABC):
                             torch.transpose(self.item_embeddings.to(self.device), 0, 1))
 
     def train_step(self, batch):
+        self.optimizer.zero_grad()
         gum, gim = self.propagate_embeddings()
         user, pos, neg = batch
         xu_pos = self.forward(inputs=(gum[user], gim[pos]))
@@ -213,8 +210,6 @@ class MMGCNModel(torch.nn.Module, ABC):
                                 self.Gi.weight[pos].pow(2) +
                                 self.Gi.weight[neg].pow(2)).mean() + self.Gum[self.modalities[0]].pow(2).mean())
         loss += reg_loss
-
-        self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
 
