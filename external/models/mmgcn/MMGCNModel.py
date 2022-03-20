@@ -147,7 +147,6 @@ class MMGCNModel(torch.nn.Module, ABC):
 
         self.softplus = torch.nn.Softplus()
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
-        self.lr_scheduler = self.set_lr_scheduler()
 
     def propagate_embeddings(self):
         x_all_m = []
