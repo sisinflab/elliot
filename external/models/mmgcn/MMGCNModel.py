@@ -135,10 +135,9 @@ class MMGCNModel(torch.nn.Module, ABC):
             self.g_linear_network_multimodal[m].to(self.device)
 
         # multimodal features
-        self.Fm = torch.nn.ParameterDict()
+        self.Fm = []
         for m_id, m in enumerate(modalities):
-            self.Fm[m] = torch.nn.Embedding.from_pretrained(
-                torch.tensor(multimodal_features[m_id], dtype=torch.float32, device=self.device), freeze=False).weight
+            self.Fm += [torch.tensor(multimodal_features[m_id], dtype=torch.float32, device=self.device)]
 
         # placeholder for calculated user and item embeddings
         self.user_embeddings = torch.nn.init.xavier_uniform_(torch.rand((self.num_users, self.embed_k)))
@@ -159,10 +158,12 @@ class MMGCNModel(torch.nn.Module, ABC):
         ego_embeddings = torch.cat((self.Gu.weight.to(self.device), self.Gi.weight.to(self.device)), 0)
 
         for m_id, m in enumerate(self.modalities):
-            temp_features = self.proj_multimodal[m](self.Fm[m].to(self.device)) if self.embed_k_multimod[m_id] else \
-                self.Fm[m].to(self.device)
-            x_all_m += [torch.nn.functional.normalize(
-                torch.cat((self.Gum[m].to(self.device), temp_features.to(self.device)), 0))]
+            temp_features = torch.nn.functional.normalize(
+                torch.nn.functional.leaky_relu(self.proj_multimodal[m](self.Fm[m_id].to(self.device))) if
+                self.embed_k_multimod[m_id] else self.Fm[
+                    m_id].to(self.device))
+            gum = torch.nn.functional.normalize(self.Gum[m].to(self.device))
+            x_all_m += [torch.cat((gum, temp_features.to(self.device)), 0)]
             for layer in range(self.n_layers):
                 h = torch.nn.functional.leaky_relu(list(
                     self.propagation_network_multimodal[m].children()
@@ -179,7 +180,7 @@ class MMGCNModel(torch.nn.Module, ABC):
                     list(self.g_linear_network_multimodal[m].children())[layer](h) + x_hat.to(self.device))
 
         x_all = torch.stack(x_all_m)
-        x_all = torch.mean(x_all, dim=0)
+        x_all = torch.sum(x_all, dim=0)
         gum, gim = torch.split(x_all, [self.num_users, self.num_items], 0)
         self.user_embeddings = gum
         self.item_embeddings = gim
