@@ -49,5 +49,6 @@ for _backend in sys.modules["external"].backend:
         from .bprmf.BPRMF import BPRMF
         from .vbpr.VBPR import VBPR
         from .grcn.GRCN import GRCN
+        from .mgat.MGAT import MGAT
         from .lattice.LATTICE import LATTICE
         from .slattice.SLATTICE import SLATTICE
