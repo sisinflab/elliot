@@ -192,8 +192,7 @@ class MGATModel(torch.nn.Module, ABC):
         xu_pos = self.forward(inputs=(gum[user], gim[pos]))
         xu_neg = self.forward(inputs=(gum[user], gim[neg]))
 
-        difference = torch.clamp(xu_pos - xu_neg, -80.0, 1e8)
-        loss = torch.sum(torch.nn.functional.softplus(-difference))
+        loss = -torch.sum(torch.log2(torch.sigmoid(xu_pos - xu_neg)))
 
         self.optimizer.zero_grad()
         loss.backward()
