@@ -58,6 +58,7 @@ class MGATModel(torch.nn.Module, ABC):
         self.rows = torch.tensor(rows, dtype=torch.int64)
         self.cols = torch.tensor(cols, dtype=torch.int64)
         self.ptr = ptr
+        self.ptr.to(self.device)
 
         # collaborative embeddings
         self.Gu = torch.nn.Embedding(self.num_users, self.embed_k)
