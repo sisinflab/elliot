@@ -58,7 +58,6 @@ class MGATModel(torch.nn.Module, ABC):
         self.rows = torch.tensor(rows, dtype=torch.int64)
         self.cols = torch.tensor(cols, dtype=torch.int64)
         self.ptr = ptr
-        self.ptr.to(self.device)
 
         # collaborative embeddings
         self.Gu = torch.nn.Embedding(self.num_users, self.embed_k)
@@ -85,7 +84,7 @@ class MGATModel(torch.nn.Module, ABC):
                 self.proj_multimodal[m].to(self.device)
                 propagation_network_list = [(MGATLayer(self.embed_k_multimod[m_id],
                                                        self.embed_k_multimod[m_id],
-                                                       self.ptr,
+                                                       self.ptr.to(self.device),
                                                        self.rows,
                                                        self.cols,
                                                        aggr='add'), 'x, edge_index -> x')]
@@ -98,7 +97,7 @@ class MGATModel(torch.nn.Module, ABC):
             else:
                 propagation_network_list = [(MGATLayer(self.multimodal_features_shapes[m_id],
                                                        self.multimodal_features_shapes[m_id],
-                                                       self.ptr,
+                                                       self.ptr.to(self.device),
                                                        self.rows,
                                                        self.cols,
                                                        aggr='add'), 'x, edge_index -> x')]
@@ -112,7 +111,7 @@ class MGATModel(torch.nn.Module, ABC):
             for layer in range(1, self.n_layers):
                 propagation_network_list.append((MGATLayer(self.embed_k,
                                                            self.embed_k,
-                                                           self.ptr,
+                                                           self.ptr.to(self.device),
                                                            self.rows,
                                                            self.cols,
                                                            aggr='add'), 'x, edge_index -> x'))
