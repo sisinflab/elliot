@@ -151,17 +151,19 @@ class MGATModel(torch.nn.Module, ABC):
         for m_id, m in enumerate(self.modalities):
             temp_features = torch.tanh(self.proj_multimodal[m](self.Fm[m_id].to(self.device))) if self.embed_k_multimod[
                 m_id] else self.Fm[m_id].to(self.device)
-            x_layer = [torch.nn.functional.normalize(
-                torch.cat((self.Gum[m].to(self.device), temp_features.to(self.device)), 0))]
+            x_out = torch.nn.functional.normalize(
+                torch.cat((self.Gum[m].to(self.device), temp_features.to(self.device)), 0))
+            x_layer = []
             for layer in range(self.n_layers):
                 h = torch.nn.functional.leaky_relu(list(
                     self.propagation_network_multimodal[m].children()
-                )[layer](x_layer[layer].to(self.device), self.adj.to(self.device)))
+                )[layer](x_out.to(self.device), self.adj.to(self.device)))
                 x_hat = torch.nn.functional.leaky_relu(
                     list(self.linear_network_multimodal[m].children())[layer](
-                        x_layer[layer].to(self.device))) + ego_embeddings
-                x_layer += [torch.nn.functional.leaky_relu(
-                    list(self.g_linear_network_multimodal[m].children())[layer](h) + x_hat.to(self.device))]
+                        x_out.to(self.device))) + ego_embeddings
+                x_out = torch.nn.functional.leaky_relu(
+                    list(self.g_linear_network_multimodal[m].children())[layer](h) + x_hat.to(self.device))
+                x_layer += [x_out]
             x_all_m += [torch.cat(x_layer, dim=1)]
 
         x_all = torch.stack(x_all_m)

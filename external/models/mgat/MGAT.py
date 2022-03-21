@@ -71,7 +71,6 @@ class MGAT(RecMixin, BaseRecommenderModel):
             ("_learning_rate", "lr", "lr", 0.0005, float, None),
             ("_factors", "factors", "factors", 64, int, None),
             ("_num_layers", "num_layers", "num_layers", 3, int, None),
-            ("_num_routings", "num_routings", "num_routings", 10, int, None),
             ("_factors_multimod", "factors_multimod", "factors_multimod", (256, None),
              lambda x: list(make_tuple(x)),
              lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
@@ -108,7 +107,6 @@ class MGAT(RecMixin, BaseRecommenderModel):
             embed_k=self._factors,
             embed_k_multimod=self._factors_multimod,
             num_layers=self._num_layers,
-            num_routings=self._num_routings,
             modalities=self._modalities,
             multimodal_features=[self.__getattribute__(f'''_side_{m}''').object.get_all_features() for m in
                                  self._modalities],
