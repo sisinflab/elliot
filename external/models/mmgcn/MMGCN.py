@@ -15,7 +15,7 @@ import torch
 import os
 
 from elliot.utils.write import store_recommendation
-from elliot.dataset.samplers import custom_sampler as cs
+from elliot.dataset.samplers import custom_sampler_full as csf
 from elliot.recommender import BaseRecommenderModel
 from elliot.recommender.base_recommender_model import init_charger
 from elliot.recommender.recommender_utils_mixin import RecMixin
@@ -66,11 +66,6 @@ class MMGCN(RecMixin, BaseRecommenderModel):
 
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
-
-        self._sampler = cs.Sampler(self._data.i_train_dict)
-        if self._batch_size < 1:
-            self._batch_size = self._num_users
-
         ######################################
 
         self._params_list = [
@@ -98,6 +93,11 @@ class MMGCN(RecMixin, BaseRecommenderModel):
         row, col = data.sp_i_train.nonzero()
         col = [c + self._num_users for c in col]
         edge_index = np.array([row, col])
+
+        self._sampler = csf.Sampler(self._data.i_train_dict, edge_index)
+        if self._batch_size < 1:
+            self._batch_size = self._num_users
+
         edge_index = torch.tensor(edge_index, dtype=torch.int64)
         self.adj = SparseTensor(row=torch.cat([edge_index[0], edge_index[1]], dim=0),
                                 col=torch.cat([edge_index[1], edge_index[0]], dim=0),
