@@ -103,6 +103,7 @@ class MMGCN(RecMixin, BaseRecommenderModel):
                                 col=torch.cat([edge_index[1], edge_index[0]], dim=0),
                                 sparse_sizes=(self._num_users + self._num_items,
                                               self._num_users + self._num_items))
+        self.adj = self.adj.t()
 
         self._model = MMGCNModel(
             num_users=self._num_users,
