@@ -136,7 +136,7 @@ class MMGCN(RecMixin, BaseRecommenderModel):
             loss = 0
             steps = 0
             row, col = self._data.sp_i_train.nonzero()
-            edge_index = np.array([row, col])
+            edge_index = np.array([row, col]).transpose()
             np.random.shuffle(edge_index)
             with tqdm(total=int(self._data.transactions // self._batch_size), disable=not self._verbose) as t:
                 for batch in self._sampler.step(edge_index, self._data.transactions, self._batch_size):

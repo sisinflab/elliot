@@ -28,7 +28,7 @@ class Sampler:
         lui_dict = self._lui_dict
 
         def sample(idx):
-            ui = edge_index[:, idx]
+            ui = edge_index[idx]
             u_pos = ui_dict[ui[0]]
             lui = lui_dict[ui[0]]
             if lui == n_items:
