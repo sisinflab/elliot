@@ -11,7 +11,7 @@ import numpy as np
 
 
 class Sampler:
-    def __init__(self, indexed_ratings, edge_index):
+    def __init__(self, indexed_ratings):
         np.random.seed(42)
         self._indexed_ratings = indexed_ratings
         self._users = list(self._indexed_ratings.keys())
@@ -20,17 +20,15 @@ class Sampler:
         self._nitems = len(self._items)
         self._ui_dict = {u: list(set(indexed_ratings[u])) for u in indexed_ratings}
         self._lui_dict = {u: len(v) for u, v in self._ui_dict.items()}
-        self.edge_index = edge_index
 
-    def step(self, events: int, batch_size: int):
+    def step(self, edge_index, events: int, batch_size: int):
         r_int = np.random.randint
         n_items = self._nitems
         ui_dict = self._ui_dict
         lui_dict = self._lui_dict
-        np.random.shuffle(self.edge_index)
 
         def sample(idx):
-            ui = self.edge_index[:, idx]
+            ui = edge_index[:, idx]
             u_pos = ui_dict[ui[0]]
             lui = lui_dict[ui[0]]
             if lui == n_items:
