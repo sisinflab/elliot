@@ -91,12 +91,11 @@ class MMGCN(RecMixin, BaseRecommenderModel):
                              self._data.side_information.__getattribute__(f'''{self._loaders[m_id]}'''))
 
         row, col = data.sp_i_train.nonzero()
-        col = [c + self._num_users for c in col]
-        edge_index = np.array([row, col])
-
-        self._sampler = csf.Sampler(self._data.i_train_dict, edge_index)
+        self._sampler = csf.Sampler(self._data.i_train_dict, np.array([row, col]))
         if self._batch_size < 1:
             self._batch_size = self._num_users
+        col = [c + self._num_users for c in col]
+        edge_index = np.array([row, col])
 
         edge_index = torch.tensor(edge_index, dtype=torch.int64)
         self.adj = SparseTensor(row=torch.cat([edge_index[0], edge_index[1]], dim=0),
