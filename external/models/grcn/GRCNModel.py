@@ -131,13 +131,14 @@ class GRCNModel(torch.nn.Module, ABC):
         torch.nn.init.xavier_uniform_(self.model_specific_conf.weight)
         self.model_specific_conf.to(self.device)
 
+        # placeholder for calculated user and item embeddings
+        self.user_embeddings = torch.nn.init.xavier_uniform_(torch.rand((self.num_users, self.embed_k)))
+        self.user_embeddings.to(self.device)
+        self.item_embeddings = torch.nn.init.xavier_uniform_(torch.rand((self.num_items, self.embed_k)))
+        self.item_embeddings.to(self.device)
+
         self.softplus = torch.nn.Softplus()
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
-        self.lr_scheduler = self.set_lr_scheduler()
-
-    def set_lr_scheduler(self):
-        scheduler = torch.optim.lr_scheduler.LambdaLR(self.optimizer, lr_lambda=lambda epoch: 0.96 ** (epoch / 50))
-        return scheduler
 
     def propagate_embeddings(self):
         # Graph Refining Layers
@@ -210,6 +211,8 @@ class GRCNModel(torch.nn.Module, ABC):
             raise NotImplementedError('This fusion mode has not been implemented yet!')
 
         gu, gi = torch.split(x, [self.num_users, self.num_items], 0)
+        self.user_embeddings = gu
+        self.item_embeddings = gi
         return gu, gi
 
     def forward(self, inputs, **kwargs):
@@ -221,8 +224,9 @@ class GRCNModel(torch.nn.Module, ABC):
 
         return xui, gamma_u, gamma_i
 
-    def predict(self, gu, gi, **kwargs):
-        return torch.matmul(gu.to(self.device), torch.transpose(gi.to(self.device), 0, 1))
+    def predict(self, start, stop, **kwargs):
+        return torch.matmul(self.user_embeddings[start: stop].to(self.device),
+                            torch.transpose(self.item_embeddings.to(self.device), 0, 1))
 
     def train_step(self, batch):
         gu, gi = self.propagate_embeddings()
