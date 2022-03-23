@@ -67,7 +67,7 @@ class VBPR(RecMixin, BaseRecommenderModel):
         if self._batch_size < 1:
             self._batch_size = self._data.transactions
 
-        self._sampler = cs.Sampler(self._data.i_train_dict)
+        self._sampler = cs.Sampler(self._data.i_train_dict, self._seed)
 
         for m_id, m in enumerate(self._modalities):
             self.__setattr__(f'''_side_{m}''',

@@ -15,7 +15,7 @@ import torch
 import torch_geometric
 import numpy as np
 import random
-from torch_sparse import SparseTensor, mul, mul_nnz, sum, add
+from torch_sparse import SparseTensor, mul, mul_nnz, sum, add, fill_diag
 
 
 class LATTICEModel(torch.nn.Module, ABC):
@@ -60,7 +60,7 @@ class LATTICEModel(torch.nn.Module, ABC):
         self.top_k = top_k
         self.n_layers = num_layers
         self.n_ui_layers = num_ui_layers
-        self.adj = adj
+        self.adj = self.compute_normalized_laplacian(adj, 1)
 
         # collaborative embeddings
         self.Gu = torch.nn.Embedding(self.num_users, self.embed_k)
@@ -88,7 +88,7 @@ class LATTICEModel(torch.nn.Module, ABC):
             self.Gim[m].to(self.device)
             current_sim = self.build_sim(self.Gim[m].detach())
             weighted_adj = self.build_knn_neighbourhood(current_sim, self.top_k)
-            self.Sim[m] = self.compute_normalized_laplacian(weighted_adj)
+            self.Sim[m] = self.compute_normalized_laplacian(weighted_adj, 0.5)
             self.Sim[m].to(self.device)
             self.projection_m[m] = torch.nn.Linear(in_features=self.multimodal_features_shapes[m_id],
                                                    out_features=self.embed_k_multimod)
@@ -130,9 +130,10 @@ class LATTICEModel(torch.nn.Module, ABC):
         return weighted_adj
 
     @staticmethod
-    def compute_normalized_laplacian(adj):
+    def compute_normalized_laplacian(adj, norm):
+        adj = fill_diag(adj, 1.)
         deg = sum(adj, dim=-1)
-        deg_inv_sqrt = deg.pow_(-0.5)
+        deg_inv_sqrt = deg.pow_(-norm)
         deg_inv_sqrt.masked_fill_(deg_inv_sqrt == float('inf'), 0.)
         adj_t = mul(adj, deg_inv_sqrt.view(-1, 1))
         adj_t = mul(adj_t, deg_inv_sqrt.view(1, -1))
@@ -163,7 +164,7 @@ class LATTICEModel(torch.nn.Module, ABC):
             learned_adj = learned_adj_addendum[0]
             for i in range(1, len(learned_adj_addendum)):
                 learned_adj = add(learned_adj, learned_adj_addendum[i])
-            learned_adj = self.compute_normalized_laplacian(learned_adj)
+            learned_adj = self.compute_normalized_laplacian(learned_adj, 0.5)
             original_adj = original_adj_addendum[0]
             for i in range(1, len(original_adj_addendum)):
                 original_adj = add(original_adj, original_adj_addendum[i])
@@ -211,8 +212,7 @@ class LATTICEModel(torch.nn.Module, ABC):
         xu_pos, gamma_u_m, gamma_i_pos_m = self.forward(inputs=(gum[user], gim[pos]))
         xu_neg, _, gamma_i_neg_m = self.forward(inputs=(gum[user], gim[neg]))
 
-        difference = torch.clamp(xu_pos - xu_neg, -80.0, 1e8)
-        loss = torch.mean(torch.nn.functional.softplus(-difference))
+        loss = -torch.mean(torch.nn.functional.logsigmoid(xu_pos - xu_neg))
         reg_loss = self.l_w * (1 / 2) * (gamma_u_m.norm(2).pow(2) +
                                          gamma_i_pos_m.norm(2).pow(2) +
                                          gamma_i_neg_m.norm(2).pow(2)) / user.shape[0]

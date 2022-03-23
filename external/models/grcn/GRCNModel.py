@@ -234,11 +234,9 @@ class GRCNModel(torch.nn.Module, ABC):
         xu_pos, gamma_u, gamma_i_pos = self.forward(inputs=(gu[user], gi[pos]))
         xu_neg, _, gamma_i_neg = self.forward(inputs=(gu[user], gi[neg]))
 
-        difference = torch.clamp(xu_pos - xu_neg, -80.0, 1e8)
-        loss = torch.mean(torch.nn.functional.softplus(-difference))
-        reg_loss = self.l_w * (1 / 2) * (gamma_u.norm(2).pow(2) +
-                                         gamma_i_pos.norm(2).pow(2) +
-                                         gamma_i_neg.norm(2).pow(2)) / user.shape[0]
+        loss = -torch.mean(torch.log(torch.sigmoid(xu_pos - xu_neg)))
+        reg_loss = self.l_w * ((self.Gu.weight[user].pow(2) +
+                                self.Gi.weight[np.concatenate([pos, neg])].pow(2)).mean())
         loss += reg_loss
 
         self.optimizer.zero_grad()

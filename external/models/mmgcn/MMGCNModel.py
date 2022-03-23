@@ -200,8 +200,8 @@ class MMGCNModel(torch.nn.Module, ABC):
 
         loss = -torch.mean(torch.log(torch.sigmoid(xu_pos - xu_neg)))
         reg_loss = self.l_w * ((self.Gu.weight[user].pow(2) +
-                                self.Gi.weight[pos].pow(2) +
-                                self.Gi.weight[neg].pow(2)).mean() + self.Gum[self.modalities[0]].pow(2).mean())
+                                self.Gi.weight[np.concatenate([pos, neg])].pow(2)).mean() + self.Gum[
+                                   self.modalities[0]].pow(2).mean())
         loss += reg_loss
 
         self.optimizer.zero_grad()

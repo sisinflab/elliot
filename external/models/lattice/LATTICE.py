@@ -15,7 +15,7 @@ import os
 import numpy as np
 
 from elliot.utils.write import store_recommendation
-from elliot.dataset.samplers import custom_sampler as cs
+from elliot.dataset.samplers import custom_sampler_batch as csb
 from elliot.recommender import BaseRecommenderModel
 from elliot.recommender.base_recommender_model import init_charger
 from elliot.recommender.recommender_utils_mixin import RecMixin
@@ -65,11 +65,6 @@ class LATTICE(RecMixin, BaseRecommenderModel):
 
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
-
-        self._sampler = cs.Sampler(self._data.i_train_dict)
-        if self._batch_size < 1:
-            self._batch_size = self._num_users
-
         ######################################
 
         self._params_list = [
@@ -87,6 +82,10 @@ class LATTICE(RecMixin, BaseRecommenderModel):
              lambda x: self._batch_remove(str(x), " []").replace(",", "-"))
         ]
         self.autoset_params()
+
+        self._sampler = csb.Sampler(self._data.i_train_dict, self._seed)
+        if self._batch_size < 1:
+            self._batch_size = self._num_users
 
         for m_id, m in enumerate(self._modalities):
             self.__setattr__(f'''_side_{m}''',

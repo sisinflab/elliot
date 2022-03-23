@@ -71,7 +71,7 @@ class BPRMF(RecMixin, BaseRecommenderModel):
 
         self._ratings = self._data.train_dict
 
-        self._sampler = cs.Sampler(self._data.i_train_dict)
+        self._sampler = cs.Sampler(self._data.i_train_dict, self._seed)
 
         self._model = BPRMFModel(self._num_users,
                                  self._num_items,

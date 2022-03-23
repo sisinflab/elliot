@@ -32,6 +32,7 @@ class MGAT(RecMixin, BaseRecommenderModel):
 
     Args:
         lr: Learning rate
+        l_w: Regularizer
         epochs: Number of epochs
         num_layers: Number of propagation layers
         num_routings: Number of routing iterations
@@ -49,6 +50,7 @@ class MGAT(RecMixin, BaseRecommenderModel):
           meta:
             save_recs: True
           lr: 0.0005
+          l_w: 0.0001
           epochs: 50
           num_layers: 3
           num_routings: 10
@@ -64,6 +66,7 @@ class MGAT(RecMixin, BaseRecommenderModel):
 
         self._params_list = [
             ("_learning_rate", "lr", "lr", 0.0005, float, None),
+            ("_l_w", "l_w", "l_w", 0.0005, float, None),
             ("_factors", "factors", "factors", 64, int, None),
             ("_num_layers", "num_layers", "num_layers", 3, int, None),
             ("_factors_multimod", "factors_multimod", "factors_multimod", (256, None),
@@ -106,6 +109,7 @@ class MGAT(RecMixin, BaseRecommenderModel):
             num_items=self._num_items,
             learning_rate=self._learning_rate,
             embed_k=self._factors,
+            l_w=self._l_w,
             embed_k_multimod=self._factors_multimod,
             num_layers=self._num_layers,
             modalities=self._modalities,
