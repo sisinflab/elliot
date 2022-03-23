@@ -11,8 +11,8 @@ import numpy as np
 
 
 class Sampler:
-    def __init__(self, indexed_ratings):
-        np.random.seed(42)
+    def __init__(self, indexed_ratings, seed):
+        np.random.seed(seed)
         self._indexed_ratings = indexed_ratings
         self._users = list(self._indexed_ratings.keys())
         self._nusers = len(self._users)

@@ -66,10 +66,6 @@ class MMGCN(RecMixin, BaseRecommenderModel):
 
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
-
-        self._sampler = csf.Sampler(self._data.i_train_dict)
-        if self._batch_size < 1:
-            self._batch_size = self._num_users
         ######################################
 
         self._params_list = [
@@ -89,6 +85,11 @@ class MMGCN(RecMixin, BaseRecommenderModel):
              lambda x: self._batch_remove(str(x), " []").replace(",", "-"))
         ]
         self.autoset_params()
+
+        np.random.seed(self._seed)
+        self._sampler = csf.Sampler(self._data.i_train_dict, self._seed)
+        if self._batch_size < 1:
+            self._batch_size = self._num_users
 
         for m_id, m in enumerate(self._modalities):
             self.__setattr__(f'''_side_{m}''',
@@ -132,11 +133,12 @@ class MMGCN(RecMixin, BaseRecommenderModel):
         if self._restore:
             return self.restore_weights()
 
+        row, col = self._data.sp_i_train.nonzero()
+        edge_index = np.array([row, col]).transpose()
+
         for it in self.iterate(self._epochs):
             loss = 0
             steps = 0
-            row, col = self._data.sp_i_train.nonzero()
-            edge_index = np.array([row, col]).transpose()
             np.random.shuffle(edge_index)
             with tqdm(total=int(self._data.transactions // self._batch_size), disable=not self._verbose) as t:
                 for batch in self._sampler.step(edge_index, self._data.transactions, self._batch_size):
