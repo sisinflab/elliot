@@ -93,6 +93,8 @@ class GRCN(RecMixin, BaseRecommenderModel):
         ]
         self.autoset_params()
 
+        np.random.seed(self._seed)
+
         self._sampler = csf.Sampler(self._data.i_train_dict, self._seed)
         if self._batch_size < 1:
             self._batch_size = self._num_users
