@@ -199,7 +199,7 @@ class MMGCNModel(torch.nn.Module, ABC):
         xu_neg = self.forward(inputs=(gum[user], gim[neg]))
 
         loss = -torch.mean(torch.log(torch.sigmoid(xu_pos - xu_neg)))
-        reg_loss = self.l_w * ((self.Gu.weight[user].pow(2) +
+        reg_loss = self.l_w * ((self.Gu.weight[np.concatenate([user, user])].pow(2) +
                                 self.Gi.weight[np.concatenate([pos, neg])].pow(2)).mean() + self.Gum[
                                    self.modalities[0]].pow(2).mean())
         loss += reg_loss
