@@ -25,6 +25,7 @@ class EGCFv2Model(torch.nn.Module, ABC):
                  learning_rate,
                  embed_k,
                  l_w,
+                 lm,
                  n_layers,
                  edge_features,
                  interactions_sorted_by_items,
@@ -52,6 +53,7 @@ class EGCFv2Model(torch.nn.Module, ABC):
         self.embed_k = embed_k
         self.learning_rate = learning_rate
         self.l_w = l_w
+        self.lm = lm
         self.n_layers = n_layers
         self.alpha = torch.tensor([1 / (k + 1) for k in range(self.n_layers + 1)])
 
@@ -158,7 +160,7 @@ class EGCFv2Model(torch.nn.Module, ABC):
         gamma_u_t = torch.squeeze(gut).to(self.device)
         gamma_i_t = torch.squeeze(git).to(self.device)
 
-        xui = torch.sum(gamma_u * gamma_i, 1) + torch.sum(gamma_u_t * gamma_i_t, 1)
+        xui = self.lm * torch.sum(gamma_u * gamma_i, 1) + (1 - self.lm) * torch.sum(gamma_u_t * gamma_i_t, 1)
 
         return xui
 

@@ -28,6 +28,7 @@ class NodeNodeTextLayer(MessagePassing, ABC):
         original_edge_index = edge_index
         edge_attr = self.leaky_relu(self.lin1(edge_attr))
         weights = torch.nn.functional.cosine_similarity(torch.mul(node_attr, edge_attr), node_attr, dim=1)
+        weights = torch.relu(weights)
         edge_index = mul_nnz(edge_index, weights, layout='coo')
 
         if self.normalize:
