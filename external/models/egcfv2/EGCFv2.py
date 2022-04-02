@@ -42,7 +42,6 @@ class EGCFv2(RecMixin, BaseRecommenderModel):
             ("_emb", "emb", "emb", 64, int, None),
             ("_n_layers", "n_layers", "n_layers", 64, int, None),
             ("_l_w", "l_w", "l_w", 0.01, float, None),
-            ("_lm", "lm", "lm", 0.4, float, None),
             ("_loader", "loader", "loader", 'InteractionsTextualAttributes', str, None)
         ]
         self.autoset_params()
@@ -67,7 +66,6 @@ class EGCFv2(RecMixin, BaseRecommenderModel):
             learning_rate=self._lr,
             embed_k=self._emb,
             l_w=self._l_w,
-            lm=self._lm,
             n_layers=self._n_layers,
             edge_features=edge_features,
             interactions_sorted_by_items=interactions_sorted_by_items,
@@ -102,10 +100,10 @@ class EGCFv2(RecMixin, BaseRecommenderModel):
     def get_recommendations(self, k: int = 100):
         predictions_top_k_test = {}
         predictions_top_k_val = {}
-        gu, gi, gut, git = self._model.propagate_embeddings(evaluate=True)
+        gu, gi = self._model.propagate_embeddings(evaluate=True)
         for index, offset in enumerate(range(0, self._num_users, self._batch_size)):
             offset_stop = min(offset + self._batch_size, self._num_users)
-            predictions = self._model.predict(gu[offset: offset_stop], gi, gut[offset: offset_stop], git)
+            predictions = self._model.predict(gu[offset: offset_stop], gi)
             recs_val, recs_test = self.process_protocol(k, predictions, offset, offset_stop)
             predictions_top_k_val.update(recs_val)
             predictions_top_k_test.update(recs_test)
