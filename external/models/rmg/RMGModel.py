@@ -195,7 +195,7 @@ class RMGModel(tf.keras.Model, ABC):
     def predict(self, inputs):
         return self.model(inputs, training=False)
 
-    # @tf.function
+    @tf.function
     def train_step(self, batch):
         inputs, r = batch
         with tf.GradientTape() as t:
