@@ -18,5 +18,5 @@ def generate_batch_data_random(item,
 
     for i in batches:
         yield ([item[item_id[i]], user[user_id[i]], user_to_item_to_user[user_id[i]],
-               user_to_item[user_id[i]], item_to_user_to_item, item_to_user[item_id[i]],
+               user_to_item[user_id[i]], item_to_user_to_item[item_id[i]], item_to_user[item_id[i]],
                np.expand_dims(item_id[i], axis=1), np.expand_dims(user_id[i], axis=1)], y[i])
