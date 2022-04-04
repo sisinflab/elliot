@@ -141,8 +141,8 @@ class RMGModel(tf.keras.Model, ABC):
         user_item_user_ids = tf.keras.Input((self.max_neighbor, self.max_neighbor), dtype='int32')
         item_user_item_ids = tf.keras.Input((self.max_neighbor, self.max_neighbor), dtype='int32')
 
-        user_item_embedding = user_embedding(user_item_ids)
-        item_user_embedding = item_embedding(item_user_ids)
+        user_item_embedding = user_embedding(item_user_ids)
+        item_user_embedding = item_embedding(user_item_ids)
 
         ui_att = Dense(self.ui_att, activation='tanh')(user_item_embedding)
         ui_att = Flatten()(Dense(1)(ui_att))
@@ -195,7 +195,7 @@ class RMGModel(tf.keras.Model, ABC):
     def predict(self, inputs):
         return self.model(inputs, training=False)
 
-    @tf.function
+    # @tf.function
     def train_step(self, batch):
         inputs, r = batch
         with tf.GradientTape() as t:
