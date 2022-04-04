@@ -157,8 +157,8 @@ class RMGModel(tf.keras.Model, ABC):
         userencoder = Model([user_item_ids], ui_emb)
         itemencoder = Model([item_user_ids], iu_emb)
 
-        user_encoder = TimeDistributed(userencoder)(user_item_user_ids)
-        item_encoder = TimeDistributed(itemencoder)(item_user_item_ids)
+        user_encoder = TimeDistributed(itemencoder)(user_item_user_ids)
+        item_encoder = TimeDistributed(userencoder)(item_user_item_ids)
 
         ufactor = concatenate([user_item_embedding, user_encoder])
         ifactor = concatenate([item_user_embedding, item_encoder])
