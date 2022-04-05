@@ -39,7 +39,12 @@ class MGATLayer(MessagePassing, ABC):
 
         # attention
         tmp = torch.mul(inner_product, gate_w)
-        attention_w = softmax(src=tmp, ptr=self.ptr).view(-1)
+        try:
+            attention_w = softmax(src=tmp, ptr=self.ptr).view(-1)
+        except:
+            print(tmp)
+            print(self.ptr)
+            exit()
         edge_index = mul_nnz(edge_index, attention_w, layout='coo')
 
         return self.propagate(edge_index, x=x)
