@@ -1,5 +1,3 @@
-from operator import itemgetter
-
 from tqdm import tqdm
 from elliot.recommender import BaseRecommenderModel
 from elliot.recommender.base_recommender_model import init_charger
@@ -27,6 +25,7 @@ class RMG(RecMixin, BaseRecommenderModel):
         ######################################
 
         self._params_list = [
+            ("_batch_eval", "batch_eval", "batch_eval", 256, int, None),
             ("_learning_rate", "lr", "lr", 0.0005, float, None),
             ("_l_w", "l_w", "l_w", 0.01, float, None),
             ("_wcfm", "wcfm", "wcfm", 100, int, None),
@@ -118,45 +117,30 @@ class RMG(RecMixin, BaseRecommenderModel):
         predictions_top_k_test = {}
         predictions_top_k_val = {}
 
-        users_tokens = self._sampler.users_tokens
-        items_tokens = self._sampler.items_tokens
-
-        self.logger.info('Starting convolutions for all users...')
-        out_users = np.empty((self._num_users, self._latent_size))
-        with tqdm(total=int(self._num_users // self._batch_eval), disable=not self._verbose) as t:
-            for start_batch in range(0, self._num_users, self._batch_eval):
-                stop_batch = min(start_batch + self._batch_eval, self._num_users)
-                user_reviews = list(
-                    itemgetter(*list(range(start_batch, stop_batch)))(users_tokens))
-                out_users[start_batch: stop_batch] = self._model.conv_users(np.array(user_reviews, dtype=np.int64))
-                t.update()
-        self.logger.info('Convolutions for all users is complete!')
-
-        self.logger.info('Starting convolutions for all items...')
-        out_items = np.empty((self._num_items, self._latent_size))
-        with tqdm(total=int(self._num_items // self._batch_eval), disable=not self._verbose) as t:
-            for start_batch in range(0, self._num_items, self._batch_eval):
-                stop_batch = min(start_batch + self._batch_eval, self._num_items)
-                item_reviews = list(
-                    itemgetter(*list(range(start_batch, stop_batch)))(items_tokens))
-                out_items[start_batch: stop_batch] = self._model.conv_items(np.array(item_reviews, dtype=np.int64))
-                t.update()
-        self.logger.info('Convolutions for all items is complete!')
-
-        self.logger.info('Starting predictions on all users/items pairs...')
+        self.logger.info('\nStarting predictions on all users/items pairs...')
         with tqdm(total=int(self._num_users // self._batch_eval), disable=not self._verbose) as t:
             for index, offset in enumerate(range(0, self._num_users, self._batch_eval)):
                 offset_stop = min(offset + self._batch_eval, self._num_users)
                 predictions = np.empty((offset_stop - offset, self._num_items))
                 for item_index, item_offset in enumerate(range(0, self._num_items, self._batch_eval)):
                     item_offset_stop = min(item_offset + self._batch_eval, self._num_items)
-                    p = self._model.predict(tf.Variable(out_users[offset: offset_stop], dtype=tf.float32),
-                                            tf.Variable(out_items[item_offset: item_offset_stop],
-                                                        dtype=tf.float32))
+                    user_range = np.repeat(np.arange(offset, offset_stop), repeats=item_offset_stop - item_offset)
+                    item_range = np.tile(np.arange(item_offset, item_offset_stop), reps=offset_stop - offset)
+                    inputs = [
+                        self._interactions_textual.object.all_item_texts_features[item_range],
+                        self._interactions_textual.object.all_user_texts_features[user_range],
+                        self._interactions_textual.object.user_to_item_to_user_features[user_range],
+                        self._interactions_textual.object.user_to_item_features[user_range],
+                        self._interactions_textual.object.item_to_user_to_item_features[item_range],
+                        self._interactions_textual.object.item_to_user_features[item_range],
+                        np.expand_dims(item_range, axis=1),
+                        np.expand_dims(user_range, axis=1)
+                    ]
+                    p = self._model.predict(inputs)
                     predictions[:, item_offset: item_offset_stop] = p
                 recs_val, recs_test = self.process_protocol(k, predictions, offset, offset_stop)
                 predictions_top_k_val.update(recs_val)
                 predictions_top_k_test.update(recs_test)
                 t.update()
-        self.logger.info('Predictions on all users/items pairs is complete!')
+        self.logger.info('Predictions on all users/items pairs is complete!\n')
         return predictions_top_k_val, predictions_top_k_test
