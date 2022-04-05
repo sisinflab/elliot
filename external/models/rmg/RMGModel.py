@@ -194,7 +194,7 @@ class RMGModel(tf.keras.Model, ABC):
     @tf.function
     def predict(self, inputs):
         out_user, out_item = inputs
-        rui = self.model(inputs, training=False)
+        rui = self(inputs, training=False)
         return tf.reshape(rui, [out_user.shape[0], out_item.shape[0]])
 
     @tf.function
