@@ -117,7 +117,7 @@ class RMG(RecMixin, BaseRecommenderModel):
         predictions_top_k_test = {}
         predictions_top_k_val = {}
 
-        self.logger.info('\nStarting predictions on all users/items pairs...')
+        self.logger.info('Starting predictions on all users/items pairs...')
         with tqdm(total=int(self._num_users // self._batch_eval), disable=not self._verbose) as t:
             for index, offset in enumerate(range(0, self._num_users, self._batch_eval)):
                 offset_stop = min(offset + self._batch_eval, self._num_users)
@@ -136,11 +136,11 @@ class RMG(RecMixin, BaseRecommenderModel):
                         np.expand_dims(item_range, axis=1),
                         np.expand_dims(user_range, axis=1)
                     ]
-                    p = self._model.predict(inputs)
-                    predictions[:, item_offset: item_offset_stop] = p
+                    p = self._model.predict(inputs, offset_stop - offset, item_offset_stop - item_offset)
+                    predictions[:, item_offset: item_offset_stop] = p.numpy()
                 recs_val, recs_test = self.process_protocol(k, predictions, offset, offset_stop)
                 predictions_top_k_val.update(recs_val)
                 predictions_top_k_test.update(recs_test)
                 t.update()
-        self.logger.info('Predictions on all users/items pairs is complete!\n')
+        self.logger.info('Predictions on all users/items pairs is complete!')
         return predictions_top_k_val, predictions_top_k_test
