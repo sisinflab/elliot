@@ -178,29 +178,36 @@ class RMGModel(tf.keras.Model, ABC):
         factor_u = concatenate([user_emb, user_embedding, user_emb_g])
         factor_i = concatenate([item_emb, item_embedding, item_emb_g])
 
-        preds = Dense(1, activation='relu')(multiply([factor_u, factor_i]))
+        self.prediction_layer = Dense(1, activation='relu')
 
-        self.model = Model(
-            [reviews_input_item, reviews_input_user, user_item_user_ids, user_item_ids, item_user_item_ids,
-             item_user_ids, item_id, user_id], preds)
+        self.model_user = Model([reviews_input_user, user_item_user_ids, user_item_ids, user_id], factor_u)
+        self.model_item = Model([reviews_input_item, item_user_item_ids, item_user_ids, item_id], factor_i)
 
         self.optimizer = tf.optimizers.Adam(self.learning_rate)
         self.loss = tf.keras.losses.MeanSquaredError()
 
     @tf.function
     def call(self, inputs, training=True):
-        return self.model(inputs, training=training)
+        out_user, out_item = inputs
+        return self.prediction_layer(tf.multiply(out_user, out_item))
 
     @tf.function
-    def predict(self, inputs, batch_user, batch_item):
+    def predict(self, inputs):
+        out_user, out_item = inputs
         rui = self.model(inputs, training=False)
-        return tf.reshape(rui, [batch_user, batch_item])
+        return tf.reshape(rui, [out_user.shape[0], out_item.shape[0]])
 
     @tf.function
     def train_step(self, batch):
         inputs, r = batch
         with tf.GradientTape() as t:
-            xui = self(inputs=inputs)
+            reviews_input_item, reviews_input_user, user_item_user_ids, \
+            user_item_ids, item_user_item_ids, item_user_ids, item_id, user_id = inputs
+            out_user = self.model_user([reviews_input_user, user_item_user_ids, user_item_ids, user_id],
+                                       training=True)
+            out_item = self.model_item([reviews_input_item, item_user_item_ids, item_user_ids, item_id],
+                                       training=True)
+            xui = self(inputs=[out_user, out_item])
             loss = self.loss(r, xui)
 
         grads = t.gradient(loss, self.trainable_variables)

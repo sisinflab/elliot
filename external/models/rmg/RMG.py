@@ -6,7 +6,6 @@ from .RMGModel import RMGModel
 from .sampler import *
 
 import numpy as np
-import tensorflow as tf
 
 
 class RMG(RecMixin, BaseRecommenderModel):
@@ -117,6 +116,36 @@ class RMG(RecMixin, BaseRecommenderModel):
         predictions_top_k_test = {}
         predictions_top_k_val = {}
 
+        self.logger.info('Starting pre-computation for all users...')
+        out_users = np.empty((self._num_users, self._factors * 4))
+        with tqdm(total=int(self._num_users // self._batch_eval), disable=not self._verbose) as t:
+            for start_batch in range(0, self._num_users, self._batch_eval):
+                stop_batch = min(start_batch + self._batch_eval, self._num_users)
+                inputs = [
+                    self._interactions_textual.object.all_user_texts_features[start_batch: stop_batch],
+                    self._interactions_textual.object.user_to_item_to_user_features[start_batch: stop_batch],
+                    self._interactions_textual.object.user_to_item_features[start_batch: stop_batch],
+                    np.arange(start_batch, stop_batch)
+                ]
+                out_users[start_batch: stop_batch] = self._model.model_user(inputs, training=False)
+                t.update()
+        self.logger.info('Pre-computation for all users is complete!')
+
+        self.logger.info('Starting pre-computation for all items...')
+        out_items = np.empty((self._num_items, self._factors * 4))
+        with tqdm(total=int(self._num_items // self._batch_eval), disable=not self._verbose) as t:
+            for start_batch in range(0, self._num_items, self._batch_eval):
+                stop_batch = min(start_batch + self._batch_eval, self._num_items)
+                inputs = [
+                    self._interactions_textual.object.all_item_texts_features[start_batch: stop_batch],
+                    self._interactions_textual.object.item_to_user_to_item_features[start_batch: stop_batch],
+                    self._interactions_textual.object.item_to_user_features[start_batch: stop_batch],
+                    np.arange(start_batch, stop_batch)
+                ]
+                out_items[start_batch: stop_batch] = self._model.model_item(inputs, training=False)
+                t.update()
+        self.logger.info('Pre-computation for all items is complete!')
+
         self.logger.info('Starting predictions on all users/items pairs...')
         with tqdm(total=int(self._num_users // self._batch_eval), disable=not self._verbose) as t:
             for index, offset in enumerate(range(0, self._num_users, self._batch_eval)):
@@ -126,17 +155,8 @@ class RMG(RecMixin, BaseRecommenderModel):
                     item_offset_stop = min(item_offset + self._batch_eval, self._num_items)
                     user_range = np.repeat(np.arange(offset, offset_stop), repeats=item_offset_stop - item_offset)
                     item_range = np.tile(np.arange(item_offset, item_offset_stop), reps=offset_stop - offset)
-                    inputs = [
-                        self._interactions_textual.object.all_item_texts_features[item_range],
-                        self._interactions_textual.object.all_user_texts_features[user_range],
-                        self._interactions_textual.object.user_to_item_to_user_features[user_range],
-                        self._interactions_textual.object.user_to_item_features[user_range],
-                        self._interactions_textual.object.item_to_user_to_item_features[item_range],
-                        self._interactions_textual.object.item_to_user_features[item_range],
-                        np.expand_dims(item_range, axis=1),
-                        np.expand_dims(user_range, axis=1)
-                    ]
-                    p = self._model.predict(inputs, offset_stop - offset, item_offset_stop - item_offset)
+                    inputs = [out_users[user_range], out_items[item_range]]
+                    p = self._model.predict(inputs)
                     predictions[:, item_offset: item_offset_stop] = p.numpy()
                 recs_val, recs_test = self.process_protocol(k, predictions, offset, offset_stop)
                 predictions_top_k_val.update(recs_val)
