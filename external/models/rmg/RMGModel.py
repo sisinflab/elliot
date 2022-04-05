@@ -192,10 +192,9 @@ class RMGModel(tf.keras.Model, ABC):
         return self.prediction_layer(tf.multiply(out_user, out_item))
 
     @tf.function
-    def predict(self, inputs):
-        out_user, out_item = inputs
+    def predict(self, inputs, batch_user, batch_item):
         rui = self(inputs, training=False)
-        return tf.reshape(rui, [out_user.shape[0], out_item.shape[0]])
+        return tf.reshape(rui, [batch_user, batch_item])
 
     @tf.function
     def train_step(self, batch):

@@ -156,7 +156,7 @@ class RMG(RecMixin, BaseRecommenderModel):
                     user_range = np.repeat(np.arange(offset, offset_stop), repeats=item_offset_stop - item_offset)
                     item_range = np.tile(np.arange(item_offset, item_offset_stop), reps=offset_stop - offset)
                     inputs = [out_users[user_range], out_items[item_range]]
-                    p = self._model.predict(inputs)
+                    p = self._model.predict(inputs, offset_stop - offset, item_offset_stop - item_offset)
                     predictions[:, item_offset: item_offset_stop] = p.numpy()
                 recs_val, recs_test = self.process_protocol(k, predictions, offset, offset_stop)
                 predictions_top_k_val.update(recs_val)
