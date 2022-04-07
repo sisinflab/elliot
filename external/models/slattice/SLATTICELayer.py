@@ -4,9 +4,9 @@ from torch_geometric.nn import MessagePassing
 from torch_sparse import matmul
 
 
-class LATTICELayer(MessagePassing, ABC):
+class SLATTICELayer(MessagePassing, ABC):
     def __init__(self):
-        super(LATTICELayer, self).__init__(aggr='add')
+        super(SLATTICELayer, self).__init__(aggr='add')
 
     def forward(self, x, edge_index):
         return self.propagate(edge_index, x=x)

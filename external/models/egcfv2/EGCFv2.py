@@ -11,7 +11,6 @@ from tqdm import tqdm
 import numpy as np
 import torch
 import os
-import itertools
 
 from elliot.utils.write import store_recommendation
 
@@ -59,28 +58,6 @@ class EGCFv2(RecMixin, BaseRecommenderModel):
                                           sparse_sizes=(self._num_users + self._num_items,
                                                         self._num_users + self._num_items))
 
-        # list_nodes_edges = []
-        #
-        # for idx in range(node_node_graph.shape[1]):
-        #     list_nodes_edges.append([node_node_graph[0, idx], idx + self._num_users + self._num_items])
-        #     list_nodes_edges.append([node_node_graph[1, idx], idx + self._num_users + self._num_items])
-        #
-        # node_edge_graph = np.array(list_nodes_edges).transpose()
-        #
-        # list_edges_edges = []
-        # for n in set(node_edge_graph[0]):
-        #     edges_connected_to_n = node_edge_graph[1][np.argwhere(node_edge_graph[0] == n)][:, 0].tolist()
-        #     list_edges_edges += list(set(itertools.combinations(edges_connected_to_n, 2)))
-        #
-        # edge_edge_graph = np.array(list_edges_edges).transpose()
-        # edge_edge_graph -= np.min(edge_edge_graph)
-        # edge_edge_graph = torch.tensor(edge_edge_graph, dtype=torch.int64)
-        #
-        # self.edge_edge_adj = SparseTensor(row=edge_edge_graph[0], col=edge_edge_graph[1],
-        #                                   sparse_sizes=(node_node_graph.shape[1], node_node_graph.shape[1]))
-        #
-        # del list_nodes_edges, node_edge_graph, list_edges_edges
-
         edge_features, interactions_sorted_by_items = self._side_edge_textual.object.get_all_features()
 
         self._model = EGCFv2Model(
@@ -123,10 +100,10 @@ class EGCFv2(RecMixin, BaseRecommenderModel):
     def get_recommendations(self, k: int = 100):
         predictions_top_k_test = {}
         predictions_top_k_val = {}
-        gu, gi, gut, git = self._model.propagate_embeddings(evaluate=True)
+        gu, gi = self._model.propagate_embeddings(evaluate=True)
         for index, offset in enumerate(range(0, self._num_users, self._batch_size)):
             offset_stop = min(offset + self._batch_size, self._num_users)
-            predictions = self._model.predict(gu[offset: offset_stop], gi, gut[offset: offset_stop], git)
+            predictions = self._model.predict(gu[offset: offset_stop], gi)
             recs_val, recs_test = self.process_protocol(k, predictions, offset, offset_stop)
             predictions_top_k_val.update(recs_val)
             predictions_top_k_test.update(recs_test)

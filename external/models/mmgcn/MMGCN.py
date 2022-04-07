@@ -15,7 +15,7 @@ import torch
 import os
 
 from elliot.utils.write import store_recommendation
-from elliot.dataset.samplers import custom_sampler as cs
+from elliot.dataset.samplers import custom_sampler_full as csf
 from elliot.recommender import BaseRecommenderModel
 from elliot.recommender.base_recommender_model import init_charger
 from elliot.recommender.recommender_utils_mixin import RecMixin
@@ -40,7 +40,8 @@ class MMGCN(RecMixin, BaseRecommenderModel):
         l_w: Regularization coefficient
         modalities: Tuple of modalities
         aggregation: Type of aggregation
-        combination: Type of combination
+        concatenation: Whether to have concatenation or not
+        has_id: Whether to sum the collaborative embeddings or not
 
     To include the recommendation model, add it to the config file adopting the following pattern:
 
@@ -54,21 +55,17 @@ class MMGCN(RecMixin, BaseRecommenderModel):
           epochs: 50
           num_layers: 2
           factors: 64
-          factors_multimod: (64,64)
+          factors_multimod: (256, None)
           batch_size: 256
           l_w: 0.1
           modalities: (visual,textual)
           aggregation: mean
-          combination: co
+          concatenation: True
+          has_id: True
     """
 
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
-
-        self._sampler = cs.Sampler(self._data.i_train_dict)
-        if self._batch_size < 1:
-            self._batch_size = self._num_users
-
         ######################################
 
         self._params_list = [
@@ -76,15 +73,23 @@ class MMGCN(RecMixin, BaseRecommenderModel):
             ("_factors", "factors", "factors", 64, int, None),
             ("_l_w", "l_w", "l_w", 0.01, float, None),
             ("_num_layers", "num_layers", "num_layers", 2, int, None),
-            ("_factors_multimod", "factors_multimod", "factors_multimod", 64, int, None),
+            ("_factors_multimod", "factors_multimod", "factors_multimod", (256, None),
+             lambda x: list(make_tuple(x)),
+             lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
             ("_modalities", "modalities", "modalites", "('visual','textual')", lambda x: list(make_tuple(x)),
              lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
             ("_aggregation", "aggregation", "aggregation", 'mean', str, None),
-            ("_combination", "combination", "combination", 'co', str, None),
+            ("_concat", "concatenation", "concatenation", True, bool, None),
+            ("_has_id", "has_id", "has_id", True, bool, None),
             ("_loaders", "loaders", "loads", "('VisualAttribute','TextualAttribute')", lambda x: list(make_tuple(x)),
              lambda x: self._batch_remove(str(x), " []").replace(",", "-"))
         ]
         self.autoset_params()
+
+        np.random.seed(self._seed)
+        self._sampler = csf.Sampler(self._data.i_train_dict, self._seed)
+        if self._batch_size < 1:
+            self._batch_size = self._num_users
 
         for m_id, m in enumerate(self._modalities):
             self.__setattr__(f'''_side_{m}''',
@@ -93,6 +98,7 @@ class MMGCN(RecMixin, BaseRecommenderModel):
         row, col = data.sp_i_train.nonzero()
         col = [c + self._num_users for c in col]
         edge_index = np.array([row, col])
+
         edge_index = torch.tensor(edge_index, dtype=torch.int64)
         self.adj = SparseTensor(row=torch.cat([edge_index[0], edge_index[1]], dim=0),
                                 col=torch.cat([edge_index[1], edge_index[0]], dim=0),
@@ -109,7 +115,8 @@ class MMGCN(RecMixin, BaseRecommenderModel):
             num_layers=self._num_layers,
             modalities=self._modalities,
             aggregation=self._aggregation,
-            combination=self._combination,
+            concatenation=self._concat,
+            has_id=self._has_id,
             multimodal_features=[self.__getattribute__(f'''_side_{m}''').object.get_all_features() for m in
                                  self._modalities],
             adj=self.adj,
@@ -126,29 +133,34 @@ class MMGCN(RecMixin, BaseRecommenderModel):
         if self._restore:
             return self.restore_weights()
 
+        row, col = self._data.sp_i_train.nonzero()
+        edge_index = np.array([row, col]).transpose()
+
         for it in self.iterate(self._epochs):
             loss = 0
             steps = 0
+            self._model.train()
+            np.random.shuffle(edge_index)
             with tqdm(total=int(self._data.transactions // self._batch_size), disable=not self._verbose) as t:
-                for batch in self._sampler.step(self._data.transactions, self._batch_size):
+                for batch in self._sampler.step(edge_index, self._data.transactions, self._batch_size):
                     steps += 1
                     loss += self._model.train_step(batch)
                     t.set_postfix({'loss': f'{loss / steps:.5f}'})
                     t.update()
-                self._model.lr_scheduler.step()
 
             self.evaluate(it, loss / (it + 1))
 
     def get_recommendations(self, k: int = 100):
         predictions_top_k_test = {}
         predictions_top_k_val = {}
-        gum, gim = self._model.propagate_embeddings(evaluate=True)
-        for index, offset in enumerate(range(0, self._num_users, self._batch_size)):
-            offset_stop = min(offset + self._batch_size, self._num_users)
-            predictions = self._model.predict(gum[offset: offset_stop], gim)
-            recs_val, recs_test = self.process_protocol(k, predictions, offset, offset_stop)
-            predictions_top_k_val.update(recs_val)
-            predictions_top_k_test.update(recs_test)
+        self._model.eval()
+        with torch.no_grad():
+            for index, offset in enumerate(range(0, self._num_users, self._batch_size)):
+                offset_stop = min(offset + self._batch_size, self._num_users)
+                predictions = self._model.predict(offset, offset_stop)
+                recs_val, recs_test = self.process_protocol(k, predictions, offset, offset_stop)
+                predictions_top_k_val.update(recs_val)
+                predictions_top_k_test.update(recs_test)
         return predictions_top_k_val, predictions_top_k_test
 
     def get_single_recommendation(self, mask, k, predictions, offset, offset_stop):
@@ -167,7 +179,7 @@ class MMGCN(RecMixin, BaseRecommenderModel):
             self._results.append(result_dict)
 
             if it is not None:
-                self.logger.info(f'Epoch {(it + 1)}/{self._epochs} loss {loss/(it + 1):.5f}')
+                self.logger.info(f'Epoch {(it + 1)}/{self._epochs} loss {loss / (it + 1):.5f}')
             else:
                 self.logger.info(f'Finished')
 

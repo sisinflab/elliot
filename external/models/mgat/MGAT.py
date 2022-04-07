@@ -3,101 +3,128 @@ Module description:
 
 """
 
-__version__ = '0.3.1'
+__version__ = '0.3.0'
 __author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malitesta@poliba.it'
 
-import torch
-import os
-import numpy as np
-from tqdm import tqdm
 from ast import literal_eval as make_tuple
 
-from elliot.dataset.samplers import custom_sampler as cs
+from tqdm import tqdm
+import numpy as np
+import torch
+import os
+
 from elliot.utils.write import store_recommendation
-
+from elliot.dataset.samplers import custom_sampler_full as csf
 from elliot.recommender import BaseRecommenderModel
-from .VBPRModel import VBPRModel
-from elliot.recommender.recommender_utils_mixin import RecMixin
 from elliot.recommender.base_recommender_model import init_charger
+from elliot.recommender.recommender_utils_mixin import RecMixin
+from .MGATModel import MGATModel
+
+from torch_sparse import SparseTensor
 
 
-class VBPR(RecMixin, BaseRecommenderModel):
+class MGAT(RecMixin, BaseRecommenderModel):
     r"""
-    VBPR: Visual Bayesian Personalized Ranking from Implicit Feedback
+    MGAT: Multimodal Graph Attention Network for Recommendation
 
-    For further details, please refer to the `paper <http://www.aaai.org/ocs/index.php/AAAI/AAAI16/paper/view/11914>`_
+    For further details, please refer to the `paper <https://www.sciencedirect.com/science/article/abs/pii/S0306457320300182?via%3Dihub>`_
 
     Args:
         lr: Learning rate
+        l_w: Regularizer
         epochs: Number of epochs
+        num_layers: Number of propagation layers
+        num_routings: Number of routing iterations
         factors: Number of latent factors
+        factors_multimod: Tuple with number of units for each modality
         batch_size: Batch size
-        l_w: Regularization coefficient
+        modalities: Tuple of modalities
 
     To include the recommendation model, add it to the config file adopting the following pattern:
 
     .. code:: yaml
 
       models:
-        VBPR:
+        MGAT:
           meta:
             save_recs: True
           lr: 0.0005
+          l_w: 0.0001
           epochs: 50
-          factors: 100
-          batch_size: 128
-          l_w: 0.000025
+          num_layers: 3
+          num_routings: 10
+          factors: 64
+          factors_multimod: (64,64)
+          batch_size: 256
+          modalities: (visual,textual)
     """
 
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
+        ######################################
+
         self._params_list = [
-            ("_factors", "factors", "factors", 10, int, None),
-            ("_learning_rate", "lr", "lr", 0.001, float, None),
-            ("_combine_modalities", "comb_mod", "comb_mod", 'concat', str, None),
+            ("_learning_rate", "lr", "lr", 0.0005, float, None),
+            ("_l_w", "l_w", "l_w", 0.0005, float, None),
+            ("_factors", "factors", "factors", 64, int, None),
+            ("_num_layers", "num_layers", "num_layers", 3, int, None),
+            ("_factors_multimod", "factors_multimod", "factors_multimod", (256, None),
+             lambda x: list(make_tuple(x)),
+             lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
             ("_modalities", "modalities", "modalites", "('visual','textual')", lambda x: list(make_tuple(x)),
              lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
-            ("_l_w", "l_w", "l_w", 0.1, float, None),
             ("_loaders", "loaders", "loads", "('VisualAttribute','TextualAttribute')", lambda x: list(make_tuple(x)),
              lambda x: self._batch_remove(str(x), " []").replace(",", "-"))
         ]
         self.autoset_params()
 
-        if self._batch_size < 1:
-            self._batch_size = self._data.transactions
+        np.random.seed(self._seed)
 
-        self._sampler = cs.Sampler(self._data.i_train_dict, self._seed)
+        self._sampler = csf.Sampler(self._data.i_train_dict, self._seed)
+        if self._batch_size < 1:
+            self._batch_size = self._num_users
 
         for m_id, m in enumerate(self._modalities):
             self.__setattr__(f'''_side_{m}''',
                              self._data.side_information.__getattribute__(f'''{self._loaders[m_id]}'''))
 
-        if type(self._modalities) == list:
-            if self._combine_modalities == 'concat':
-                all_multimodal_features = self.__getattribute__(
-                    f'''_side_{self._modalities[0]}''').object.get_all_features()
-                for m in self._modalities[1:]:
-                    all_multimodal_features = np.concatenate((all_multimodal_features,
-                                                              self.__getattribute__(
-                                                                  f'''_side_{m}''').object.get_all_features()),
-                                                             axis=-1)
-            else:
-                raise NotImplementedError('This combination of multimodal features has not been implemented yet!')
-        else:
-            all_multimodal_features = self._side_visual.object.get_all_features()
+        row, col = data.sp_i_train.nonzero()
+        col = [c + self._num_users for c in col]
+        _, counts_full = np.unique(np.concatenate((row, np.array(col))), return_counts=True)
+        ptr_full = [0]
+        c_full = counts_full.tolist()
+        for i in range(len(c_full)):
+            ptr_full += [ptr_full[i] + c_full[i]]
+        ptr_full = torch.tensor(np.array(ptr_full), dtype=torch.int64)
+        edge_index = np.array([row, col])
+        edge_index = torch.tensor(edge_index, dtype=torch.int64)
+        self.adj = SparseTensor(row=torch.cat([edge_index[0], edge_index[1]], dim=0),
+                                col=torch.cat([edge_index[1], edge_index[0]], dim=0),
+                                sparse_sizes=(self._num_users + self._num_items,
+                                              self._num_users + self._num_items))
 
-        self._model = VBPRModel(self._num_users,
-                                self._num_items,
-                                self._learning_rate,
-                                self._factors,
-                                self._l_w,
-                                all_multimodal_features,
-                                self._seed)
+        self._model = MGATModel(
+            num_users=self._num_users,
+            num_items=self._num_items,
+            learning_rate=self._learning_rate,
+            embed_k=self._factors,
+            l_w=self._l_w,
+            embed_k_multimod=self._factors_multimod,
+            num_layers=self._num_layers,
+            modalities=self._modalities,
+            multimodal_features=[self.__getattribute__(f'''_side_{m}''').object.get_all_features() for m in
+                                 self._modalities],
+            adj=self.adj,
+            rows=row,
+            cols=col,
+            ptr=ptr_full,
+            random_seed=self._seed
+        )
 
     @property
     def name(self):
-        return "VBPR" \
+        return "MGAT" \
                + f"_{self.get_base_params_shortcut()}" \
                + f"_{self.get_params_shortcut()}"
 
@@ -105,11 +132,16 @@ class VBPR(RecMixin, BaseRecommenderModel):
         if self._restore:
             return self.restore_weights()
 
+        row, col = self._data.sp_i_train.nonzero()
+        edge_index = np.array([row, col]).transpose()
+
         for it in self.iterate(self._epochs):
             loss = 0
             steps = 0
+            self._model.train()
+            np.random.shuffle(edge_index)
             with tqdm(total=int(self._data.transactions // self._batch_size), disable=not self._verbose) as t:
-                for batch in self._sampler.step(self._data.transactions, self._batch_size):
+                for batch in self._sampler.step(edge_index, self._data.transactions, self._batch_size):
                     steps += 1
                     loss += self._model.train_step(batch)
                     t.set_postfix({'loss': f'{loss / steps:.5f}'})
@@ -120,12 +152,14 @@ class VBPR(RecMixin, BaseRecommenderModel):
     def get_recommendations(self, k: int = 100):
         predictions_top_k_test = {}
         predictions_top_k_val = {}
-        for index, offset in enumerate(range(0, self._num_users, self._batch_size)):
-            offset_stop = min(offset + self._batch_size, self._num_users)
-            predictions = self._model.predict(offset, offset_stop)
-            recs_val, recs_test = self.process_protocol(k, predictions, offset, offset_stop)
-            predictions_top_k_val.update(recs_val)
-            predictions_top_k_test.update(recs_test)
+        self._model.eval()
+        with torch.no_grad():
+            for index, offset in enumerate(range(0, self._num_users, self._batch_size)):
+                offset_stop = min(offset + self._batch_size, self._num_users)
+                predictions = self._model.predict(offset, offset_stop)
+                recs_val, recs_test = self.process_protocol(k, predictions, offset, offset_stop)
+                predictions_top_k_val.update(recs_val)
+                predictions_top_k_test.update(recs_test)
         return predictions_top_k_val, predictions_top_k_test
 
     def get_single_recommendation(self, mask, k, predictions, offset, offset_stop):

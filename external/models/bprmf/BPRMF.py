@@ -71,7 +71,7 @@ class BPRMF(RecMixin, BaseRecommenderModel):
 
         self._ratings = self._data.train_dict
 
-        self._sampler = cs.Sampler(self._data.i_train_dict)
+        self._sampler = cs.Sampler(self._data.i_train_dict, self._seed)
 
         self._model = BPRMFModel(self._num_users,
                                  self._num_items,
@@ -99,7 +99,6 @@ class BPRMF(RecMixin, BaseRecommenderModel):
                     loss += self._model.train_step(batch)
                     t.set_postfix({'loss': f'{loss / steps:.5f}'})
                     t.update()
-                self._model.lr_scheduler.step()
 
             self.evaluate(it, loss / (it + 1))
 

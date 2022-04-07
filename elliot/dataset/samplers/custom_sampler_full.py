@@ -21,26 +21,25 @@ class Sampler:
         self._ui_dict = {u: list(set(indexed_ratings[u])) for u in indexed_ratings}
         self._lui_dict = {u: len(v) for u, v in self._ui_dict.items()}
 
-    def step(self, events: int, batch_size: int):
+    def step(self, edge_index, events: int, batch_size: int):
         r_int = np.random.randint
-        n_users = self._nusers
         n_items = self._nitems
         ui_dict = self._ui_dict
         lui_dict = self._lui_dict
 
-        def sample():
-            u = r_int(n_users)
-            ui = ui_dict[u]
-            lui = lui_dict[u]
+        def sample(idx):
+            ui = edge_index[idx]
+            u_pos = ui_dict[ui[0]]
+            lui = lui_dict[ui[0]]
             if lui == n_items:
-                sample()
-            i = ui[r_int(lui)]
+                sample(idx)
+            i = ui[1]
 
             j = r_int(n_items)
-            while j in ui:
+            while j in u_pos:
                 j = r_int(n_items)
-            return u, i, j
+            return ui[0], i, j
 
         for batch_start in range(0, events, batch_size):
-            bui, bii, bij = map(np.array, zip(*[sample() for _ in range(batch_start, min(batch_start + batch_size, events))]))
+            bui, bii, bij = map(np.array, zip(*[sample(i) for i in range(batch_start, min(batch_start + batch_size, events))]))
             yield bui[:, None], bii[:, None], bij[:, None]

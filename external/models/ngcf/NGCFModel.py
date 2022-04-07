@@ -87,44 +87,36 @@ class NGCFModel(torch.nn.Module, ABC):
         self.propagation_network = torch_geometric.nn.Sequential('x, edge_index', propagation_network_list)
         self.propagation_network.to(self.device)
 
+        # placeholder for calculated user and item embeddings
+        self.user_embeddings = torch.nn.init.xavier_uniform_(torch.rand((self.num_users, self.embed_k)))
+        self.user_embeddings.to(self.device)
+        self.item_embeddings = torch.nn.init.xavier_uniform_(torch.rand((self.num_items, self.embed_k)))
+        self.item_embeddings.to(self.device)
+
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
-        self.lr_scheduler = self.set_lr_scheduler()
 
-    def set_lr_scheduler(self):
-        scheduler = torch.optim.lr_scheduler.LambdaLR(self.optimizer, lr_lambda=lambda epoch: 0.96 ** (epoch / 50))
-        return scheduler
-
-    def propagate_embeddings(self, evaluate=False):
+    def propagate_embeddings(self):
         ego_embeddings = torch.cat((self.Gu.weight.to(self.device), self.Gi.weight.to(self.device)), 0)
         all_embeddings = [ego_embeddings]
         embedding_idx = 0
 
         for layer in range(0, self.n_layers * 2, 2):
-            if not evaluate:
-                dropout_edge_index = list(
-                    self.propagation_network.children()
-                )[layer](self.edge_index.to(self.device))
-                adj = SparseTensor(row=torch.cat([dropout_edge_index[0], dropout_edge_index[1]], dim=0),
-                                   col=torch.cat([dropout_edge_index[1], dropout_edge_index[0]], dim=0),
-                                   sparse_sizes=(self.num_users + self.num_items,
-                                                 self.num_users + self.num_items))
-                all_embeddings += [torch.nn.functional.normalize(self.dropout_layers[embedding_idx](list(
-                    self.propagation_network.children()
-                )[layer + 1](all_embeddings[embedding_idx].to(self.device), adj.to(self.device))), p=2, dim=1)]
-            else:
-                self.propagation_network.eval()
-                with torch.no_grad():
-                    all_embeddings += [torch.nn.functional.normalize(list(
-                        self.propagation_network.children()
-                    )[layer + 1](all_embeddings[embedding_idx].to(self.device), self.adj.to(self.device)), p=2, dim=1)]
-
+            dropout_edge_index = list(
+                self.propagation_network.children()
+            )[layer](self.edge_index.to(self.device))
+            adj = SparseTensor(row=torch.cat([dropout_edge_index[0], dropout_edge_index[1]], dim=0),
+                               col=torch.cat([dropout_edge_index[1], dropout_edge_index[0]], dim=0),
+                               sparse_sizes=(self.num_users + self.num_items,
+                                             self.num_users + self.num_items))
+            all_embeddings += [torch.nn.functional.normalize(self.dropout_layers[embedding_idx](list(
+                self.propagation_network.children()
+            )[layer + 1](all_embeddings[embedding_idx].to(self.device), adj.to(self.device))), p=2, dim=1)]
             embedding_idx += 1
-
-        if evaluate:
-            self.propagation_network.train()
 
         all_embeddings = torch.cat(all_embeddings, 1)
         gu, gi = torch.split(all_embeddings, [self.num_users, self.num_items], 0)
+        self.user_embeddings = gu
+        self.item_embeddings = gi
         return gu, gi
 
     def forward(self, inputs, **kwargs):
@@ -136,8 +128,9 @@ class NGCFModel(torch.nn.Module, ABC):
 
         return xui, gamma_u, gamma_i
 
-    def predict(self, gu, gi, **kwargs):
-        return torch.matmul(gu.to(self.device), torch.transpose(gi.to(self.device), 0, 1))
+    def predict(self, start, stop, **kwargs):
+        return torch.matmul(self.user_embeddings[start: stop].to(self.device),
+                            torch.transpose(self.item_embeddings.to(self.device), 0, 1))
 
     def train_step(self, batch):
         gu, gi = self.propagate_embeddings()

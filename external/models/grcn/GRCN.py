@@ -15,7 +15,7 @@ import torch
 import os
 
 from elliot.utils.write import store_recommendation
-from elliot.dataset.samplers import custom_sampler as cs
+from elliot.dataset.samplers import custom_sampler_full as csf
 from elliot.recommender import BaseRecommenderModel
 from elliot.recommender.base_recommender_model import init_charger
 from elliot.recommender.recommender_utils_mixin import RecMixin
@@ -42,6 +42,9 @@ class GRCN(RecMixin, BaseRecommenderModel):
         modalities: Tuple of modalities
         aggregation: Type of aggregation
         weight_mode: Type of weight
+        pruning: Whether to pruning or not
+        has_act: Whether to use activation or not
+        fusion_mode: Type of multimodal fusion
 
     To include the recommendation model, add it to the config file adopting the following pattern:
 
@@ -62,15 +65,13 @@ class GRCN(RecMixin, BaseRecommenderModel):
           modalities: (visual,textual)
           aggregation: concat
           weight_mode: max
+          pruning: True
+          has_act: False
+          fusion_mode: concat
     """
 
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
-
-        self._sampler = cs.Sampler(self._data.i_train_dict)
-        if self._batch_size < 1:
-            self._batch_size = self._num_users
-
         ######################################
 
         self._params_list = [
@@ -82,12 +83,21 @@ class GRCN(RecMixin, BaseRecommenderModel):
             ("_factors_multimod", "factors_multimod", "factors_multimod", 64, int, None),
             ("_modalities", "modalities", "modalites", "('visual','textual')", lambda x: list(make_tuple(x)),
              lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
-            ("_aggregation", "aggregation", "aggregation", 'concat', str, None),
-            ("_weight_mode", "weight_mode", "weight_mode", 'max', str, None),
+            ("_aggregation", "aggregation", "aggr", 'concat', str, None),
+            ("_weight_mode", "weight_mode", "w_mod", 'max', str, None),
+            ("_pruning", "pruning", "prun", True, bool, None),
+            ("_has_act", "has_act", "act", False, bool, None),
+            ("_fusion_mode", "fusion_mode", "f_mod", 'concat', str, None),
             ("_loaders", "loaders", "loads", "('VisualAttribute','TextualAttribute')", lambda x: list(make_tuple(x)),
              lambda x: self._batch_remove(str(x), " []").replace(",", "-"))
         ]
         self.autoset_params()
+
+        np.random.seed(self._seed)
+
+        self._sampler = csf.Sampler(self._data.i_train_dict, self._seed)
+        if self._batch_size < 1:
+            self._batch_size = self._num_users
 
         for m_id, m in enumerate(self._modalities):
             self.__setattr__(f'''_side_{m}''',
@@ -96,6 +106,17 @@ class GRCN(RecMixin, BaseRecommenderModel):
         row, col = data.sp_i_train.nonzero()
         col = [c + self._num_users for c in col]
         _, counts = np.unique(row, return_counts=True)
+        ptr = [0]
+        c = counts.tolist()
+        for i in range(len(c)):
+            ptr += [ptr[i] + c[i]]
+        ptr = torch.tensor(np.array(ptr), dtype=torch.int64)
+        _, counts_full = np.unique(np.concatenate((row, np.array(col))), return_counts=True)
+        ptr_full = [0]
+        c_full = counts_full.tolist()
+        for i in range(len(c_full)):
+            ptr_full += [ptr_full[i] + c_full[i]]
+        ptr_full = torch.tensor(np.array(ptr_full), dtype=torch.int64)
         edge_index = np.array([row, col])
         edge_index = torch.tensor(edge_index, dtype=torch.int64)
         self.adj = SparseTensor(row=torch.cat([edge_index[0], edge_index[1]], dim=0),
@@ -118,13 +139,17 @@ class GRCN(RecMixin, BaseRecommenderModel):
             modalities=self._modalities,
             aggregation=self._aggregation,
             weight_mode=self._weight_mode,
+            pruning=self._pruning,
+            has_act=self._has_act,
+            fusion_mode=self._fusion_mode,
             multimodal_features=[self.__getattribute__(f'''_side_{m}''').object.get_all_features() for m in
                                  self._modalities],
             adj=self.adj,
             adj_user=self.adj_user,
             rows=row,
             cols=col,
-            size_rows=counts,
+            ptr=ptr,
+            ptr_full=ptr_full,
             random_seed=self._seed
         )
 
@@ -138,17 +163,20 @@ class GRCN(RecMixin, BaseRecommenderModel):
         if self._restore:
             return self.restore_weights()
 
+        row, col = self._data.sp_i_train.nonzero()
+        edge_index = np.array([row, col]).transpose()
+
         for it in self.iterate(self._epochs):
             loss = 0
             steps = 0
             self._model.train()
+            np.random.shuffle(edge_index)
             with tqdm(total=int(self._data.transactions // self._batch_size), disable=not self._verbose) as t:
-                for batch in self._sampler.step(self._data.transactions, self._batch_size):
+                for batch in self._sampler.step(edge_index, self._data.transactions, self._batch_size):
                     steps += 1
                     loss += self._model.train_step(batch)
                     t.set_postfix({'loss': f'{loss / steps:.5f}'})
                     t.update()
-                self._model.lr_scheduler.step()
 
             self.evaluate(it, loss / (it + 1))
 
@@ -157,10 +185,9 @@ class GRCN(RecMixin, BaseRecommenderModel):
         predictions_top_k_val = {}
         self._model.eval()
         with torch.no_grad():
-            gu, gi = self._model.propagate_embeddings()
             for index, offset in enumerate(range(0, self._num_users, self._batch_size)):
                 offset_stop = min(offset + self._batch_size, self._num_users)
-                predictions = self._model.predict(gu[offset: offset_stop], gi)
+                predictions = self._model.predict(offset, offset_stop)
                 recs_val, recs_test = self.process_protocol(k, predictions, offset, offset_stop)
                 predictions_top_k_val.update(recs_val)
                 predictions_top_k_test.update(recs_test)

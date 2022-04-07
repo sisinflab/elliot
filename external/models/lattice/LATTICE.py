@@ -12,12 +12,14 @@ from ast import literal_eval as make_tuple
 from tqdm import tqdm
 import torch
 import os
+import numpy as np
 
 from elliot.utils.write import store_recommendation
-from elliot.dataset.samplers import custom_sampler as cs
+from elliot.dataset.samplers import custom_sampler_batch as csb
 from elliot.recommender import BaseRecommenderModel
 from elliot.recommender.base_recommender_model import init_charger
 from elliot.recommender.recommender_utils_mixin import RecMixin
+from torch_sparse import SparseTensor
 from .LATTICEModel import LATTICEModel
 
 
@@ -31,6 +33,7 @@ class LATTICE(RecMixin, BaseRecommenderModel):
         lr: Learning rate
         epochs: Number of epochs
         n_layers: Number of propagation layers for the item-item graph
+        n_ui_layers: Number of propagation layers for the user-item graph
         factors: Number of latent factors
         factors_multimod: Tuple with number of units for each modality
         batch_size: Batch size
@@ -44,12 +47,13 @@ class LATTICE(RecMixin, BaseRecommenderModel):
     .. code:: yaml
 
       models:
-        MMGCN:
+        LATTICE:
           meta:
             save_recs: True
           lr: 0.0001
           epochs: 400
-          n_layers: 3
+          n_layers: 1
+          n_ui_layers: 3
           factors: 64
           factors_multimod: 64
           batch_size: 1024
@@ -61,18 +65,14 @@ class LATTICE(RecMixin, BaseRecommenderModel):
 
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
-
-        self._sampler = cs.Sampler(self._data.i_train_dict)
-        if self._batch_size < 1:
-            self._batch_size = self._num_users
-
         ######################################
 
         self._params_list = [
             ("_learning_rate", "lr", "lr", 0.0005, float, None),
             ("_factors", "factors", "factors", 64, int, None),
             ("_l_w", "l_w", "l_w", 0.01, float, None),
-            ("_n_layers", "n_layers", "n_layers", 3, int, None),
+            ("_n_layers", "n_layers", "n_layers", 1, int, None),
+            ("_n_ui_layers", "n_ui_layers", "n_ui_layers", 3, int, None),
             ("_top_k", "top_k", "top_k", 100, int, None),
             ("_factors_multimod", "factors_multimod", "factors_multimod", 64, int, None),
             ("_modalities", "modalities", "modalites", "('visual','textual')", lambda x: list(make_tuple(x)),
@@ -83,14 +83,28 @@ class LATTICE(RecMixin, BaseRecommenderModel):
         ]
         self.autoset_params()
 
+        self._sampler = csb.Sampler(self._data.i_train_dict, self._seed)
+        if self._batch_size < 1:
+            self._batch_size = self._num_users
+
         for m_id, m in enumerate(self._modalities):
             self.__setattr__(f'''_side_{m}''',
                              self._data.side_information.__getattribute__(f'''{self._loaders[m_id]}'''))
+
+        row, col = data.sp_i_train.nonzero()
+        col = [c + self._num_users for c in col]
+        edge_index = np.array([row, col])
+        edge_index = torch.tensor(edge_index, dtype=torch.int64)
+        self.adj = SparseTensor(row=torch.cat([edge_index[0], edge_index[1]], dim=0),
+                                col=torch.cat([edge_index[1], edge_index[0]], dim=0),
+                                sparse_sizes=(self._num_users + self._num_items,
+                                              self._num_users + self._num_items))
 
         self._model = LATTICEModel(
             num_users=self._num_users,
             num_items=self._num_items,
             num_layers=self._n_layers,
+            num_ui_layers=self._n_ui_layers,
             learning_rate=self._learning_rate,
             embed_k=self._factors,
             embed_k_multimod=self._factors_multimod,
@@ -100,6 +114,7 @@ class LATTICE(RecMixin, BaseRecommenderModel):
             top_k=self._top_k,
             multimodal_features=[self.__getattribute__(f'''_side_{m}''').object.get_all_features() for m in
                                  self._modalities],
+            adj=self.adj,
             random_seed=self._seed
         )
 
@@ -134,10 +149,10 @@ class LATTICE(RecMixin, BaseRecommenderModel):
         predictions_top_k_val = {}
         self._model.eval()
         with torch.no_grad():
-            gim = self._model.propagate_embeddings(build_item_graph=True)
+            gum, gim = self._model.propagate_embeddings(build_item_graph=True)
             for index, offset in enumerate(range(0, self._num_users, self._batch_size)):
                 offset_stop = min(offset + self._batch_size, self._num_users)
-                predictions = self._model.predict(offset, offset_stop, gim)
+                predictions = self._model.predict(gum[offset: offset_stop], gim)
                 recs_val, recs_test = self.process_protocol(k, predictions, offset, offset_stop)
                 predictions_top_k_val.update(recs_val)
                 predictions_top_k_test.update(recs_test)

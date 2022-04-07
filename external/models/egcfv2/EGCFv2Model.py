@@ -149,28 +149,25 @@ class EGCFv2Model(torch.nn.Module, ABC):
             [node_node_textual_emb[k] * self.alpha[k] for k in range(len(node_node_textual_emb))])
         gu, gi = torch.split(node_node_collab_emb, [self.num_users, self.num_items], 0)
         gut, git = torch.split(node_node_textual_emb, [self.num_users, self.num_items], 0)
-        return gu, gi, gut, git
+        return gu + gut, gi + git
 
     def forward(self, inputs, **kwargs):
-        gu, gi, gut, git = inputs
+        gu, gi = inputs
         gamma_u = torch.squeeze(gu).to(self.device)
         gamma_i = torch.squeeze(gi).to(self.device)
-        gamma_u_t = torch.squeeze(gut).to(self.device)
-        gamma_i_t = torch.squeeze(git).to(self.device)
 
-        xui = torch.sum(gamma_u * gamma_i, 1) + torch.sum(gamma_u_t * gamma_i_t, 1)
+        xui = torch.sum(gamma_u * gamma_i, 1)
 
         return xui
 
-    def predict(self, gu, gi, gut, git, **kwargs):
-        return torch.matmul(gu.to(self.device), torch.transpose(gi.to(self.device), 0, 1)) + \
-               torch.matmul(gut.to(self.device), torch.transpose(git.to(self.device), 0, 1))
+    def predict(self, gu, gi, **kwargs):
+        return torch.matmul(gu.to(self.device), torch.transpose(gi.to(self.device), 0, 1))
 
     def train_step(self, batch):
-        gu, gi, gut, git = self.propagate_embeddings()
+        gu, gi = self.propagate_embeddings()
         user, pos, neg = batch
-        xu_pos = self.forward(inputs=(gu[user[:, 0]], gi[pos[:, 0]], gut[user[:, 0]], git[pos[:, 0]]))
-        xu_neg = self.forward(inputs=(gu[user[:, 0]], gi[neg[:, 0]], gut[user[:, 0]], git[neg[:, 0]]))
+        xu_pos = self.forward(inputs=(gu[user[:, 0]], gi[pos[:, 0]]))
+        xu_neg = self.forward(inputs=(gu[user[:, 0]], gi[neg[:, 0]]))
         difference = torch.clamp(xu_pos - xu_neg, -80.0, 1e8)
         loss = torch.sum(self.softplus(-difference))
         reg_loss = self.l_w * (torch.norm(self.Gu, 2) +

@@ -31,6 +31,7 @@ for _backend in sys.modules["external"].backend:
     if _backend == "tensorflow":
         from .hrdr.HRDR import HRDR
         from .deepconn.DeepCoNN import DeepCoNN
+        from .rmg.RMG import RMG
     elif _backend == "pytorch":
         from .ngcf.NGCF import NGCF
         from .lightgcn.LightGCN import LightGCN
@@ -42,10 +43,13 @@ for _backend in sys.modules["external"].backend:
         from .dgcf.DGCF import DGCF
         from .egcf.EGCF import EGCF
         from .lgacn.LGACN import LGACN
-        from .kgcn.KGCN import KGCN
+        # from .kgcn.KGCN import KGCN
         from .lightegcf.LightEGCF import LightEGCF
         from .gcn.GCN import GCN
         from .egcfv2.EGCFv2 import EGCFv2
         from .bprmf.BPRMF import BPRMF
         from .vbpr.VBPR import VBPR
+        from .grcn.GRCN import GRCN
+        from .mgat.MGAT import MGAT
         from .lattice.LATTICE import LATTICE
+        from .slattice.SLATTICE import SLATTICE

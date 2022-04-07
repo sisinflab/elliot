@@ -51,32 +51,26 @@ class BPRMFModel(torch.nn.Module, ABC):
         self.Gi.to(self.device)
 
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
-        self.lr_scheduler = self.set_lr_scheduler()
-
-    def set_lr_scheduler(self):
-        scheduler = torch.optim.lr_scheduler.LambdaLR(self.optimizer, lr_lambda=lambda epoch: 0.96 ** (epoch / 50))
-        return scheduler
 
     def forward(self, inputs, **kwargs):
         users, items = inputs
-        gamma_u = torch.squeeze(self.Gu[users]).to(self.device)
-        gamma_i = torch.squeeze(self.Gi[items]).to(self.device)
+        gamma_u = torch.squeeze(self.Gu.weight[users]).to(self.device)
+        gamma_i = torch.squeeze(self.Gi.weight[items]).to(self.device)
 
         xui = torch.sum(gamma_u * gamma_i, 1)
 
         return xui, gamma_u, gamma_i
 
     def predict(self, start, stop, **kwargs):
-        return torch.matmul(self.Gu[start:stop].to(self.device),
-                            torch.transpose(self.Gi.to(self.device), 0, 1))
+        return torch.matmul(self.Gu.weight[start:stop].to(self.device),
+                            torch.transpose(self.Gi.weight.to(self.device), 0, 1))
 
     def train_step(self, batch):
         user, pos, neg = batch
         xu_pos, gamma_u, gamma_i_pos = self.forward(inputs=(user, pos))
         xu_neg, _, gamma_i_neg = self.forward(inputs=(user, neg))
 
-        difference = torch.clamp(xu_pos - xu_neg, -80.0, 1e8)
-        loss = torch.mean(torch.nn.functional.softplus(-difference))
+        loss = -torch.mean(torch.nn.functional.logsigmoid(xu_pos - xu_neg))
         reg_loss = self.l_w * (1 / 2) * (gamma_u.norm(2).pow(2) +
                                          gamma_i_pos.norm(2).pow(2) +
                                          gamma_i_neg.norm(2).pow(2)) / user.shape[0]
