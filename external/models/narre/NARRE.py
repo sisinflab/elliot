@@ -54,8 +54,7 @@ class NARRE(RecMixin, BaseRecommenderModel):
             self._interactions_textual.object.users_tokens,
             self._interactions_textual.object.items_tokens,
             self._interactions_textual.object.pos_users,
-            self._interactions_textual.object.pos_items,
-            self._seed
+            self._interactions_textual.object.pos_items
         )
 
         self._model = NARREModel(

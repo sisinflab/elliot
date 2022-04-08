@@ -1,11 +1,8 @@
-import random
 import numpy as np
 
 
 class Sampler:
-    def __init__(self, ui_dict, public_users, public_items, users_tokens, items_tokens, pos_user, pos_item, seed=42):
-        np.random.seed(seed)
-        random.seed(seed)
+    def __init__(self, ui_dict, public_users, public_items, users_tokens, items_tokens, pos_user, pos_item):
         self._ui_dict = ui_dict
         self._users = list(self._ui_dict.keys())
         self._nusers = len(self._users)

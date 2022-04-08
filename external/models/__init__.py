@@ -31,7 +31,9 @@ for _backend in sys.modules["external"].backend:
     if _backend == "tensorflow":
         from .hrdr.HRDR import HRDR
         from .deepconn.DeepCoNN import DeepCoNN
+        from .deepconnpp.DeepCoNNpp import DeepCoNNpp
         from .rmg.RMG import RMG
+        from .narre.NARRE import NARRE
     elif _backend == "pytorch":
         from .ngcf.NGCF import NGCF
         from .lightgcn.LightGCN import LightGCN
