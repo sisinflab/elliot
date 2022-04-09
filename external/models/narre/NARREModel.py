@@ -23,6 +23,7 @@ class NARREModel(tf.keras.Model, ABC):
                  attention_size_item,
                  latent_size,
                  n_latent,
+                 pretrained,
                  dropout_rate,
                  random_seed,
                  name="NARRE",
@@ -50,18 +51,27 @@ class NARREModel(tf.keras.Model, ABC):
         self.attention_size_user = attention_size_user
         self.attention_size_item = attention_size_item
         self.n_latent = n_latent
+        self.pretrained = pretrained
 
         # user and item vocabulary
-        self.W1 = tf.Variable(tf.convert_to_tensor(users_vocabulary_features, dtype=tf.float32))
-        self.W2 = tf.Variable(tf.convert_to_tensor(items_vocabulary_features, dtype=tf.float32))
+        if self.pretrained:
+            self.W1 = tf.Variable(tf.convert_to_tensor(users_vocabulary_features, dtype=tf.float32))
+            self.W2 = tf.Variable(tf.convert_to_tensor(items_vocabulary_features, dtype=tf.float32))
+        else:
+            self.W1 = tf.Variable(
+                tf.initializers.random_uniform(-0.1, 0.1)(shape=[users_vocabulary_features.shape[0], 300]))
+            self.W2 = tf.Variable(
+                tf.initializers.random_uniform(-0.1, 0.1)(shape=[items_vocabulary_features.shape[0], 300]))
 
         self.textual_words_feature_shape = textual_words_feature_shape
 
         # user and item embeddings
         self.iidW = tf.Variable(tf.initializers.random_uniform(-0.1, 0.1)(shape=[self.num_items + 2, self.latent_size]))
         self.uidW = tf.Variable(tf.initializers.random_uniform(-0.1, 0.1)(shape=[self.num_users + 2, self.latent_size]))
-        self.iidmf = tf.Variable(tf.initializers.random_uniform(-0.1, 0.1)(shape=[self.num_items + 2, self.latent_size]))
-        self.uidmf = tf.Variable(tf.initializers.random_uniform(-0.1, 0.1)(shape=[self.num_users + 2, self.latent_size]))
+        self.iidmf = tf.Variable(
+            tf.initializers.random_uniform(-0.1, 0.1)(shape=[self.num_items + 2, self.latent_size]))
+        self.uidmf = tf.Variable(
+            tf.initializers.random_uniform(-0.1, 0.1)(shape=[self.num_users + 2, self.latent_size]))
 
         # cnn
         self.user_convolutions = []

@@ -38,6 +38,7 @@ class NARRE(RecMixin, BaseRecommenderModel):
             ("_att_i", "att_i", "att_i", 100, int, None),
             ("_lat_s", "lat_s", "lat_s", 100, int, None),
             ("_n_lat", "n_lat", "n_lat", 100, int, None),
+            ("_pretr", "pretr", "pretr", True, bool, None),
             ("_dropout", "dropout", "dropout", 0.5, float, None),
             ("_loader", "loader", "loader", 'WordsTextualAttributes', str, None)
         ]
@@ -74,6 +75,7 @@ class NARRE(RecMixin, BaseRecommenderModel):
             latent_size=self._lat_s,
             n_latent=self._n_lat,
             dropout_rate=self._dropout,
+            pretrained=self._pretr,
             random_seed=self._seed,
         )
 

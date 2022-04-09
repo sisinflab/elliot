@@ -35,6 +35,7 @@ class DeepCoNN(RecMixin, BaseRecommenderModel):
             ("_i_rev_cnn_features", "i_rev_cnn_features", "i_rev_cnn_features", 100, int, None),
             ("_latent_size", "latent_size", "latent_size", 128, int, None),
             ("_fm_k", "fm_k", "fm_k", 8, int, None),
+            ("_pretr", "pretr", "pretr", True, bool, None),
             ("_dropout", "dropout", "dropout", 0.5, float, None),
             ("_loader", "loader", "loader", 'WordsTextualAttributes', str, None)
         ]
@@ -65,6 +66,7 @@ class DeepCoNN(RecMixin, BaseRecommenderModel):
             latent_size=self._latent_size,
             dropout_rate=self._dropout,
             fm_k=self._fm_k,
+            pretrained=self._pretr,
             random_seed=self._seed
         )
 

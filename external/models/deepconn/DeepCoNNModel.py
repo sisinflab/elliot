@@ -21,6 +21,7 @@ class DeepCoNNModel(tf.keras.Model, ABC):
                  latent_size,
                  fm_k,
                  dropout_rate,
+                 pretrained,
                  random_seed,
                  name="DeepCoNN",
                  **kwargs
@@ -44,10 +45,17 @@ class DeepCoNNModel(tf.keras.Model, ABC):
         self.latent_size = latent_size
         self.fm_k = fm_k
         self.dropout_rate = dropout_rate
+        self.pretrained = pretrained
 
         # user and item vocabulary
-        self.W1 = tf.Variable(tf.convert_to_tensor(users_vocabulary_features, dtype=tf.float32))
-        self.W2 = tf.Variable(tf.convert_to_tensor(items_vocabulary_features, dtype=tf.float32))
+        if self.pretrained:
+            self.W1 = tf.Variable(tf.convert_to_tensor(users_vocabulary_features, dtype=tf.float32))
+            self.W2 = tf.Variable(tf.convert_to_tensor(items_vocabulary_features, dtype=tf.float32))
+        else:
+            self.W1 = tf.Variable(
+                tf.initializers.random_uniform(-0.1, 0.1)(shape=[users_vocabulary_features.shape[0], 300]))
+            self.W2 = tf.Variable(
+                tf.initializers.random_uniform(-0.1, 0.1)(shape=[items_vocabulary_features.shape[0], 300]))
 
         self.textual_words_feature_shape = textual_words_feature_shape
 
