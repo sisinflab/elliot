@@ -20,8 +20,8 @@ class Sampler:
         self._public_items[last_private_item] = last_publict_item
         self._users_tokens = {self._public_users[u]: v for u, v in users_tokens.items()}
         self._items_tokens = {self._public_items[i]: v for i, v in items_tokens.items()}
-        self._pos_user = {self._public_users[u]: [self._public_items[i] for i in v] for u, v in pos_user.items()}
-        self._pos_item = {self._public_items[i]: [self._public_users[u] for u in v] for i, v in pos_item.items()}
+        self._pos_user = pos_user
+        self._pos_item = pos_item
 
     def step(self, edge_index, events: int, batch_size: int):
         n_items = self._nitems
