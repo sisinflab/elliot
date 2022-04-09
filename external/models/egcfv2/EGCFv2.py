@@ -1,12 +1,3 @@
-"""
-Module description:
-
-"""
-
-__version__ = '0.3.0'
-__author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta'
-__email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malitesta@poliba.it'
-
 from tqdm import tqdm
 import numpy as np
 import torch
@@ -26,7 +17,7 @@ from torch_sparse import SparseTensor
 
 class EGCFv2(RecMixin, BaseRecommenderModel):
     r"""
-    Edge-Based Graph Collaborative Filtering (version 2)
+    Edge Graph Collaborative Filtering
     """
 
     @init_charger
@@ -58,7 +49,7 @@ class EGCFv2(RecMixin, BaseRecommenderModel):
                                           sparse_sizes=(self._num_users + self._num_items,
                                                         self._num_users + self._num_items))
 
-        edge_features, interactions_sorted_by_items = self._side_edge_textual.object.get_all_features()
+        edge_features = self._side_edge_textual.object.get_all_features()
 
         self._model = EGCFv2Model(
             num_users=self._num_users,
@@ -68,7 +59,6 @@ class EGCFv2(RecMixin, BaseRecommenderModel):
             l_w=self._l_w,
             n_layers=self._n_layers,
             edge_features=edge_features,
-            interactions_sorted_by_items=interactions_sorted_by_items,
             node_node_adj=self.node_node_adj,
             rows=row,
             cols=col,
@@ -100,10 +90,10 @@ class EGCFv2(RecMixin, BaseRecommenderModel):
     def get_recommendations(self, k: int = 100):
         predictions_top_k_test = {}
         predictions_top_k_val = {}
-        gu, gi = self._model.propagate_embeddings(evaluate=True)
+        gu, gi, gut, git = self._model.propagate_embeddings(evaluate=True)
         for index, offset in enumerate(range(0, self._num_users, self._batch_size)):
             offset_stop = min(offset + self._batch_size, self._num_users)
-            predictions = self._model.predict(gu[offset: offset_stop], gi)
+            predictions = self._model.predict(gu[offset: offset_stop], gi, gut[offset: offset_stop], git)
             recs_val, recs_test = self.process_protocol(k, predictions, offset, offset_stop)
             predictions_top_k_val.update(recs_val)
             predictions_top_k_test.update(recs_test)
