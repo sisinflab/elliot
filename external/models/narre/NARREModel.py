@@ -58,10 +58,10 @@ class NARREModel(tf.keras.Model, ABC):
         self.textual_words_feature_shape = textual_words_feature_shape
 
         # user and item embeddings
-        self.iidW = tf.Variable(tf.initializers.random_uniform(-0.1, 0.1)(shape=[self.num_items + 1, self.latent_size]))
-        self.uidW = tf.Variable(tf.initializers.random_uniform(-0.1, 0.1)(shape=[self.num_users + 1, self.latent_size]))
-        self.iidmf = tf.Variable(tf.initializers.random_uniform(-0.1, 0.1)(shape=[self.num_items + 1, self.latent_size]))
-        self.uidmf = tf.Variable(tf.initializers.random_uniform(-0.1, 0.1)(shape=[self.num_users + 1, self.latent_size]))
+        self.iidW = tf.Variable(tf.initializers.random_uniform(-0.1, 0.1)(shape=[self.num_items + 2, self.latent_size]))
+        self.uidW = tf.Variable(tf.initializers.random_uniform(-0.1, 0.1)(shape=[self.num_users + 2, self.latent_size]))
+        self.iidmf = tf.Variable(tf.initializers.random_uniform(-0.1, 0.1)(shape=[self.num_items + 2, self.latent_size]))
+        self.uidmf = tf.Variable(tf.initializers.random_uniform(-0.1, 0.1)(shape=[self.num_users + 2, self.latent_size]))
 
         # cnn
         self.user_convolutions = []
@@ -109,8 +109,8 @@ class NARREModel(tf.keras.Model, ABC):
 
         # ncf
         self.Wmul = tf.Variable(tf.initializers.random_uniform(-0.1, 0.1)(shape=[self.n_latent, 1]))
-        self.uidW2 = tf.Variable(tf.constant(0.1, shape=[self.num_users]))
-        self.iidW2 = tf.Variable(tf.constant(0.1, shape=[self.num_items]))
+        self.uidW2 = tf.Variable(tf.constant(0.1, shape=[self.num_users + 2]))
+        self.iidW2 = tf.Variable(tf.constant(0.1, shape=[self.num_items + 2]))
         self.bised = tf.Variable(tf.constant(0.1))
 
         self.optimizer = tf.optimizers.Adam(self.learning_rate, beta_1=0.9, beta_2=0.999, epsilon=1e-8)
