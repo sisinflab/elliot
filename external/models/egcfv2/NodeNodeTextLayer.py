@@ -32,6 +32,7 @@ class NodeNodeTextLayer(MessagePassing, ABC):
         # weights = torch.nn.functional.relu(weights)
         inputs = torch.cat([node_attr_rows, edge_attr, node_attr_cols], dim=1)
         weights = self.activation2(self.lin2(self.activation1(self.lin1(inputs))))
+        print(weights.shape)
         edge_index = mul_nnz(edge_index, weights, layout='coo')
 
         if self.normalize:
