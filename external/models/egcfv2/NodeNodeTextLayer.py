@@ -31,8 +31,7 @@ class NodeNodeTextLayer(MessagePassing, ABC):
         # weights = torch.nn.functional.cosine_similarity(torch.mul(node_attr, edge_attr), node_attr, dim=1)
         # weights = torch.nn.functional.relu(weights)
         inputs = torch.cat([node_attr_rows, edge_attr, node_attr_cols], dim=1)
-        weights = self.activation2(self.lin2(self.activation1(self.lin1(inputs))))
-        print(weights.shape)
+        weights = torch.squeeze(self.activation2(self.lin2(self.activation1(self.lin1(inputs)))))
         edge_index = mul_nnz(edge_index, weights, layout='coo')
 
         if self.normalize:
