@@ -18,20 +18,14 @@ def apply_norm(original_edge_index, current_edge_index, add_self_loops=True):
 
 
 class NodeNodeTextLayer(MessagePassing, ABC):
-    def __init__(self, embed_dim, normalize=True):
+    def __init__(self, normalize=True):
         super(NodeNodeTextLayer, self).__init__(aggr='add')
         self.normalize = normalize
-        self.lin1 = torch.nn.Linear(3 * embed_dim, embed_dim)
-        self.lin2 = torch.nn.Linear(embed_dim, 1)
-        self.activation1 = torch.nn.LeakyReLU()
-        self.activation2 = torch.nn.Sigmoid()
 
     def forward(self, x, edge_index, node_attr_rows, node_attr_cols, edge_attr):
         original_edge_index = edge_index
-        # weights = torch.nn.functional.cosine_similarity(torch.mul(node_attr, edge_attr), node_attr, dim=1)
-        # weights = torch.nn.functional.relu(weights)
-        inputs = torch.cat([node_attr_rows, edge_attr, node_attr_cols], dim=1)
-        weights = torch.squeeze(self.activation2(self.lin2(self.activation1(self.lin1(inputs)))))
+        weights = torch.nn.functional.cosine_similarity(torch.mul(node_attr_rows, edge_attr), torch.mul(node_attr_cols, edge_attr), dim=1)
+        weights = torch.nn.functional.sigmoid(weights)
         edge_index = mul_nnz(edge_index, weights, layout='coo')
 
         if self.normalize:
