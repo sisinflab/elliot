@@ -23,7 +23,7 @@ class NodeNodeTextLayer(MessagePassing, ABC):
         self.normalize = normalize
         self.lin1 = torch.nn.Linear(3 * embed_dim, embed_dim)
         self.lin2 = torch.nn.Linear(embed_dim, 1)
-        self.activation1 = torch.nn.ReLU()
+        self.activation1 = torch.nn.LeakyReLU()
         self.activation2 = torch.nn.Sigmoid()
 
     def forward(self, x, edge_index, node_attr_rows, node_attr_cols, edge_attr):
