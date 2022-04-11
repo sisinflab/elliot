@@ -80,7 +80,7 @@ class EGCFv2Model(torch.nn.Module, ABC):
         propagation_node_node_textual_list = []
         for _ in range(self.n_layers):
             propagation_node_node_textual_list.append(
-                (NodeNodeTextLayer(), 'x, edge_index -> x'))
+                (NodeNodeTextLayer(self.embed_k), 'x, edge_index -> x'))
 
         self.node_node_textual_network = torch_geometric.nn.Sequential('x, edge_index',
                                                                        propagation_node_node_textual_list)
@@ -101,6 +101,9 @@ class EGCFv2Model(torch.nn.Module, ABC):
 
         for layer in range(self.n_layers):
             user_item_embeddings_interactions = torch.cat([
+                node_node_textual_emb[layer][:self.num_users][self.rows],
+                node_node_textual_emb[layer][self.num_users:][self.cols - self.num_users]], dim=0)
+            item_user_embeddings_interactions = torch.cat([
                 node_node_textual_emb[layer][self.num_users:][self.cols - self.num_users],
                 node_node_textual_emb[layer][:self.num_users][self.rows]], dim=0)
 
@@ -120,6 +123,7 @@ class EGCFv2Model(torch.nn.Module, ABC):
                     )[layer](node_node_textual_emb[layer].to(self.device),
                              self.node_node_adj.to(self.device),
                              user_item_embeddings_interactions.to(self.device),
+                             item_user_embeddings_interactions.to(self.device),
                              edge_embeddings_interactions_projected.to(self.device))]
                 self.node_node_collab_network.train()
                 self.node_node_textual_network.train()
@@ -136,6 +140,7 @@ class EGCFv2Model(torch.nn.Module, ABC):
                 )[layer](node_node_textual_emb[layer].to(self.device),
                          self.node_node_adj.to(self.device),
                          user_item_embeddings_interactions.to(self.device),
+                         item_user_embeddings_interactions.to(self.device),
                          edge_embeddings_interactions_projected.to(self.device))]
 
         node_node_collab_emb = sum([node_node_collab_emb[k] * self.alpha[k] for k in range(len(node_node_collab_emb))])
