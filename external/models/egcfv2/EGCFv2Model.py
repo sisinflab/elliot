@@ -80,7 +80,7 @@ class EGCFv2Model(torch.nn.Module, ABC):
         propagation_node_node_textual_list = []
         for _ in range(self.n_layers):
             propagation_node_node_textual_list.append(
-                (NodeNodeTextLayer(self.embed_k), 'x, edge_index -> x'))
+                (NodeNodeTextLayer(), 'x, edge_index -> x'))
 
         self.node_node_textual_network = torch_geometric.nn.Sequential('x, edge_index',
                                                                        propagation_node_node_textual_list)
