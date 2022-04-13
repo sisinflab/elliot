@@ -120,7 +120,7 @@ class DeepCoNNModel(tf.keras.Model, ABC):
                 padding='VALID')
             pooled_outputs_u.append(pooled)
             
-        h_pool_u = tf.concat(pooled_outputs_u, 1)
+        h_pool_u = tf.concat(pooled_outputs_u, 3)
         print(h_pool_u.shape)
         h_pool_flat_u = tf.reshape(h_pool_u, [-1, self.num_filters_total_user])
 
@@ -158,7 +158,7 @@ class DeepCoNNModel(tf.keras.Model, ABC):
                 strides=[1, 1, 1, 1],
                 padding='VALID')
             pooled_outputs_i.append(pooled)
-        h_pool_i = tf.concat(pooled_outputs_i, 1)
+        h_pool_i = tf.concat(pooled_outputs_i, 3)
         h_pool_flat_i = tf.reshape(h_pool_i, [-1, self.num_filters_total_item])
 
         if training:
