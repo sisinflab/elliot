@@ -119,9 +119,11 @@ class DeepCoNNModel(tf.keras.Model, ABC):
                 strides=[1, 1, 1, 1],
                 padding='VALID')
             pooled_outputs_u.append(pooled)
-        print(pooled_outputs_u[0].shape)
+            
         h_pool_u = tf.concat(pooled_outputs_u, 3)
+        print(h_pool_u.shape)
         h_pool_flat_u = tf.reshape(h_pool_u, [-1, self.num_filters_total_user])
+        print(h_pool_flat_u.shape)
 
         if training:
             h_drop_u = tf.nn.dropout(h_pool_flat_u, 0.0)
