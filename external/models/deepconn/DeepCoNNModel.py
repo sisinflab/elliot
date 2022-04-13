@@ -200,8 +200,8 @@ class DeepCoNNModel(tf.keras.Model, ABC):
             i_neg_feas = self.forward_item_embeddings((neg, item_reviews_neg), training=True)
             xu_pos = self(inputs=(u_feas, i_pos_feas), training=True)
             xu_neg = self(inputs=(u_feas, i_neg_feas), training=True)
-            difference = torch.clamp(xu_pos - xu_neg, -80.0, 1e8)
-            loss = torch.sum(self.softplus(-difference))
+            result = tf.clip_by_value(xu_pos - xu_neg, -80.0, 1e8)
+            loss = tf.reduce_sum(tf.nn.softplus(-result))
             
         grads = t.gradient(loss, self.trainable_variables)
         self.optimizer.apply_gradients(zip(grads, self.trainable_variables))
