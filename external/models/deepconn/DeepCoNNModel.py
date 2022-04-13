@@ -173,7 +173,7 @@ class DeepCoNNModel(tf.keras.Model, ABC):
         u_feas, i_feas = inputs
         z = tf.nn.relu(tf.concat([u_feas, i_feas], 1))
 
-        one = tf.squeeze(tf.matmul(z, self.WF1))
+        one = tf.matmul(z, self.WF1)
 
         inte1 = tf.matmul(z, self.WF2)
         inte2 = tf.matmul(tf.square(z), tf.square(self.WF2))
@@ -183,7 +183,7 @@ class DeepCoNNModel(tf.keras.Model, ABC):
         if training:
             inter = tf.nn.dropout(inter, self.dropout_rate)
 
-        inter = tf.reduce_sum(inter, 1)
+        inter = tf.reduce_sum(inter, 1, keepdims=True)
 
         predictions = one + inter + self.B
         return predictions
