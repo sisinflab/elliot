@@ -187,7 +187,7 @@ class DeepCoNNModel(tf.keras.Model, ABC):
 
     @tf.function
     def predict(self, out_users, out_items, batch_user, batch_item):
-        rui = self((out_users, out_items), training=False)
+        rui = tf.math.sigmoid(self((out_users, out_items), training=False))
         return tf.reshape(rui, [batch_user, batch_item])
 
     @tf.function
