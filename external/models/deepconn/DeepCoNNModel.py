@@ -183,9 +183,12 @@ class DeepCoNNModel(tf.keras.Model, ABC):
         if training:
             inter = tf.nn.dropout(inter, self.dropout_rate)
         
-        print(inter.shape)
         inter = tf.reduce_sum(inter, 1)
-
+        
+        print(one.shape)
+        print(inter.shape)
+        print(self.B.shape)
+        
         predictions = one + inter + self.B
         return predictions
 
