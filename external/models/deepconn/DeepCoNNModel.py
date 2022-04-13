@@ -193,7 +193,7 @@ class DeepCoNNModel(tf.keras.Model, ABC):
         rui = self((out_users, out_items), training=False)
         return tf.reshape(rui, [batch_user, batch_item])
 
-    @tf.function
+    #@tf.function
     def train_step(self, batch):
         user, item, r, user_reviews, item_reviews = batch
         print(r)
