@@ -32,7 +32,7 @@ class DeepCoNN(RecMixin, BaseRecommenderModel):
             ("_u_rev_cnn_features", "u_rev_cnn_f", "u_rev_cnn_f", 100, int, None),
             ("_i_rev_cnn_kernel", "i_rev_cnn_k", "i_rev_cnn_k", "(3,)",
              lambda x: list(make_tuple(x)), None),
-            ("_i_rev_cnn_f", "i_rev_cnn_f", "i_rev_cnn_f", 100, int, None),
+            ("_i_rev_cnn_features", "i_rev_cnn_f", "i_rev_cnn_f", 100, int, None),
             ("_latent_size", "lat_s", "lat_s", 128, int, None),
             ("_fm_k", "fm_k", "fm_k", 8, int, None),
             ("_pretr", "pretr", "pretr", True, bool, None),
