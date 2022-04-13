@@ -49,3 +49,11 @@ class Sampler:
         for batch_start in range(0, events, batch_size):
             bui, bii, bij, u_t, i_t_p, i_t_n = map(np.array, zip(*[sample(i) for i in range(batch_start, min(batch_start + batch_size, events))]))
             yield bui[:, None], bii[:, None], bij[:, None], u_t, i_t_p, i_t_n
+
+    @property
+    def users_tokens(self):
+        return self._users_tokens
+
+    @property
+    def items_tokens(self):
+        return self._items_tokens
