@@ -20,6 +20,8 @@ class Sampler:
         self._nitems = len(self._items)
         self._ui_dict = {u: list(set(indexed_ratings[u])) for u in indexed_ratings}
         self._lui_dict = {u: len(v) for u, v in self._ui_dict.items()}
+        self._public_users = public_users
+        self._public_items = public_items
         self._users_tokens = {self._public_users[u]: v for u, v in users_tokens.items()}
         self._items_tokens = {self._public_items[i]: v for i, v in items_tokens.items()}
 
