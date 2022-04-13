@@ -120,7 +120,7 @@ class DeepCoNNModel(tf.keras.Model, ABC):
                 padding='VALID')
             pooled_outputs_u.append(pooled)
             
-        h_pool_u = tf.concat(pooled_outputs_u, 3)
+        h_pool_u = tf.concat(pooled_outputs_u, axis=1)
         h_pool_flat_u = tf.reshape(h_pool_u, [-1, self.num_filters_total_user])
 
         u_fea = self.dense_u(h_pool_flat_u)
@@ -155,7 +155,7 @@ class DeepCoNNModel(tf.keras.Model, ABC):
                 strides=[1, 1, 1, 1],
                 padding='VALID')
             pooled_outputs_i.append(pooled)
-        h_pool_i = tf.concat(pooled_outputs_i, 3)
+        h_pool_i = tf.concat(pooled_outputs_i, axis=1)
         h_pool_flat_i = tf.reshape(h_pool_i, [-1, self.num_filters_total_item])
 
         i_fea = self.dense_i(h_pool_flat_i)
@@ -168,9 +168,9 @@ class DeepCoNNModel(tf.keras.Model, ABC):
     @tf.function
     def call(self, inputs, training=True):
         u_feas, i_feas = inputs
-        z = tf.nn.relu(tf.concat([u_feas, i_feas], 1))
+        z = tf.nn.relu(tf.concat([u_feas, i_feas], -1))
 
-        one = tf.squeeze(tf.matmul(z, self.WF1))
+        one = tf.matmul(z, self.WF1)
 
         inte1 = tf.matmul(z, self.WF2)
         inte2 = tf.matmul(tf.square(z), tf.square(self.WF2))
@@ -180,9 +180,9 @@ class DeepCoNNModel(tf.keras.Model, ABC):
         if training:
             inter = tf.nn.dropout(inter, self.dropout_rate)
         
-        inter = tf.reduce_sum(inter, 1)
+        inter = tf.reduce_sum(inter, -1, keepdims=True)
         
-        predictions = one + inter + self.B
+        predictions = tf.squeeze(one + inter + self.B)
         return predictions
 
     @tf.function
