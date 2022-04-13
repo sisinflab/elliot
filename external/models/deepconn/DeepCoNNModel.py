@@ -190,16 +190,10 @@ class DeepCoNNModel(tf.keras.Model, ABC):
         rui = tf.math.sigmoid(self((out_users, out_items), training=False))
         return tf.reshape(rui, [batch_user, batch_item])
 
-    #@tf.function
+    @tf.function
     def train_step(self, batch):
         #user, item, r, user_reviews, item_reviews = batch
         user, pos, neg, user_reviews, item_reviews_pos, item_reviews_neg = batch
-        print(user.shape)
-        print(pos.shape)
-        print(neg.shape)
-        print(user_reviews.shape)
-        print(item_reviews_pos.shape)
-        print(item_reviews_neg.shape)
         with tf.GradientTape() as t:
             u_feas = self.forward_user_embeddings((user, user_reviews), training=True)
             i_pos_feas = self.forward_item_embeddings((pos, item_reviews_pos), training=True)
