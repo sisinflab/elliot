@@ -3,7 +3,7 @@ from operator import itemgetter
 
 from tqdm import tqdm
 #from .pointwise_pos_neg_sampler import Sampler
-from elliot.dataset.samplers import custom_sampler_full as csf
+from .bpr_loss import Sampler
 from elliot.recommender import BaseRecommenderModel
 from elliot.recommender.base_recommender_model import init_charger
 from elliot.recommender.recommender_utils_mixin import RecMixin
@@ -46,12 +46,12 @@ class DeepCoNN(RecMixin, BaseRecommenderModel):
 
         self._interactions_textual = self._data.side_information.WordsTextualAttributes
 
-        self._sampler = cfs.Sampler(self._data.i_train_dict,
-                                    self._data.public_users,
-                                    self._data.public_items,
-                                    self._interactions_textual.object.users_tokens,
-                                    self._interactions_textual.object.items_tokens,
-                                    self._seed)
+        self._sampler = Sampler(self._data.i_train_dict,
+                                self._data.public_users,
+                                self._data.public_items,
+                                self._interactions_textual.object.users_tokens,
+                                self._interactions_textual.object.items_tokens,
+                                self._seed)
 
         self._model = DeepCoNNModel(
             num_users=self._num_users,
