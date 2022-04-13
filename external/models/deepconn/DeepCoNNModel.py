@@ -59,8 +59,8 @@ class DeepCoNNModel(tf.keras.Model, ABC):
 
         self.textual_words_feature_shape = textual_words_feature_shape
         
-        print(self.W1)
-        print(self.W2)
+        print(tf.math.count_nonzero(self.W1))
+        print(tf.math.count_nonzero(self.W2))
 
         # cnn
         self.user_convolutions = []
