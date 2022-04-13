@@ -69,7 +69,7 @@ class DeepCoNNModel(tf.keras.Model, ABC):
                                                                       self.user_review_cnn_features], stddev=0.1)),
                 tf.Variable(initial_value=tf.constant(0.1, shape=[self.user_review_cnn_features]))))
         self.item_convolutions = []
-        for i, filter_size in enumerate(self.user_review_cnn_kernel):
+        for i, filter_size in enumerate(self.item_review_cnn_kernel):
             self.item_convolutions.append((
                 tf.Variable(initial_value=tf.random.truncated_normal([filter_size,
                                                                       self.textual_words_feature_shape,
