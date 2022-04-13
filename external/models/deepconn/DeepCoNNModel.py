@@ -190,7 +190,7 @@ class DeepCoNNModel(tf.keras.Model, ABC):
         rui = tf.math.sigmoid(self((out_users, out_items), training=False))
         return tf.reshape(rui, [batch_user, batch_item])
 
-    #@tf.function
+    @tf.function
     def train_step(self, batch):
         #user, item, r, user_reviews, item_reviews = batch
         user, pos, neg, user_reviews, item_reviews_pos, item_reviews_neg = batch
@@ -200,8 +200,6 @@ class DeepCoNNModel(tf.keras.Model, ABC):
             i_neg_feas = self.forward_item_embeddings((neg, item_reviews_neg), training=True)
             xu_pos = self(inputs=(u_feas, i_pos_feas), training=True)
             xu_neg = self(inputs=(u_feas, i_neg_feas), training=True)
-            print(xu_pos.shape)
-            print(xu_neg.shape)
             result = tf.clip_by_value(xu_pos - xu_neg, -80.0, 1e8)
             loss = tf.reduce_sum(tf.nn.softplus(-result))
             
