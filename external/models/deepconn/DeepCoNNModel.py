@@ -193,7 +193,7 @@ class DeepCoNNModel(tf.keras.Model, ABC):
     @tf.function
     def train_step(self, batch):
         #user, item, r, user_reviews, item_reviews = batch
-        user, pos, neg, user_reviews_pos, item_reviews_neg = batch
+        user, pos, neg, user_reviews_pos, item_reviews_pos, item_reviews_neg = batch
         with tf.GradientTape() as t:
             u_feas = self.forward_user_embeddings((user, user_reviews), training=True)
             i_pos_feas = self.forward_item_embeddings((pos, item_reviews_pos), training=True)
