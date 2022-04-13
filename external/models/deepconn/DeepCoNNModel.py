@@ -58,9 +58,6 @@ class DeepCoNNModel(tf.keras.Model, ABC):
                 tf.initializers.random_uniform(-0.1, 0.1)(shape=[items_vocabulary_features.shape[0], 300]))
 
         self.textual_words_feature_shape = textual_words_feature_shape
-        
-        print(tf.math.count_nonzero(self.W1))
-        print(tf.math.count_nonzero(self.W2))
 
         # cnn
         self.user_convolutions = []
