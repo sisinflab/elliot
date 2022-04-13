@@ -196,6 +196,7 @@ class DeepCoNNModel(tf.keras.Model, ABC):
     @tf.function
     def train_step(self, batch):
         user, item, r, user_reviews, item_reviews = batch
+        print(r)
         with tf.GradientTape() as t:
             u_feas = self.forward_user_embeddings((user, user_reviews), training=True)
             i_feas = self.forward_item_embeddings((item, item_reviews), training=True)
