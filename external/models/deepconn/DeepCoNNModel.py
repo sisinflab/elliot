@@ -94,7 +94,7 @@ class DeepCoNNModel(tf.keras.Model, ABC):
 
         self.optimizer = tf.optimizers.Adam(self.learning_rate, beta_1=0.9, beta_2=0.999, epsilon=1e-8)
 
-    @tf.function
+    #@tf.function
     def forward_user_embeddings(self, inputs, training=True):
         user, user_reviews = inputs
         review_len_u = user_reviews.shape[1]
@@ -119,6 +119,7 @@ class DeepCoNNModel(tf.keras.Model, ABC):
                 strides=[1, 1, 1, 1],
                 padding='VALID')
             pooled_outputs_u.append(pooled)
+        print(pooled_outputs_u[0].shape)
         h_pool_u = tf.concat(pooled_outputs_u, 3)
         h_pool_flat_u = tf.reshape(h_pool_u, [-1, self.num_filters_total_user])
 
