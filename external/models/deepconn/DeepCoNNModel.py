@@ -123,12 +123,10 @@ class DeepCoNNModel(tf.keras.Model, ABC):
         h_pool_u = tf.concat(pooled_outputs_u, 3)
         h_pool_flat_u = tf.reshape(h_pool_u, [-1, self.num_filters_total_user])
 
+        u_fea = self.dense_u(h_pool_flat_u)
+        
         if training:
-            h_drop_u = tf.nn.dropout(h_pool_flat_u, 0.0)
-        else:
-            h_drop_u = h_pool_flat_u
-
-        u_fea = self.dense_u(h_drop_u)
+            u_fea = tf.nn.dropout(u_fea, self.dropout_rate)
 
         return u_fea
 
@@ -160,12 +158,10 @@ class DeepCoNNModel(tf.keras.Model, ABC):
         h_pool_i = tf.concat(pooled_outputs_i, 3)
         h_pool_flat_i = tf.reshape(h_pool_i, [-1, self.num_filters_total_item])
 
+        i_fea = self.dense_i(h_pool_flat_i)
+        
         if training:
-            h_drop_i = tf.nn.dropout(h_pool_flat_i, 0.0)
-        else:
-            h_drop_i = h_pool_flat_i
-
-        i_fea = self.dense_i(h_drop_i)
+            i_fea = tf.nn.dropout(i_fea, self.dropout_rate)
 
         return i_fea
 
