@@ -168,7 +168,7 @@ class DeepCoNNModel(tf.keras.Model, ABC):
 
         return i_fea
 
-    @tf.function
+    #@tf.function
     def call(self, inputs, training=True):
         u_feas, i_feas = inputs
         z = tf.nn.relu(tf.concat([u_feas, i_feas], 1))
@@ -182,8 +182,9 @@ class DeepCoNNModel(tf.keras.Model, ABC):
 
         if training:
             inter = tf.nn.dropout(inter, self.dropout_rate)
-
-        inter = tf.reduce_sum(inter, 1, keepdims=True)
+        
+        print(inter.shape)
+        inter = tf.reduce_sum(inter, 1)
 
         predictions = one + inter + self.B
         return predictions
