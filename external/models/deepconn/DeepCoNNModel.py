@@ -75,7 +75,7 @@ class DeepCoNNModel(tf.keras.Model, ABC):
                                                                       self.textual_words_feature_shape,
                                                                       1,
                                                                       self.item_review_cnn_features], stddev=0.1)),
-                tf.Variable(initial_value=tf.constant(0.1, shape=[self.user_review_cnn_features]))))
+                tf.Variable(initial_value=tf.constant(0.1, shape=[self.item_review_cnn_features]))))
 
         # user and item dense
         self.num_filters_total_user = self.user_review_cnn_features * len(self.user_review_cnn_kernel)
