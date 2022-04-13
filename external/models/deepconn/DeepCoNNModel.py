@@ -183,7 +183,7 @@ class DeepCoNNModel(tf.keras.Model, ABC):
         inter = tf.reduce_sum(inter, -1, keepdims=True)
         
         predictions = tf.squeeze(one + inter + self.B)
-        return predictions
+        return tf.math.sigmoid(predictions)
 
     @tf.function
     def predict(self, out_users, out_items, batch_user, batch_item):
@@ -192,13 +192,17 @@ class DeepCoNNModel(tf.keras.Model, ABC):
 
     @tf.function
     def train_step(self, batch):
-        user, item, r, user_reviews, item_reviews = batch
+        #user, item, r, user_reviews, item_reviews = batch
+        user, pos, neg, user_reviews_pos, item_reviews_neg = batch
         with tf.GradientTape() as t:
             u_feas = self.forward_user_embeddings((user, user_reviews), training=True)
-            i_feas = self.forward_item_embeddings((item, item_reviews), training=True)
-            xui = self(inputs=(u_feas, i_feas), training=True)
-            loss = tf.nn.l2_loss(tf.subtract(xui, r))
-
+            i_pos_feas = self.forward_item_embeddings((pos, item_reviews_pos), training=True)
+            i_neg_feas = self.forward_item_embeddings((neg, item_reviews_neg), training=True)
+            xu_pos = self(inputs=(u_feas, i_pos_feas), training=True)
+            xu_neg = self(inputs=(u_feas, i_neg_feas), training=True)
+            difference = torch.clamp(xu_pos - xu_neg, -80.0, 1e8)
+            loss = torch.sum(self.softplus(-difference))
+            
         grads = t.gradient(loss, self.trainable_variables)
         self.optimizer.apply_gradients(zip(grads, self.trainable_variables))
 
