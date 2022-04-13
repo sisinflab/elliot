@@ -49,8 +49,8 @@ class DeepCoNNModel(tf.keras.Model, ABC):
 
         # user and item vocabulary
         if self.pretrained:
-            self.W1 = tf.Variable(tf.convert_to_tensor(users_vocabulary_features, dtype=tf.float32))
-            self.W2 = tf.Variable(tf.convert_to_tensor(items_vocabulary_features, dtype=tf.float32))
+            self.W1 = tf.Variable(tf.convert_to_tensor(users_vocabulary_features, dtype=tf.float32), trainable=False)
+            self.W2 = tf.Variable(tf.convert_to_tensor(items_vocabulary_features, dtype=tf.float32), trainable=False)
         else:
             self.W1 = tf.Variable(
                 tf.initializers.random_uniform(-0.1, 0.1)(shape=[users_vocabulary_features.shape[0], 300]))
