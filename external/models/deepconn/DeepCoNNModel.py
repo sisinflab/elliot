@@ -193,15 +193,13 @@ class DeepCoNNModel(tf.keras.Model, ABC):
         rui = self((out_users, out_items), training=False)
         return tf.reshape(rui, [batch_user, batch_item])
 
-    #@tf.function
+    @tf.function
     def train_step(self, batch):
         user, item, r, user_reviews, item_reviews = batch
-        print(r)
         with tf.GradientTape() as t:
             u_feas = self.forward_user_embeddings((user, user_reviews), training=True)
             i_feas = self.forward_item_embeddings((item, item_reviews), training=True)
             xui = self(inputs=(u_feas, i_feas), training=True)
-            print(xui)
             loss = tf.nn.l2_loss(tf.subtract(xui, r))
 
         grads = t.gradient(loss, self.trainable_variables)
