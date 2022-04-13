@@ -94,10 +94,11 @@ class DeepCoNNModel(tf.keras.Model, ABC):
 
         self.optimizer = tf.optimizers.Adam(self.learning_rate, beta_1=0.9, beta_2=0.999, epsilon=1e-8)
 
-    @tf.function
+    #@tf.function
     def forward_user_embeddings(self, inputs, training=True):
         user, user_reviews = inputs
         review_len_u = user_reviews.shape[1]
+        print(review_len_u)
 
         embedded_user = tf.nn.embedding_lookup(self.W1, user_reviews)
         embedded_user = tf.expand_dims(embedded_user, -1)
