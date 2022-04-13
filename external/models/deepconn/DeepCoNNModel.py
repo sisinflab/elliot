@@ -92,7 +92,7 @@ class DeepCoNNModel(tf.keras.Model, ABC):
         self.WF2 = tf.Variable(tf.random.uniform(minval=-0.1, maxval=0.1, shape=[self.latent_size * 2, self.fm_k]))
         self.B = tf.Variable(tf.constant(0.1))
 
-        self.optimizer = tf.optimizers.Adam(self.learning_rate, beta_1=0.9, beta_2=0.999, epsilon=1e-8)
+        self.optimizer = tf.optimizers.Adam(self.learning_rate, beta_1=0.9, beta_2=0.999, epsilon=1e-7)
 
     @tf.function
     def forward_user_embeddings(self, inputs, training=True):
