@@ -23,9 +23,9 @@ class NodeNodeTextLayer(MessagePassing, ABC):
         self.normalize = normalize
         self.activation = torch.nn.Sigmoid()
 
-    def forward(self, x, edge_index, node_attr, edge_attr):
+    def forward(self, x, edge_index, node_attr_rows, node_attr_cols, edge_attr):
         original_edge_index = edge_index
-        weights = torch.nn.functional.cosine_similarity(torch.mul(node_attr, edge_attr), node_attr, dim=1)
+        weights = torch.nn.functional.cosine_similarity(torch.mul(node_attr_rows, edge_attr), torch.mul(node_attr_cols, edge_attr), dim=1)
         weights = self.activation(weights)
         edge_index = mul_nnz(edge_index, weights, layout='coo')
 

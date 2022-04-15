@@ -100,6 +100,9 @@ class EGCFv2Model(torch.nn.Module, ABC):
         edge_embeddings_interactions_projected = self.projection(self.edge_embeddings_interactions)
 
         for layer in range(self.n_layers):
+            user_item_embeddings_interactions = torch.cat([
+                node_node_textual_emb[layer][:self.num_users][self.rows],
+                node_node_textual_emb[layer][self.num_users:][self.cols - self.num_users]], dim=0)
             item_user_embeddings_interactions = torch.cat([
                 node_node_textual_emb[layer][self.num_users:][self.cols - self.num_users],
                 node_node_textual_emb[layer][:self.num_users][self.rows]], dim=0)
@@ -119,6 +122,7 @@ class EGCFv2Model(torch.nn.Module, ABC):
                         self.node_node_textual_network.children()
                     )[layer](node_node_textual_emb[layer].to(self.device),
                              self.node_node_adj.to(self.device),
+                             user_item_embeddings_interactions.to(self.device),
                              item_user_embeddings_interactions.to(self.device),
                              edge_embeddings_interactions_projected.to(self.device))]
                 self.node_node_collab_network.train()
@@ -135,6 +139,7 @@ class EGCFv2Model(torch.nn.Module, ABC):
                     self.node_node_textual_network.children()
                 )[layer](node_node_textual_emb[layer].to(self.device),
                          self.node_node_adj.to(self.device),
+                         user_item_embeddings_interactions.to(self.device),
                          item_user_embeddings_interactions.to(self.device),
                          edge_embeddings_interactions_projected.to(self.device))]
 
