@@ -55,3 +55,4 @@ for _backend in sys.modules["external"].backend:
         from .mgat.MGAT import MGAT
         from .lattice.LATTICE import LATTICE
         from .slattice.SLATTICE import SLATTICE
+        from .uuii.UUII import UUII
