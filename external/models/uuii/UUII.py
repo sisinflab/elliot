@@ -66,7 +66,6 @@ class UUII(RecMixin, BaseRecommenderModel):
             learning_rate=self._learning_rate,
             embed_k=self._factors,
             l_w=self._l_w,
-            interaction_modalities=self._int_mod,
             top_k_uu=self._top_k_uu,
             top_k_ii=self._top_k_ii,
             sim_uu=sim_uu,

@@ -18,7 +18,6 @@ class UUIIModel(torch.nn.Module, ABC):
                  learning_rate,
                  embed_k,
                  l_w,
-                 interaction_modalities,
                  top_k_uu,
                  top_k_ii,
                  sim_uu,
@@ -44,7 +43,6 @@ class UUIIModel(torch.nn.Module, ABC):
         self.embed_k = embed_k
         self.learning_rate = learning_rate
         self.l_w = l_w
-        self.interaction_modalities = interaction_modalities
         self.top_k_uu = top_k_uu
         self.top_k_ii = top_k_ii
         self.n_uu_layers = num_uu_layers
