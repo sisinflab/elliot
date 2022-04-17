@@ -9,6 +9,8 @@ class UUIILayer(MessagePassing, ABC):
         super(UUIILayer, self).__init__(aggr='add')
 
     def forward(self, x, edge_index):
+        print(x.shape)
+        print(edge_index)
         return self.propagate(edge_index, x=x)
 
     def message_and_aggregate(self, adj_t, x):
