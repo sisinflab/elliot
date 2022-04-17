@@ -107,15 +107,15 @@ class UUIIModel(torch.nn.Module, ABC):
     def propagate_embeddings(self):
         user_embeddings = [self.Gu.to(self.device)]
         for layer in range(self.n_uu_layers):
-            user_embeddings += list(self.propagation_network_uu.children())[layer](
+            user_embeddings += [list(self.propagation_network_uu.children())[layer](
                 user_embeddings[layer].to(self.device),
-                self.sim_uu.to(self.device))
+                self.sim_uu.to(self.device))]
 
         item_embeddings = [self.Gi.to(self.device)]
         for layer in range(self.n_ii_layers):
-            item_embeddings += list(self.propagation_network_ii.children())[layer](
+            item_embeddings += [list(self.propagation_network_ii.children())[layer](
                 item_embeddings[layer].to(self.device),
-                self.sim_ii.to(self.device))
+                self.sim_ii.to(self.device))]
 
         user_embeddings = torch.stack(user_embeddings, dim=1)
         user_embeddings = user_embeddings.mean(dim=1, keepdim=False)
