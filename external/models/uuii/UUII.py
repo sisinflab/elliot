@@ -39,7 +39,6 @@ class UUII(RecMixin, BaseRecommenderModel):
             ("_learning_rate", "lr", "lr", 0.0005, float, None),
             ("_factors", "factors", "factors", 64, int, None),
             ("_l_w", "l_w", "l_w", 0.01, float, None),
-            ("_n_layers", "n_layers", "n_layers", 1, int, None),
             ("_n_uu_layers", "n_uu_layers", "n_uu_layers", 2, int, None),
             ("_n_ii_layers", "n_ii_layers", "n_ii_layers", 2, int, None),
             ("_top_k_uu", "top_k_uu", "top_k_uu", 100, int, None),
