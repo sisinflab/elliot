@@ -58,14 +58,14 @@ class UUIIModel(torch.nn.Module, ABC):
 
         # user-user graph
         ur = torch.tensor(list(range(self.num_users)), dtype=torch.int64, device=self.device)
-        self.users_rows = torch.repeat_interleave(ur, self.top_k_uu).to(self.device)
-        weighted_adj_uu = self.build_knn_neighbourhood(sim_uu.to_dense().detach(), self.top_k_uu)
+        users_rows = torch.repeat_interleave(ur, self.top_k_uu).to(self.device)
+        weighted_adj_uu = self.build_knn_neighbourhood(sim_uu.to_dense().detach(), self.top_k_uu, users_rows, self.num_users)
         self.sim_uu = self.compute_normalized_laplacian(weighted_adj_uu)
 
         # item-item graph
         ir = torch.tensor(list(range(self.num_items)), dtype=torch.int64, device=self.device)
-        self.items_rows = torch.repeat_interleave(ir, self.top_k_ii).to(self.device)
-        weighted_adj_ii = self.build_knn_neighbourhood(sim_ii.to_dense().detach(), self.top_k_ii)
+        items_rows = torch.repeat_interleave(ir, self.top_k_ii).to(self.device)
+        weighted_adj_ii = self.build_knn_neighbourhood(sim_ii.to_dense().detach(), self.top_k_ii, items_rows, self.num_items)
         self.sim_ii = self.compute_normalized_laplacian(weighted_adj_ii)
 
         # graph convolutional network for user-user graph
@@ -85,14 +85,14 @@ class UUIIModel(torch.nn.Module, ABC):
         self.softplus = torch.nn.Softplus()
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
 
-    def build_knn_neighbourhood(self, adj, topk):
+    def build_knn_neighbourhood(self, adj, topk, rows, n_nodes):
         knn_val, knn_ind = torch.topk(adj, topk, dim=-1)
-        items_cols = torch.flatten(knn_ind).to(self.device)
+        cols = torch.flatten(knn_ind).to(self.device)
         values = torch.flatten(knn_val).to(self.device)
-        weighted_adj = SparseTensor(row=self.items_rows,
-                                    col=items_cols,
+        weighted_adj = SparseTensor(row=rows,
+                                    col=cols,
                                     value=values,
-                                    sparse_sizes=(self.num_items, self.num_items))
+                                    sparse_sizes=(n_nodes, n_nodes))
         return weighted_adj
 
     @staticmethod
