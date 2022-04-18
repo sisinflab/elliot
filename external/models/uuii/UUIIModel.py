@@ -59,14 +59,14 @@ class UUIIModel(torch.nn.Module, ABC):
         # user-user graph
         ur = torch.tensor(list(range(self.num_users)), dtype=torch.int64, device=self.device)
         users_rows = torch.repeat_interleave(ur, self.top_k_uu).to(self.device)
-        self.sim_uu = self.build_knn_neighbourhood(sim_uu.to_dense().detach(), self.top_k_uu, users_rows, self.num_users)
-        # self.sim_uu = self.compute_normalized_laplacian(weighted_adj_uu)
+        weighted_adj_uu = self.build_knn_neighbourhood(sim_uu.to_dense().detach(), self.top_k_uu, users_rows, self.num_users)
+        self.sim_uu = self.compute_normalized_laplacian(weighted_adj_uu)
 
         # item-item graph
         ir = torch.tensor(list(range(self.num_items)), dtype=torch.int64, device=self.device)
         items_rows = torch.repeat_interleave(ir, self.top_k_ii).to(self.device)
-        self.sim_ii = self.build_knn_neighbourhood(sim_ii.to_dense().detach(), self.top_k_ii, items_rows, self.num_items)
-        # self.sim_ii = self.compute_normalized_laplacian(weighted_adj_ii)
+        weighted_adj_ii = self.build_knn_neighbourhood(sim_ii.to_dense().detach(), self.top_k_ii, items_rows, self.num_items)
+        self.sim_ii = self.compute_normalized_laplacian(weighted_adj_ii)
 
         # graph convolutional network for user-user graph
         propagation_network_uu_list = []
