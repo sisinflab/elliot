@@ -1,73 +1,81 @@
 from tqdm import tqdm
-import numpy as np
 import torch
 import os
+import numpy as np
 
 from elliot.utils.write import store_recommendation
-
 from elliot.dataset.samplers import custom_sampler as cs
-
 from elliot.recommender import BaseRecommenderModel
 from elliot.recommender.base_recommender_model import init_charger
 from elliot.recommender.recommender_utils_mixin import RecMixin
-from .EGCFv2Model import EGCFv2Model
-
 from torch_sparse import SparseTensor
+from .UUIIModel import UUIIModel
 
 
-class EGCFv2(RecMixin, BaseRecommenderModel):
+class UUII(RecMixin, BaseRecommenderModel):
     r"""
-    Edge Graph Collaborative Filtering
+    Args:
+        lr: Learning rate
+        epochs: Number of epochs
+        n_uu_layers: Number of propagation layers for the user-user graph
+        n_ii_layers: Number of propagation layers for the item-item graph
+        factors: Number of latent factors
+        batch_size: Batch size
+        l_w: Regularization coefficient
+        top_k_uu: Top-k for user-user similarity matrix
+        top_k_ii: Top-k for item-item similarity matrix
     """
 
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
-        self._sampler = cs.Sampler(self._data.i_train_dict)
 
+        self._sampler = cs.Sampler(self._data.i_train_dict)
         if self._batch_size < 1:
             self._batch_size = self._num_users
 
         ######################################
+
         self._params_list = [
-            ("_lr", "lr", "lr", 0.0005, float, None),
-            ("_emb", "emb", "emb", 64, int, None),
-            ("_n_layers", "n_layers", "n_layers", 64, int, None),
+            ("_learning_rate", "lr", "lr", 0.0005, float, None),
+            ("_factors", "factors", "factors", 64, int, None),
             ("_l_w", "l_w", "l_w", 0.01, float, None),
-            ("_loader", "loader", "loader", 'InteractionsTextualAttributes', str, None)
+            ("_n_uu_layers", "n_uu_layers", "n_uu_layers", 2, int, None),
+            ("_n_ii_layers", "n_ii_layers", "n_ii_layers", 2, int, None),
+            ("_top_k_uu", "top_k_uu", "top_k_uu", 100, int, None),
+            ("_top_k_ii", "top_k_ii", "top_k_ii", 100, int, None),
+            ("_loader", "loader", "loader", 'SentimentInteractionsTextualAttributesUUII', str, None)
         ]
         self.autoset_params()
 
-        self._side_edge_textual = self._data.side_information.InteractionsTextualAttributes
+        self._side_edge_textual = self._data.side_information.SentimentInteractionsTextualAttributesUUII
+        all_interactions_uu, all_interactions_ii, rows_uu, rows_ii, cols_uu, cols_ii = self._side_edge_textual.object.get_all_features(
+            self._data.public_users, self._data.public_items)
 
-        row, col = data.sp_i_train.nonzero()
-        col = [c + self._num_users for c in col]
-        node_node_graph = np.array([row, col])
-        node_node_graph = torch.tensor(node_node_graph, dtype=torch.int64)
+        sim_uu = SparseTensor(row=torch.tensor(np.array(rows_uu), dtype=torch.int64),
+                              col=torch.tensor(np.array(cols_uu), dtype=torch.int64),
+                              value=torch.tensor(np.array(all_interactions_uu), dtype=torch.float32))
+        sim_ii = SparseTensor(row=torch.tensor(np.array(rows_ii), dtype=torch.int64),
+                              col=torch.tensor(np.array(cols_ii), dtype=torch.int64),
+                              value=torch.tensor(np.array(all_interactions_ii), dtype=torch.float32))
 
-        self.node_node_adj = SparseTensor(row=torch.cat([node_node_graph[0], node_node_graph[1]], dim=0),
-                                          col=torch.cat([node_node_graph[1], node_node_graph[0]], dim=0),
-                                          sparse_sizes=(self._num_users + self._num_items,
-                                                        self._num_users + self._num_items))
-
-        edge_features = self._side_edge_textual.object.get_all_features()
-
-        self._model = EGCFv2Model(
+        self._model = UUIIModel(
             num_users=self._num_users,
             num_items=self._num_items,
-            learning_rate=self._lr,
-            embed_k=self._emb,
+            num_uu_layers=self._n_uu_layers,
+            num_ii_layers=self._n_ii_layers,
+            learning_rate=self._learning_rate,
+            embed_k=self._factors,
             l_w=self._l_w,
-            n_layers=self._n_layers,
-            edge_features=edge_features,
-            node_node_adj=self.node_node_adj,
-            rows=row,
-            cols=col,
+            top_k_uu=self._top_k_uu,
+            top_k_ii=self._top_k_ii,
+            sim_uu=sim_uu,
+            sim_ii=sim_ii,
             random_seed=self._seed
         )
 
     @property
     def name(self):
-        return "EGCFv2" \
+        return "UUII" \
                + f"_{self.get_base_params_shortcut()}" \
                + f"_{self.get_params_shortcut()}"
 
@@ -78,6 +86,7 @@ class EGCFv2(RecMixin, BaseRecommenderModel):
         for it in self.iterate(self._epochs):
             loss = 0
             steps = 0
+            self._model.train()
             with tqdm(total=int(self._data.transactions // self._batch_size), disable=not self._verbose) as t:
                 for batch in self._sampler.step(self._data.transactions, self._batch_size):
                     steps += 1
@@ -90,13 +99,15 @@ class EGCFv2(RecMixin, BaseRecommenderModel):
     def get_recommendations(self, k: int = 100):
         predictions_top_k_test = {}
         predictions_top_k_val = {}
-        gu, gi, gut, git = self._model.propagate_embeddings(evaluate=True)
-        for index, offset in enumerate(range(0, self._num_users, self._batch_size)):
-            offset_stop = min(offset + self._batch_size, self._num_users)
-            predictions = self._model.predict(gu[offset: offset_stop], gi, gut[offset: offset_stop], git)
-            recs_val, recs_test = self.process_protocol(k, predictions, offset, offset_stop)
-            predictions_top_k_val.update(recs_val)
-            predictions_top_k_test.update(recs_test)
+        self._model.eval()
+        with torch.no_grad():
+            gu, gi = self._model.propagate_embeddings()
+            for index, offset in enumerate(range(0, self._num_users, self._batch_size)):
+                offset_stop = min(offset + self._batch_size, self._num_users)
+                predictions = self._model.predict(gu[offset: offset_stop], gi)
+                recs_val, recs_test = self.process_protocol(k, predictions, offset, offset_stop)
+                predictions_top_k_val.update(recs_val)
+                predictions_top_k_test.update(recs_test)
         return predictions_top_k_val, predictions_top_k_test
 
     def get_single_recommendation(self, mask, k, predictions, offset, offset_stop):

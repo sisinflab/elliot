@@ -2,17 +2,16 @@ from ast import literal_eval as make_tuple
 from operator import itemgetter
 
 from tqdm import tqdm
-#from .pointwise_pos_neg_sampler import Sampler
-from .bpr_loss import Sampler
+from .pointwise_pos_neg_sampler import Sampler
 from elliot.recommender import BaseRecommenderModel
 from elliot.recommender.base_recommender_model import init_charger
 from elliot.recommender.recommender_utils_mixin import RecMixin
-from .DeepCoNNModel import DeepCoNNModel
+from .DeepCoNNppModel import DeepCoNNppModel
 
 import numpy as np
 
 
-class DeepCoNN(RecMixin, BaseRecommenderModel):
+class DeepCoNNpp(RecMixin, BaseRecommenderModel):
     r"""
     Joint Deep Modeling of Users and Items Using Reviews for Recommendation
     """
@@ -28,6 +27,7 @@ class DeepCoNN(RecMixin, BaseRecommenderModel):
         self._params_list = [
             ("_batch_eval", "batch_eval", "batch_eval", 64, int, None),
             ("_learning_rate", "lr", "lr", 0.0005, float, None),
+            ("_l_w", "l_w", "l_w", 0.01, float, None),
             ("_u_rev_cnn_kernel", "u_rev_cnn_k", "u_rev_cnn_k", "(3,)",
              lambda x: list(make_tuple(x)), None),
             ("_u_rev_cnn_features", "u_rev_cnn_f", "u_rev_cnn_f", 100, int, None),
@@ -42,21 +42,19 @@ class DeepCoNN(RecMixin, BaseRecommenderModel):
         ]
         self.autoset_params()
 
-        np.random.seed(self._seed)
-
         self._interactions_textual = self._data.side_information.WordsTextualAttributes
 
         self._sampler = Sampler(self._data.i_train_dict,
                                 self._data.public_users,
                                 self._data.public_items,
                                 self._interactions_textual.object.users_tokens,
-                                self._interactions_textual.object.items_tokens,
-                                self._seed)
+                                self._interactions_textual.object.items_tokens)
 
-        self._model = DeepCoNNModel(
+        self._model = DeepCoNNppModel(
             num_users=self._num_users,
             num_items=self._num_items,
             learning_rate=self._learning_rate,
+            l_w=self._l_w,
             users_vocabulary_features=self._interactions_textual.object.users_word_features,
             items_vocabulary_features=self._interactions_textual.object.items_word_features,
             textual_words_feature_shape=self._interactions_textual.word_feature_shape,
@@ -73,7 +71,7 @@ class DeepCoNN(RecMixin, BaseRecommenderModel):
 
     @property
     def name(self):
-        return "DeepCoNN" \
+        return "DeepCoNNpp" \
                + f"_{self.get_base_params_shortcut()}" \
                + f"_{self.get_params_shortcut()}"
 
@@ -82,10 +80,9 @@ class DeepCoNN(RecMixin, BaseRecommenderModel):
             return self.restore_weights()
 
         row, col = self._data.sp_i_train.nonzero()
-        #ratings = self._data.sp_i_train_ratings.data
-        #edge_index = np.array([row, col, ratings]).transpose()
-        edge_index = np.array([row, col]).transpose()
-        
+        ratings = self._data.sp_i_train_ratings.data
+        edge_index = np.array([row, col, ratings]).transpose()
+
         for it in self.iterate(self._epochs):
             loss = 0
             steps = 0
@@ -142,7 +139,9 @@ class DeepCoNN(RecMixin, BaseRecommenderModel):
                     user_range = np.repeat(np.arange(offset, offset_stop), repeats=item_offset_stop - item_offset)
                     item_range = np.tile(np.arange(item_offset, item_offset_stop), reps=offset_stop - offset)
                     p = self._model.predict(out_users[user_range],
+                                            user_range,
                                             out_items[item_range],
+                                            item_range,
                                             offset_stop - offset,
                                             item_offset_stop - item_offset)
                     predictions[:, item_offset: item_offset_stop] = p.numpy()

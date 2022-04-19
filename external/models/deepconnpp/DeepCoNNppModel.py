@@ -6,11 +6,12 @@ import os
 import random
 
 
-class DeepCoNNModel(tf.keras.Model, ABC):
+class DeepCoNNppModel(tf.keras.Model, ABC):
     def __init__(self,
                  num_users,
                  num_items,
                  learning_rate,
+                 l_w,
                  users_vocabulary_features,
                  items_vocabulary_features,
                  textual_words_feature_shape,
@@ -23,7 +24,7 @@ class DeepCoNNModel(tf.keras.Model, ABC):
                  dropout_rate,
                  pretrained,
                  random_seed,
-                 name="DeepCoNN",
+                 name="DeepCoNNpp",
                  **kwargs
                  ):
         super().__init__()
@@ -38,6 +39,7 @@ class DeepCoNNModel(tf.keras.Model, ABC):
         self.num_users = num_users
         self.num_items = num_items
         self.learning_rate = learning_rate
+        self.l_w = l_w
         self.user_review_cnn_kernel = user_review_cnn_kernel
         self.user_review_cnn_features = user_review_cnn_features
         self.item_review_cnn_kernel = item_review_cnn_kernel
@@ -69,13 +71,17 @@ class DeepCoNNModel(tf.keras.Model, ABC):
                                                                       self.user_review_cnn_features], stddev=0.1)),
                 tf.Variable(initial_value=tf.constant(0.1, shape=[self.user_review_cnn_features]))))
         self.item_convolutions = []
-        for i, filter_size in enumerate(self.item_review_cnn_kernel):
+        for i, filter_size in enumerate(self.user_review_cnn_kernel):
             self.item_convolutions.append((
                 tf.Variable(initial_value=tf.random.truncated_normal([filter_size,
                                                                       self.textual_words_feature_shape,
                                                                       1,
                                                                       self.item_review_cnn_features], stddev=0.1)),
-                tf.Variable(initial_value=tf.constant(0.1, shape=[self.item_review_cnn_features]))))
+                tf.Variable(initial_value=tf.constant(0.1, shape=[self.user_review_cnn_features]))))
+
+        # get fea
+        self.iidmf = tf.Variable(tf.initializers.RandomUniform(-0.1, 0.1)([self.num_items + 2, self.latent_size]))
+        self.uidmf = tf.Variable(tf.initializers.RandomUniform(-0.1, 0.1)([self.num_users + 2, self.latent_size]))
 
         # user and item dense
         self.num_filters_total_user = self.user_review_cnn_features * len(self.user_review_cnn_kernel)
@@ -87,10 +93,12 @@ class DeepCoNNModel(tf.keras.Model, ABC):
                                              kernel_initializer=tf.keras.initializers.glorot_normal(),
                                              bias_initializer=tf.initializers.Constant(0.1))
 
-        # parameter for FM
-        self.WF1 = tf.Variable(tf.random.uniform(minval=-0.1, maxval=0.1, shape=[self.latent_size * 2, 1]))
-        self.WF2 = tf.Variable(tf.random.uniform(minval=-0.1, maxval=0.1, shape=[self.latent_size * 2, self.fm_k]))
-        self.B = tf.Variable(tf.constant(0.1))
+        # ncf
+        self.Wmul = tf.Variable(tf.initializers.RandomUniform(-0.1, 0.1)([self.latent_size, 1]))
+        self.uidW2 = tf.Variable(tf.constant(0.01, shape=[self.num_users + 2]))
+        self.iidW2 = tf.Variable(tf.constant(0.01, shape=[self.num_items + 2]))
+
+        self.bised = tf.Variable(tf.constant(0.1))
 
         self.optimizer = tf.optimizers.Adam(self.learning_rate, beta_1=0.9, beta_2=0.999, epsilon=1e-8)
 
@@ -119,14 +127,17 @@ class DeepCoNNModel(tf.keras.Model, ABC):
                 strides=[1, 1, 1, 1],
                 padding='VALID')
             pooled_outputs_u.append(pooled)
-            
-        h_pool_u = tf.concat(pooled_outputs_u, axis=1)
+        h_pool_u = tf.concat(pooled_outputs_u, 3)
         h_pool_flat_u = tf.reshape(h_pool_u, [-1, self.num_filters_total_user])
 
-        u_fea = self.dense_u(h_pool_flat_u)
-        
         if training:
-            u_fea = tf.nn.dropout(u_fea, self.dropout_rate)
+            h_drop_u = tf.nn.dropout(h_pool_flat_u, 0.0)
+        else:
+            h_drop_u = h_pool_flat_u
+
+        uid = tf.nn.embedding_lookup(self.uidmf, user)
+        uid = tf.reshape(uid, [-1, self.latent_size])
+        u_fea = self.dense_u(h_drop_u) + uid
 
         return u_fea
 
@@ -155,54 +166,66 @@ class DeepCoNNModel(tf.keras.Model, ABC):
                 strides=[1, 1, 1, 1],
                 padding='VALID')
             pooled_outputs_i.append(pooled)
-        h_pool_i = tf.concat(pooled_outputs_i, axis=1)
+        h_pool_i = tf.concat(pooled_outputs_i, 3)
         h_pool_flat_i = tf.reshape(h_pool_i, [-1, self.num_filters_total_item])
 
-        i_fea = self.dense_i(h_pool_flat_i)
-        
         if training:
-            i_fea = tf.nn.dropout(i_fea, self.dropout_rate)
+            h_drop_i = tf.nn.dropout(h_pool_flat_i, 0.0)
+        else:
+            h_drop_i = h_pool_flat_i
+
+        iid = tf.nn.embedding_lookup(self.iidmf, item)
+        iid = tf.reshape(iid, [-1, self.latent_size])
+        i_fea = self.dense_i(h_drop_i) + iid
 
         return i_fea
 
     @tf.function
     def call(self, inputs, training=True):
-        u_feas, i_feas = inputs
-        z = tf.nn.relu(tf.concat([u_feas, i_feas], -1))
+        u_feas, u_bias, i_feas, i_bias = inputs
 
-        one = tf.matmul(z, self.WF1)
-
-        inte1 = tf.matmul(z, self.WF2)
-        inte2 = tf.matmul(tf.square(z), tf.square(self.WF2))
-
-        inter = (tf.square(inte1) - inte2) * 0.5
+        FM = tf.multiply(u_feas, i_feas)
+        FM = tf.nn.relu(FM)
 
         if training:
-            inter = tf.nn.dropout(inter, self.dropout_rate)
-        
-        inter = tf.reduce_sum(inter, -1, keepdims=True)
-        
-        predictions = tf.squeeze(one + inter + self.B)
-        return tf.math.sigmoid(predictions)
+            FM = tf.nn.dropout(FM, self.dropout_rate)
+
+        mul = tf.matmul(FM, self.Wmul)
+        score = tf.reduce_sum(mul, 1)
+
+        Feature_bias = u_bias + i_bias
+        predictions = score + Feature_bias + self.bised
+
+        return predictions
 
     @tf.function
-    def predict(self, out_users, out_items, batch_user, batch_item):
-        rui = tf.math.sigmoid(self((out_users, out_items), training=False))
+    def predict(self, out_users, user, out_items, item, batch_user, batch_item):
+        u_bias = tf.gather(self.uidW2, user)
+        i_bias = tf.gather(self.iidW2, item)
+        rui = self((out_users, u_bias, out_items, i_bias), training=False)
         return tf.reshape(rui, [batch_user, batch_item])
 
     @tf.function
     def train_step(self, batch):
-        #user, item, r, user_reviews, item_reviews = batch
-        user, pos, neg, user_reviews, item_reviews_pos, item_reviews_neg = batch
+        user, item, r, user_reviews, item_reviews = batch
         with tf.GradientTape() as t:
             u_feas = self.forward_user_embeddings((user, user_reviews), training=True)
-            i_pos_feas = self.forward_item_embeddings((pos, item_reviews_pos), training=True)
-            i_neg_feas = self.forward_item_embeddings((neg, item_reviews_neg), training=True)
-            xu_pos = self(inputs=(u_feas, i_pos_feas), training=True)
-            xu_neg = self(inputs=(u_feas, i_neg_feas), training=True)
-            result = tf.clip_by_value(xu_pos - xu_neg, -80.0, 1e8)
-            loss = tf.reduce_sum(tf.nn.softplus(-result))
-            
+            i_feas = self.forward_item_embeddings((item, item_reviews), training=True)
+            u_bias = tf.gather(self.uidW2, user)
+            i_bias = tf.gather(self.iidW2, item)
+            xui = self(inputs=(u_feas, u_bias, i_feas, i_bias), training=True)
+
+            loss = tf.nn.l2_loss(tf.subtract(xui, r))
+
+            # Regularization Component
+            reg_loss = self.l_w * tf.reduce_sum([
+                tf.nn.l2_loss(self.uidW2),
+                tf.nn.l2_loss(self.iidW2)
+            ])
+
+            # Loss to be optimized
+            loss += reg_loss
+
         grads = t.gradient(loss, self.trainable_variables)
         self.optimizer.apply_gradients(zip(grads, self.trainable_variables))
 

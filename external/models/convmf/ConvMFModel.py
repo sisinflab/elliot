@@ -78,7 +78,7 @@ class convMF(object):
         else:
             self.item_weight = np.ones(self.item_total, dtype=float)
 
-        self.user_embeddings = np.random.uniform(size=(self.user_total, self.embedding_size))
+        self.user_embeddings = np.random.uniform(size=(self.user_total, self.factors_dim))
 
         self.cnn_module = CNN_module(self.factors_dim, vocab_size, self.dropout_rate, self.batch_size,
                                      self.embedding_size, self.max_len, self.kernel_per_ws, self.init_W, self.seed)

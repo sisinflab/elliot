@@ -62,10 +62,10 @@ class InteractionsTextualAttributes(AbstractLoader):
 
     def get_all_features(self):
         user_item_interactions = pd.read_csv(self.interactions_path, sep='\t', header=None)
-        interactions_sorted_by_items = user_item_interactions.groupby(1).apply(
-            lambda x: x.sort_values(by=[1], ascending=True)).reset_index(drop=True)[2].tolist()
-        interactions = user_item_interactions[2].nunique()
+        user_item_interactions = user_item_interactions.groupby(0).apply(
+            lambda x: x.sort_values(by=[1], ascending=True)).reset_index(drop=True)
+        interactions = len(user_item_interactions)
         user_item_features = np.empty((interactions, *self.interactions_features_shape))
         for i, row in user_item_interactions.iterrows():
-            user_item_features[int(row[2])] = np.load(self.interactions_feature_folder_path + '/' + str(row[2]) + '.npy')
-        return user_item_features, interactions_sorted_by_items
+            user_item_features[i] = np.load(self.interactions_feature_folder_path + '/' + str(row[2]) + '.npy')
+        return user_item_features
