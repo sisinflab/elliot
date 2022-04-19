@@ -95,16 +95,12 @@ class DGCFModel(torch.nn.Module, ABC):
                     )[layer](all_embeddings[layer].to(self.device),
                              self.edge_index.to(self.device),
                              current_edge_index_intents.to(self.device))
-                    current_t_gu, current_t_gi = torch.split(current_embeddings, [self.num_users, self.num_items], 0)
+                    current_t_gu, _ = torch.split(current_embeddings, [self.num_users, self.num_items], 0)
                     with torch.no_grad():  # the update is done manually, the tensor is not learned during the training
-                        users_items = torch.sum(
+                        current_edge_index_intents = current_edge_index_intents.clone() + torch.sum(
                             current_t_gu[row].to(self.device) * torch.tanh(current_0_gi[col].to(self.device)).to(
-                                self.device), dim=-1)
-                        items_users = torch.sum(
-                            current_t_gi[col].to(self.device) * torch.tanh(current_0_gu[row].to(self.device)).to(
-                                self.device), dim=-1)
-                        all_interactions = torch.cat([users_items, items_users], dim=0)
-                        current_edge_index_intents = current_edge_index_intents.clone() + all_interactions.permute(1, 0)
+                                self.device),
+                            dim=-1).permute(1, 0)
                 else:
                     self.dgcf_network.eval()
                     with torch.no_grad():
@@ -113,15 +109,11 @@ class DGCFModel(torch.nn.Module, ABC):
                         )[layer](all_embeddings[layer].to(self.device),
                                  self.edge_index.to(self.device),
                                  current_edge_index_intents.to(self.device))
-                        current_t_gu, current_t_gi = torch.split(current_embeddings, [self.num_users, self.num_items], 0)
-                        users_items = torch.sum(
+                        current_t_gu, _ = torch.split(current_embeddings, [self.num_users, self.num_items], 0)
+                        current_edge_index_intents = current_edge_index_intents.clone() + torch.sum(
                             current_t_gu[row].to(self.device) * torch.tanh(current_0_gi[col].to(self.device)).to(
-                                self.device), dim=-1)
-                        items_users = torch.sum(
-                            current_t_gi[col].to(self.device) * torch.tanh(current_0_gu[row].to(self.device)).to(
-                                self.device), dim=-1)
-                        all_interactions = torch.cat([users_items, items_users], dim=0)
-                        current_edge_index_intents = current_edge_index_intents.clone() + all_interactions.permute(1, 0)
+                                self.device),
+                            dim=-1).permute(1, 0)
             self.edge_index_intents = current_edge_index_intents
             all_embeddings += [current_embeddings]
 
