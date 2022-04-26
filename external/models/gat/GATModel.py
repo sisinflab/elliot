@@ -106,23 +106,13 @@ class GATModel(torch.nn.Module, ABC):
             if evaluate:
                 self.propagation_network.eval()
                 with torch.no_grad():
-                    if layer == self.n_layers - 1:
-                        current_embeddings = list(
-                            self.propagation_network.children()
-                        )[layer](current_embeddings.to(self.device), self.adj.to(self.device))
-                    else:
-                        current_embeddings = torch.nn.functional.elu(list(
-                            self.propagation_network.children()
-                        )[layer](current_embeddings.to(self.device), self.adj.to(self.device)))
-            else:
-                if layer == self.n_layers - 1:
                     current_embeddings = list(
                         self.propagation_network.children()
                     )[layer](current_embeddings.to(self.device), self.adj.to(self.device))
-                else:
-                    current_embeddings = torch.nn.functional.elu(list(
-                        self.propagation_network.children()
-                    )[layer](current_embeddings.to(self.device), self.adj.to(self.device)))
+            else:
+                current_embeddings = list(
+                    self.propagation_network.children()
+                )[layer](current_embeddings.to(self.device), self.adj.to(self.device))
 
         if evaluate:
             self.propagation_network.train()

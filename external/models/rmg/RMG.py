@@ -24,9 +24,8 @@ class RMG(RecMixin, BaseRecommenderModel):
         ######################################
 
         self._params_list = [
-            ("_batch_eval", "batch_eval", "batch_eval", 256, int, None),
+            ("_batch_eval", "batch_eval", "be", 256, int, None),
             ("_learning_rate", "lr", "lr", 0.0005, float, None),
-            ("_l_w", "l_w", "l_w", 0.01, float, None),
             ("_wcfm", "wcfm", "wcfm", 100, int, None),
             ("_wcfk", "wcfk", "wcfk", 3, int, None),
             ("_wa", "wa", "wa", 100, int, None),
@@ -35,13 +34,13 @@ class RMG(RecMixin, BaseRecommenderModel):
             ("_sa", "sa", "sa", 100, int, None),
             ("_da", "da", "da", 100, int, None),
             ("_dau", "dau", "dau", 100, int, None),
-            ("_factors", "factors", "factors", 100, int, None),
+            ("_factors", "factors", "f", 100, int, None),
             ("_uia", "uia", "uia", 100, int, None),
             ("_iua", "iua", "iua", 100, int, None),
             ("_ua", "ua", "ua", 100, int, None),
             ("_ia", "ia", "ia", 100, int, None),
-            ("_dropout", "dropout", "dropout", 0.5, float, None),
-            ("_loader", "loader", "loader", 'WordsTextualAttributesPreprocessed', str, None)
+            ("_dropout", "dropout", "d", 0.5, float, None),
+            ("_loader", "loader", "l", 'WordsTextualAttributesPreprocessed', str, None)
         ]
         self.autoset_params()
 
@@ -57,7 +56,6 @@ class RMG(RecMixin, BaseRecommenderModel):
             num_users=self._num_users,
             num_items=self._num_items,
             learning_rate=self._learning_rate,
-            l_w=self._l_w,
             word_cnn_fea_maps=self._wcfm,
             word_cnn_fea_kernel=self._wcfk,
             word_att=self._wa,

@@ -13,6 +13,8 @@ class WordsTextualAttributes(AbstractLoader):
         self.items_vocabulary_features_path = getattr(ns, "items_vocabulary_features", None)
         self.users_tokens_path = getattr(ns, "users_tokens", None)
         self.items_tokens_path = getattr(ns, "items_tokens", None)
+        self.pos_users_path = getattr(ns, "pos_users", None)
+        self.pos_items_path = getattr(ns, "pos_items", None)
 
         self.item_mapping = {}
         self.user_mapping = {}
@@ -21,6 +23,8 @@ class WordsTextualAttributes(AbstractLoader):
         self.items_word_features = None
         self.users_tokens = None
         self.items_tokens = None
+        self.pos_users = None
+        self.pos_items = None
 
         inner_users, inner_items = self.check_interactions_in_folder()
 
@@ -65,6 +69,13 @@ class WordsTextualAttributes(AbstractLoader):
             self.users_word_features = np.load(self.users_vocabulary_features_path)
             self.items_word_features = np.load(self.items_vocabulary_features_path)
             self.word_feature_shape = self.users_word_features.shape[-1]
+        if self.pos_users_path and self.pos_items_path:
+            with open(self.pos_users_path, "r") as f:
+                self.pos_users = json.load(f)
+                self.pos_users = {int(k): v for k, v in self.pos_users.items()}
+            with open(self.pos_items_path, "r") as f:
+                self.pos_items = json.load(f)
+                self.pos_items = {int(k): v for k, v in self.pos_items.items()}
         if users:
             self.user_mapping = {user: val for val, user in enumerate(users)}
         if items:

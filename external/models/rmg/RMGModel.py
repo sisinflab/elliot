@@ -13,7 +13,6 @@ class RMGModel(tf.keras.Model, ABC):
                  num_users,
                  num_items,
                  learning_rate,
-                 l_w,
                  word_cnn_fea_maps,
                  word_cnn_fea_kernel,
                  word_att,
@@ -50,7 +49,6 @@ class RMGModel(tf.keras.Model, ABC):
         self.num_users = num_users
         self.num_items = num_items
         self.learning_rate = learning_rate
-        self.l_w = l_w
         self.word_cnn_fea_maps = word_cnn_fea_maps
         self.word_cnn_fea_kernel = word_cnn_fea_kernel
         self.word_att = word_att
