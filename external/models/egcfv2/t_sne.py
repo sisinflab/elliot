@@ -1,7 +1,6 @@
 from abc import ABC
 
 from torch_geometric.nn import LGConv
-from external.models.dgcf.DGCFLayer import DGCFLayer
 from NodeNodeTextLayer import NodeNodeTextLayer
 import random
 import numpy as np
@@ -13,6 +12,37 @@ from PIL import Image, ImageOps
 import torch
 import pandas as pd
 import torch_geometric
+
+from abc import ABC
+
+import torch
+from torch_geometric.nn import MessagePassing
+
+
+class DGCFLayer(MessagePassing, ABC):
+    def __init__(self):
+        super(DGCFLayer, self).__init__(aggr='add', node_dim=-3)
+
+    @staticmethod
+    def weighted_degree(index, weights, num_nodes, dtype):
+        out = torch.zeros((weights.shape[0], num_nodes,), dtype=dtype, device=weights.device)
+        return out.scatter_add_(1, index.repeat(weights.shape[0], 1), weights)
+
+    def forward(self, x, edge_index, edge_index_intents):
+        normalized_edge_index_intents = torch.softmax(edge_index_intents, dim=0)
+        row, col = edge_index
+        deg_row = self.weighted_degree(index=row, weights=normalized_edge_index_intents, num_nodes=x.size(0),
+                                       dtype=x.dtype)
+        deg_col = self.weighted_degree(index=col, weights=normalized_edge_index_intents, num_nodes=x.size(0),
+                                       dtype=x.dtype)
+        deg = deg_row + deg_col
+        deg_inv_sqrt = deg.pow(-0.5)
+        deg_inv_sqrt[deg_inv_sqrt == float('inf')] = 0
+        norm = deg_inv_sqrt[:, row] * deg_inv_sqrt[:, col]
+        return self.propagate(edge_index, x=x, norm=norm)
+
+    def message(self, x_j, norm):
+        return torch.unsqueeze(norm.permute(1, 0), -1) * x_j
 
 
 class DGCFModel(torch.nn.Module, ABC):
@@ -90,11 +120,11 @@ class LightGCNModel(torch.nn.Module, ABC):
         self.n_layers = n_layers
         self.weight_size_list = [self.embed_k] * (self.n_layers + 1)
 
-        self.Gu = torch.nn.Embedding(self.num_users, self.embed_k)
-        torch.nn.init.xavier_uniform_(self.Gu.weight)
+        self.Gu = torch.nn.Parameter(
+            torch.nn.init.xavier_normal_(torch.empty((self.num_users, self.embed_k))))
         self.Gu.to(self.device)
-        self.Gi = torch.nn.Embedding(self.num_items, self.embed_k)
-        torch.nn.init.xavier_uniform_(self.Gi.weight)
+        self.Gi = torch.nn.Parameter(
+            torch.nn.init.xavier_normal_(torch.empty((self.num_items, self.embed_k))))
         self.Gi.to(self.device)
 
         propagation_network_list = []
@@ -238,11 +268,12 @@ men_dgcf = {
 dataset = 'amazon_baby'
 pretrained = True
 
-train = pd.read_csv('../../../data/{0}/trainingset.tsv'.format(dataset), sep='\t', header=None)
-public_users = {u: idx for idx, u in enumerate(set(train[0].unique().tolist()))}
-public_items = {i: idx for idx, i in enumerate(set(train[1].unique().tolist()))}
-train[0] = pd.Series([public_users[u] for u in train[0].tolist()])
-train[1] = pd.Series([public_items[i] for i in train[1].tolist()])
+train = pd.read_csv('../../../data/{0}/train_reviews.tsv'.format(dataset), sep='\t')
+train = train[['USER_ID', 'ITEM_ID', 'RATING', 'REVIEW']]
+public_users = {u: idx for idx, u in enumerate(set(train['USER_ID'].unique().tolist()))}
+public_items = {i: idx for idx, i in enumerate(set(train['ITEM_ID'].unique().tolist()))}
+train['USER_ID'] = pd.Series([public_users[u] for u in train['USER_ID'].tolist()])
+train['ITEM_ID'] = pd.Series([public_items[i] for i in train['ITEM_ID'].tolist()])
 
 if dataset == 'amazon_baby':
     egcf = EGCFv2Model(
@@ -320,9 +351,9 @@ if pretrained:
     checkpoint_egcf = torch.load("../../../data/{0}/egcf/model".format(dataset))
     egcf.load_state_dict(checkpoint_egcf['model_state_dict'])
     checkpoint_lightgcn = torch.load("../../../data/{0}/lightgcn/model".format(dataset))
-    lightgcn.load_state_dict(checkpoint_egcf['model_state_dict'])
+    lightgcn.load_state_dict(checkpoint_lightgcn['model_state_dict'])
     checkpoint_dgcf = torch.load("../../../data/{0}/dgcf/model".format(dataset))
-    dgcf.load_state_dict(checkpoint_egcf['model_state_dict'])
+    dgcf.load_state_dict(checkpoint_dgcf['model_state_dict'])
 
 Gut = egcf.Gut.detach().cpu().numpy()
 Git = egcf.Git.detach().cpu().numpy()
@@ -331,33 +362,66 @@ Gilight = lightgcn.Gi.detach().cpu().numpy()
 Gudgcf = dgcf.Gu.detach().cpu().numpy()
 Gidgcf = dgcf.Gi.detach().cpu().numpy()
 
-train.columns = ['USER_ID', 'ITEM_ID', 'RATING', 'TIME']
-
 count_items = train.groupby('ITEM_ID').size().reset_index(name='counts')
 count_items = count_items.sort_values(by='counts', ascending=True)
-count_items = count_items[count_items['counts'] == 6]
+count_items = count_items[count_items['counts'] == 5]
 count_items = count_items.sample(frac=1).reset_index(drop=True)
-selected_items = count_items.head(5).ITEM_ID.tolist()
+selected_item = count_items.head(1).ITEM_ID.tolist()
 
-for i in selected_items:
-    item_embedding_egcf = np.expand_dims(Git[i], axis=0)
-    item_embedding_lightgcn = np.expand_dims(Gilight[i], axis=0)
-    item_embedding_dgcf = np.expand_dims(Gidgcf[i], axis=0)
-    selected_users = train[train['ITEM_ID'] == i]['USER_ID'].tolist()
-    user_embeddings_egcf = Gut[selected_users]
-    user_embeddings_lightgcn = Gulight[selected_users]
-    user_embeddings_dgcf = Gudgcf[selected_users]
-    t_sne = TSNE(n_components=2, random_state=1234).fit_transform(
-        np.concatenate((user_embeddings_egcf,
-                        user_embeddings_lightgcn,
-                        user_embeddings_dgcf,
-                        item_embedding_egcf,
-                        item_embedding_lightgcn,
-                        item_embedding_dgcf), axis=0))
-    x_item, y_item = t_sne[-3:, 0].tolist(), t_sne[-3:, 1].tolist()
-    x_users, y_users = t_sne[:-3, 0].tolist(), t_sne[:-3, 1].tolist()
-    plt.scatter(x_users, y_users)
-    plt.scatter(x_item, y_item, color='red')
-    plt.axis('off')
-    plt.show()
-    plt.close()
+item_embedding_egcf = Git[selected_item]
+item_embedding_lightgcn = Gilight[selected_item]
+item_embedding_dgcf = Gidgcf[selected_item]
+selected_users = train[train['ITEM_ID'] == selected_item[0]]['USER_ID'].tolist()
+user_embeddings_egcf = Gut[selected_users]
+user_embeddings_lightgcn = Gulight[selected_users]
+user_embeddings_dgcf = Gudgcf[selected_users]
+X = np.concatenate((user_embeddings_egcf,
+                    user_embeddings_lightgcn,
+                    user_embeddings_dgcf,
+                    item_embedding_egcf,
+                    item_embedding_lightgcn,
+                    item_embedding_dgcf), axis=0)
+t_sne = TSNE(n_components=2, random_state=1234).fit_transform(X)
+
+# egcf (reference)
+x_item_egcf, y_item_egcf = t_sne[-3, 0].tolist(), t_sne[-3, 1].tolist()
+plt.scatter(x_item_egcf, y_item_egcf, color='yellow', marker='*', edgecolors='black', s=200)
+x_users_egcf, y_users_egcf = t_sne[:5, 0].tolist(), t_sne[:5, 1].tolist()
+plt.scatter(x_users_egcf, y_users_egcf,
+            color=["red", "green", "blue", "orange", "purple"])
+for x, y in zip(x_users_egcf, y_users_egcf):
+    plt.plot([x_item_egcf, x], [y_item_egcf, y], color='black', linewidth=1.0, ls='-')
+
+# lightgcn
+x_item_lightgcn, y_item_lightgcn = t_sne[-2, 0].tolist(), t_sne[-2, 1].tolist()
+x_lightgcn_displacement = x_item_egcf - x_item_lightgcn
+y_lightgcn_displacement = y_item_egcf - y_item_lightgcn
+# plt.scatter(x_item_lightgcn + x_lightgcn_displacement,
+#             y_item_lightgcn + y_lightgcn_displacement, color='blue', marker='*', edgecolors='black', s=200)
+x_users_lightgcn, y_users_lightgcn = t_sne[5:10, 0].tolist(), t_sne[5:10, 1].tolist()
+plt.scatter((np.array(x_users_lightgcn) + x_lightgcn_displacement).tolist(),
+            (np.array(y_users_lightgcn) + y_lightgcn_displacement).tolist(),
+            color=["red", "green", "blue", "orange", "purple"])
+for x, y in zip((np.array(x_users_lightgcn) + x_lightgcn_displacement).tolist(),
+                (np.array(y_users_lightgcn) + y_lightgcn_displacement).tolist()):
+    plt.plot([x_item_egcf, x], [y_item_egcf, y], color='black', linewidth=1.0, ls='--')
+
+# dgcf
+x_item_dgcf, y_item_dgcf = t_sne[-1, 0].tolist(), t_sne[-1, 1].tolist()
+x_dgcf_displacement = x_item_egcf - x_item_dgcf
+y_dgcf_displacement = y_item_egcf - y_item_dgcf
+# plt.scatter(x_item_dgcf + x_dgcf_displacement,
+#             y_item_dgcf + y_dgcf_displacement, color='red', marker='*', edgecolors='black', s=200)
+x_users_dgcf, y_users_dgcf = t_sne[10:15, 0].tolist(), t_sne[10:15, 1].tolist()
+plt.scatter((np.array(x_users_dgcf) + x_dgcf_displacement).tolist(),
+            (np.array(y_users_dgcf) + y_dgcf_displacement).tolist(),
+            color=["red", "green", "blue", "orange", "purple"])
+for x, y in zip((np.array(x_users_dgcf) + x_dgcf_displacement).tolist(),
+                (np.array(y_users_dgcf) + y_dgcf_displacement).tolist()):
+    plt.plot([x_item_egcf, x], [y_item_egcf, y], color='black', linewidth=1.0, ls=':')
+
+# plt.legend(labels=['SimGCF', 'LightGCN', 'DGCF'], loc='best')
+
+plt.axis('off')
+plt.show()
+plt.close()
