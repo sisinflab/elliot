@@ -56,3 +56,4 @@ for _backend in sys.modules["external"].backend:
         from .lattice.LATTICE import LATTICE
         from .slattice.SLATTICE import SLATTICE
         from .uuii.UUII import UUII
+        from .ultragcn import UltraGCN
