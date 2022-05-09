@@ -63,8 +63,6 @@ class UltraGCNModel(torch.nn.Module, ABC):
         torch.nn.init.normal_(self.Gi.weight, std=self.initial_weight)
         self.Gi.to(self.device)
 
-        self.softplus = torch.nn.Softplus()
-
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
 
     def get_omegas(self, users, pos_items, neg_items):
@@ -87,9 +85,9 @@ class UltraGCNModel(torch.nn.Module, ABC):
         return weight
 
     def cal_loss_l(self, users, pos_items, neg_items, omega_weight):
-        user_embeds = self.Gu(users)
-        pos_embeds = self.Gi(pos_items)
-        neg_embeds = self.Gi(neg_items)
+        user_embeds = self.Gu(users.to(self.device))
+        pos_embeds = self.Gi(pos_items.to(self.device))
+        neg_embeds = self.Gi(neg_items.to(self.device))
 
         pos_scores = (user_embeds * pos_embeds).sum(dim=-1)  # batch_size
         user_embeds = user_embeds.unsqueeze(1)
@@ -114,7 +112,7 @@ class UltraGCNModel(torch.nn.Module, ABC):
         neighbor_embeds = self.Gi(
             self.ii_neighbor_mat[pos_items].to(self.device))  # len(pos_items) * num_neighbors * dim
         sim_scores = self.ii_constraint_mat[pos_items].to(self.device)  # len(pos_items) * num_neighbors
-        user_embeds = self.Gu(users).unsqueeze(1)
+        user_embeds = self.Gu(users.to(self.device)).unsqueeze(1)
 
         loss = -sim_scores * (user_embeds * neighbor_embeds).sum(dim=-1).sigmoid().log()
 
@@ -132,11 +130,15 @@ class UltraGCNModel(torch.nn.Module, ABC):
 
         loss = self.cal_loss_l(users, pos_items, neg_items, omega_weight)
         loss += self.gamma * self.norm_loss()
-        loss += self.lambda_ * self.cal_loss_i(users, pos_items)
+        loss += self.lm * self.cal_loss_i(users, pos_items)
         return loss
 
-    def predict(self, gu, gi, **kwargs):
-        return torch.matmul(gu.to(self.device), torch.transpose(gi.to(self.device), 0, 1))
+    def predict(self, users, **kwargs):
+        items = torch.arange(self.num_items).to(self.device)
+        user_embeds = self.Gu(users.to(self.device))
+        item_embeds = self.Gi(items.to(self.device))
+
+        return user_embeds.mm(item_embeds.t())
 
     def train_step(self, batch):
         user, pos, neg = batch

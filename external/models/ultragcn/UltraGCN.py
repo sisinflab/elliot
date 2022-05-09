@@ -1,10 +1,9 @@
 from tqdm import tqdm
-import numpy as np
-import torch
 import os
 
 from elliot.utils.write import store_recommendation
-from elliot.dataset.samplers import custom_sampler as cs
+from .custom_sampler_batch import Sampler
+from .sampling import *
 from elliot.recommender import BaseRecommenderModel
 from elliot.recommender.base_recommender_model import init_charger
 from elliot.recommender.recommender_utils_mixin import RecMixin
@@ -25,30 +24,41 @@ class UltraGCN(RecMixin, BaseRecommenderModel):
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
 
-        self._sampler = cs.Sampler(self._data.i_train_dict)
+        self._sampler = Sampler(self._data.i_train_dict)
         if self._batch_size < 1:
             self._batch_size = self._num_users
 
         ######################################
 
         self._params_list = [
-            ("_learning_rate", "lr", "lr", 0.0005, float, None),
+            ("_learning_rate", "lr", "lr", 1e-3, float, None),
             ("_factors", "factors", "factors", 64, int, None),
-            ("_w1", "w1", "w1", 0.01, float, None),
-            ("_w2", "w2", "w2", 0.01, float, None),
-            ("_w3", "w3", "w3", 0.01, float, None),
-            ("_w4", "w4", "w4", 0.01, float, None),
+            ("_w1", "w1", "w1", 1e-8, float, None),
+            ("_w2", "w2", "w2", 1, float, None),
+            ("_w3", "w3", "w3", 1, float, None),
+            ("_w4", "w4", "w4", 1e-8, float, None),
             ("_ii_neighbor_num", "ii_neighbor_num", "ii_neighbor_num", 10, int, None),
-            ("_initial_weight", "initial_weight", "initial_weight", 0.01, float, None),
-            ("_negative_num", "negative_num", "negative_num", 1500, int, None),
-            ("_negative_weight", "negative_weight", "negative_weight", 300, float, None),
-            ("_gamma", "gamma", "gamma", 0.01, float, None),
-            ("_lambda", "lambda", "lambda", 0.01, float, None)
+            ("_initial_weight", "initial_weight", "initial_weight", 1e-4, float, None),
+            ("_negative_num", "negative_num", "negative_num", 500, int, None),
+            ("_negative_weight", "negative_weight", "negative_weight", 500, float, None),
+            ("_gamma", "gamma", "gamma", 1e-4, float, None),
+            ("_lambda", "lambda", "lambda", 2.75, float, None),
+            ("_sampling_sift_pos", "sampling_sift_pos", "sampling_sift_pos", False, bool, None)
         ]
         self.autoset_params()
 
-        ii_neighbor_mat, ii_constraint_mat, constraint_mat = self.get_ii_constraint_mat(data.sp_i_train,
-                                                                                        self._ii_neighbor_num)
+        self.interacted_items = {u: list(set(self._data.i_train_dict[u])) for u in self._data.i_train_dict}
+
+        ii_neighbor_mat, ii_constraint_mat = self.get_ii_constraint_mat(data.sp_i_train, self._ii_neighbor_num)
+
+        items_D = np.sum(data.sp_i_train, axis=0).reshape(-1)
+        users_D = np.sum(data.sp_i_train, axis=1).reshape(-1)
+
+        beta_uD = (np.sqrt(users_D + 1) / users_D).reshape(-1, 1)
+        beta_iD = (1 / np.sqrt(items_D + 1)).reshape(1, -1)
+
+        constraint_mat = {"beta_uD": torch.from_numpy(beta_uD).reshape(-1),
+                          "beta_iD": torch.from_numpy(beta_iD).reshape(-1)}
 
         self._model = UltraGCNModel(
             num_users=self._num_users,
@@ -97,10 +107,7 @@ class UltraGCN(RecMixin, BaseRecommenderModel):
             res_mat[i] = row_idxs
             res_sim_mat[i] = row_sims
 
-        constraint_mat = {"beta_uD": torch.from_numpy(beta_uD).reshape(-1),
-                          "beta_iD": torch.from_numpy(beta_iD).reshape(-1)}
-
-        return res_mat.long(), res_sim_mat.float(), constraint_mat
+        return res_mat.long(), res_sim_mat.float()
 
     def train(self):
         if self._restore:
@@ -112,7 +119,11 @@ class UltraGCN(RecMixin, BaseRecommenderModel):
             with tqdm(total=int(self._data.transactions // self._batch_size), disable=not self._verbose) as t:
                 for batch in self._sampler.step(self._data.transactions, self._batch_size):
                     steps += 1
-                    loss += self._model.train_step(batch)
+                    users, pos_items, neg_items = sampling(batch, self._num_items, self._negative_num,
+                                                           self.interacted_items, self._sampling_sift_pos)
+                    loss += self._model.train_step((torch.from_numpy(users),
+                                                    torch.from_numpy(pos_items),
+                                                    neg_items))
                     t.set_postfix({'loss': f'{loss / steps:.5f}'})
                     t.update()
 
@@ -121,10 +132,9 @@ class UltraGCN(RecMixin, BaseRecommenderModel):
     def get_recommendations(self, k: int = 100):
         predictions_top_k_test = {}
         predictions_top_k_val = {}
-        gu, gi = self._model.propagate_embeddings(evaluate=True)
         for index, offset in enumerate(range(0, self._num_users, self._batch_size)):
             offset_stop = min(offset + self._batch_size, self._num_users)
-            predictions = self._model.predict(gu[offset: offset_stop], gi)
+            predictions = self._model.predict(torch.arange(offset, offset_stop))
             recs_val, recs_test = self.process_protocol(k, predictions, offset, offset_stop)
             predictions_top_k_val.update(recs_val)
             predictions_top_k_test.update(recs_test)
