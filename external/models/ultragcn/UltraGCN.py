@@ -31,16 +31,16 @@ class UltraGCN(RecMixin, BaseRecommenderModel):
         ######################################
 
         self._params_list = [
-            ("_learning_rate", "lr", "lr", 1e-3, float, None),
+            ("_learning_rate", "lr", "lr", 1e-4, float, None),
             ("_factors", "factors", "factors", 64, int, None),
-            ("_w1", "w1", "w1", 1e-8, float, None),
+            ("_w1", "w1", "w1", 1e-7, float, None),
             ("_w2", "w2", "w2", 1, float, None),
             ("_w3", "w3", "w3", 1, float, None),
-            ("_w4", "w4", "w4", 1e-8, float, None),
+            ("_w4", "w4", "w4", 1e-7, float, None),
             ("_ii_neighbor_num", "ii_neighbor_num", "ii_neighbor_num", 10, int, None),
-            ("_initial_weight", "initial_weight", "initial_weight", 1e-4, float, None),
-            ("_negative_num", "negative_num", "negative_num", 500, int, None),
-            ("_negative_weight", "negative_weight", "negative_weight", 500, float, None),
+            ("_initial_weight", "initial_weight", "initial_weight", 1e-3, float, None),
+            ("_negative_num", "negative_num", "negative_num", 200, int, None),
+            ("_negative_weight", "negative_weight", "negative_weight", 200, float, None),
             ("_gamma", "gamma", "gamma", 1e-4, float, None),
             ("_lambda", "lambda", "lambda", 2.75, float, None),
             ("_sampling_sift_pos", "sampling_sift_pos", "sampling_sift_pos", False, bool, None)
