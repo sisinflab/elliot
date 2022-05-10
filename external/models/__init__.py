@@ -58,3 +58,4 @@ for _backend in sys.modules["external"].backend:
         from .uuii.UUII import UUII
         from .ultragcn import UltraGCN
         from .gfcf import GFCF
+        from .lrgccf import LRGCCF
