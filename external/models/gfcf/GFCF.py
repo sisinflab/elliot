@@ -2,7 +2,7 @@ import torch
 import numpy as np
 from scipy.sparse import csr_matrix
 import scipy
-from sparsesvd import sparsesvd
+from scipy.sparse.linalg import svds
 
 from elliot.recommender import BaseRecommenderModel
 from elliot.recommender.base_recommender_model import init_charger
@@ -24,8 +24,8 @@ class GFCF(RecMixin, BaseRecommenderModel):
     def __init__(self, data, config, params, *args, **kwargs):
         self._params_list = [
             ("_batch_eval", "batch_eval", "batch_eval", 512, int, None),
-            ("_svd_factors", "svd_factors", "svd_factors", 512, int, None),
-            ("_alpha", "alpha", "alpha", 0.5, float, None)
+            ("_svd_factors", "svd_factors", "svd_factors", 256, int, None),
+            ("_alpha", "alpha", "alpha", 0.3, float, None)
         ]
 
         self.autoset_params()
@@ -51,7 +51,7 @@ class GFCF(RecMixin, BaseRecommenderModel):
         self.d_mat_i_inv = scipy.sparse.diags(1 / d_inv)
         norm_adj = self.norm_adj.dot(d_mat)
         norm_adj = norm_adj.tocsc()
-        _, _, self.vt = sparsesvd(norm_adj, self._svd_factors)
+        _, _, self.vt = svds(norm_adj, self._svd_factors)
 
         self.evaluate()
 
@@ -77,7 +77,7 @@ class GFCF(RecMixin, BaseRecommenderModel):
 
     def get_top_k(self, preds, train_mask, k=100):
         return torch.topk(torch.where(torch.tensor(train_mask).to(self.device), torch.tensor(preds).to(self.device),
-                                      torch.tensor(-np.inf).double().to(self.device)), k=k, sorted=True)
+                                      torch.tensor(-np.inf).to(self.device)), k=k, sorted=True)
 
     def get_single_recommendation(self, mask, k, predictions, offset, offset_stop):
         v, i = self.get_top_k(predictions, mask[offset: offset_stop], k=k)
