@@ -76,7 +76,7 @@ class LRGCCFModel(torch.nn.Module, ABC):
                 self.propagation_network.children()
             )[layer](all_embeddings[layer].to(self.device), self.adj.to(self.device)), p=2, dim=1)]
 
-        all_embeddings = torch.stack(all_embeddings, dim=1)
+        all_embeddings = torch.cat(all_embeddings, dim=1)
         gu, gi = torch.split(all_embeddings, [self.num_users, self.num_items], 0)
         return gu, gi
 
@@ -99,7 +99,7 @@ class LRGCCFModel(torch.nn.Module, ABC):
         xu_neg, _, gamma_i_neg = self.forward(inputs=(gu[user], gi[neg]))
 
         reg_loss = self.l_w * (gamma_u**2 + gamma_i_pos**2 + gamma_i_neg**2).sum(dim=-1)
-        loss = (xu_pos - xu_neg).sigmoid().log().mean() + reg_loss.mean()
+        loss = - (xu_pos - xu_neg).sigmoid().log().mean() + reg_loss.mean()
 
         self.optimizer.zero_grad()
         loss.backward()
