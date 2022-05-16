@@ -37,13 +37,13 @@ class UltraGCN(RecMixin, BaseRecommenderModel):
             ("_w2", "w2", "w2", 1, float, None),
             ("_w3", "w3", "w3", 1, float, None),
             ("_w4", "w4", "w4", 1e-7, float, None),
-            ("_ii_n_n", "ii_neighbor_num", "ii_neighbor_num", 10, int, None),
-            ("_i_w", "initial_weight", "initial_weight", 1e-3, float, None),
-            ("_n_n", "negative_num", "negative_num", 200, int, None),
-            ("_n_w", "negative_weight", "negative_weight", 200, float, None),
-            ("_g", "gamma", "gamma", 1e-4, float, None),
-            ("_l", "lambda", "lambda", 2.75, float, None),
-            ("_s_s_p", "sampling_sift_pos", "sampling_sift_pos", False, bool, None)
+            ("_ii_n_n", "ii_n_n", "ii_n_n", 10, int, None),
+            ("_i_w", "i_w", "i_w", 1e-3, float, None),
+            ("_n_n", "n_n", "n_n", 200, int, None),
+            ("_n_w", "n_w", "n_w", 200, float, None),
+            ("_g", "g", "g", 1e-4, float, None),
+            ("_l", "l", "l", 2.75, float, None),
+            ("_s_s_p", "s_s_p", "s_s_p", False, bool, None)
         ]
         self.autoset_params()
 
