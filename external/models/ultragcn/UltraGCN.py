@@ -37,19 +37,19 @@ class UltraGCN(RecMixin, BaseRecommenderModel):
             ("_w2", "w2", "w2", 1, float, None),
             ("_w3", "w3", "w3", 1, float, None),
             ("_w4", "w4", "w4", 1e-7, float, None),
-            ("_ii_neighbor_num", "ii_neighbor_num", "ii_neighbor_num", 10, int, None),
-            ("_initial_weight", "initial_weight", "initial_weight", 1e-3, float, None),
-            ("_negative_num", "negative_num", "negative_num", 200, int, None),
-            ("_negative_weight", "negative_weight", "negative_weight", 200, float, None),
-            ("_gamma", "gamma", "gamma", 1e-4, float, None),
-            ("_lambda", "lambda", "lambda", 2.75, float, None),
-            ("_sampling_sift_pos", "sampling_sift_pos", "sampling_sift_pos", False, bool, None)
+            ("_ii_n_num", "ii_neighbor_num", "ii_neighbor_num", 10, int, None),
+            ("_i_w", "initial_weight", "initial_weight", 1e-3, float, None),
+            ("_n_n", "negative_num", "negative_num", 200, int, None),
+            ("_n_w", "negative_weight", "negative_weight", 200, float, None),
+            ("_g", "gamma", "gamma", 1e-4, float, None),
+            ("_l", "lambda", "lambda", 2.75, float, None),
+            ("_s_s_p", "sampling_sift_pos", "sampling_sift_pos", False, bool, None)
         ]
         self.autoset_params()
 
         self.interacted_items = {u: list(set(self._data.i_train_dict[u])) for u in self._data.i_train_dict}
 
-        ii_neighbor_mat, ii_constraint_mat = self.get_ii_constraint_mat(data.sp_i_train, self._ii_neighbor_num)
+        ii_neighbor_mat, ii_constraint_mat = self.get_ii_constraint_mat(data.sp_i_train, self._ii_n_n)
 
         items_D = np.sum(data.sp_i_train, axis=0).reshape(-1)
         users_D = np.sum(data.sp_i_train, axis=1).reshape(-1)
@@ -69,14 +69,14 @@ class UltraGCN(RecMixin, BaseRecommenderModel):
             w2=self._w2,
             w3=self._w3,
             w4=self._w4,
-            initial_weight=self._initial_weight,
-            negative_num=self._negative_num,
-            negative_weight=self._negative_weight,
+            initial_weight=self._i_w,
+            negative_num=self._n_n,
+            negative_weight=self._n_w,
             ii_neighbor_mat=ii_neighbor_mat,
             ii_constraint_mat=ii_constraint_mat,
             constraint_mat=constraint_mat,
-            gamma=self._gamma,
-            lm=self._lambda,
+            gamma=self._g,
+            lm=self._l,
             random_seed=self._seed
         )
 
@@ -119,8 +119,8 @@ class UltraGCN(RecMixin, BaseRecommenderModel):
             with tqdm(total=int(self._data.transactions // self._batch_size), disable=not self._verbose) as t:
                 for batch in self._sampler.step(self._data.transactions, self._batch_size):
                     steps += 1
-                    users, pos_items, neg_items = sampling(batch, self._num_items, self._negative_num,
-                                                           self.interacted_items, self._sampling_sift_pos)
+                    users, pos_items, neg_items = sampling(batch, self._num_items, self._n_n,
+                                                           self.interacted_items, self._s_s_p)
                     loss += self._model.train_step((torch.from_numpy(users),
                                                     torch.from_numpy(pos_items),
                                                     neg_items))
