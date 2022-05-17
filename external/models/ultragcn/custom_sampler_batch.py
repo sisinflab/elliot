@@ -24,8 +24,7 @@ class Sampler:
         self._lui_dict = {u: len(v) for u, v in self._ui_dict.items()}
         self._probs = {u: self.get_probs(v) for u, v in self._ui_dict.items()}
         
-    @staticmethod
-    def get_probs(ui):
+    def get_probs(self, ui):
         probs = np.ones(self._nitems)
         probs[ui] = 0
         probs /= np.sum(probs)
