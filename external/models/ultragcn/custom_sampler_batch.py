@@ -51,5 +51,5 @@ class Sampler:
             batch_stop = min(batch_start + batch_size, events)
             current_batch_size = batch_stop - batch_start
             bui, bii, ps = sample(current_batch_size)
-            batch = np.array([bui, bii, ps])
-            yield batch
+            batch = np.array([bui, bii])
+            yield batch, ps
