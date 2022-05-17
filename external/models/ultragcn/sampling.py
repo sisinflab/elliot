@@ -6,12 +6,12 @@ np.random.seed(1234)
 random.seed(1234)
 
 
-def sampling(pos_train_data, item_num, neg_ratio, interacted_items, sampling_sift_pos):
+def sampling(pos_train_data, ps, item_num, neg_ratio, interacted_items, sampling_sift_pos):
     neg_candidates = np.arange(item_num)
 
     if sampling_sift_pos:
         neg_items = []
-        for u, probs in pos_train_data[:2]:
+        for u, probs in zip(pos_train_data[0], ps):
             u_neg_items = np.random.choice(neg_candidates, size=neg_ratio, p=probs, replace=True).reshape(1, -1)
             
             neg_items.append(u_neg_items)
