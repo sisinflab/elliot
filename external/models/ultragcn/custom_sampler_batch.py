@@ -32,19 +32,24 @@ class Sampler:
         def sample(bs):
             users = random.sample(self._users, bs)
             pos_items = []
+            all_probs = []
             for u in users:
                 ui = ui_dict[u]
+                probs = np.ones(n_items)
+                probs[ui] = 0
+                probs /= np.sum(probs)
                 lui = lui_dict[u]
                 if lui == n_items:
                     sample(bs)
                 i = ui[r_int(lui)]
 
                 pos_items.append(i)
-            return users, pos_items
+                all_probs.append(probs)
+            return users, pos_items, all_probs
 
         for batch_start in range(0, events, batch_size):
             batch_stop = min(batch_start + batch_size, events)
             current_batch_size = batch_stop - batch_start
-            bui, bii = sample(current_batch_size)
-            batch = np.array([bui, bii])
+            bui, bii, ps = sample(current_batch_size)
+            batch = np.array([bui, bii, ps])
             yield batch
