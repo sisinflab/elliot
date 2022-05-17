@@ -16,8 +16,9 @@ def sampling(pos_train_data, item_num, neg_ratio, interacted_items, sampling_sif
             probs[interacted_items[u]] = 0
             probs /= np.sum(probs)
 
-            u_neg_items = np.random.choice(neg_candidates, size=neg_ratio, p=probs, replace=True).reshape(1, -1)
-
+            # u_neg_items = np.random.choice(neg_candidates, size=neg_ratio, p=probs, replace=True).reshape(1, -1)
+            u_neg_items = np.array([1, 2, 3])
+            
             neg_items.append(u_neg_items)
 
         neg_items = np.concatenate(neg_items, axis=0)
