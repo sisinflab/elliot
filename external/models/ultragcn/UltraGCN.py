@@ -117,9 +117,9 @@ class UltraGCN(RecMixin, BaseRecommenderModel):
             loss = 0
             steps = 0
             with tqdm(total=int(self._data.transactions // self._batch_size), disable=not self._verbose) as t:
-                for batch in self._sampler.step(self._data.transactions, self._batch_size):
+                for batch, probs in self._sampler.step(self._data.transactions, self._batch_size):
                     steps += 1
-                    users, pos_items, neg_items = sampling(batch, self._num_items, self._n_n,
+                    users, pos_items, neg_items = sampling(batch, probs, self._num_items, self._n_n,
                                                            self.interacted_items, self._s_s_p)
                     loss += self._model.train_step((torch.from_numpy(users),
                                                     torch.from_numpy(pos_items),
