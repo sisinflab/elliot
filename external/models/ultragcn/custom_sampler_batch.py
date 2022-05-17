@@ -22,7 +22,7 @@ class Sampler:
         self._nitems = len(self._items)
         self._ui_dict = {u: list(set(indexed_ratings[u])) for u in indexed_ratings}
         self._lui_dict = {u: len(v) for u, v in self._ui_dict.items()}
-        self._probs = {u: get_probs(v) for u, v in self._ui_dict.items()}
+        self._probs = {u: self.get_probs(v) for u, v in self._ui_dict.items()}
         
     @staticmethod
     def get_probs(ui):
