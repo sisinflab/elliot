@@ -11,11 +11,7 @@ def sampling(pos_train_data, item_num, neg_ratio, interacted_items, sampling_sif
 
     if sampling_sift_pos:
         neg_items = []
-        for u in pos_train_data[0]:
-            probs = np.ones(item_num)
-            probs[interacted_items[u]] = 0
-            probs /= np.sum(probs)
-
+        for u, probs in pos_train_data[:2]:
             u_neg_items = np.random.choice(neg_candidates, size=neg_ratio, p=probs, replace=True).reshape(1, -1)
             
             neg_items.append(u_neg_items)
