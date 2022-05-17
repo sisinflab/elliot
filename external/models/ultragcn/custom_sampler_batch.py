@@ -22,12 +22,21 @@ class Sampler:
         self._nitems = len(self._items)
         self._ui_dict = {u: list(set(indexed_ratings[u])) for u in indexed_ratings}
         self._lui_dict = {u: len(v) for u, v in self._ui_dict.items()}
+        self._probs = {u: get_probs(v) for u, v in self._ui_dict.items()}
+        
+    @staticmethod
+    def get_probs(ui):
+        probs = np.ones(self._nitems)
+        probs[ui] = 0
+        probs /= np.sum(probs)
+        return probs
 
     def step(self, events: int, batch_size: int):
         r_int = np.random.randint
         n_items = self._nitems
         ui_dict = self._ui_dict
         lui_dict = self._lui_dict
+        probs = self._probs
 
         def sample(bs):
             users = random.sample(self._users, bs)
@@ -35,16 +44,14 @@ class Sampler:
             all_probs = []
             for u in users:
                 ui = ui_dict[u]
-                probs = np.ones(n_items)
-                probs[ui] = 0
-                probs /= np.sum(probs)
+                pr_u = probs[u]
                 lui = lui_dict[u]
                 if lui == n_items:
                     sample(bs)
                 i = ui[r_int(lui)]
 
                 pos_items.append(i)
-                all_probs.append(probs)
+                all_probs.append(pr_u)
             return users, pos_items, all_probs
 
         for batch_start in range(0, events, batch_size):
