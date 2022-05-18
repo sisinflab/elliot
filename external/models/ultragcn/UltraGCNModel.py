@@ -12,9 +12,8 @@ class UltraGCNModel(torch.nn.Module, ABC):
                  learning_rate,
                  embed_k,
                  w1,
-                 w2,
+                 w24,
                  w3,
-                 w4,
                  initial_weight,
                  negative_num,
                  negative_weight,
@@ -44,9 +43,8 @@ class UltraGCNModel(torch.nn.Module, ABC):
         self.embed_k = embed_k
         self.learning_rate = learning_rate
         self.w1 = w1
-        self.w2 = w2
+        self.w24 = w24
         self.w3 = w3
-        self.w4 = w4
         self.initial_weight = initial_weight
         self.negative_num = negative_num
         self.negative_weight = negative_weight
@@ -66,7 +64,7 @@ class UltraGCNModel(torch.nn.Module, ABC):
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
 
     def get_omegas(self, users, pos_items, neg_items):
-        if self.w2 > 0:
+        if self.w24 > 0:
             pos_weight = torch.mul(self.constraint_mat['beta_uD'][users], self.constraint_mat['beta_iD'][pos_items]).to(
                 self.device)
             pos_weight = self.w1 + self.w2 * pos_weight
@@ -74,7 +72,7 @@ class UltraGCNModel(torch.nn.Module, ABC):
             pos_weight = self.w1 * torch.ones(len(pos_items)).to(self.device)
 
         # users = (users * self.item_num).unsqueeze(0)
-        if self.w4 > 0:
+        if self.w24 > 0:
             neg_weight = torch.mul(torch.repeat_interleave(self.constraint_mat['beta_uD'][users], neg_items.size(1)),
                                    self.constraint_mat['beta_iD'][neg_items.flatten()]).to(self.device)
             neg_weight = self.w3 + self.w4 * neg_weight
