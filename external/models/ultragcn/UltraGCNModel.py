@@ -67,7 +67,7 @@ class UltraGCNModel(torch.nn.Module, ABC):
         if self.w24 > 0:
             pos_weight = torch.mul(self.constraint_mat['beta_uD'][users], self.constraint_mat['beta_iD'][pos_items]).to(
                 self.device)
-            pos_weight = self.w1 + self.w2 * pos_weight
+            pos_weight = self.w1 + self.w24 * pos_weight
         else:
             pos_weight = self.w1 * torch.ones(len(pos_items)).to(self.device)
 
@@ -75,7 +75,7 @@ class UltraGCNModel(torch.nn.Module, ABC):
         if self.w24 > 0:
             neg_weight = torch.mul(torch.repeat_interleave(self.constraint_mat['beta_uD'][users], neg_items.size(1)),
                                    self.constraint_mat['beta_iD'][neg_items.flatten()]).to(self.device)
-            neg_weight = self.w3 + self.w4 * neg_weight
+            neg_weight = self.w3 + self.w24 * neg_weight
         else:
             neg_weight = self.w3 * torch.ones(neg_items.size(0) * neg_items.size(1)).to(self.device)
 
