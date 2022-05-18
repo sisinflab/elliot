@@ -9,6 +9,7 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
 import numpy as np
 import random
+from operator import itemgetter
 
 
 class Sampler:
@@ -40,17 +41,15 @@ class Sampler:
         def sample(bs):
             users = random.sample(self._users, bs)
             pos_items = []
-            all_probs = []
+            all_probs = list(itemgetter(*users)(probs))
             for u in users:
                 ui = ui_dict[u]
-                pr_u = probs[u]
                 lui = lui_dict[u]
                 if lui == n_items:
                     sample(bs)
                 i = ui[r_int(lui)]
 
                 pos_items.append(i)
-                all_probs.append(pr_u)
             return users, pos_items, all_probs
 
         for batch_start in range(0, events, batch_size):
