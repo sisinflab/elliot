@@ -59,3 +59,5 @@ for _backend in sys.modules["external"].backend:
         from .ultragcn import UltraGCN
         from .gfcf import GFCF
         from .lrgccf import LRGCCF
+        from .lightgcnuu import LightGCNUU
+        from .lightgcnii import LightGCNII
