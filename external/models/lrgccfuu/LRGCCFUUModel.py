@@ -53,7 +53,7 @@ class LRGCCFUUModel(torch.nn.Module, ABC):
         self.Gu = torch.nn.Embedding(self.num_users, self.embed_k)
         torch.nn.init.normal_(self.Gu.weight, std=0.01)
         self.Gu.to(self.device)
-        self.Gi = torch.nn.Embedding(self.num_items, self.embed_k)
+        self.Gi = torch.nn.Embedding(self.num_items, self.embed_k * (self.n_layers + 1))
         torch.nn.init.normal_(self.Gi.weight, std=0.01)
         self.Gi.to(self.device)
 
