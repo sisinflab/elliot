@@ -88,7 +88,7 @@ class LRGCCFUUModel(torch.nn.Module, ABC):
 
         return xui, gamma_u, gamma_i
 
-    def predict(self, gu, gi, **kwargs):
+    def predict(self, gu, **kwargs):
         return torch.matmul(gu.to(self.device), torch.transpose(self.Gi.weight.to(self.device), 0, 1))
 
     def train_step(self, batch):
