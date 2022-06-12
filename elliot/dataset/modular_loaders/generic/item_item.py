@@ -37,7 +37,7 @@ class ItemItem(AbstractLoader):
 
         for k, v in int_sim.items():
             for val in v:
-                rows_ii.append(public_items[k if not k.isdigit() else int(k)])
-                cols_ii.append(public_items[val if not val.isdigit() else int(val)])
+                rows_ii.append(public_items[k])
+                cols_ii.append(public_items[val])
 
         return rows_ii, cols_ii
