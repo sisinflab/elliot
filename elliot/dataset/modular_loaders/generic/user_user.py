@@ -37,7 +37,7 @@ class UserUser(AbstractLoader):
 
         for k, v in int_sim.items():
             for val in v:
-                rows_uu.append(public_users[k])
-                cols_uu.append(public_users[val])
+                rows_uu.append(public_users[k if not k.isdigit() else int(k)])
+                cols_uu.append(public_users[val if not val.isdigit() else int(val)])
 
         return rows_uu, cols_uu
