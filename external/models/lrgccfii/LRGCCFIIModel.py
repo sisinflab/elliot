@@ -50,7 +50,7 @@ class LRGCCFIIModel(torch.nn.Module, ABC):
         self.weight_size_list = [self.embed_k] * (self.n_layers + 1)
         self.adj = adj
 
-        self.Gu = torch.nn.Embedding(self.num_users, self.embed_k)
+        self.Gu = torch.nn.Embedding(self.num_users, self.embed_k * (self.n_layers + 1))
         torch.nn.init.normal_(self.Gu.weight, std=0.01)
         self.Gu.to(self.device)
         self.Gi = torch.nn.Embedding(self.num_items, self.embed_k)
