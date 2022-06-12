@@ -64,4 +64,4 @@ for _backend in sys.modules["external"].backend:
         from .lightgcnuu import LightGCNUU
         from .lightgcnii import LightGCNII
         from .lrgccfuu import LRGCCFUU
-        from lrgccfii import LRGCCFII
+        from .lrgccfii import LRGCCFII
