@@ -1,12 +1,3 @@
-"""
-Module description:
-
-"""
-
-__version__ = '0.3.0'
-__author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta'
-__email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malitesta@poliba.it'
-
 from ast import literal_eval as make_tuple
 
 from tqdm import tqdm
@@ -15,11 +6,13 @@ import torch
 import os
 
 from elliot.utils.write import store_recommendation
-from elliot.dataset.samplers import pointwise_pos_neg_ratio_ratings_sampler as ppnrrs
+from .pointwise_pos_neg_sampler import Sampler
 from elliot.recommender import BaseRecommenderModel
 from elliot.recommender.base_recommender_model import init_charger
 from elliot.recommender.recommender_utils_mixin import RecMixin
 from .GCMCModel import GCMCModel
+
+from torch_sparse import SparseTensor
 
 
 class GCMC(RecMixin, BaseRecommenderModel):
@@ -57,34 +50,49 @@ class GCMC(RecMixin, BaseRecommenderModel):
           node_dropout: ()
           dense_layer_dropout: (0.1,)
     """
+
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
-
-        self._sampler = ppnrrs.Sampler(self._data.i_train_dict, self._data.sp_i_train_ratings, 0)
         if self._batch_size < 1:
             self._batch_size = self._num_users
 
         ######################################
 
         self._params_list = [
-            ("_learning_rate", "lr", "lr", 0.0005, float, None),
+            ("_learning_rate", "lr", "lr", 0.005, float, None),
             ("_factors", "factors", "factors", 64, int, None),
+            ("_batch_eval", "batch_eval", "batch_eval", 256, int, None),
             ("_l_w", "l_w", "l_w", 0.01, float, None),
-            ("_convolutional_layer_size", "convolutional_layer_size", "convolutional_layer_size", "(64,)", lambda x: list(make_tuple(x)),
+            ("_convolutional_layer_size", "convolutional_layer_size", "convolutional_layer_size", "(64,)",
+             lambda x: list(make_tuple(x)),
              lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
             ("_dense_layer_size", "dense_layer_size", "dense_layer_size", "(64,)", lambda x: list(make_tuple(x)),
              lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
-            ("_node_dropout", "node_dropout", "node_dropout", 0.1, float, None),
-            ("_dense_layer_dropout", "dense_layer_dropout", "dense_layer_dropout", 0.1, float, None)
+            ("_num_rel", "num_rel", "num_rel", 5, int, None),
+            ("_acc", "acc", "acc", 'stack', str, None)
         ]
         self.autoset_params()
+
+        np.random.seed(self._seed)
 
         self._n_convolutional_layers = len(self._convolutional_layer_size)
         self._n_dense_layers = len(self._dense_layer_size)
 
-        row, col = data.sp_i_train.nonzero()
+        self._sampler = Sampler(self._data.i_train_dict)
+
+        row, col = self._data.sp_i_train.nonzero()
         col = [c + self._num_users for c in col]
-        self.edge_index = np.array([row, col])
+        ratings = self._data.sp_i_train_ratings.data
+        edge_index = np.array([row, col, ratings])
+        self.adj_ratings = []
+        for r in range(1, self._num_rel + 1):
+            indices = edge_index[2, :] == r
+            edge_index_0 = torch.tensor(edge_index[0, indices], dtype=torch.int64)
+            edge_index_1 = torch.tensor(edge_index[1, indices], dtype=torch.int64)
+            self.adj_ratings.append(SparseTensor(row=torch.cat([edge_index_0, edge_index_1], dim=0),
+                                                 col=torch.cat([edge_index_1, edge_index_0], dim=0),
+                                                 sparse_sizes=(self._num_users + self._num_items,
+                                                               self._num_users + self._num_items)))
 
         self._model = GCMCModel(
             num_users=self._num_users,
@@ -96,9 +104,9 @@ class GCMC(RecMixin, BaseRecommenderModel):
             dense_layer_size=self._dense_layer_size,
             n_convolutional_layers=self._n_convolutional_layers,
             n_dense_layers=self._n_dense_layers,
-            node_dropout=self._node_dropout,
-            dense_layer_dropout=self._dense_layer_dropout,
-            edge_index=self.edge_index,
+            num_relations=self._num_rel,
+            adj_ratings=self.adj_ratings,
+            accumulation=self._acc,
             random_seed=self._seed
         )
 
@@ -112,11 +120,16 @@ class GCMC(RecMixin, BaseRecommenderModel):
         if self._restore:
             return self.restore_weights()
 
+        row, col = self._data.sp_i_train.nonzero()
+        ratings = self._data.sp_i_train_ratings.data
+        edge_index = np.array([row, col, ratings]).transpose()
+
         for it in self.iterate(self._epochs):
             loss = 0
             steps = 0
+            np.random.shuffle(edge_index)
             with tqdm(total=int(self._data.transactions // self._batch_size), disable=not self._verbose) as t:
-                for batch in self._sampler.step(self._data.transactions, self._batch_size):
+                for batch in self._sampler.step(edge_index, self._data.transactions, self._batch_size):
                     steps += 1
                     loss += self._model.train_step(batch)
                     t.set_postfix({'loss': f'{loss / steps:.5f}'})
@@ -128,12 +141,25 @@ class GCMC(RecMixin, BaseRecommenderModel):
         predictions_top_k_test = {}
         predictions_top_k_val = {}
         zu, zi = self._model.propagate_embeddings(evaluate=True)
-        for index, offset in enumerate(range(0, self._num_users, self._batch_size)):
-            offset_stop = min(offset + self._batch_size, self._num_users)
-            predictions = self._model.predict(zu[offset: offset_stop], zi)
-            recs_val, recs_test = self.process_protocol(k, predictions, offset, offset_stop)
-            predictions_top_k_val.update(recs_val)
-            predictions_top_k_test.update(recs_test)
+        self.logger.info('Starting predictions on all users/items pairs...')
+        with tqdm(total=int(self._num_users // self._batch_eval), disable=not self._verbose) as t:
+            for index, offset in enumerate(range(0, self._num_users, self._batch_eval)):
+                offset_stop = min(offset + self._batch_eval, self._num_users)
+                predictions = np.empty((offset_stop - offset, self._num_items))
+                for item_index, item_offset in enumerate(range(0, self._num_items, self._batch_eval)):
+                    item_offset_stop = min(item_offset + self._batch_eval, self._num_items)
+                    user_range = np.repeat(np.arange(offset, offset_stop), repeats=item_offset_stop - item_offset)
+                    item_range = np.tile(np.arange(item_offset, item_offset_stop), reps=offset_stop - offset)
+                    p = self._model.predict(zu[user_range],
+                                            zi[item_range],
+                                            offset_stop - offset,
+                                            item_offset_stop - item_offset)
+                    predictions[:, item_offset: item_offset_stop] = p.detach().cpu().numpy()
+                recs_val, recs_test = self.process_protocol(k, predictions, offset, offset_stop)
+                predictions_top_k_val.update(recs_val)
+                predictions_top_k_test.update(recs_test)
+                t.update()
+        self.logger.info('Predictions on all users/items pairs is complete!')
         return predictions_top_k_val, predictions_top_k_test
 
     def get_single_recommendation(self, mask, k, predictions, offset, offset_stop):
@@ -152,7 +178,7 @@ class GCMC(RecMixin, BaseRecommenderModel):
             self._results.append(result_dict)
 
             if it is not None:
-                self.logger.info(f'Epoch {(it + 1)}/{self._epochs} loss {loss/(it + 1):.5f}')
+                self.logger.info(f'Epoch {(it + 1)}/{self._epochs} loss {loss / (it + 1):.5f}')
             else:
                 self.logger.info(f'Finished')
 
