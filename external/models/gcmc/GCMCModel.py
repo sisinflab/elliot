@@ -14,7 +14,6 @@ class GCMCModel(torch.nn.Module, ABC):
                  num_items,
                  learning_rate,
                  embed_k,
-                 l_w,
                  convolutional_layer_size,
                  dense_layer_size,
                  n_convolutional_layers,
@@ -42,10 +41,9 @@ class GCMCModel(torch.nn.Module, ABC):
         self.num_items = num_items
         self.embed_k = embed_k
         self.learning_rate = learning_rate
-        self.l_w = l_w
-        self.convolutional_layer_size = [self.embed_k] + convolutional_layer_size
         self.n_convolutional_layers = n_convolutional_layers
         self.n_dense_layers = n_dense_layers
+        self.convolutional_layer_size = [self.embed_k] + ([convolutional_layer_size] * self.n_convolutional_layers)
         self.num_relations = num_relations
 
         if accumulation not in ['stack', 'sum']:
@@ -53,7 +51,8 @@ class GCMCModel(torch.nn.Module, ABC):
 
         self.accumulation = accumulation
         self.dense_layer_size = [self.convolutional_layer_size[-1] if self.accumulation == 'sum' else
-                                 self.convolutional_layer_size[-1] * self.num_relations] + dense_layer_size
+                                 self.convolutional_layer_size[-1] * self.num_relations] + (
+                                            [dense_layer_size] * self.n_dense_layers)
 
         self.adj_ratings = adj_ratings
 

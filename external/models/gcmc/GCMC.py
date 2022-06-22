@@ -62,21 +62,16 @@ class GCMC(RecMixin, BaseRecommenderModel):
             ("_learning_rate", "lr", "lr", 0.005, float, None),
             ("_factors", "factors", "factors", 64, int, None),
             ("_batch_eval", "batch_eval", "batch_eval", 256, int, None),
-            ("_l_w", "l_w", "l_w", 0.01, float, None),
-            ("_convolutional_layer_size", "convolutional_layer_size", "convolutional_layer_size", "(64,)",
-             lambda x: list(make_tuple(x)),
-             lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
-            ("_dense_layer_size", "dense_layer_size", "dense_layer_size", "(64,)", lambda x: list(make_tuple(x)),
-             lambda x: self._batch_remove(str(x), " []").replace(",", "-")),
+            ("_convolutional_layer_size", "conv_size", "conv_size", 64, int, None),
+            ("_dense_layer_size", "dense_size", "dense_size", 64, int, None),
+            ("_n_convolutional_layers", "n_conv", "n_conv", 1, int, None),
+            ("_n_dense_layers", "n_dense", "_n_dense", 1, int, None),
             ("_num_rel", "num_rel", "num_rel", 5, int, None),
             ("_acc", "acc", "acc", 'stack', str, None)
         ]
         self.autoset_params()
 
         np.random.seed(self._seed)
-
-        self._n_convolutional_layers = len(self._convolutional_layer_size)
-        self._n_dense_layers = len(self._dense_layer_size)
 
         self._sampler = Sampler(self._data.i_train_dict)
 
@@ -99,7 +94,6 @@ class GCMC(RecMixin, BaseRecommenderModel):
             num_items=self._num_items,
             learning_rate=self._learning_rate,
             embed_k=self._factors,
-            l_w=self._l_w,
             convolutional_layer_size=self._convolutional_layer_size,
             dense_layer_size=self._dense_layer_size,
             n_convolutional_layers=self._n_convolutional_layers,
