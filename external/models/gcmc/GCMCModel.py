@@ -148,7 +148,7 @@ class GCMCModel(torch.nn.Module, ABC):
                 torch.sum(zeta_u.to(self.device) * torch.matmul(zeta_i.to(self.device), self.Q[r].to(self.device)), 1),
                 1))
         pui = torch.cat(xui_r, 1)
-        xui = torch.sum(torch.arange(0, 5) * torch.softmax(pui, 1), 1)
+        xui = torch.sum(torch.arange(0, 5) * torch.softmax(pui.to(self.device), 1), 1)
         return xui, pui
 
     def predict(self, zu, zi, batch_user, batch_item, **kwargs):
