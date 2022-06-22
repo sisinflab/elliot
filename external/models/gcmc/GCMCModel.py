@@ -160,7 +160,7 @@ class GCMCModel(torch.nn.Module, ABC):
         user, item, r = batch
         xui, pui = self.forward(inputs=(zu[user], zi[item]))
 
-        loss = self.loss(torch.nn.functional.log_softmax(pui, 1), torch.tensor(r))
+        loss = self.loss(torch.nn.functional.log_softmax(pui, 1), torch.tensor(r, device=self.device))
 
         self.optimizer.zero_grad()
         loss.backward()
