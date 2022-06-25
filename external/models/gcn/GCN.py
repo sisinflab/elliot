@@ -16,7 +16,7 @@ import os
 from torch_sparse import SparseTensor
 
 from elliot.utils.write import store_recommendation
-from elliot.dataset.samplers import custom_sampler as cs
+from elliot.dataset.samplers import custom_sampler_batch as csb
 from elliot.recommender import BaseRecommenderModel
 from elliot.recommender.base_recommender_model import init_charger
 from elliot.recommender.recommender_utils_mixin import RecMixin
@@ -55,7 +55,6 @@ class GCN(RecMixin, BaseRecommenderModel):
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
 
-        self._sampler = cs.Sampler(self._data.i_train_dict)
         if self._batch_size < 1:
             self._batch_size = self._num_users
 
@@ -65,12 +64,14 @@ class GCN(RecMixin, BaseRecommenderModel):
             ("_learning_rate", "lr", "lr", 0.0005, float, None),
             ("_factors", "factors", "factors", 64, int, None),
             ("_l_w", "l_w", "l_w", 0.01, float, None),
-            ("_weight_size", "weight_size", "weight_size", "(64,)", lambda x: list(make_tuple(x)),
-             lambda x: self._batch_remove(str(x), " []").replace(",", "-"))
+            ("_weight_size", "weight_size", "weight_size", 64, int, None),
+            ("_n_layers", "n_layers", "n_layers", 3, int, None)
         ]
         self.autoset_params()
 
-        self._n_layers = len(self._weight_size)
+        self._sampler = csb.Sampler(self._data.i_train_dict, self._seed)
+        if self._batch_size < 1:
+            self._batch_size = self._num_users
 
         row, col = data.sp_i_train.nonzero()
         col = [c + self._num_users for c in col]

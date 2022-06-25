@@ -49,7 +49,7 @@ class GCNModel(torch.nn.Module, ABC):
         self.l_w = l_w
         self.weight_size = weight_size
         self.n_layers = n_layers
-        self.weight_size_list = [self.embed_k] + self.weight_size
+        self.weight_size_list = [self.embed_k] + ([self.weight_size] * self.n_layers)
 
         self.adj = adj
 
@@ -65,8 +65,9 @@ class GCNModel(torch.nn.Module, ABC):
         for layer in range(self.n_layers):
             propagation_network_list.append((GCNConv(in_channels=self.weight_size_list[layer],
                                                      out_channels=self.weight_size_list[layer + 1],
-                                                     add_self_loops=True,
-                                                     bias=True), 'x, edge_index -> x'))
+                                                     normalize=False,
+                                                     add_self_loops=False,
+                                                     bias=False), 'x, edge_index -> x'))
 
         self.propagation_network = torch_geometric.nn.Sequential('x, edge_index', propagation_network_list)
         self.propagation_network.to(self.device)
@@ -102,7 +103,7 @@ class GCNModel(torch.nn.Module, ABC):
 
         xui = torch.sum(gamma_u * gamma_i, 1)
 
-        return xui
+        return xui, gamma_u, gamma_i
 
     def predict(self, gu, gi, **kwargs):
         return torch.matmul(gu.to(self.device), torch.transpose(gi.to(self.device), 0, 1))
@@ -110,15 +111,18 @@ class GCNModel(torch.nn.Module, ABC):
     def train_step(self, batch):
         gu, gi = self.propagate_embeddings()
         user, pos, neg = batch
-        xu_pos = self.forward(inputs=(gu[user[:, 0]], gi[pos[:, 0]]))
-        xu_neg = self.forward(inputs=(gu[user[:, 0]], gi[neg[:, 0]]))
+        xu_pos, gamma_u, gamma_i_pos = self.forward(inputs=(gu[user[:, 0]], gi[pos[:, 0]]))
+        xu_neg, _, gamma_i_neg = self.forward(inputs=(gu[user[:, 0]], gi[neg[:, 0]]))
 
         difference = torch.clamp(xu_pos - xu_neg, -80.0, 1e8)
         loss = torch.sum(self.softplus(-difference))
-        reg_loss = self.l_w * (torch.norm(self.Gu, 2) +
-                               torch.norm(self.Gi, 2) +
-                               torch.stack([torch.norm(value, 2) for value in self.propagation_network.parameters()],
-                                           dim=0).sum(dim=0))
+        reg_loss = self.l_w * (1 / 2) * (gamma_u.norm(2).pow(2) +
+                                         gamma_i_pos.norm(2).pow(2) +
+                                         gamma_i_neg.norm(2).pow(2) +
+                                         torch.stack(
+                                             [torch.norm(value, 2) for value in self.propagation_network.parameters()],
+                                             dim=0).sum(dim=0)
+                                         ) / user.shape[0]
         loss += reg_loss
 
         self.optimizer.zero_grad()
