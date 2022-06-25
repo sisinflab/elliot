@@ -80,15 +80,15 @@ class GCNModel(torch.nn.Module, ABC):
 
         for layer in range(self.n_layers):
             if not evaluate:
-                ego_embeddings = list(
+                ego_embeddings = torch.relu(list(
                     self.propagation_network.children()
-                )[layer](ego_embeddings.to(self.device), self.adj.to(self.device))
+                )[layer](ego_embeddings.to(self.device), self.adj.to(self.device)))
             else:
                 self.propagation_network.eval()
                 with torch.no_grad():
-                    ego_embeddings = list(
+                    ego_embeddings = torch.relu(list(
                         self.propagation_network.children()
-                    )[layer](ego_embeddings.to(self.device), self.adj.to(self.device))
+                    )[layer](ego_embeddings.to(self.device), self.adj.to(self.device)))
 
         if evaluate:
             self.propagation_network.train()
