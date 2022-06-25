@@ -118,11 +118,7 @@ class GCNModel(torch.nn.Module, ABC):
         loss = torch.sum(self.softplus(-difference))
         reg_loss = self.l_w * (1 / 2) * (gamma_u.norm(2).pow(2) +
                                          gamma_i_pos.norm(2).pow(2) +
-                                         gamma_i_neg.norm(2).pow(2) +
-                                         torch.stack(
-                                             [torch.norm(value, 2) for value in self.propagation_network.parameters()],
-                                             dim=0).sum(dim=0)
-                                         ) / user.shape[0]
+                                         gamma_i_neg.norm(2).pow(2)) / user.shape[0]
         loss += reg_loss
 
         self.optimizer.zero_grad()
