@@ -53,6 +53,7 @@ _models = 'models'
 _recommender = 'recommender'
 _gpu = 'gpu'
 _external_models_path = 'external_models_path'
+_external_posthoc_path = 'external_posthoc_path'
 _hyper_max_evals = 'hyper_max_evals'
 _hyper_opt_alg = 'hyper_opt_alg'
 _data_paths = 'data_paths'
@@ -127,7 +128,7 @@ class NameSpaceModel:
                            self.config[_experiment][_performance])
 
         for p in [_data_config, _weights, _recs, _dataset, _top_k, _performance, _logger_config,
-                  _log_folder, _dataloader, _splitting, _prefiltering, _evaluation, _external_models_path,
+                  _log_folder, _dataloader, _splitting, _prefiltering, _evaluation, _external_models_path, _external_posthoc_path,
                   _print_triplets, _config_test, _negative_sampling, _binarize, _random_seed, _align_side_with_train,
                   _version, _backend]:
             if p == _data_config:
@@ -227,6 +228,9 @@ class NameSpaceModel:
 
                 # setattr(self.base_namespace, p, f"{self._base_folder_path_elliot}/../log/")
             elif p == _external_models_path and self.config[_experiment].get(p, False):
+                self.config[_experiment][p] = self._safe_set_path(self._base_folder_path_config, self.config[_experiment][p], "")
+                setattr(self.base_namespace, p, self.config[_experiment][p])
+            elif p == _external_posthoc_path and self.config[_experiment].get(p, False):
                 self.config[_experiment][p] = self._safe_set_path(self._base_folder_path_config, self.config[_experiment][p], "")
                 setattr(self.base_namespace, p, self.config[_experiment][p])
             elif p == _config_test:
