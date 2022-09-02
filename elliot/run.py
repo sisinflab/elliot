@@ -172,15 +172,16 @@ def run_experiment(config_path: str = ''):
                                                   output=base.base_namespace.path_output_rec_performance)
 
     logger.info("End experiment")
-    logger.info("Start Post-Hoc scripts")
+    # TODO: check before to push only this feature!
+    # logger.info("Start Post-Hoc scripts")
 
-    spec = importlib.util.spec_from_file_location("post_hoc", path.relpath(base.base_namespace.external_posthoc_path))
-    post_hoc = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = post_hoc
-    spec.loader.exec_module(post_hoc)
-    post_hoc.run(data_test_list, all_trials)
+    # spec = importlib.util.spec_from_file_location("post_hoc", path.relpath(base.base_namespace.external_posthoc_path))
+    # post_hoc = importlib.util.module_from_spec(spec)
+    # sys.modules[spec.name] = post_hoc
+    # spec.loader.exec_module(post_hoc)
+    # post_hoc.run(data_test_list, all_trials)
 
-    logger.info("End Post-Hoc scripts")
+    # logger.info("End Post-Hoc scripts")
 
 
 def _reset_verbose_option(model):
