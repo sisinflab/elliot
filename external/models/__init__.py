@@ -46,7 +46,6 @@ for _backend in sys.modules["external"].backend:
         from .egcf.EGCF import EGCF
         from .lgacn.LGACN import LGACN
         # from .kgcn.KGCN import KGCN
-        from .lightegcf.LightEGCF import LightEGCF
         from .gcn.GCN import GCN
         from .egcfv2.EGCFv2 import EGCFv2
         from .bprmf.BPRMF import BPRMF
@@ -61,9 +60,3 @@ for _backend in sys.modules["external"].backend:
         from .lrgccf import LRGCCF
         from .svd_gcn import SVDGCN
         from .svd_gcn_s import SVDGCNS
-        from .ngcfuu import NGCFUU
-        from .ngcfii import NGCFII
-        from .lightgcnuu import LightGCNUU
-        from .lightgcnii import LightGCNII
-        from .lrgccfuu import LRGCCFUU
-        from .lrgccfii import LRGCCFII

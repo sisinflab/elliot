@@ -56,7 +56,9 @@ class LightGCN(RecMixin, BaseRecommenderModel):
             ("_learning_rate", "lr", "lr", 0.0005, float, None),
             ("_factors", "factors", "factors", 64, int, None),
             ("_l_w", "l_w", "l_w", 0.01, float, None),
-            ("_n_layers", "n_layers", "n_layers", 1, int, None)
+            ("_n_layers", "n_layers", "n_layers", 1, int, None),
+            ("_user_item", "user_item", "user_item", True, bool, None),
+            ("_item_user", "item_user", "item_user", True, bool, None)
         ]
         self.autoset_params()
 
@@ -64,10 +66,21 @@ class LightGCN(RecMixin, BaseRecommenderModel):
         col = [c + self._num_users for c in col]
         edge_index = np.array([row, col])
         edge_index = torch.tensor(edge_index, dtype=torch.int64)
-        self.adj = SparseTensor(row=torch.cat([edge_index[0], edge_index[1]], dim=0),
-                                col=torch.cat([edge_index[1], edge_index[0]], dim=0),
-                                sparse_sizes=(self._num_users + self._num_items,
-                                              self._num_users + self._num_items))
+        if self._user_item and self._item_user:
+            self.adj = SparseTensor(row=torch.cat([edge_index[0], edge_index[1]], dim=0),
+                                    col=torch.cat([edge_index[1], edge_index[0]], dim=0),
+                                    sparse_sizes=(self._num_users + self._num_items,
+                                                  self._num_users + self._num_items))
+        elif self._user_item:
+            self.adj = SparseTensor(row=torch.cat([edge_index[0], edge_index[1]], dim=0),
+                                    col=torch.cat([edge_index[1], edge_index[1]], dim=0),
+                                    sparse_sizes=(self._num_users + self._num_items,
+                                                  self._num_users + self._num_items))
+        else:
+            self.adj = SparseTensor(row=torch.cat([edge_index[1], edge_index[0]], dim=0),
+                                    col=torch.cat([edge_index[0], edge_index[0]], dim=0),
+                                    sparse_sizes=(self._num_users + self._num_items,
+                                                  self._num_users + self._num_items))
 
         self._model = LightGCNModel(
             num_users=self._num_users,

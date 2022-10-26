@@ -1,4 +1,0 @@
-from .NGCFII import NGCFII
-
-
-
