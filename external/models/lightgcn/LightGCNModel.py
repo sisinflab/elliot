@@ -18,6 +18,8 @@ class LightGCNModel(torch.nn.Module, ABC):
                  adj,
                  random_seed,
                  name="LightGCN",
+                 user_item=True,
+                 item_user=True,
                  **kwargs
                  ):
         super().__init__()
@@ -58,6 +60,9 @@ class LightGCNModel(torch.nn.Module, ABC):
         self.propagation_network.to(self.device)
         self.softplus = torch.nn.Softplus()
 
+        self.user_item = user_item
+        self.item_user = item_user
+
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
 
     def propagate_embeddings(self, evaluate=False):
@@ -80,7 +85,15 @@ class LightGCNModel(torch.nn.Module, ABC):
             self.propagation_network.train()
 
         all_embeddings = sum([all_embeddings[k] * self.alpha[k] for k in range(len(all_embeddings))])
-        gu, gi = torch.split(all_embeddings, [self.num_users, self.num_items], 0)
+
+        if self.user_item and self.item_user:
+            gu, gi = torch.split(all_embeddings, [self.num_users, self.num_items], 0)
+        elif self.user_item:
+            gu, gi = torch.split(all_embeddings, [self.num_users, self.num_items], 0)
+            gi = self.Gi
+        else:
+            gu, gi = torch.split(all_embeddings, [self.num_users, self.num_items], 0)
+            gu = self.Gu
         return gu, gi
 
     def forward(self, inputs, **kwargs):

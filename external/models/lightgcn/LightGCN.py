@@ -90,7 +90,9 @@ class LightGCN(RecMixin, BaseRecommenderModel):
             l_w=self._l_w,
             n_layers=self._n_layers,
             adj=self.adj,
-            random_seed=self._seed
+            random_seed=self._seed,
+            user_item=self._user_item,
+            item_user=self._item_user
         )
 
     @property
