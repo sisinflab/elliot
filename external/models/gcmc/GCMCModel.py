@@ -151,9 +151,13 @@ class GCMCModel(torch.nn.Module, ABC):
         xui = torch.sum(torch.arange(0, 5).to(self.device) * torch.softmax(pui.to(self.device), 1), 1)
         return xui, pui
 
-    def predict(self, zu, zi, batch_user, batch_item, **kwargs):
+    # def predict(self, zu, zi, batch_user, batch_item, **kwargs):
+    #     xui, _ = self.forward((zu, zi))
+    #     return torch.reshape(xui, [batch_user, batch_item])
+
+    def predict(self, zu, zi, **kwargs):
         xui, _ = self.forward((zu, zi))
-        return torch.reshape(xui, [batch_user, batch_item])
+        return xui
 
     def train_step(self, batch):
         zu, zi = self.propagate_embeddings()

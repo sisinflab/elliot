@@ -91,6 +91,21 @@ class Evaluator(object):
             result_dict[k] = local_result_dict
         return result_dict
 
+    def eval_error(self, recommendations):
+        """
+        Runtime Evaluation of Error-based Performance
+        :return:
+        """
+        result_dict = {}
+        for k in self._k:
+            val_results, val_statistical_results, test_results, test_statistical_results = self.eval_at_k(recommendations, k)
+            local_result_dict ={"val_results": val_results,
+                                "val_statistical_results": val_statistical_results,
+                                "test_results": test_results,
+                                "test_statistical_results": test_statistical_results}
+            result_dict[k] = local_result_dict
+        return result_dict
+
     def eval_at_k(self, recommendations, k):
         val_test = ["Validation", "Test"]
         result_list = []

@@ -1,5 +1,6 @@
 from ast import literal_eval as make_tuple
 
+import pandas as pd
 from tqdm import tqdm
 import numpy as np
 import torch
@@ -75,6 +76,29 @@ class GCMC(RecMixin, BaseRecommenderModel):
 
         self._sampler = Sampler(self._data.i_train_dict)
 
+        self.df_val_rat = pd.DataFrame(columns=['user', 'item', 'rating'])
+        self.df_test_rat = pd.DataFrame(columns=['user', 'item', 'rating'])
+
+        for k, v in data.val_dict.items():
+            for kk, vv in v.items():
+                self.df_val_rat = self.df_val_rat.append(
+                    {'user': k, 'item': int(kk), 'rating': vv},
+                    ignore_index=True)
+
+        for k, v in data.test_dict.items():
+            for kk, vv in v.items():
+                self.df_test_rat = self.df_test_rat.append(
+                    {'user': k, 'item': int(kk), 'rating': vv},
+                    ignore_index=True)
+
+        self.df_val_rat = self.df_val_rat.astype({'user': int, 'item': int, 'rating': float})
+        self.df_test_rat = self.df_test_rat.astype({'user': int, 'item': int, 'rating': float})
+
+        self.df_val_rat = self.df_val_rat[self.df_val_rat['user'] <= self._num_users - 1]
+        self.df_test_rat = self.df_test_rat[self.df_test_rat['user'] <= self._num_users - 1]
+        self.df_val_rat = self.df_val_rat[self.df_val_rat['item'] <= self._num_items - 1]
+        self.df_test_rat = self.df_test_rat[self.df_test_rat['item'] <= self._num_items - 1]
+
         row, col = self._data.sp_i_train.nonzero()
         col = [c + self._num_users for c in col]
         ratings = self._data.sp_i_train_ratings.data
@@ -131,30 +155,58 @@ class GCMC(RecMixin, BaseRecommenderModel):
 
             self.evaluate(it, loss / (it + 1))
 
+    # def get_recommendations(self, k: int = 100):
+    #     predictions_top_k_test = {}
+    #     predictions_top_k_val = {}
+    #     zu, zi = self._model.propagate_embeddings(evaluate=True)
+    #     self.logger.info('Starting predictions on all users/items pairs...')
+    #     with tqdm(total=int(self._num_users // self._batch_eval), disable=not self._verbose) as t:
+    #         for index, offset in enumerate(range(0, self._num_users, self._batch_eval)):
+    #             offset_stop = min(offset + self._batch_eval, self._num_users)
+    #             predictions = np.empty((offset_stop - offset, self._num_items))
+    #             for item_index, item_offset in enumerate(range(0, self._num_items, self._batch_eval)):
+    #                 item_offset_stop = min(item_offset + self._batch_eval, self._num_items)
+    #                 user_range = np.repeat(np.arange(offset, offset_stop), repeats=item_offset_stop - item_offset)
+    #                 item_range = np.tile(np.arange(item_offset, item_offset_stop), reps=offset_stop - offset)
+    #                 p = self._model.predict(zu[user_range],
+    #                                         zi[item_range],
+    #                                         offset_stop - offset,
+    #                                         item_offset_stop - item_offset)
+    #                 predictions[:, item_offset: item_offset_stop] = p.detach().cpu().numpy()
+    #             recs_val, recs_test = self.process_protocol(k, predictions, offset, offset_stop)
+    #             predictions_top_k_val.update(recs_val)
+    #             predictions_top_k_test.update(recs_test)
+    #             t.update()
+    #     self.logger.info('Predictions on all users/items pairs is complete!')
+    #     return predictions_top_k_val, predictions_top_k_test
+
     def get_recommendations(self, k: int = 100):
-        predictions_top_k_test = {}
-        predictions_top_k_val = {}
+        predictions_test = []
+        predictions_val = []
         zu, zi = self._model.propagate_embeddings(evaluate=True)
-        self.logger.info('Starting predictions on all users/items pairs...')
-        with tqdm(total=int(self._num_users // self._batch_eval), disable=not self._verbose) as t:
-            for index, offset in enumerate(range(0, self._num_users, self._batch_eval)):
-                offset_stop = min(offset + self._batch_eval, self._num_users)
-                predictions = np.empty((offset_stop - offset, self._num_items))
-                for item_index, item_offset in enumerate(range(0, self._num_items, self._batch_eval)):
-                    item_offset_stop = min(item_offset + self._batch_eval, self._num_items)
-                    user_range = np.repeat(np.arange(offset, offset_stop), repeats=item_offset_stop - item_offset)
-                    item_range = np.tile(np.arange(item_offset, item_offset_stop), reps=offset_stop - offset)
-                    p = self._model.predict(zu[user_range],
-                                            zi[item_range],
-                                            offset_stop - offset,
-                                            item_offset_stop - item_offset)
-                    predictions[:, item_offset: item_offset_stop] = p.detach().cpu().numpy()
-                recs_val, recs_test = self.process_protocol(k, predictions, offset, offset_stop)
-                predictions_top_k_val.update(recs_val)
-                predictions_top_k_test.update(recs_test)
+        self.logger.info('Starting predictions on validation set...')
+        val_len = len(self.df_val_rat)
+        with tqdm(total=int(val_len // self._batch_eval), disable=not self._verbose) as t:
+            for index, offset in enumerate(range(0, val_len, self._batch_eval)):
+                offset_stop = min(offset + self._batch_eval, val_len)
+                current_df = self.df_val_rat[offset:offset_stop]
+                p = self._model.predict(zu[current_df['user'].tolist()],
+                                        zi[current_df['item'].tolist()])
+                predictions_val += p.detach().cpu().numpy().tolist()
                 t.update()
-        self.logger.info('Predictions on all users/items pairs is complete!')
-        return predictions_top_k_val, predictions_top_k_test
+        self.logger.info('End predictions on test set...')
+        self.logger.info('Starting predictions on test set...')
+        test_len = len(self.df_test_rat)
+        with tqdm(total=int(test_len // self._batch_eval), disable=not self._verbose) as t:
+            for index, offset in enumerate(range(0, test_len, self._batch_eval)):
+                offset_stop = min(offset + self._batch_eval, test_len)
+                current_df = self.df_test_rat[offset:offset_stop]
+                p = self._model.predict(zu[current_df['user'].tolist()],
+                                        zi[current_df['item'].tolist()])
+                predictions_test += p.detach().cpu().numpy().tolist()
+                t.update()
+        self.logger.info('End predictions on test set...')
+        return predictions_val, predictions_test
 
     def get_single_recommendation(self, mask, k, predictions, offset, offset_stop):
         v, i = self._model.get_top_k(predictions, mask[offset: offset_stop], k=k)
@@ -164,8 +216,10 @@ class GCMC(RecMixin, BaseRecommenderModel):
 
     def evaluate(self, it=None, loss=0):
         if (it is None) or (not (it + 1) % self._validation_rate):
-            recs = self.get_recommendations(self.evaluator.get_needed_recommendations())
-            result_dict = self.evaluator.eval(recs)
+            predictions_val, predictions_test = self.get_recommendations()
+            true_val, true_test = self.df_val_rat['rating'].to_numpy(), self.df_test_rat['rating'].to_numpy()
+            result_dict = self.evaluator.eval_error(np.array(predictions_val), true_val, np.array(predictions_test),
+                                                    true_test)
 
             self._losses.append(loss)
 
@@ -175,15 +229,6 @@ class GCMC(RecMixin, BaseRecommenderModel):
                 self.logger.info(f'Epoch {(it + 1)}/{self._epochs} loss {loss / (it + 1):.5f}')
             else:
                 self.logger.info(f'Finished')
-
-            if self._save_recs:
-                self.logger.info(f"Writing recommendations at: {self._config.path_output_rec_result}")
-                if it is not None:
-                    store_recommendation(recs[1], os.path.abspath(
-                        os.sep.join([self._config.path_output_rec_result, f"{self.name}_it={it + 1}.tsv"])))
-                else:
-                    store_recommendation(recs[1], os.path.abspath(
-                        os.sep.join([self._config.path_output_rec_result, f"{self.name}.tsv"])))
 
             if (len(self._results) - 1) == self.get_best_arg():
                 if it is not None:
