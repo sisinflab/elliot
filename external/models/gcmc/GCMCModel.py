@@ -19,6 +19,7 @@ class GCMCModel(torch.nn.Module, ABC):
                  n_convolutional_layers,
                  n_dense_layers,
                  num_relations,
+                 num_basis,
                  adj_ratings,
                  accumulation,
                  random_seed,
@@ -45,6 +46,7 @@ class GCMCModel(torch.nn.Module, ABC):
         self.n_dense_layers = n_dense_layers
         self.convolutional_layer_size = [self.embed_k] + ([convolutional_layer_size] * self.n_convolutional_layers)
         self.num_relations = num_relations
+        self.num_basis = num_basis
 
         if accumulation not in ['stack', 'sum']:
             raise NotImplementedError('This accumulation method has not been implemented yet!')
@@ -62,12 +64,18 @@ class GCMCModel(torch.nn.Module, ABC):
         self.Gi = torch.nn.Parameter(
             torch.nn.init.xavier_normal_(torch.empty((self.num_items, self.embed_k))))
         self.Gi.to(self.device)
-        self.Q = torch.nn.ParameterList()
+        self.P = torch.nn.ParameterList()
+        for _ in range(self.num_basis):
+            p_s = torch.nn.Parameter(
+                torch.nn.init.orthogonal_(torch.empty((self.dense_layer_size[-1], self.dense_layer_size[-1]))))
+            p_s.to(self.device)
+            self.P.append(p_s)
+        self.A = torch.nn.ParameterList()
         for _ in range(self.num_relations):
-            q_r = torch.nn.Parameter(
-                torch.nn.init.xavier_normal_(torch.empty((self.dense_layer_size[-1], self.dense_layer_size[-1]))))
-            q_r.to(self.device)
-            self.Q.append(q_r)
+            a_r = torch.nn.Parameter(
+                torch.nn.init.uniform_(torch.empty((self.num_basis, 1))))
+            a_r.to(self.device)
+            self.A.append(a_r)
 
         # Convolutional part
         self.convolutions = torch.nn.ModuleList()
@@ -90,13 +98,12 @@ class GCMCModel(torch.nn.Module, ABC):
                                                                               out_features=self.dense_layer_size[
                                                                                   layer + 1],
                                                                               bias=False)))
-            dense_network_list.append(('relu_' + str(layer), torch.nn.ReLU()))
         self.dense_network = torch.nn.Sequential(OrderedDict(dense_network_list))
         self.dense_network.to(self.device)
 
         self.loss = torch.nn.NLLLoss(reduction='sum')
 
-        self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
+        self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate, weight_decay=0.995)
 
     def propagate_embeddings(self, evaluate=False):
         current_embeddings = []
@@ -143,12 +150,16 @@ class GCMCModel(torch.nn.Module, ABC):
         zeta_i = torch.squeeze(zi).to(self.device)
 
         xui_r = []
+
         for r in range(self.num_relations):
+            q_r = []
+            for s in range(self.num_basis):
+                q_r.append(torch.unsqueeze(self.A[r][s] * self.P[s], 0))
+            q_r = torch.sum(torch.cat(q_r, 0), 0)
             xui_r.append(torch.unsqueeze(
-                torch.sum(zeta_u.to(self.device) * torch.matmul(zeta_i.to(self.device), self.Q[r].to(self.device)), 1),
-                1))
+                torch.sum(torch.mm(zeta_u.to(self.device), q_r.to(self.device)) * zeta_i.to(self.device), 1), 1))
         pui = torch.cat(xui_r, 1)
-        xui = torch.sum(torch.arange(0, 5).to(self.device) * torch.softmax(pui.to(self.device), 1), 1)
+        xui = torch.sum(torch.arange(1, 6).to(self.device) * torch.softmax(pui.to(self.device), 1), 1)
         return xui, pui
 
     # def predict(self, zu, zi, batch_user, batch_item, **kwargs):
