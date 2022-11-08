@@ -60,3 +60,5 @@ for _backend in sys.modules["external"].backend:
         from .lrgccf import LRGCCF
         from .svd_gcn import SVDGCN
         from .svd_gcn_s import SVDGCNS
+        from .lightgcn_minibatch import LightGCNMiniBatch
+        from .lightgcn_edge import LightGCNEdge
