@@ -10,8 +10,9 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malite
 import torch
 import os
 from tqdm import tqdm
+import json
 
-from elliot.dataset.samplers import custom_sampler as cs
+from .custom_sampler import Sampler
 from elliot.utils.write import store_recommendation
 
 from elliot.recommender import BaseRecommenderModel
@@ -62,7 +63,8 @@ class BPRMF(RecMixin, BaseRecommenderModel):
         self._params_list = [
             ("_factors", "factors", "factors", 10, int, None),
             ("_learning_rate", "lr", "lr", 0.001, float, None),
-            ("_l_w", "l_w", "l_w", 0.1, float, None)
+            ("_l_w", "l_w", "l_w", 0.1, float, None),
+            ("_store_freq", "store_freq", "store_freq", './results/{0}/performance/', str, None)
         ]
         self.autoset_params()
 
@@ -71,7 +73,7 @@ class BPRMF(RecMixin, BaseRecommenderModel):
 
         self._ratings = self._data.train_dict
 
-        self._sampler = cs.Sampler(self._data.i_train_dict, self._seed)
+        self._sampler = Sampler(self._data.i_train_dict, self._seed)
 
         self._model = BPRMFModel(self._num_users,
                                  self._num_items,
@@ -101,6 +103,11 @@ class BPRMF(RecMixin, BaseRecommenderModel):
                     t.update()
 
             self.evaluate(it, loss / (it + 1))
+
+        with open(self._store_freq.format(self._config.dataset) + 'freq_users.json', 'w') as f:
+            json.dump(self._sampler.freq_users, f)
+        with open(self._store_freq.format(self._config.dataset) + 'freq_items.json', 'w') as f:
+            json.dump(self._sampler.freq_items, f)
 
     def get_recommendations(self, k: int = 100):
         predictions_top_k_test = {}
