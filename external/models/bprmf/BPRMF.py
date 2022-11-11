@@ -63,8 +63,7 @@ class BPRMF(RecMixin, BaseRecommenderModel):
         self._params_list = [
             ("_factors", "factors", "factors", 10, int, None),
             ("_learning_rate", "lr", "lr", 0.001, float, None),
-            ("_l_w", "l_w", "l_w", 0.1, float, None),
-            ("_store_freq", "store_freq", "store_freq", './results/{0}/performance/', str, None)
+            ("_l_w", "l_w", "l_w", 0.1, float, None)
         ]
         self.autoset_params()
 
@@ -104,9 +103,9 @@ class BPRMF(RecMixin, BaseRecommenderModel):
 
             self.evaluate(it, loss / (it + 1))
 
-        with open(self._store_freq.format(self._config.dataset) + 'freq_users.json', 'w') as f:
+        with open('./results/{0}/performance/'.format(self._config.dataset) + 'freq_users.json', 'w') as f:
             json.dump(self._sampler.freq_users, f)
-        with open(self._store_freq.format(self._config.dataset) + 'freq_items.json', 'w') as f:
+        with open('./results/{0}/performance/'.format(self._config.dataset) + 'freq_items.json', 'w') as f:
             json.dump(self._sampler.freq_items, f)
 
     def get_recommendations(self, k: int = 100):
