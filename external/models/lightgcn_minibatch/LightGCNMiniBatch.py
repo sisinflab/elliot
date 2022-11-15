@@ -26,7 +26,6 @@ class LightGCNMiniBatch(RecMixin, BaseRecommenderModel):
         batch_size: Batch size
         l_w: Regularization coefficient
         n_layers: Number of stacked propagation layers
-        k: batch depth
 
     To include the recommendation model, add it to the config file adopting the following pattern:
 
@@ -43,7 +42,6 @@ class LightGCNMiniBatch(RecMixin, BaseRecommenderModel):
           batch_size: 256
           l_w: 0.1
           n_layers: 2
-          k: 2 as in "Graph Convolutional Neural Networks for Web-Scale Recommender Systems"
     """
 
     @init_charger
@@ -58,15 +56,16 @@ class LightGCNMiniBatch(RecMixin, BaseRecommenderModel):
             ("_learning_rate", "lr", "lr", 0.0005, float, None),
             ("_factors", "factors", "factors", 64, int, None),
             ("_l_w", "l_w", "l_w", 0.01, float, None),
-            ("_n_layers", "n_layers", "n_layers", 1, int, None),
-            ("_batch_depth", "k", "k", 2, int, None)
+            ("_n_layers", "n_layers", "n_layers", 1, int, None)
         ]
         self.autoset_params()
-        self._sampler = Sampler(self._data.i_train_dict, self._epochs, int(self._data.transactions // self._batch_size))
 
         row, col = data.sp_i_train.nonzero()
         col = [c + self._num_users for c in col]
         edge_index = np.array([row, col])
+        self._sampler = Sampler(self._data.i_train_dict, data.build_items_neighbour(), edge_index, self._n_layers)
+        # n_layers as in "Graph Convolutional Neural Networks for Web-Scale Recommender Systems"
+
         edge_index = torch.tensor(edge_index, dtype=torch.int64)
         self.adj = SparseTensor(row=torch.cat([edge_index[0], edge_index[1]], dim=0),
                                 col=torch.cat([edge_index[1], edge_index[0]], dim=0),
@@ -98,7 +97,7 @@ class LightGCNMiniBatch(RecMixin, BaseRecommenderModel):
             loss = 0
             steps = 0
             with tqdm(total=int(self._data.transactions // self._batch_size), disable=not self._verbose) as t:
-                for batch in self._sampler.step(self._data.transactions, self._batch_size, it):
+                for batch in self._sampler.step(self._data.transactions, self._batch_size):
                     steps += 1
                     loss += self._model.train_step(batch)
                     t.set_postfix({'loss': f'{loss / steps:.5f}'})

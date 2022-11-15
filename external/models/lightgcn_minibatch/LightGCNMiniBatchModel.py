@@ -95,8 +95,8 @@ class LightGCNMiniBatchModel(torch.nn.Module, ABC):
         return torch.matmul(gu.to(self.device), torch.transpose(gi.to(self.device), 0, 1))
 
     def train_step(self, batch):
-        gu, gi = self.propagate_embeddings()
-        user, pos, neg = batch
+        user, pos, neg, adj = batch
+        gu, gi = self.propagate_embeddings(adj)
         xu_pos = self.forward(inputs=(gu[user[:, 0]], gi[pos[:, 0]]))
         xu_neg = self.forward(inputs=(gu[user[:, 0]], gi[neg[:, 0]]))
         difference = torch.clamp(xu_pos - xu_neg, -80.0, 1e8)
