@@ -209,8 +209,8 @@ class LATTICEModel(torch.nn.Module, ABC):
     def train_step(self, batch, build_item_graph):
         gum, gim = self.propagate_embeddings(build_item_graph)
         user, pos, neg = batch
-        xu_pos, gamma_u_m, gamma_i_pos_m = self.forward(inputs=(gum[user], gim[pos]))
-        xu_neg, _, gamma_i_neg_m = self.forward(inputs=(gum[user], gim[neg]))
+        xu_pos, gamma_u_m, gamma_i_pos_m = self.forward(inputs=(gum[user[:, 0]], gim[pos[:, 0]]))
+        xu_neg, _, gamma_i_neg_m = self.forward(inputs=(gum[user[:, 0]], gim[neg[:, 0]]))
 
         loss = -torch.mean(torch.nn.functional.logsigmoid(xu_pos - xu_neg))
         reg_loss = self.l_w * (1 / 2) * (gamma_u_m.norm(2).pow(2) +

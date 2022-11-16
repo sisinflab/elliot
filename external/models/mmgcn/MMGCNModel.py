@@ -195,8 +195,8 @@ class MMGCNModel(torch.nn.Module, ABC):
     def train_step(self, batch):
         gum, gim = self.propagate_embeddings()
         user, pos, neg = batch
-        xu_pos = self.forward(inputs=(gum[user], gim[pos]))
-        xu_neg = self.forward(inputs=(gum[user], gim[neg]))
+        xu_pos = self.forward(inputs=(gum[user[:, 0]], gim[pos[:, 0]]))
+        xu_neg = self.forward(inputs=(gum[user[:, 0]], gim[neg[:, 0]]))
 
         loss = -torch.mean(torch.log(torch.sigmoid(xu_pos - xu_neg)))
         reg_loss = self.l_w * ((self.Gu.weight[np.concatenate([user, user])].pow(2) +

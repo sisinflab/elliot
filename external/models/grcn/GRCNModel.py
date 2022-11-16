@@ -231,8 +231,8 @@ class GRCNModel(torch.nn.Module, ABC):
     def train_step(self, batch):
         gu, gi = self.propagate_embeddings()
         user, pos, neg = batch
-        xu_pos, gamma_u, gamma_i_pos = self.forward(inputs=(gu[user], gi[pos]))
-        xu_neg, _, gamma_i_neg = self.forward(inputs=(gu[user], gi[neg]))
+        xu_pos, gamma_u, gamma_i_pos = self.forward(inputs=(gu[user[:, 0]], gi[pos[:, 0]]))
+        xu_neg, _, gamma_i_neg = self.forward(inputs=(gu[user[:, 0]], gi[neg[:, 0]]))
 
         loss = -torch.mean(torch.log(torch.sigmoid(xu_pos - xu_neg)))
         reg_content_loss = torch.sum(torch.stack(

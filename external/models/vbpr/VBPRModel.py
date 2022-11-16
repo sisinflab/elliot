@@ -84,8 +84,8 @@ class VBPRModel(torch.nn.Module, ABC):
 
     def train_step(self, batch):
         user, pos, neg = batch
-        xu_pos, gamma_u, gamma_i_pos, theta_u, proj_i_pos = self.forward(inputs=(user, pos))
-        xu_neg, _, gamma_i_neg, _, proj_i_neg = self.forward(inputs=(user, neg))
+        xu_pos, gamma_u, gamma_i_pos, theta_u, proj_i_pos = self.forward(inputs=(user[:, 0], pos[:, 0]))
+        xu_neg, _, gamma_i_neg, _, proj_i_neg = self.forward(inputs=(user[:, 0], neg[:, 0]))
 
         difference = torch.clamp(xu_pos - xu_neg, -80.0, 1e8)
         loss = torch.mean(torch.nn.functional.softplus(-difference))
