@@ -237,8 +237,8 @@ class GRCNModel(torch.nn.Module, ABC):
         loss = -torch.mean(torch.log(torch.sigmoid(xu_pos - xu_neg)))
         reg_content_loss = torch.sum(torch.stack(
             [self.Gum[m][np.concatenate([user, user])].pow(2).mean() for m in self.modalities]))
-        reg_loss = self.l_w * ((self.Gu.weight[np.concatenate([user, user])].pow(2) +
-                                self.Gi.weight[np.concatenate([pos, neg])].pow(2)).mean())
+        reg_loss = self.l_w * ((self.Gu.weight[np.concatenate([user[:, 0], user[:, 0]])].pow(2) +
+                                self.Gi.weight[np.concatenate([pos[:, 0], neg[:, 0]])].pow(2)).mean())
         loss += (reg_loss + reg_content_loss)
 
         self.optimizer.zero_grad()
