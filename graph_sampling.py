@@ -5,26 +5,21 @@ import numpy as np
 import random
 import networkx
 import torch
-from networkx.algorithms import bipartite
-from torch_geometric.data import Data
-from torch_geometric.utils import to_networkx
+from networkx.algorithms import bipartite, degree_assortativity_coefficient
+import csv
 from torch_geometric.utils.dropout import dropout_node, dropout_edge, dropout_path
 
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Run graph sampling (Node Dropout, Edge Dropout, Random Walking).")
-    parser.add_argument('--dataset', nargs='?', default='last-fm', help='dataset name')
-    parser.add_argument('--filename', nargs='?', default='dataset.txt', help='filename')
-    parser.add_argument('--sampling', nargs='+', type=str, default=['ND', 'ED', 'RW'],
+    parser.add_argument('--dataset', nargs='?', default='allrecipes', help='dataset name')
+    parser.add_argument('--filename', nargs='?', default='dataset.tsv', help='filename')
+    parser.add_argument('--sampling_strategies', nargs='+', type=str, default=['RW'],
                         help='graph sampling strategy')
-    parser.add_argument('--number_dropout_ratios', nargs='?', type=int, default=500,
-                        help='dropout ratios')
-    parser.add_argument('--num_layers', nargs='?', type=int, default=4,
-                        help='number of layers (only for RW)')
-    parser.add_argument('--num_random_users', nargs='?', type=int, default=100,
-                        help='number of random users for statistics')
-    parser.add_argument('--num_random_items', nargs='?', type=int, default=100,
-                        help='number of random items for statistics')
+    parser.add_argument('--num_samplings', nargs='?', type=int, default=300,
+                        help='number of samplings')
+    parser.add_argument('--num_walks', nargs='?', type=int, default=4,
+                        help='number of walks (only for RW)')
     parser.add_argument('--random_seed', nargs='?', type=int, default=42,
                         help='random seed for reproducibility')
 
@@ -42,144 +37,315 @@ torch.backends.cudnn.deterministic = True
 
 
 def calculate_statistics(data, info):
-    # basic metrics
-    users = torch.unique(data[0]).shape[0]
-    items = torch.unique(data[1]).shape[0]
-    m = data.shape[1]
-    delta_G = m / (users * items)
-    k_users = m / users
-    k_items = m / items
+    # mapping users and items
+    num_users = torch.unique(data[0]).shape[0]
+    current_public_to_private_users = {u.item(): idx for idx, u in enumerate(torch.unique(data[0]))}
+    current_public_to_private_items = {i.item(): idx + num_users for idx, i in enumerate(torch.unique(data[1]))}
+    current_private_to_public_users = {idx: u for u, idx in current_public_to_private_users.items()}
+    current_private_to_public_items = {idx: i for i, idx in current_public_to_private_items.items()}
 
     # rescale nodes indices to feed the edge_index into networkx
-    current_public_to_private_users = {u.item(): idx for idx, u in enumerate(torch.unique(data[0]))}
-    current_public_to_private_items = {i.item(): idx + users for idx, i in enumerate(torch.unique(data[1]))}
-    rescaled_rows = [current_public_to_private_users[u.item()] for u in data[0]]
-    rescaled_cols = [current_public_to_private_items[i.item()] for i in data[1]]
-    rescaled_edge_index = np.array([rescaled_rows, rescaled_cols])
-    rescaled_edge_index = torch.tensor(rescaled_edge_index, dtype=torch.int64)
-    torch_geometric_dataset = Data(edge_index=rescaled_edge_index, num_nodes=users + items)
-    networkx_dataset = to_networkx(torch_geometric_dataset, to_undirected=True)
+    graph = networkx.Graph()
+    graph.add_nodes_from([idx for idx, _ in enumerate(torch.unique(data[0]))], bipartite='users')
+    graph.add_nodes_from([idx + num_users for idx, _ in enumerate(torch.unique(data[1]))], bipartite='items')
+    graph.add_edges_from(list(zip(
+        [current_public_to_private_users[u] for u in data[0].tolist()],
+        [current_public_to_private_items[i] for i in data[1].tolist()]))
+    )
 
-    # calculate average eccentricity
-    random_users = random.sample(list(range(users)), args.num_random_users)
-    random_items = random.sample(list(range(users, users + items)), args.num_random_users)
-    eccentricity_users = list(dict(networkx.eccentricity(networkx_dataset, v=random_users)).values())
-    eccentricity_items = list(dict(networkx.eccentricity(networkx_dataset, v=random_items)).values())
-    average_eccentricity_users = sum(eccentricity_users) / args.num_random_users
-    average_eccentricity_items = sum(eccentricity_items) / args.num_random_users
+    if networkx.is_connected(graph):
+        # basic statistics
+        user_nodes, item_nodes = bipartite.sets(graph)
+        num_users = len(user_nodes)
+        num_items = len(item_nodes)
+        m = len(graph.edges())
+        delta_g = m / (num_users * num_items)
+        k = (2 * m) / (num_users + num_items)
+        k_users = m / num_users
+        k_items = m / num_items
 
-    # calculate clustering coefficients
-    average_clustering_dot_users = bipartite.average_clustering(networkx_dataset, nodes=random_users, mode='dot')
-    average_clustering_dot_items = bipartite.average_clustering(networkx_dataset, nodes=random_items, mode='dot')
-    average_clustering_min_users = bipartite.average_clustering(networkx_dataset, nodes=random_users, mode='min')
-    average_clustering_min_items = bipartite.average_clustering(networkx_dataset, nodes=random_items, mode='min')
-    average_clustering_max_users = bipartite.average_clustering(networkx_dataset, nodes=random_users, mode='max')
-    average_clustering_max_items = bipartite.average_clustering(networkx_dataset, nodes=random_items, mode='max')
+        # TOO SLOW
+        # calculate average eccentricity
+        # average_eccentricity = sum(list(dict(networkx.eccentricity(graph)).values())) / (users + items)
 
-    # calculate node redundancy
-    node_redundancy_users = list(dict(networkx.node_redundancy(networkx_dataset, v=random_users)).values())
-    node_redundancy_items = list(dict(networkx.node_redundancy(networkx_dataset, v=random_items)).values())
-    average_node_redundancy_users = sum(node_redundancy_users) / args.num_random_users
-    average_node_redundancy_items = sum(node_redundancy_items) / args.num_random_users
+        # calculate clustering coefficients
+        average_clustering_dot = bipartite.average_clustering(graph, mode='dot')
+        average_clustering_min = bipartite.average_clustering(graph, mode='min')
+        average_clustering_max = bipartite.average_clustering(graph, mode='max')
+        average_clustering_dot_users = bipartite.average_clustering(graph, mode='dot', nodes=user_nodes)
+        average_clustering_dot_items = bipartite.average_clustering(graph, mode='dot', nodes=item_nodes)
+        average_clustering_min_users = bipartite.average_clustering(graph, mode='min', nodes=user_nodes)
+        average_clustering_min_items = bipartite.average_clustering(graph, mode='min', nodes=item_nodes)
+        average_clustering_max_users = bipartite.average_clustering(graph, mode='max', nodes=user_nodes)
+        average_clustering_max_items = bipartite.average_clustering(graph, mode='max', nodes=item_nodes)
 
-    stats_dict = {
-        'users': users,
-        'items': items,
-        'interactions': m,
-        'delta_G': delta_G,
-        'k_users': k_users,
-        'k_items': k_items,
-        'eccentricity_users': average_eccentricity_users,
-        'eccentricity_items': average_eccentricity_items,
-        'clustering_dot_users': average_clustering_dot_users,
-        'clustering_dot_items': average_clustering_dot_items,
-        'clustering_min_users': average_clustering_min_users,
-        'clustering_min_items': average_clustering_min_items,
-        'clustering_max_users': average_clustering_max_users,
-        'clustering_max_items': average_clustering_max_items,
-        'node_redundancy_users': average_node_redundancy_users,
-        'node_redundancy_items': average_node_redundancy_items
-    }
+        # TOO SLOW
+        # calculate node redundancy
+        # average_node_redundancy = sum(list(dict(bipartite.node_redundancy(graph)).values())) / (users + items)
 
-    return info.update(stats_dict)
+        # calculate average assortativity
+        average_assortativity = degree_assortativity_coefficient(graph)
+
+        stats_dict = {
+            'users': num_users,
+            'items': num_items,
+            'interactions': m,
+            'delta_g': delta_g,
+            'k': k,
+            'k_users': k_users,
+            'k_items': k_items,
+            # 'eccentricity': average_eccentricity,
+            'clustering_dot': average_clustering_dot,
+            'clustering_min': average_clustering_min,
+            'clustering_max': average_clustering_max,
+            'clustering_dot_users': average_clustering_dot_users,
+            'clustering_dot_items': average_clustering_dot_items,
+            'clustering_min_users': average_clustering_min_users,
+            'clustering_min_items': average_clustering_min_items,
+            'clustering_max_users': average_clustering_max_users,
+            'clustering_max_items': average_clustering_max_items,
+            'assortativity': average_assortativity
+            # 'node_redundancy': average_node_redundancy
+        }
+
+        return info.update(stats_dict), None
+    else:
+        # take the subgraph with maximum extension
+        graph = graph.subgraph(max(networkx.connected_components(graph), key=len))
+
+        # basic statistics
+        user_nodes, item_nodes = bipartite.sets(graph)
+        num_users = len(user_nodes)
+        num_items = len(item_nodes)
+        m = len(graph.edges())
+        delta_g = m / (num_users * num_items)
+        k = (2 * m) / (num_users + num_items)
+        k_users = m / num_users
+        k_items = m / num_items
+
+        # TOO SLOW
+        # calculate average eccentricity
+        # average_eccentricity = sum(list(dict(networkx.eccentricity(graph)).values())) / (users + items)
+
+        # calculate clustering coefficients
+        average_clustering_dot = bipartite.average_clustering(graph, mode='dot')
+        average_clustering_min = bipartite.average_clustering(graph, mode='min')
+        average_clustering_max = bipartite.average_clustering(graph, mode='max')
+        average_clustering_dot_users = bipartite.average_clustering(graph, mode='dot', nodes=user_nodes)
+        average_clustering_dot_items = bipartite.average_clustering(graph, mode='dot', nodes=item_nodes)
+        average_clustering_min_users = bipartite.average_clustering(graph, mode='min', nodes=user_nodes)
+        average_clustering_min_items = bipartite.average_clustering(graph, mode='min', nodes=item_nodes)
+        average_clustering_max_users = bipartite.average_clustering(graph, mode='max', nodes=user_nodes)
+        average_clustering_max_items = bipartite.average_clustering(graph, mode='max', nodes=item_nodes)
+
+        # TOO SLOW
+        # calculate node redundancy
+        # average_node_redundancy = sum(list(dict(bipartite.node_redundancy(graph)).values())) / (users + items)
+
+        # calculate average assortativity
+        average_assortativity = degree_assortativity_coefficient(graph)
+
+        stats_dict = {
+            'users': num_users,
+            'items': num_items,
+            'interactions': m,
+            'delta_g': delta_g,
+            'k': k,
+            'k_users': k_users,
+            'k_items': k_items,
+            # 'eccentricity': average_eccentricity,
+            'clustering_dot': average_clustering_dot,
+            'clustering_min': average_clustering_min,
+            'clustering_max': average_clustering_max,
+            'clustering_dot_users': average_clustering_dot_users,
+            'clustering_dot_items': average_clustering_dot_items,
+            'clustering_min_users': average_clustering_min_users,
+            'clustering_min_items': average_clustering_min_items,
+            'clustering_max_users': average_clustering_max_users,
+            'clustering_max_items': average_clustering_max_items,
+            'assortativity': average_assortativity
+            # 'node_redundancy': average_node_redundancy
+        }
+
+        connected_edges = list(graph.edges())
+        connected_edges = [[current_private_to_public_users[i] for i, j in connected_edges],
+                           [current_private_to_public_items[j] for i, j in connected_edges]]
+        edge_index = torch.tensor([connected_edges[0], connected_edges[1]], dtype=torch.int64)
+
+        return info.update(stats_dict), edge_index
 
 
 def graph_sampling():
     # load public dataset
     dataset = pd.read_csv(f'./data/{args.dataset}/{args.filename}', sep='\t', header=None)
-
-    # calculate initial statistics
-    num_users = dataset[0].nunique()
-    num_items = dataset[1].nunique()
-    num_interactions = len(dataset)  # graph is undirected
-    print('\n\nSTART GRAPH SAMPLING...')
-    print(f'DATASET: {args.dataset}')
-    print(f'Number of users: {num_users}')
-    print(f'Number of items: {num_items}')
-    print(f'Number of interactions: {num_interactions}')
-    print(f'Density: {num_interactions / (num_users * num_items)}')
-
-    # calculate dropout ratios
-    dropout_ratios = [np.random.uniform(0, 1) for _ in range(args.number_dropout_ratios)]
-
-    # create public-private/private-public dictionaries
-    public_to_private_users = {u: idx for idx, u in enumerate(dataset[0].unique().tolist())}
-    public_to_private_items = {i: idx + num_users for idx, i in enumerate(dataset[1].unique().tolist())}
+    initial_num_users = dataset[0].nunique()
+    initial_num_items = dataset[1].nunique()
+    initial_users = dataset[0].unique().tolist()
+    initial_items = dataset[1].unique().tolist()
+    public_to_private_users = {u: idx for idx, u in enumerate(initial_users)}
+    public_to_private_items = {i: idx + initial_num_users for idx, i in enumerate(initial_items)}
     private_to_public_users = {idx: u for u, idx in public_to_private_users.items()}
     private_to_public_items = {idx: i for i, idx in public_to_private_items.items()}
 
+    # build undirected and bipartite graph with networkx
+    graph = networkx.Graph()
+    graph.add_nodes_from(list(range(initial_num_users)), bipartite='users')
+    graph.add_nodes_from(list(range(initial_num_users, initial_num_users + initial_num_items)),
+                         bipartite='items')
+    graph.add_edges_from(list(zip(
+        [public_to_private_users[u] for u in dataset[0].tolist()],
+        [public_to_private_items[i] for i in dataset[1].tolist()]))
+    )
+
+    # if graph is not connected, retain only the biggest connected portion
+    if not networkx.is_connected(graph):
+        graph = graph.subgraph(max(networkx.connected_components(graph), key=len))
+
+    # calculate statistics
+    user_nodes, item_nodes = bipartite.sets(graph)
+    num_users = len(user_nodes)
+    num_items = len(item_nodes)
+    m = len(graph.edges())
+    delta_g = m / (num_users * num_items)
+    k = (2 * m) / (num_users + num_items)
+    k_users = m / num_users
+    k_items = m / num_items
+
+    # calculate clustering coefficients
+    average_clustering_dot = bipartite.average_clustering(graph, mode='dot')
+    average_clustering_min = bipartite.average_clustering(graph, mode='min')
+    average_clustering_max = bipartite.average_clustering(graph, mode='max')
+    average_clustering_dot_users = bipartite.average_clustering(graph, mode='dot', nodes=user_nodes)
+    average_clustering_dot_items = bipartite.average_clustering(graph, mode='dot', nodes=item_nodes)
+    average_clustering_min_users = bipartite.average_clustering(graph, mode='min', nodes=user_nodes)
+    average_clustering_min_items = bipartite.average_clustering(graph, mode='min', nodes=item_nodes)
+    average_clustering_max_users = bipartite.average_clustering(graph, mode='max', nodes=user_nodes)
+    average_clustering_max_items = bipartite.average_clustering(graph, mode='max', nodes=item_nodes)
+
+    # calculate average assortativity
+    average_assortativity = degree_assortativity_coefficient(graph)
+
+    # print statistics
+    print(f'DATASET: {args.dataset}')
+    print(f'Number of users: {num_users}')
+    print(f'Number of items: {num_items}')
+    print(f'Number of interactions: {m}')
+    print(f'Density: {delta_g}')
+    print(f'Average degree: {k}')
+    print(f'Average user degree: {k_users}')
+    print(f'Average item degree: {k_items}')
+    print(f'Average clustering (dot): {average_clustering_dot}')
+    print(f'Average clustering (min): {average_clustering_min}')
+    print(f'Average clustering (max): {average_clustering_max}')
+    print(f'Average user clustering (dot): {average_clustering_dot_users}')
+    print(f'Average item clustering (dot): {average_clustering_dot_items}')
+    print(f'Average user clustering (min): {average_clustering_min_users}')
+    print(f'Average item clustering (min): {average_clustering_min_items}')
+    print(f'Average user clustering (max): {average_clustering_max_users}')
+    print(f'Average item clustering (max): {average_clustering_max_items}')
+    print(f'Assortativity: {average_assortativity}')
+
     # get rows and cols for the dataset and convert them into private
-    rows = [public_to_private_users[r] for r in dataset[0].tolist()]
-    cols = [public_to_private_items[c] for c in dataset[1].tolist()]
+    connected_edges = list(graph.edges())
+    connected_edges = [[private_to_public_users[i] for i, j in connected_edges],
+                       [private_to_public_items[j] for i, j in connected_edges]]
 
     # create edge index
-    edge_index = np.array([rows, cols])
-    edge_index = torch.tensor(edge_index, dtype=torch.int64)
+    edge_index = torch.tensor([connected_edges[0], connected_edges[1]], dtype=torch.int64)
 
     # create dictionary to store
-    dictionary = {gss: [] for gss in args.sampling}
     filename_no_extension = args.filename.split('.')[0]
     extension = args.filename.split('.')[1]
 
-    for gss in args.sampling:
-        if gss == 'ND':
-            if not os.path.exists(f'./data/{args.dataset}/node-dropout/'):
-                os.makedirs(f'./data/{args.dataset}/node-dropout/')
-            for dr in dropout_ratios:
-                print(f'\n\nRunning NODE DROPOUT with dropout ratio: {dr}')
+    print('\n\nSTART GRAPH SAMPLING...')
+    with open(f'./data/{args.dataset}/sampling-stats.tsv', 'w') as f:
+        writer = csv.writer(f, delimiter='\t')
+        writer.writerow(['strategy',
+                         'dropout',
+                         'users',
+                         'items',
+                         'interactions',
+                         'delta_g',
+                         'k',
+                         'k_users',
+                         'k_items',
+                         'clustering_dot',
+                         'clustering_min',
+                         'clustering_max',
+                         'clustering_dot_users',
+                         'clustering_dot_items',
+                         'clustering_min_users',
+                         'clustering_min_items',
+                         'clustering_max_users',
+                         'clustering_max_items',
+                         'assortativity'])
+        for _ in range(args.num_samplings):
+            gss = random.choice(args.sampling_strategies)
+            dr = np.random.uniform(0.7, 0.9)
+            if gss == 'ND':
+                if not os.path.exists(f'./data/{args.dataset}/node-dropout/'):
+                    os.makedirs(f'./data/{args.dataset}/node-dropout/')
+                print(f'\n\nRunning NODE DROPOUT with dropout ratio {dr}')
                 sampled_edge_index, _, _ = dropout_node(edge_index, p=dr, num_nodes=num_users + num_items)
-                dictionary['ND'].append(calculate_statistics(sampled_edge_index, info={'strategy': 'node dropout',
-                                                                                       'dropout': dr}))
-                sampled_rows = [private_to_public_users[r] for r in sampled_edge_index[0].tolist()]
-                sampled_cols = [private_to_public_items[c] for c in sampled_edge_index[1].tolist()]
+                current_stats_dict, sampled_graph = calculate_statistics(sampled_edge_index,
+                                                                         info={'strategy': 'node dropout',
+                                                                               'dropout': dr})
+                if sampled_graph:
+                    sampled_rows = [private_to_public_users[r] for r in sampled_graph[0].tolist()]
+                    sampled_cols = [private_to_public_items[c] for c in sampled_graph[1].tolist()]
+                else:
+                    sampled_rows = [private_to_public_users[r] for r in sampled_edge_index[0].tolist()]
+                    sampled_cols = [private_to_public_items[c] for c in sampled_edge_index[1].tolist()]
                 sampled_dataset = pd.concat([pd.Series(sampled_rows), pd.Series(sampled_cols)], axis=1)
                 sampled_dataset.to_csv(
-                    f'./data/{args.dataset}/node-dropout/{filename_no_extension}-{dr}-{args.num_random_users}-{args.num_random_items}.{extension}',
+                    f'./data/{args.dataset}/node-dropout/{filename_no_extension}-{dr}.{extension}',
                     sep='\t', header=None, index=None)
-        elif gss == 'ED':
-            if not os.path.exists(f'./data/{args.dataset}/edge-dropout/'):
-                os.makedirs(f'./data/{args.dataset}/edge-dropout/')
-            for dr in args.dropout_ratio:
-                print(f'\n\nRunning EDGE DROPOUT with dropout ratio: {dr}')
-                n_interactions_to_drop = round(num_interactions * dr)
-                sampled_dataset = dataset.sample(n=num_interactions - n_interactions_to_drop,
-                                                 random_state=args.random_seed).reset_index(drop=True)
-                sampled_dataset.to_csv(f'./data/{args.dataset}/{filename_no_extension}-edge-dropout-{dr}.{extension}',
-                                       sep='\t', header=None, index=None)
-        elif gss == 'RW':
-            if not os.path.exists(f'./data/{args.dataset}/random-walk/'):
-                os.makedirs(f'./data/{args.dataset}/random-walk/')
-            for dr in args.dropout_ratio:
-                for nl in range(args.num_layers):
-                    print(f'\n\nRunning RANDOM WALK with dropout ratio: {dr} at layer: {nl + 1}')
-                    n_interactions_to_drop = round(num_interactions * dr)
-                    sampled_dataset = dataset.sample(n=num_interactions - n_interactions_to_drop,
-                                                     random_state=args.random_seed).reset_index(drop=True)
-                    sampled_dataset.to_csv(
-                        f'./data/{args.dataset}/{filename_no_extension}-random-walk-{dr}-{nl + 1}.{extension}',
-                        sep='\t', header=None, index=None)
-        else:
-            raise NotImplementedError('This graph sampling strategy has not been implemented yet!')
+                writer.writerow(current_stats_dict)
+            elif gss == 'ED':
+                if not os.path.exists(f'./data/{args.dataset}/edge-dropout/'):
+                    os.makedirs(f'./data/{args.dataset}/edge-dropout/')
+                print(f'\n\nRunning EDGE DROPOUT with dropout ratio {dr}')
+                sampled_edge_index, _ = dropout_edge(edge_index, p=dr)
+                current_stats_dict, sampled_graph = calculate_statistics(sampled_edge_index,
+                                                                         info={'strategy': 'edge dropout',
+                                                                               'dropout': dr})
+                if sampled_graph:
+                    sampled_rows = [private_to_public_users[r] for r in sampled_graph[0].tolist()]
+                    sampled_cols = [private_to_public_items[c] for c in sampled_graph[1].tolist()]
+                else:
+                    sampled_rows = [private_to_public_users[r] for r in sampled_edge_index[0].tolist()]
+                    sampled_cols = [private_to_public_items[c] for c in sampled_edge_index[1].tolist()]
+                sampled_dataset = pd.concat([pd.Series(sampled_rows), pd.Series(sampled_cols)], axis=1)
+                sampled_dataset.to_csv(
+                    f'./data/{args.dataset}/edge-dropout/{filename_no_extension}-{dr}.{extension}',
+                    sep='\t', header=None, index=None)
+                writer.writerow(current_stats_dict)
+            elif gss == 'RW':
+                if not os.path.exists(f'./data/{args.dataset}/random-walk/'):
+                    os.makedirs(f'./data/{args.dataset}/random-walk/')
+                print(f'\n\nRunning RANDOM WALK with dropout ratio {dr}, '
+                      f'{args.num_walks} walk length, and {round(k / 2)} walks per node')
+                sampled_edge_index, _ = dropout_path(edge_index,
+                                                     p=dr,
+                                                     walks_per_node=round(k / 2),
+                                                     walk_length=args.num_walks,
+                                                     num_nodes=num_users + num_items)
+                current_stats_dict, sampled_graph = calculate_statistics(sampled_edge_index,
+                                                                         info={'strategy': 'random walk',
+                                                                               'dropout': dr})
+                if sampled_graph:
+                    sampled_rows = [private_to_public_users[r] for r in sampled_graph[0].tolist()]
+                    sampled_cols = [private_to_public_items[c] for c in sampled_graph[1].tolist()]
+                else:
+                    sampled_rows = [private_to_public_users[r] for r in sampled_edge_index[0].tolist()]
+                    sampled_cols = [private_to_public_items[c] for c in sampled_edge_index[1].tolist()]
+                sampled_dataset = pd.concat([pd.Series(sampled_rows), pd.Series(sampled_cols)], axis=1)
+                sampled_dataset.to_csv(
+                    f'./data/{args.dataset}/random-walk/{filename_no_extension}-{dr}-{args.num_walks}.{extension}',
+                    sep='\t', header=None, index=None)
+                writer.writerow(current_stats_dict)
+            else:
+                raise NotImplementedError('This graph sampling strategy has not been implemented yet!')
     print('\n\nEND GRAPH SAMPLING...')
 
 
