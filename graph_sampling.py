@@ -13,8 +13,8 @@ from torch_geometric.utils.dropout import dropout_node, dropout_edge, dropout_pa
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Run graph sampling (Node Dropout, Edge Dropout, Random Walking).")
-    parser.add_argument('--dataset', nargs='?', default='last-fm', help='dataset name')
-    parser.add_argument('--filename', nargs='?', default='dataset.txt', help='filename')
+    parser.add_argument('--dataset', nargs='?', default='allrecipes', help='dataset name')
+    parser.add_argument('--filename', nargs='?', default='dataset.tsv', help='filename')
     parser.add_argument('--sampling_strategies', nargs='+', type=str, default=['RW'],
                         help='graph sampling strategy')
     parser.add_argument('--num_samplings', nargs='?', type=int, default=300,
@@ -64,6 +64,30 @@ def calculate_statistics(data, info):
         k = (2 * m) / (num_users + num_items)
         k_users = m / num_users
         k_items = m / num_items
+        space_size = math.sqrt(num_users * num_items) / 1000
+        shape = num_users / num_items
+
+        dataset = pd.concat([pd.Series(data[0].tolist()), pd.Series(data[1].tolist())], axis=1)
+        sorted_users = dataset.groupby(0).count().sort_values(by=[1]).to_dict()[1]
+        sorted_items = dataset.groupby(1).count().sort_values(by=[0]).to_dict()[0]
+
+        def gini_user_term():
+            return (num_users + 1 - idx) / (num_users + 1) * sorted_users[user] / m
+
+        def gini_item_term():
+            return (num_items + 1 - idx) / (num_items + 1) * sorted_items[item] / m
+
+        gini_terms = 0
+        for idx, (user, ratings) in enumerate(sorted_users.items()):
+            gini_terms += gini_user_term()
+
+        gini_user = 1 - 2 * gini_terms
+
+        gini_terms = 0
+        for idx, (item, ratings) in enumerate(sorted_items.items()):
+            gini_terms += gini_item_term()
+
+        gini_item = 1 - 2 * gini_terms
 
         # TOO SLOW
         # calculate average eccentricity
@@ -95,6 +119,10 @@ def calculate_statistics(data, info):
             'k': k,
             'k_users': k_users,
             'k_items': k_items,
+            'space_size': space_size,
+            'shape': shape,
+            'gini_user': gini_user,
+            'gini_item': gini_item,
             # 'eccentricity': average_eccentricity,
             'clustering_dot': average_clustering_dot,
             'clustering_min': average_clustering_min,
@@ -123,6 +151,34 @@ def calculate_statistics(data, info):
         k = (2 * m) / (num_users + num_items)
         k_users = m / num_users
         k_items = m / num_items
+        space_size = math.sqrt(num_users * num_items) / 1000
+        shape = num_users / num_items
+
+        connected_edges = list(graph.edges())
+        connected_edges = [[current_private_to_public_users[i] for i, j in connected_edges],
+                           [current_private_to_public_items[j] for i, j in connected_edges]]
+
+        connected_dataset = pd.concat([pd.Series(connected_edges[0]), pd.Series(connected_edges[1])], axis=1)
+        sorted_users = connected_dataset.groupby(0).count().sort_values(by=[1]).to_dict()[1]
+        sorted_items = connected_dataset.groupby(1).count().sort_values(by=[0]).to_dict()[0]
+
+        def gini_user_term():
+            return (num_users + 1 - idx) / (num_users + 1) * sorted_users[user] / m
+
+        def gini_item_term():
+            return (num_items + 1 - idx) / (num_items + 1) * sorted_items[item] / m
+
+        gini_terms = 0
+        for idx, (user, ratings) in enumerate(sorted_users.items()):
+            gini_terms += gini_user_term()
+
+        gini_user = 1 - 2 * gini_terms
+
+        gini_terms = 0
+        for idx, (item, ratings) in enumerate(sorted_items.items()):
+            gini_terms += gini_item_term()
+
+        gini_item = 1 - 2 * gini_terms
 
         # TOO SLOW
         # calculate average eccentricity
@@ -154,6 +210,10 @@ def calculate_statistics(data, info):
             'k': k,
             'k_users': k_users,
             'k_items': k_items,
+            'space_size': space_size,
+            'shape': shape,
+            'gini_user': gini_user,
+            'gini_item': gini_item,
             # 'eccentricity': average_eccentricity,
             'clustering_dot': average_clustering_dot,
             'clustering_min': average_clustering_min,
@@ -168,9 +228,6 @@ def calculate_statistics(data, info):
             # 'node_redundancy': average_node_redundancy
         }
 
-        connected_edges = list(graph.edges())
-        connected_edges = [[current_private_to_public_users[i] for i, j in connected_edges],
-                           [current_private_to_public_items[j] for i, j in connected_edges]]
         edge_index = torch.tensor([connected_edges[0], connected_edges[1]], dtype=torch.int64)
 
         return info.update(stats_dict), edge_index
@@ -198,9 +255,14 @@ def graph_sampling():
         [public_to_private_items[i] for i in dataset[1].tolist()]))
     )
 
+    connected_edges = None
+
     # if graph is not connected, retain only the biggest connected portion
     if not networkx.is_connected(graph):
         graph = graph.subgraph(max(networkx.connected_components(graph), key=len))
+        connected_edges = list(graph.edges())
+        connected_edges = [[private_to_public_users[i] for i, j in connected_edges],
+                           [private_to_public_items[j] for i, j in connected_edges]]
 
     # calculate statistics
     user_nodes, item_nodes = bipartite.sets(graph)
@@ -211,11 +273,16 @@ def graph_sampling():
     k = (2 * m) / (num_users + num_items)
     k_users = m / num_users
     k_items = m / num_items
-    space_size = math.log10(math.sqrt(num_users * num_items) / 1000)
-    shape = math.log10(num_users / num_items)
+    space_size = math.sqrt(num_users * num_items) / 1000
+    shape = num_users / num_items
 
-    sorted_users = dataset.groupby(0).count().sort_values(by=[1]).to_dict()[1]
-    sorted_items = dataset.groupby(1).count().sort_values(by=[0]).to_dict()[0]
+    if not connected_edges:
+        sorted_users = dataset.groupby(0).count().sort_values(by=[1]).to_dict()[1]
+        sorted_items = dataset.groupby(1).count().sort_values(by=[0]).to_dict()[0]
+    else:
+        connected_dataset = pd.concat([pd.Series(connected_edges[0]), pd.Series(connected_edges[1])], axis=1)
+        sorted_users = connected_dataset.groupby(0).count().sort_values(by=[1]).to_dict()[1]
+        sorted_items = connected_dataset.groupby(1).count().sort_values(by=[0]).to_dict()[0]
 
     def gini_user_term():
         return (num_users + 1 - idx) / (num_users + 1) * sorted_users[user] / m
