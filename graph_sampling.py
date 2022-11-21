@@ -15,7 +15,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Run graph sampling (Node Dropout, Edge Dropout, Random Walking).")
     parser.add_argument('--dataset', nargs='?', default='allrecipes', help='dataset name')
     parser.add_argument('--filename', nargs='?', default='dataset.tsv', help='filename')
-    parser.add_argument('--sampling_strategies', nargs='+', type=str, default=['RW'],
+    parser.add_argument('--sampling_strategies', nargs='+', type=str, default=['ND', 'ED', 'RW'],
                         help='graph sampling strategy')
     parser.add_argument('--num_samplings', nargs='?', type=int, default=300,
                         help='number of samplings')
