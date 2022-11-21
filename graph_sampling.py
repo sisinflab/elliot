@@ -7,13 +7,14 @@ import networkx
 import torch
 from networkx.algorithms import bipartite, degree_assortativity_coefficient
 import csv
+import math
 from torch_geometric.utils.dropout import dropout_node, dropout_edge, dropout_path
 
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Run graph sampling (Node Dropout, Edge Dropout, Random Walking).")
-    parser.add_argument('--dataset', nargs='?', default='allrecipes', help='dataset name')
-    parser.add_argument('--filename', nargs='?', default='dataset.tsv', help='filename')
+    parser.add_argument('--dataset', nargs='?', default='last-fm', help='dataset name')
+    parser.add_argument('--filename', nargs='?', default='dataset.txt', help='filename')
     parser.add_argument('--sampling_strategies', nargs='+', type=str, default=['RW'],
                         help='graph sampling strategy')
     parser.add_argument('--num_samplings', nargs='?', type=int, default=300,
@@ -210,6 +211,29 @@ def graph_sampling():
     k = (2 * m) / (num_users + num_items)
     k_users = m / num_users
     k_items = m / num_items
+    space_size = math.log10(math.sqrt(num_users * num_items) / 1000)
+    shape = math.log10(num_users / num_items)
+
+    sorted_users = dataset.groupby(0).count().sort_values(by=[1]).to_dict()[1]
+    sorted_items = dataset.groupby(1).count().sort_values(by=[0]).to_dict()[0]
+
+    def gini_user_term():
+        return (num_users + 1 - idx) / (num_users + 1) * sorted_users[user] / m
+
+    def gini_item_term():
+        return (num_items + 1 - idx) / (num_items + 1) * sorted_items[item] / m
+
+    gini_terms = 0
+    for idx, (user, ratings) in enumerate(sorted_users.items()):
+        gini_terms += gini_user_term()
+
+    gini_user = 1 - 2 * gini_terms
+
+    gini_terms = 0
+    for idx, (item, ratings) in enumerate(sorted_items.items()):
+        gini_terms += gini_item_term()
+
+    gini_item = 1 - 2 * gini_terms
 
     # calculate clustering coefficients
     average_clustering_dot = bipartite.average_clustering(graph, mode='dot')
@@ -231,6 +255,10 @@ def graph_sampling():
     print(f'Number of items: {num_items}')
     print(f'Number of interactions: {m}')
     print(f'Density: {delta_g}')
+    print(f'Space size: {space_size}')
+    print(f'Shape: {shape}')
+    print(f'Gini user: {gini_user}')
+    print(f'Gini item: {gini_item}')
     print(f'Average degree: {k}')
     print(f'Average user degree: {k_users}')
     print(f'Average item degree: {k_items}')
