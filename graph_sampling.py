@@ -240,8 +240,13 @@ def graph_sampling():
     initial_num_items = dataset[1].nunique()
     initial_users = dataset[0].unique().tolist()
     initial_items = dataset[1].unique().tolist()
+
+    # public --> private reindexing
     public_to_private_users = {u: idx for idx, u in enumerate(initial_users)}
     public_to_private_items = {i: idx + initial_num_users for idx, i in enumerate(initial_items)}
+    del initial_users, initial_items
+
+    # private --> public reindexing
     private_to_public_users = {idx: u for u, idx in public_to_private_users.items()}
     private_to_public_items = {idx: i for i, idx in public_to_private_items.items()}
 
@@ -255,14 +260,12 @@ def graph_sampling():
         [public_to_private_items[i] for i in dataset[1].tolist()]))
     )
 
-    connected_edges = None
+    connected_graph = True
 
     # if graph is not connected, retain only the biggest connected portion
     if not networkx.is_connected(graph):
         graph = graph.subgraph(max(networkx.connected_components(graph), key=len))
-        connected_edges = list(graph.edges())
-        connected_edges = [[private_to_public_users[i] for i, j in connected_edges],
-                           [private_to_public_items[j] for i, j in connected_edges]]
+        connected_graph = False
 
     # calculate statistics
     user_nodes, item_nodes = bipartite.sets(graph)
@@ -276,13 +279,40 @@ def graph_sampling():
     space_size = math.sqrt(num_users * num_items) / 1000
     shape = num_users / num_items
 
-    if not connected_edges:
+    if connected_graph:
+        edges = [[public_to_private_users[r] for r in dataset[0].tolist()],
+                 [public_to_private_items[c] for c in dataset[1].tolist()]]
+        edge_index = torch.tensor(edges, dtype=torch.int64)
+        del edges
+
         sorted_users = dataset.groupby(0).count().sort_values(by=[1]).to_dict()[1]
         sorted_items = dataset.groupby(1).count().sort_values(by=[0]).to_dict()[0]
     else:
-        connected_dataset = pd.concat([pd.Series(connected_edges[0]), pd.Series(connected_edges[1])], axis=1)
-        sorted_users = connected_dataset.groupby(0).count().sort_values(by=[1]).to_dict()[1]
-        sorted_items = connected_dataset.groupby(1).count().sort_values(by=[0]).to_dict()[0]
+        # the reindexing needs to be performed again
+        connected_users = [private_to_public_users[u] for u in user_nodes]
+        connected_items = [private_to_public_items[i] for i in item_nodes]
+        connected_edges = list(graph.edges())
+        connected_edges = [[private_to_public_users[i] for i, j in connected_edges],
+                           [private_to_public_items[j] for i, j in connected_edges]]
+        dataset = pd.concat([pd.Series(connected_edges[0]), pd.Series(connected_edges[1])], axis=1)
+        del connected_edges
+
+        # the public --> private reindexing is performed again
+        public_to_private_users = {u: idx for idx, u in enumerate(connected_users)}
+        public_to_private_items = {i: idx + initial_num_users for idx, i in enumerate(connected_items)}
+        del connected_users, connected_items
+
+        # the private --> public reindexing is performed again
+        private_to_public_users = {idx: u for u, idx in public_to_private_users.items()}
+        private_to_public_items = {idx: i for i, idx in public_to_private_items.items()}
+
+        sorted_users = dataset.groupby(0).count().sort_values(by=[1]).to_dict()[1]
+        sorted_items = dataset.groupby(1).count().sort_values(by=[0]).to_dict()[0]
+
+        edges = [[public_to_private_users[r] for r in dataset[0].tolist()],
+                 [public_to_private_items[c] for c in dataset[1].tolist()]]
+        edge_index = torch.tensor(edges, dtype=torch.int64)
+        del edges
 
     def gini_user_term():
         return (num_users + 1 - idx) / (num_users + 1) * sorted_users[user] / m
@@ -316,6 +346,8 @@ def graph_sampling():
     # calculate average assortativity
     average_assortativity = degree_assortativity_coefficient(graph)
 
+    del graph
+
     # print statistics
     print(f'DATASET: {args.dataset}')
     print(f'Number of users: {num_users}')
@@ -340,15 +372,6 @@ def graph_sampling():
     print(f'Average item clustering (max): {average_clustering_max_items}')
     print(f'Assortativity: {average_assortativity}')
 
-    # get rows and cols for the dataset and convert them into private
-    connected_edges = list(graph.edges())
-    connected_edges = [[private_to_public_users[i] for i, j in connected_edges],
-                       [private_to_public_items[j] for i, j in connected_edges]]
-
-    # create edge index
-    edge_index = torch.tensor([connected_edges[0], connected_edges[1]], dtype=torch.int64)
-
-    # create dictionary to store
     filename_no_extension = args.filename.split('.')[0]
     extension = args.filename.split('.')[1]
 
