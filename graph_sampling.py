@@ -314,63 +314,63 @@ def graph_sampling():
         edge_index = torch.tensor(edges, dtype=torch.int64)
         del edges
 
-    # def gini_user_term():
-    #     return (num_users + 1 - idx) / (num_users + 1) * sorted_users[user] / m
-    #
-    # def gini_item_term():
-    #     return (num_items + 1 - idx) / (num_items + 1) * sorted_items[item] / m
-    #
-    # gini_terms = 0
-    # for idx, (user, ratings) in enumerate(sorted_users.items()):
-    #     gini_terms += gini_user_term()
-    #
-    # gini_user = 1 - 2 * gini_terms
-    #
-    # gini_terms = 0
-    # for idx, (item, ratings) in enumerate(sorted_items.items()):
-    #     gini_terms += gini_item_term()
-    #
-    # gini_item = 1 - 2 * gini_terms
-    #
-    # # calculate clustering coefficients
-    # average_clustering_dot = bipartite.average_clustering(graph, mode='dot')
-    # average_clustering_min = bipartite.average_clustering(graph, mode='min')
-    # average_clustering_max = bipartite.average_clustering(graph, mode='max')
-    # average_clustering_dot_users = bipartite.average_clustering(graph, mode='dot', nodes=user_nodes)
-    # average_clustering_dot_items = bipartite.average_clustering(graph, mode='dot', nodes=item_nodes)
-    # average_clustering_min_users = bipartite.average_clustering(graph, mode='min', nodes=user_nodes)
-    # average_clustering_min_items = bipartite.average_clustering(graph, mode='min', nodes=item_nodes)
-    # average_clustering_max_users = bipartite.average_clustering(graph, mode='max', nodes=user_nodes)
-    # average_clustering_max_items = bipartite.average_clustering(graph, mode='max', nodes=item_nodes)
-    #
-    # # calculate average assortativity
-    # average_assortativity = degree_assortativity_coefficient(graph)
-    #
-    # del graph
-    #
-    # # print statistics
-    # print(f'DATASET: {args.dataset}')
-    # print(f'Number of users: {num_users}')
-    # print(f'Number of items: {num_items}')
-    # print(f'Number of interactions: {m}')
-    # print(f'Density: {delta_g}')
-    # print(f'Space size: {space_size}')
-    # print(f'Shape: {shape}')
-    # print(f'Gini user: {gini_user}')
-    # print(f'Gini item: {gini_item}')
-    # print(f'Average degree: {k}')
-    # print(f'Average user degree: {k_users}')
-    # print(f'Average item degree: {k_items}')
-    # print(f'Average clustering (dot): {average_clustering_dot}')
-    # print(f'Average clustering (min): {average_clustering_min}')
-    # print(f'Average clustering (max): {average_clustering_max}')
-    # print(f'Average user clustering (dot): {average_clustering_dot_users}')
-    # print(f'Average item clustering (dot): {average_clustering_dot_items}')
-    # print(f'Average user clustering (min): {average_clustering_min_users}')
-    # print(f'Average item clustering (min): {average_clustering_min_items}')
-    # print(f'Average user clustering (max): {average_clustering_max_users}')
-    # print(f'Average item clustering (max): {average_clustering_max_items}')
-    # print(f'Assortativity: {average_assortativity}')
+    def gini_user_term():
+        return (num_users + 1 - idx) / (num_users + 1) * sorted_users[user] / m
+
+    def gini_item_term():
+        return (num_items + 1 - idx) / (num_items + 1) * sorted_items[item] / m
+
+    gini_terms = 0
+    for idx, (user, ratings) in enumerate(sorted_users.items()):
+        gini_terms += gini_user_term()
+
+    gini_user = 1 - 2 * gini_terms
+
+    gini_terms = 0
+    for idx, (item, ratings) in enumerate(sorted_items.items()):
+        gini_terms += gini_item_term()
+
+    gini_item = 1 - 2 * gini_terms
+
+    # calculate clustering coefficients
+    average_clustering_dot = bipartite.average_clustering(graph, mode='dot')
+    average_clustering_min = bipartite.average_clustering(graph, mode='min')
+    average_clustering_max = bipartite.average_clustering(graph, mode='max')
+    average_clustering_dot_users = bipartite.average_clustering(graph, mode='dot', nodes=user_nodes)
+    average_clustering_dot_items = bipartite.average_clustering(graph, mode='dot', nodes=item_nodes)
+    average_clustering_min_users = bipartite.average_clustering(graph, mode='min', nodes=user_nodes)
+    average_clustering_min_items = bipartite.average_clustering(graph, mode='min', nodes=item_nodes)
+    average_clustering_max_users = bipartite.average_clustering(graph, mode='max', nodes=user_nodes)
+    average_clustering_max_items = bipartite.average_clustering(graph, mode='max', nodes=item_nodes)
+
+    # calculate average assortativity
+    average_assortativity = degree_assortativity_coefficient(graph)
+
+    del graph
+
+    # print statistics
+    print(f'DATASET: {args.dataset}')
+    print(f'Number of users: {num_users}')
+    print(f'Number of items: {num_items}')
+    print(f'Number of interactions: {m}')
+    print(f'Density: {delta_g}')
+    print(f'Space size: {space_size}')
+    print(f'Shape: {shape}')
+    print(f'Gini user: {gini_user}')
+    print(f'Gini item: {gini_item}')
+    print(f'Average degree: {k}')
+    print(f'Average user degree: {k_users}')
+    print(f'Average item degree: {k_items}')
+    print(f'Average clustering (dot): {average_clustering_dot}')
+    print(f'Average clustering (min): {average_clustering_min}')
+    print(f'Average clustering (max): {average_clustering_max}')
+    print(f'Average user clustering (dot): {average_clustering_dot_users}')
+    print(f'Average item clustering (dot): {average_clustering_dot_items}')
+    print(f'Average user clustering (min): {average_clustering_min_users}')
+    print(f'Average item clustering (min): {average_clustering_min_items}')
+    print(f'Average user clustering (max): {average_clustering_max_users}')
+    print(f'Average item clustering (max): {average_clustering_max_items}')
+    print(f'Assortativity: {average_assortativity}')
 
     filename_no_extension = args.filename.split('.')[0]
     extension = args.filename.split('.')[1]
