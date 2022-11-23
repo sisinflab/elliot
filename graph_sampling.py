@@ -137,7 +137,9 @@ def calculate_statistics(data, info):
             # 'node_redundancy': average_node_redundancy
         }
 
-        return info.update(stats_dict), None
+        info.update(stats_dict)
+
+        return info, None
     else:
         # take the subgraph with maximum extension
         graph = graph.subgraph(max(networkx.connected_components(graph), key=len))
@@ -228,9 +230,11 @@ def calculate_statistics(data, info):
             # 'node_redundancy': average_node_redundancy
         }
 
+        info.update(stats_dict)
+
         edge_index = torch.tensor([connected_edges[0], connected_edges[1]], dtype=torch.int64)
 
-        return info.update(stats_dict), edge_index
+        return info, edge_index
 
 
 def graph_sampling():
