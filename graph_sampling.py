@@ -17,7 +17,7 @@ def parse_args():
     parser.add_argument('--filename', nargs='?', default='dataset.tsv', help='filename')
     parser.add_argument('--sampling_strategies', nargs='+', type=str, default=['ND', 'ED', 'RW'],
                         help='graph sampling strategy')
-    parser.add_argument('--num_samplings', nargs='?', type=int, default=300,
+    parser.add_argument('--num_samplings', nargs='?', type=int, default=20,
                         help='number of samplings')
     parser.add_argument('--num_walks', nargs='?', type=int, default=4,
                         help='number of walks (only for RW)')
@@ -299,7 +299,7 @@ def graph_sampling():
 
         # the public --> private reindexing is performed again
         public_to_private_users = {u: idx for idx, u in enumerate(connected_users)}
-        public_to_private_items = {i: idx + initial_num_users for idx, i in enumerate(connected_items)}
+        public_to_private_items = {i: idx + num_users for idx, i in enumerate(connected_items)}
         del connected_users, connected_items
 
         # the private --> public reindexing is performed again
@@ -314,63 +314,63 @@ def graph_sampling():
         edge_index = torch.tensor(edges, dtype=torch.int64)
         del edges
 
-    def gini_user_term():
-        return (num_users + 1 - idx) / (num_users + 1) * sorted_users[user] / m
-
-    def gini_item_term():
-        return (num_items + 1 - idx) / (num_items + 1) * sorted_items[item] / m
-
-    gini_terms = 0
-    for idx, (user, ratings) in enumerate(sorted_users.items()):
-        gini_terms += gini_user_term()
-
-    gini_user = 1 - 2 * gini_terms
-
-    gini_terms = 0
-    for idx, (item, ratings) in enumerate(sorted_items.items()):
-        gini_terms += gini_item_term()
-
-    gini_item = 1 - 2 * gini_terms
-
-    # calculate clustering coefficients
-    average_clustering_dot = bipartite.average_clustering(graph, mode='dot')
-    average_clustering_min = bipartite.average_clustering(graph, mode='min')
-    average_clustering_max = bipartite.average_clustering(graph, mode='max')
-    average_clustering_dot_users = bipartite.average_clustering(graph, mode='dot', nodes=user_nodes)
-    average_clustering_dot_items = bipartite.average_clustering(graph, mode='dot', nodes=item_nodes)
-    average_clustering_min_users = bipartite.average_clustering(graph, mode='min', nodes=user_nodes)
-    average_clustering_min_items = bipartite.average_clustering(graph, mode='min', nodes=item_nodes)
-    average_clustering_max_users = bipartite.average_clustering(graph, mode='max', nodes=user_nodes)
-    average_clustering_max_items = bipartite.average_clustering(graph, mode='max', nodes=item_nodes)
-
-    # calculate average assortativity
-    average_assortativity = degree_assortativity_coefficient(graph)
-
-    del graph
-
-    # print statistics
-    print(f'DATASET: {args.dataset}')
-    print(f'Number of users: {num_users}')
-    print(f'Number of items: {num_items}')
-    print(f'Number of interactions: {m}')
-    print(f'Density: {delta_g}')
-    print(f'Space size: {space_size}')
-    print(f'Shape: {shape}')
-    print(f'Gini user: {gini_user}')
-    print(f'Gini item: {gini_item}')
-    print(f'Average degree: {k}')
-    print(f'Average user degree: {k_users}')
-    print(f'Average item degree: {k_items}')
-    print(f'Average clustering (dot): {average_clustering_dot}')
-    print(f'Average clustering (min): {average_clustering_min}')
-    print(f'Average clustering (max): {average_clustering_max}')
-    print(f'Average user clustering (dot): {average_clustering_dot_users}')
-    print(f'Average item clustering (dot): {average_clustering_dot_items}')
-    print(f'Average user clustering (min): {average_clustering_min_users}')
-    print(f'Average item clustering (min): {average_clustering_min_items}')
-    print(f'Average user clustering (max): {average_clustering_max_users}')
-    print(f'Average item clustering (max): {average_clustering_max_items}')
-    print(f'Assortativity: {average_assortativity}')
+    # def gini_user_term():
+    #     return (num_users + 1 - idx) / (num_users + 1) * sorted_users[user] / m
+    #
+    # def gini_item_term():
+    #     return (num_items + 1 - idx) / (num_items + 1) * sorted_items[item] / m
+    #
+    # gini_terms = 0
+    # for idx, (user, ratings) in enumerate(sorted_users.items()):
+    #     gini_terms += gini_user_term()
+    #
+    # gini_user = 1 - 2 * gini_terms
+    #
+    # gini_terms = 0
+    # for idx, (item, ratings) in enumerate(sorted_items.items()):
+    #     gini_terms += gini_item_term()
+    #
+    # gini_item = 1 - 2 * gini_terms
+    #
+    # # calculate clustering coefficients
+    # average_clustering_dot = bipartite.average_clustering(graph, mode='dot')
+    # average_clustering_min = bipartite.average_clustering(graph, mode='min')
+    # average_clustering_max = bipartite.average_clustering(graph, mode='max')
+    # average_clustering_dot_users = bipartite.average_clustering(graph, mode='dot', nodes=user_nodes)
+    # average_clustering_dot_items = bipartite.average_clustering(graph, mode='dot', nodes=item_nodes)
+    # average_clustering_min_users = bipartite.average_clustering(graph, mode='min', nodes=user_nodes)
+    # average_clustering_min_items = bipartite.average_clustering(graph, mode='min', nodes=item_nodes)
+    # average_clustering_max_users = bipartite.average_clustering(graph, mode='max', nodes=user_nodes)
+    # average_clustering_max_items = bipartite.average_clustering(graph, mode='max', nodes=item_nodes)
+    #
+    # # calculate average assortativity
+    # average_assortativity = degree_assortativity_coefficient(graph)
+    #
+    # del graph
+    #
+    # # print statistics
+    # print(f'DATASET: {args.dataset}')
+    # print(f'Number of users: {num_users}')
+    # print(f'Number of items: {num_items}')
+    # print(f'Number of interactions: {m}')
+    # print(f'Density: {delta_g}')
+    # print(f'Space size: {space_size}')
+    # print(f'Shape: {shape}')
+    # print(f'Gini user: {gini_user}')
+    # print(f'Gini item: {gini_item}')
+    # print(f'Average degree: {k}')
+    # print(f'Average user degree: {k_users}')
+    # print(f'Average item degree: {k_items}')
+    # print(f'Average clustering (dot): {average_clustering_dot}')
+    # print(f'Average clustering (min): {average_clustering_min}')
+    # print(f'Average clustering (max): {average_clustering_max}')
+    # print(f'Average user clustering (dot): {average_clustering_dot_users}')
+    # print(f'Average item clustering (dot): {average_clustering_dot_items}')
+    # print(f'Average user clustering (min): {average_clustering_min_users}')
+    # print(f'Average item clustering (min): {average_clustering_min_items}')
+    # print(f'Average user clustering (max): {average_clustering_max_users}')
+    # print(f'Average item clustering (max): {average_clustering_max_items}')
+    # print(f'Assortativity: {average_assortativity}')
 
     filename_no_extension = args.filename.split('.')[0]
     extension = args.filename.split('.')[1]
@@ -408,7 +408,7 @@ def graph_sampling():
                 current_stats_dict, sampled_graph = calculate_statistics(sampled_edge_index,
                                                                          info={'strategy': 'node dropout',
                                                                                'dropout': dr})
-                if sampled_graph:
+                if sampled_graph is not None:
                     sampled_rows = [private_to_public_users[r] for r in sampled_graph[0].tolist()]
                     sampled_cols = [private_to_public_items[c] for c in sampled_graph[1].tolist()]
                 else:
@@ -427,7 +427,7 @@ def graph_sampling():
                 current_stats_dict, sampled_graph = calculate_statistics(sampled_edge_index,
                                                                          info={'strategy': 'edge dropout',
                                                                                'dropout': dr})
-                if sampled_graph:
+                if sampled_graph is not None:
                     sampled_rows = [private_to_public_users[r] for r in sampled_graph[0].tolist()]
                     sampled_cols = [private_to_public_items[c] for c in sampled_graph[1].tolist()]
                 else:
@@ -451,7 +451,7 @@ def graph_sampling():
                 current_stats_dict, sampled_graph = calculate_statistics(sampled_edge_index,
                                                                          info={'strategy': 'random walk',
                                                                                'dropout': dr})
-                if sampled_graph:
+                if sampled_graph is not None:
                     sampled_rows = [private_to_public_users[r] for r in sampled_graph[0].tolist()]
                     sampled_cols = [private_to_public_items[c] for c in sampled_graph[1].tolist()]
                 else:
