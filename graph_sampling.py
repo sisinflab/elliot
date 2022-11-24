@@ -400,7 +400,7 @@ def graph_sampling():
                       'clustering_max_users',
                       'clustering_max_items',
                       'assortativity']
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer = csv.DictWriter(f, fieldnames=fieldnames, delimiter='\t')
         writer.writeheader()
         for _ in range(args.num_samplings):
             gss = random.choice(args.sampling_strategies)
