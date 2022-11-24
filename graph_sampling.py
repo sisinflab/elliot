@@ -381,26 +381,27 @@ def graph_sampling():
 
     print('\n\nSTART GRAPH SAMPLING...')
     with open(f'./data/{args.dataset}/sampling-stats.tsv', 'w') as f:
-        writer = csv.writer(f, delimiter='\t')
-        writer.writerow(['strategy',
-                         'dropout',
-                         'users',
-                         'items',
-                         'interactions',
-                         'delta_g',
-                         'k',
-                         'k_users',
-                         'k_items',
-                         'clustering_dot',
-                         'clustering_min',
-                         'clustering_max',
-                         'clustering_dot_users',
-                         'clustering_dot_items',
-                         'clustering_min_users',
-                         'clustering_min_items',
-                         'clustering_max_users',
-                         'clustering_max_items',
-                         'assortativity'])
+        fieldnames = ['strategy',
+                      'dropout',
+                      'users',
+                      'items',
+                      'interactions',
+                      'delta_g',
+                      'k',
+                      'k_users',
+                      'k_items',
+                      'clustering_dot',
+                      'clustering_min',
+                      'clustering_max',
+                      'clustering_dot_users',
+                      'clustering_dot_items',
+                      'clustering_min_users',
+                      'clustering_min_items',
+                      'clustering_max_users',
+                      'clustering_max_items',
+                      'assortativity']
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
         for _ in range(args.num_samplings):
             gss = random.choice(args.sampling_strategies)
             dr = np.random.uniform(0.7, 0.9)
