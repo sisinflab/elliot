@@ -15,7 +15,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Run graph sampling (Node Dropout, Edge Dropout, Random Walking).")
     parser.add_argument('--dataset', nargs='?', default='allrecipes', help='dataset name')
     parser.add_argument('--filename', nargs='?', default='dataset.tsv', help='filename')
-    parser.add_argument('--sampling_strategies', nargs='+', type=str, default=['ND', 'ED', 'RW'],
+    parser.add_argument('--sampling_strategies', nargs='+', type=str, default=['ND', 'ED'],
                         help='graph sampling strategy')
     parser.add_argument('--num_samplings', nargs='?', type=int, default=20,
                         help='number of samplings')
@@ -448,9 +448,11 @@ def graph_sampling():
                     os.makedirs(f'./data/{args.dataset}/random-walk/')
                 print(f'\n\nRunning RANDOM WALK with dropout ratio {dr}, '
                       f'{args.num_walks} walk length, and {round(k / 2)} walks per node')
-                sampled_edge_index, _ = dropout_path(edge_index,
+                sampled_edge_index, _ = dropout_path(torch.tensor([edge_index[0].tolist() + edge_index[1].tolist(),
+                                                                   edge_index[1].tolist() + edge_index[0].tolist()],
+                                                                  dtype=torch.long),
                                                      p=dr,
-                                                     walks_per_node=round(k / 2),
+                                                     walks_per_node=1,
                                                      walk_length=args.num_walks,
                                                      num_nodes=num_users + num_items)
                 current_stats_dict, sampled_graph = calculate_statistics(sampled_edge_index,
