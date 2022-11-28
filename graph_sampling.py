@@ -381,7 +381,8 @@ def graph_sampling():
 
     print('\n\nSTART GRAPH SAMPLING...')
     with open(f'./data/{args.dataset}/sampling-stats.tsv', 'w') as f:
-        fieldnames = ['strategy',
+        fieldnames = ['dataset_id',
+                      'strategy',
                       'dropout',
                       'users',
                       'items',
@@ -406,7 +407,7 @@ def graph_sampling():
                       'assortativity']
         writer = csv.DictWriter(f, fieldnames=fieldnames, delimiter='\t')
         writer.writeheader()
-        for _ in range(args.num_samplings):
+        for idx in range(args.num_samplings):
             gss = random.choice(args.sampling_strategies)
             dr = np.random.uniform(0.7, 0.9)
             if gss == 'ND':
@@ -425,8 +426,9 @@ def graph_sampling():
                     sampled_cols = [private_to_public_items[c] for c in sampled_edge_index[1].tolist()]
                 sampled_dataset = pd.concat([pd.Series(sampled_rows), pd.Series(sampled_cols)], axis=1)
                 sampled_dataset.to_csv(
-                    f'./data/{args.dataset}/node-dropout/{filename_no_extension}-{dr}.{extension}',
+                    f'./data/{args.dataset}/node-dropout/{filename_no_extension}-{idx + 1}.{extension}',
                     sep='\t', header=None, index=None)
+                {'dataset_id': idx + 1}.update(current_stats_dict)
                 writer.writerow(current_stats_dict)
             elif gss == 'ED':
                 if not os.path.exists(f'./data/{args.dataset}/edge-dropout/'):
@@ -444,35 +446,34 @@ def graph_sampling():
                     sampled_cols = [private_to_public_items[c] for c in sampled_edge_index[1].tolist()]
                 sampled_dataset = pd.concat([pd.Series(sampled_rows), pd.Series(sampled_cols)], axis=1)
                 sampled_dataset.to_csv(
-                    f'./data/{args.dataset}/edge-dropout/{filename_no_extension}-{dr}.{extension}',
+                    f'./data/{args.dataset}/edge-dropout/{filename_no_extension}-{idx + 1}.{extension}',
                     sep='\t', header=None, index=None)
+                {'dataset_id': idx + 1}.update(current_stats_dict)
                 writer.writerow(current_stats_dict)
-            elif gss == 'RW':
-                if not os.path.exists(f'./data/{args.dataset}/random-walk/'):
-                    os.makedirs(f'./data/{args.dataset}/random-walk/')
-                print(f'\n\nRunning RANDOM WALK with dropout ratio {dr}, '
-                      f'{args.num_walks} walk length, and {round(k / 2)} walks per node')
-                sampled_edge_index, _ = dropout_path(torch.tensor([edge_index[0].tolist() + edge_index[1].tolist(),
-                                                                   edge_index[1].tolist() + edge_index[0].tolist()],
-                                                                  dtype=torch.long),
-                                                     p=dr,
-                                                     walks_per_node=1,
-                                                     walk_length=args.num_walks,
-                                                     num_nodes=num_users + num_items)
-                current_stats_dict, sampled_graph = calculate_statistics(sampled_edge_index,
-                                                                         info={'strategy': 'random walk',
-                                                                               'dropout': dr})
-                if sampled_graph is not None:
-                    sampled_rows = [private_to_public_users[r] for r in sampled_graph[0].tolist()]
-                    sampled_cols = [private_to_public_items[c] for c in sampled_graph[1].tolist()]
-                else:
-                    sampled_rows = [private_to_public_users[r] for r in sampled_edge_index[0].tolist()]
-                    sampled_cols = [private_to_public_items[c] for c in sampled_edge_index[1].tolist()]
-                sampled_dataset = pd.concat([pd.Series(sampled_rows), pd.Series(sampled_cols)], axis=1)
-                sampled_dataset.to_csv(
-                    f'./data/{args.dataset}/random-walk/{filename_no_extension}-{dr}-{args.num_walks}.{extension}',
-                    sep='\t', header=None, index=None)
-                writer.writerow(current_stats_dict)
+            # elif gss == 'RW':
+            #     if not os.path.exists(f'./data/{args.dataset}/random-walk/'):
+            #         os.makedirs(f'./data/{args.dataset}/random-walk/')
+            #     print(f'\n\nRunning RANDOM WALK with dropout ratio {dr}, '
+            #           f'{args.num_walks} walk length, and {round(k / 2)} walks per node')
+            #     sampled_edge_index, _ = dropout_path(edge_index,
+            #                                          p=dr,
+            #                                          walks_per_node=round(k / 2),
+            #                                          walk_length=args.num_walks,
+            #                                          num_nodes=num_users + num_items)
+            #     current_stats_dict, sampled_graph = calculate_statistics(sampled_edge_index,
+            #                                                              info={'strategy': 'random walk',
+            #                                                                    'dropout': dr})
+            #     if sampled_graph is not None:
+            #         sampled_rows = [private_to_public_users[r] for r in sampled_graph[0].tolist()]
+            #         sampled_cols = [private_to_public_items[c] for c in sampled_graph[1].tolist()]
+            #     else:
+            #         sampled_rows = [private_to_public_users[r] for r in sampled_edge_index[0].tolist()]
+            #         sampled_cols = [private_to_public_items[c] for c in sampled_edge_index[1].tolist()]
+            #     sampled_dataset = pd.concat([pd.Series(sampled_rows), pd.Series(sampled_cols)], axis=1)
+            #     sampled_dataset.to_csv(
+            #         f'./data/{args.dataset}/random-walk/{filename_no_extension}-{dr}-{args.num_walks}.{extension}',
+            #         sep='\t', header=None, index=None)
+            #     writer.writerow(current_stats_dict)
             else:
                 raise NotImplementedError('This graph sampling strategy has not been implemented yet!')
     print('\n\nEND GRAPH SAMPLING...')
