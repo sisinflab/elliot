@@ -40,7 +40,8 @@ class KGIN(RecMixin, BaseRecommenderModel):
             ("_mess_dropout", "mess_dropout", "mess_dropout", True, bool, None),   # consider message dropout or not
             ("_mess_dropout_rate", "mess_dropout_rate", "mess_dropout_rate", 0.1, float, None), # ratio of node dropout
             ("_ind", "ind", "ind", "distance", str, None),    # independence modeling: mi, distance, cosine
-            ("_loader", "loader", "load", "KGINLoader", None, None)
+            ("_loader", "loader", "loader", "KGINTSVLoader", None, None)
+            # ("_loader", "loader", "loader", "KGINTSVLoader", None, None)
         ]
         self.autoset_params()
 
@@ -52,9 +53,9 @@ class KGIN(RecMixin, BaseRecommenderModel):
 
         ckg_graph = nx.MultiDiGraph()
 
-        self.public_entities = {**self._data.public_items, **self._side.public_objects}
+        self.public_entities = {**self._data.public_items, **self._side.public_objects}  # questo lo devi prendere da loader di kgin
         self.private_entities = {**self._data.private_items, **self._side.private_objects}
-
+# srotolatore *iterabile = generato degli elementi , **iter = elementi dell'iterabile, ** = dict chiave-valore
         print("Building the graph")
         rd = defaultdict(list)
         rd[0] = list(zip(*self._data.sp_i_train.nonzero()))
@@ -148,9 +149,11 @@ class KGIN(RecMixin, BaseRecommenderModel):
     def get_recommendations(self, k: int = 100):
         predictions_top_k_test = {}
         predictions_top_k_val = {}
+        entity_gcn_emb, user_gcn_emb = self._model.generate()
         for index, offset in enumerate(range(0, self._num_users, self._batch_size)):
             offset_stop = min(offset + self._batch_size, self._num_users)
-            predictions = self._model.predict_batch(offset, offset_stop)
+            predictions = self._model.predict_batch(entity_gcn_emb, user_gcn_emb, offset, offset_stop)
+            # predictions = self._model.predict_on_batch(offset, offset_stop)
             recs_val, recs_test = self.process_protocol(k, predictions, offset, offset_stop)
             predictions_top_k_val.update(recs_val)
             predictions_top_k_test.update(recs_test)

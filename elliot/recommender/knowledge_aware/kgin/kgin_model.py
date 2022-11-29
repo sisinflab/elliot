@@ -338,19 +338,28 @@ class KGINModel(keras.Model):
 
         return loss
 
+    @tf.function
+    def predict_batch(self, entity_gcn_emb, user_gcn_emb, offset, offset_stop):
+        u_g_embeddings = user_gcn_emb[offset:offset_stop]
+        return self.rating(u_g_embeddings, entity_gcn_emb[:self.n_items])
 
-    # #@tf.function
-    # def generate(self):
-    #     user_emb = self.all_embed[:self.n_users, :]
-    #     item_emb = self.all_embed[self.n_users:, :]
-    #     return self.gcn.call(user_emb,
-    #                          item_emb,
-    #                          self.latent_emb,
-    #                          self.edge_index,
-    #                          self.edge_type,
-    #                          self.interact_mat,
-    #                          mess_dropout=False, node_dropout=False)[:-1]
 
-    # def rating(self, u_g_embeddings, i_g_embeddings):
-    #     return torch.matmul(u_g_embeddings, i_g_embeddings.t())
+    @tf.function
+    def generate(self):
+        user_emb = self.all_embed[:self.n_users, :]
+        item_emb = self.all_embed[self.n_users:, :]
+        return self.gcn.call(user_emb,
+                             item_emb,
+                             self.latent_emb,
+                             self.edge_index,
+                             self.edge_type,
+                             self.interact_mat,
+                             mess_dropout=False, node_dropout=False)[:-1]
 
+    @tf.function
+    def rating(self, u_g_embeddings, i_g_embeddings):
+        return tf.matmul(u_g_embeddings, tf.transpose(i_g_embeddings))
+
+    @tf.function
+    def get_top_k(self, predictions, train_mask, k=100):
+        return tf.nn.top_k(tf.where(train_mask, predictions, -np.inf), k=k, sorted=True)
