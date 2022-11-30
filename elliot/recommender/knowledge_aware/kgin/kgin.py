@@ -58,9 +58,9 @@ class KGIN(RecMixin, BaseRecommenderModel):
 # srotolatore *iterabile = generato degli elementi , **iter = elementi dell'iterabile, ** = dict chiave-valore
         print("Building the graph")
         rd = defaultdict(list)
-        rd[0] = list(zip(*self._data.sp_i_train.nonzero()))
+        rd[0] = list(zip(*self._data.sp_i_train.nonzero())) # we create the "dummy" relation "interacts with"
 
-        for h_id, r_id, t_id in tqdm(self._side.map_, ascii=True):
+        for h_id, r_id, t_id in tqdm(self._side.map_.values, ascii=True):
             ckg_graph.add_edge(self.public_entities[h_id], self.public_entities[t_id], key=self._side.public_relations[r_id])
             rd[self._side.public_relations[r_id]].append([self.public_entities[h_id], self.public_entities[t_id]])
 
