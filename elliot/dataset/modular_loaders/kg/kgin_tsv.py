@@ -19,7 +19,23 @@ class KGINTSVLoader(AbstractLoader):
             self.map_ = self.read_triplets(self.attribute_file)  # KG
             # self.items = self.items & set(self.map_.keys())
 
-        self.map_ = self.map_[self.map_['subject'].isin(self.items)]
+        # self.map_ = self.map_[self.map_['subject'].isin(self.items)]
+        #
+        # count_subject = pd.concat([pd.Series(self.map_.groupby('subject').size().index.to_list()),
+        #                            pd.Series(self.map_.groupby('subject').size().values.tolist())], axis=1)
+        #
+        # k_core_subject = count_subject[count_subject[1] >= 10][0].to_list()
+        #
+        # self.map_ = self.map_[self.map_['subject'].isin(k_core_subject)]
+        #
+        # count_object = pd.concat([pd.Series(self.map_.groupby('object').size().index.to_list()),
+        #                           pd.Series(self.map_.groupby('object').size().values.tolist())], axis=1)
+        #
+        # k_core_object = count_object[count_object[1] >= 10][0].to_list()
+        #
+        # k_core_object = set.union(set(k_core_object), set(k_core_subject))
+        #
+        # self.map_ = self.map_[self.map_['object'].isin(list(k_core_object))]
 
         # entities = pd.read_csv(self.entities_file, sep='\t', header=0, names=['id', 'remap'])
         # self.entities = set(entities.remap.unique())
@@ -36,6 +52,23 @@ class KGINTSVLoader(AbstractLoader):
         self.users = self.users & users  # solo elem comuni
         self.items = self.items & items
         self.map_ = self.map_[self.map_['subject'].isin(self.items)]
+
+        # count_subject = pd.concat([pd.Series(self.map_.groupby('subject').size().index.to_list()),
+        #                            pd.Series(self.map_.groupby('subject').size().values.tolist())], axis=1)
+        #
+        # k_core_subject = count_subject[count_subject[1] >= 10][0].to_list()
+        #
+        # self.map_ = self.map_[self.map_['subject'].isin(k_core_subject)]
+        #
+        # count_object = pd.concat([pd.Series(self.map_.groupby('object').size().index.to_list()),
+        #                           pd.Series(self.map_.groupby('object').size().values.tolist())], axis=1)
+        #
+        # k_core_object = count_object[count_object[1] >= 10][0].to_list()
+        #
+        # k_core_object = set.union(set(k_core_object), set(k_core_subject))
+        #
+        # self.map_ = self.map_[self.map_['object'].isin(list(k_core_object))]
+
         self.entities = set(self.map_.values[:, 0]).union(set(self.map_.values[:, 2]))
         self.items = set.intersection(self.items, self.entities)
         self.entity_list = set.difference(self.entities, self.items)
