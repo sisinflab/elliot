@@ -24,7 +24,7 @@ from .kgflex_umap import KGFlexUmap
 from .convmf import ConvMF
 from .hrdr import HRDR
 from .KaVAE import KaVAE
-
+from .cdrib import CDRIB
 
 import sys
 for _backend in sys.modules["external"].backend:
