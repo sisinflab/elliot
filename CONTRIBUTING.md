@@ -14,8 +14,7 @@ Talk about Elliot on social media with the hashtag **#elliotrs**.
 
 If you find Elliot useful for your research or development, please cite the following [paper](https://arxiv.org/abs/2103.02590):
 
-```
-
+```bibtex
 @article{DBLP:journals/corr/abs-2103-02590,
   author    = {Vito Walter Anelli and
                Alejandro Bellog{\'{\i}}n and
@@ -31,5 +30,4 @@ If you find Elliot useful for your research or development, please cite the foll
   volume    = {abs/2103.02590},
   year      = {2021}
 }
-
 ```
