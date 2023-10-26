@@ -31,7 +31,7 @@ We did our best to put all the bibliographic information of the methods, techniq
 
 Actually, the same holds also for Elliot :-) If you find Elliot useful for your research or development, remember to cite the following [paper](https://doi.org/10.1145/3404835.3463245):
 
-```
+```bibtex
 @inproceedings{DBLP:conf/sigir/AnelliBFMMPDN21,
   author    = {Vito Walter Anelli and
                Alejandro Bellog{\'{\i}}n and
@@ -61,7 +61,6 @@ Actually, the same holds also for Elliot :-) If you find Elliot useful for your 
   biburl    = {https://dblp.org/rec/conf/sigir/AnelliBFMMPDN21.bib},
   bibsource = {dblp computer science bibliography, https://dblp.org}
 }
-
 ```
 
 
