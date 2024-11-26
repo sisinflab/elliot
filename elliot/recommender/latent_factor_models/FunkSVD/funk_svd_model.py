@@ -53,10 +53,10 @@ class FunkSVDModel(keras.Model):
                                                           embeddings_regularizer=keras.regularizers.l2(self.lambda_bias),
                                                           dtype=tf.float32)
 
-        self.user_mf_embedding(0)
-        self.item_mf_embedding(0)
-        self.user_bias_embedding(0)
-        self.item_bias_embedding(0)
+        # self.user_mf_embedding(0)
+        # self.item_mf_embedding(0)
+        # self.user_bias_embedding(0)
+        # self.item_bias_embedding(0)
 
         self.loss = keras.losses.MeanSquaredError()
 
