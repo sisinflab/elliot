@@ -209,7 +209,7 @@ class FactorizationMachineLayer(tf.keras.layers.Layer):
 
         super().__init__(**kwargs)
 
-        self.embedding = Embedding(field_dims, factors, kernel_initializer, kernel_regularizer)
+        self.embedding = Embedding(field_dims=field_dims, factors=factors, kernel_initializer=kernel_initializer, kernel_regularizer=kernel_regularizer)
         self.linear = Linear(field_dims, tf.initializers.zeros())
 
         self._supports_masking = True
