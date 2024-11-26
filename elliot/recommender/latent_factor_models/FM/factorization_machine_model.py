@@ -121,7 +121,7 @@ class Linear(tf.keras.layers.Layer):
         self._g_bias = tf.Variable(0., name='GlobalBias')
 
         # Force initialization
-        self._field_embedding(0)
+        # self._field_embedding(0)
 
         self.built = True
 
@@ -170,7 +170,7 @@ class Embedding(tf.keras.layers.Layer):
                                                  dtype=tf.float32)
 
         # Force initialization
-        self._embedding(0)
+        # self._embedding(0)
         self.built = True
 
     @tf.function
@@ -274,10 +274,10 @@ class MatrixFactorizationLayer(tf.keras.layers.Layer):
 
         self.bias_ = tf.Variable(0., name='GB')
 
-        self.user_mf_embedding(0)
-        self.item_mf_embedding(0)
-        self.u_bias(0)
-        self.i_bias(0)
+        # self.user_mf_embedding(0)
+        # self.item_mf_embedding(0)
+        # self.u_bias(0)
+        # self.i_bias(0)
 
         self._supports_masking = True
 
