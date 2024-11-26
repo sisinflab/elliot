@@ -217,7 +217,7 @@ class FactorizationMachineLayer(tf.keras.layers.Layer):
     @tf.function
     def call(self, inputs: tf.Tensor, training=False) -> tf.Tensor:
         linear = self.linear(inputs, training=training)
-        second_order = tf.expand_dims(self.embedding(inputs, training), axis=-1)
+        second_order = tf.expand_dims(self.embedding(inputs, training=training), axis=-1)
         return linear + second_order
 
     @tf.function
