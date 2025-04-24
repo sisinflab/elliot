@@ -5,7 +5,7 @@ from os.path import splitext
 import numpy as np
 import pandas as pd
 
-from elliot.dataset.modular_loaders.abstract_loader import AbstractLoader
+from elliot.dataset.dataloader.abstract_loader import AbstractLoader
 
 
 class KGFlexLoader(AbstractLoader):

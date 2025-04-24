@@ -1,8 +1,7 @@
 from types import SimpleNamespace
-import pandas as pd
 import typing as t
 
-from elliot.dataset.modular_loaders.abstract_loader import AbstractLoader
+from elliot.dataset.dataloader.abstract_loader import AbstractLoader
 
 
 class ItemAttributes(AbstractLoader):

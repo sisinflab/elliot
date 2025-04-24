@@ -1,9 +1,8 @@
 from collections import Counter
 from types import SimpleNamespace
-import pandas as pd
 import typing as t
 
-from elliot.dataset.modular_loaders.abstract_loader import AbstractLoader
+from elliot.dataset.dataloader.abstract_loader import AbstractLoader
 
 
 class ChainedKG(AbstractLoader):
@@ -66,7 +65,7 @@ class ChainedKG(AbstractLoader):
 
     def load_feature_names(self, infile, separator='\t'):
         feature_names = {}
-        with open(infile) as file:
+        with open(infile, encoding='utf-8') as file:
             for line in file:
                 line = line.split(separator)
                 pattern = line[1].split('><')

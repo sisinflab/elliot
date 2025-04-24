@@ -3,7 +3,7 @@ import numpy as np
 import json
 from types import SimpleNamespace
 
-from elliot.dataset.modular_loaders.abstract_loader import AbstractLoader
+from elliot.dataset.dataloader.abstract_loader import AbstractLoader
 
 
 class WordsTextualAttributes(AbstractLoader):

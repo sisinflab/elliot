@@ -3,7 +3,7 @@ import typing as t
 import numpy as np
 import pandas as pd
 
-from elliot.dataset.modular_loaders.abstract_loader import AbstractLoader
+from elliot.dataset.dataloader.abstract_loader import AbstractLoader
 # forse vanno rimappati user e item dopo che sono stati mappati da dataset in questa classe
 
 class KGINTSVLoader(AbstractLoader):

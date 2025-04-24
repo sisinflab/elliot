@@ -23,21 +23,18 @@ from elliot.prefiltering.standard_prefilters import PreFilter
 from elliot.negative_sampling.negative_sampling import NegativeSampler
 from elliot.utils import logging
 
-from elliot.dataset.modular_loaders.loader_coordinator_mixin import LoaderCoordinator
+from elliot.dataset.loader_coordinator_mixin import LoaderCoordinator
 
 
 class DataSetLoader(LoaderCoordinator):
     """
-    Load train and test dataset
+    Dataset loader.
+
+    Load ratings according to the provided strategy.
+    (to be developed) Load item features, if required
     """
 
     def __init__(self, config, *args, **kwargs):
-        """
-        Constructor of DataSet
-        :param path_train_data: relative path for train file
-        :param path_test_data: relative path for test file
-        """
-
         self.logger = logging.get_logger(self.__class__.__name__)
         self.args = args
         self.kwargs = kwargs
@@ -45,69 +42,46 @@ class DataSetLoader(LoaderCoordinator):
         self.column_names = ['userId', 'itemId', 'rating', 'timestamp']
         if config.config_test:
             return
-        if config.data_config.strategy == "fixed":
-            path_train_data = config.data_config.train_path
-            path_val_data = getattr(config.data_config, "validation_path", None)
-            path_test_data = config.data_config.test_path
 
-            self.train_dataframe = pd.read_csv(path_train_data, sep="\t", header=None, names=self.column_names)
-            self.test_dataframe = pd.read_csv(path_test_data, sep="\t", header=None, names=self.column_names)
+        self._load_ratings()
+        self._load_item_feat()
 
-            # self.train_dataframe, self.side_information = self.coordinate_information(self.train_dataframe, sides=config.data_config.side_information)
-            # self.train_dataframe = pd.read_csv(path_train_data, sep="\t", header=None, names=self.column_names)
+    def _load_ratings(self):
+        """
+        User interactions loader.
 
-            self.train_dataframe = self.check_timestamp(self.train_dataframe)
-            self.test_dataframe = self.check_timestamp(self.test_dataframe)
+        Strategy:
+        - fixed: read train, test and val (optional) data
+        - hierarchy: read splitting
+        - dataset: read dataset and perform pre-filtering and splitting
+        """
+        if self.config.data_config.strategy == "fixed":
+            path_train_data = self.config.data_config.train_path
+            path_val_data = getattr(self.config.data_config, "validation_path", None)
+            path_test_data = self.config.data_config.test_path
+
+            self.train_dataframe = self._load_data(path_train_data, check_timestamp=True)
+            self.test_dataframe = self._load_data(path_test_data, check_timestamp=True)
 
             self.logger.info(f"{path_train_data} - Loaded")
 
-            if config.binarize == True or all(self.train_dataframe["rating"].isna()):
-                self.test_dataframe["rating"] = 1
-                self.train_dataframe["rating"] = 1
-
             if path_val_data:
-                self.validation_dataframe = pd.read_csv(path_val_data, sep="\t", header=None, names=self.column_names)
-                self.validation_dataframe = self.check_timestamp(self.validation_dataframe)
-
-                if config.binarize == True or all(self.train_dataframe["rating"].isna()):
-                    self.validation_dataframe["rating"] = 1
-
+                self.validation_dataframe = self._load_data(path_val_data, check_timestamp=True)
                 self.tuple_list = [([(self.train_dataframe, self.validation_dataframe)], self.test_dataframe)]
-                self.tuple_list, self.side_information = self.coordinate_information(self.tuple_list,
-                                                                                     sides=config.data_config.side_information,
-                                                                                     logger=self.logger)
             else:
                 self.tuple_list = [(self.train_dataframe, self.test_dataframe)]
-                self.tuple_list, self.side_information = self.coordinate_information(self.tuple_list,
-                                                                                     sides=config.data_config.side_information,
-                                                                                     logger=self.logger)
 
-        elif config.data_config.strategy == "hierarchy":
-            self.tuple_list = self.read_splitting(config.data_config.root_folder, column_names=self.column_names)
+        elif self.config.data_config.strategy == "hierarchy":
+            self.tuple_list = self.read_splitting(self.config.data_config.root_folder)
 
-            self.tuple_list, self.side_information = self.coordinate_information(self.tuple_list,
-                                                                                 sides=config.data_config.side_information,
-                                                                                 logger=self.logger)
+        elif self.config.data_config.strategy == "dataset":
+            path_dataset = self.config.data_config.dataset_path
 
-        elif config.data_config.strategy == "dataset":
-            self.logger.info("There will be the splitting")
-            path_dataset = config.data_config.dataset_path
-
-            self.dataframe = pd.read_csv(path_dataset, sep="\t", header=None, names=self.column_names)
-            self.dataframe, self.side_information = self.coordinate_information(self.dataframe,
-                                                                                sides=config.data_config.side_information,
-                                                                                logger=self.logger)
-            # self.dataframe = pd.read_csv(path_dataset, sep="\t", header=None, names=self.column_names)
-
-            self.dataframe = self.check_timestamp(self.dataframe)
-
+            self.dataframe = self._load_data(path_dataset, check_timestamp=True)
             self.logger.info(('{0} - Loaded'.format(path_dataset)))
 
             self.dataframe = PreFilter.filter(self.dataframe, self.config)
-
-            if config.binarize == True or all(self.dataframe["rating"].isna()):
-                self.dataframe["rating"] = 1
-
+            self.logger.info("There will be the splitting")
             splitter = Splitter(self.dataframe, self.config.splitting, self.config.random_seed)
             self.tuple_list = splitter.process_splitting()
 
@@ -120,27 +94,35 @@ class DataSetLoader(LoaderCoordinator):
             self.config.evaluation.paired_ttest = False
             self.config.evaluation.wilcoxon_test = False
 
-    def check_timestamp(self, d: pd.DataFrame) -> pd.DataFrame:
-        if all(d["timestamp"].isna()):
-            d = d.drop(columns=["timestamp"]).reset_index(drop=True)
-        return d
+    def _load_item_feat(self):
+        self.dataframe, self.side_information = self.coordinate_information(self.dataframe,
+                                                                            sides=self.config.data_config.side_information,
+                                                                            logger=self.logger)
+        #pass
 
-    def read_splitting(self, folder_path, column_names):
+    def _load_data(self, file_path, check_timestamp=False):
+        dataframe = pd.read_csv(file_path, sep='\t', header=None, names=self.column_names)
+        if check_timestamp and all(dataframe["timestamp"].isna()):
+            dataframe = dataframe.drop(columns=["timestamp"]).reset_index(drop=True)
+        if self.config.binarize == True or all(dataframe["rating"].isna()):
+            dataframe["rating"] = 1
+        return dataframe
+
+    def read_splitting(self, folder_path):
         tuple_list = []
         for dirs in os.listdir(folder_path):
             for test_dir in dirs:
-                test_ = pd.read_csv(os.sep.join([folder_path, test_dir, "test.tsv"]), sep="\t", names=self.column_names)
+                test_ = self._load_data(os.sep.join([folder_path, test_dir, "test.tsv"]))
                 val_dirs = [os.sep.join([folder_path, test_dir, val_dir]) for val_dir in
                             os.listdir(os.sep.join([folder_path, test_dir])) if
                             os.path.isdir(os.sep.join([folder_path, test_dir, val_dir]))]
                 val_list = []
                 for val_dir in val_dirs:
-                    train_ = pd.read_csv(os.sep.join([val_dir, "train.tsv"]), sep="\t", names=self.column_names)
-                    val_ = pd.read_csv(os.sep.join([val_dir, "val.tsv"]), sep="\t", names=self.column_names)
+                    train_ = self._load_data(os.sep.join([val_dir, "train.tsv"]))
+                    val_ = self._load_data(os.sep.join([val_dir, "val.tsv"]))
                     val_list.append((train_, val_))
                 if not val_list:
-                    val_list = pd.read_csv(os.sep.join([folder_path, test_dir, "train.tsv"]), sep="\t",
-                                           names=self.column_names)
+                    val_list = self._load_data(os.sep.join([folder_path, test_dir, "train.tsv"]))
                 tuple_list.append((val_list, test_))
 
         return tuple_list
@@ -228,7 +210,7 @@ class DataSet(AbstractDataset):
         self.sp_i_train_ratings = self.build_sparse_ratings()
 
         if len(data_tuple) == 2:
-            self.test_dict = self.build_dict(data_tuple[1], self.users)
+            self.test_dict = self.build_dict(data_tuple[1])
             if hasattr(config, "negative_sampling"):
                 val_neg_samples, test_neg_samples = NegativeSampler.sample(config, self.public_users, self.public_items,
                                                                            self.private_users, self.private_items,
@@ -237,8 +219,8 @@ class DataSet(AbstractDataset):
                 test_candidate_items = test_neg_samples + sp_i_test
                 self.test_mask = np.where((test_candidate_items.toarray() == True), True, False)
         else:
-            self.val_dict = self.build_dict(data_tuple[1], self.users)
-            self.test_dict = self.build_dict(data_tuple[2], self.users)
+            self.val_dict = self.build_dict(data_tuple[1])
+            self.test_dict = self.build_dict(data_tuple[2])
             if hasattr(config, "negative_sampling"):
                 val_neg_samples, test_neg_samples = NegativeSampler.sample(config, self.public_users, self.public_items,
                                                                            self.private_users, self.private_items,
@@ -261,7 +243,7 @@ class DataSet(AbstractDataset):
         return iu_dict
 
     def dataframe_to_dict(self, data):
-        users = list(data['userId'].unique())
+        # users = list(data['userId'].unique())
 
         "Conversion to Dictionary"
         ratings = data.set_index('userId')[['itemId', 'rating']].apply(lambda x: (x['itemId'], float(x['rating'])), 1)\
@@ -271,7 +253,7 @@ class DataSet(AbstractDataset):
         #     ratings[u] = dict(zip(sel_['itemId'], sel_['rating']))
         return ratings
 
-    def build_dict(self, dataframe, users):
+    def build_dict(self, dataframe):
         ratings = dataframe.set_index('userId')[['itemId', 'rating']].apply(lambda x: (x['itemId'], float(x['rating'])), 1)\
             .groupby(level=0).agg(lambda x: dict(x.values)).to_dict()
         # for u in users:

@@ -3,7 +3,7 @@ import typing as t
 import pandas as pd
 from types import SimpleNamespace
 
-from elliot.dataset.modular_loaders.abstract_loader import AbstractLoader
+from elliot.dataset.dataloader.abstract_loader import AbstractLoader
 
 
 class LoaderCoordinator:
@@ -34,7 +34,7 @@ class LoaderCoordinator:
         side_info_objs = []
         users_items = []
         for side in sides:
-            dataloader_class = getattr(importlib.import_module("elliot.dataset.modular_loaders.loaders"), side.dataloader)
+            dataloader_class = getattr(importlib.import_module("elliot.dataset.dataloader.loaders"), side.dataloader)
             if issubclass(dataloader_class, AbstractLoader):
                 side_obj = dataloader_class(users, items, side, logger)
                 side_info_objs.append(side_obj)

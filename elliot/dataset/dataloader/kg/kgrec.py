@@ -1,23 +1,27 @@
 from types import SimpleNamespace
 import typing as t
 from os.path import splitext
+from collections import defaultdict
 
 import numpy as np
 
-from elliot.dataset.modular_loaders.abstract_loader import AbstractLoader
+from elliot.dataset.dataloader.abstract_loader import AbstractLoader
 
 
-class KGCompletion(AbstractLoader):
+class KGRec(AbstractLoader):
     def __init__(self, users: t.Set, items: t.Set, ns: SimpleNamespace, logger: object):
         self.logger = logger
-        self.train_path = getattr(ns, "train_path", None)
-        self.dev_path = getattr(ns, "dev_path", None)
-        self.test_path = getattr(ns, "test_path", None)
+        self.mapping_path = getattr(ns, "mapping", None)
+        self.train_path = getattr(ns, "kg_train", None)
+        self.dev_path = getattr(ns, "kg_dev", None)
+        self.test_path = getattr(ns, "kg_test", None)
         self.test_i_path = getattr(ns, "test_i_path", None)
         self.test_ii_path = getattr(ns, "test_ii_path", None)
         self.input_type = getattr(ns, "input_type", "standard")
         self.users = users
         self.items = items
+
+        self.mapping = self.load_mapping_file(self.mapping_path)
 
         assert self.input_type in {'standard', 'reciprocal'}
 
@@ -79,7 +83,14 @@ class KGCompletion(AbstractLoader):
 
     def create_namespace(self):
         ns = SimpleNamespace()
-        ns.__name__ = "KGCompletion"
+        ns.__name__ = "KGRec"
+        self.public_items_entitiesidx = defaultdict(lambda: -1)
+        # for i in self.items:
+        #     if i in self.mapping.keys():
+        #         if self.mapping[i] in self.entity_to_idx.keys():
+        #             self.public_items_entitiesidx[i] = self.entity_to_idx[self.mapping[i]]
+        [self.public_items_entitiesidx.update({i:self.entity_to_idx[self.mapping[i]]})
+          for i in self.items if i in self.mapping.keys() and self.mapping[i] in self.entity_to_idx.keys()]
         ns.object = self
         ns.__dict__.update(self.__dict__)
         return ns
@@ -106,3 +117,11 @@ class KGCompletion(AbstractLoader):
         Xp = np.array([predicate_to_idx[p] for (s, p, o) in triples], dtype=np.int32)
         Xo = np.array([entity_to_idx[o] for (s, p, o) in triples], dtype=np.int32)
         return Xs, Xp, Xo
+
+    def load_mapping_file(self, mapping_file, separator='\t'):
+        map = {}
+        with open(mapping_file) as file:
+            for line in file:
+                line = line.rstrip("\n").split(separator)
+                map[int(line[0])] = line[1]
+        return map
