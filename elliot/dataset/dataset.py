@@ -8,161 +8,52 @@ __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
 import copy
-import os
 from types import SimpleNamespace
 
 import numpy as np
-import pandas as pd
+#import fireducks.pandas as fd
 import scipy.sparse as sp
-import typing as t
 import logging as pylog
 
-from elliot.dataset.abstract_dataset import AbstractDataset
-from elliot.splitter.base_splitter import Splitter
-from elliot.prefiltering.standard_prefilters import PreFilter
 from elliot.negative_sampling.negative_sampling import NegativeSampler
 from elliot.utils import logging
 
-from elliot.dataset.loader_coordinator_mixin import LoaderCoordinator
+
+class DataSetRequiredAttributesController(type):
+    required_attributes = [
+        "config",  # comment
+        "args",  # comment
+        "kwargs",  # comment
+        "users",  # comment
+        "items",  # comment
+        "num_users",  # comment
+        "num_items",  # comment
+        "private_users",  # comment
+        "public_users",  # comment
+        "private_items",  # comment
+        "public_items",  # comment
+        "transactions",  # comment
+        "train_dict",  # comment
+        "i_train_dict",  # comment
+        "sp_i_train",  # comment
+        "test_dict"  # comment
+    ]
+
+    def __call__(cls, *args, **kwargs):
+        class_object = type.__call__(cls, *args, **kwargs)
+        cls.check_required_attributes(class_object)
+        return class_object
+
+    def check_required_attributes(cls, class_object):
+        missing_attrs = [f"{attr}" for attr in cls.required_attributes
+                         if not hasattr(class_object, attr)]
+        if missing_attrs:
+            raise NotImplementedError("class '%s' requires attribute%s %s" %
+                                      (class_object.__class__.__name__, "s" * (len(missing_attrs) > 1),
+                                       ", ".join(missing_attrs)))
 
 
-class DataSetLoader(LoaderCoordinator):
-    """
-    Dataset loader.
-
-    Load ratings according to the provided strategy.
-    (to be developed) Load item features, if required
-    """
-
-    def __init__(self, config, *args, **kwargs):
-        self.logger = logging.get_logger(self.__class__.__name__)
-        self.args = args
-        self.kwargs = kwargs
-        self.config = config
-        self.column_names = ['userId', 'itemId', 'rating', 'timestamp']
-        if config.config_test:
-            return
-
-        self._load_ratings()
-        self._load_item_feat()
-
-    def _load_ratings(self):
-        """
-        User interactions loader.
-
-        Strategy:
-        - fixed: read train, test and val (optional) data
-        - hierarchy: read splitting
-        - dataset: read dataset and perform pre-filtering and splitting
-        """
-        if self.config.data_config.strategy == "fixed":
-            path_train_data = self.config.data_config.train_path
-            path_val_data = getattr(self.config.data_config, "validation_path", None)
-            path_test_data = self.config.data_config.test_path
-
-            self.train_dataframe = self._load_data(path_train_data, check_timestamp=True)
-            self.test_dataframe = self._load_data(path_test_data, check_timestamp=True)
-
-            self.logger.info(f"{path_train_data} - Loaded")
-
-            if path_val_data:
-                self.validation_dataframe = self._load_data(path_val_data, check_timestamp=True)
-                self.tuple_list = [([(self.train_dataframe, self.validation_dataframe)], self.test_dataframe)]
-            else:
-                self.tuple_list = [(self.train_dataframe, self.test_dataframe)]
-
-        elif self.config.data_config.strategy == "hierarchy":
-            self.tuple_list = self.read_splitting(self.config.data_config.root_folder)
-
-        elif self.config.data_config.strategy == "dataset":
-            path_dataset = self.config.data_config.dataset_path
-
-            self.dataframe = self._load_data(path_dataset, check_timestamp=True)
-            self.logger.info(('{0} - Loaded'.format(path_dataset)))
-
-            self.dataframe = PreFilter.filter(self.dataframe, self.config)
-            self.logger.info("There will be the splitting")
-            splitter = Splitter(self.dataframe, self.config.splitting, self.config.random_seed)
-            self.tuple_list = splitter.process_splitting()
-
-        else:
-            raise Exception("Strategy option not recognized")
-
-        if isinstance(self.tuple_list[0][1], list):
-            self.logger.warning("You are using a splitting strategy with folds. "
-                                "Paired TTest and Wilcoxon Test are not available!")
-            self.config.evaluation.paired_ttest = False
-            self.config.evaluation.wilcoxon_test = False
-
-    def _load_item_feat(self):
-        self.dataframe, self.side_information = self.coordinate_information(self.dataframe,
-                                                                            sides=self.config.data_config.side_information,
-                                                                            logger=self.logger)
-        #pass
-
-    def _load_data(self, file_path, check_timestamp=False):
-        dataframe = pd.read_csv(file_path, sep='\t', header=None, names=self.column_names)
-        if check_timestamp and all(dataframe["timestamp"].isna()):
-            dataframe = dataframe.drop(columns=["timestamp"]).reset_index(drop=True)
-        if self.config.binarize == True or all(dataframe["rating"].isna()):
-            dataframe["rating"] = 1
-        return dataframe
-
-    def read_splitting(self, folder_path):
-        tuple_list = []
-        for dirs in os.listdir(folder_path):
-            for test_dir in dirs:
-                test_ = self._load_data(os.sep.join([folder_path, test_dir, "test.tsv"]))
-                val_dirs = [os.sep.join([folder_path, test_dir, val_dir]) for val_dir in
-                            os.listdir(os.sep.join([folder_path, test_dir])) if
-                            os.path.isdir(os.sep.join([folder_path, test_dir, val_dir]))]
-                val_list = []
-                for val_dir in val_dirs:
-                    train_ = self._load_data(os.sep.join([val_dir, "train.tsv"]))
-                    val_ = self._load_data(os.sep.join([val_dir, "val.tsv"]))
-                    val_list.append((train_, val_))
-                if not val_list:
-                    val_list = self._load_data(os.sep.join([folder_path, test_dir, "train.tsv"]))
-                tuple_list.append((val_list, test_))
-
-        return tuple_list
-
-    def generate_dataobjects(self) -> t.List[object]:
-        data_list = []
-        for p1, (train_val, test) in enumerate(self.tuple_list):
-            # testset level
-            if isinstance(train_val, list):
-                # validation level
-                val_list = []
-                for p2, (train, val) in enumerate(train_val):
-                    self.logger.info(f"Test Fold {p1} - Validation Fold {p2}")
-                    single_dataobject = DataSet(self.config, (train, val, test), self.side_information, self.args,
-                                                self.kwargs)
-                    val_list.append(single_dataobject)
-                data_list.append(val_list)
-            else:
-                self.logger.info(f"Test Fold {p1}")
-                single_dataobject = DataSet(self.config, (train_val, test), self.side_information, self.args,
-                                            self.kwargs)
-                data_list.append([single_dataobject])
-        return data_list
-
-    def generate_dataobjects_mock(self) -> t.List[object]:
-        np.random.seed(self.config.random_seed)
-        _column_names = ['userId', 'itemId', 'rating']
-        training_set = np.hstack(
-            (np.random.randint(0, 5 * 20, size=(5 * 20, 2)), np.random.randint(0, 2, size=(5 * 20, 1))))
-        test_set = np.hstack(
-            (np.random.randint(0, 5 * 20, size=(5 * 20, 2)), np.random.randint(0, 2, size=(5 * 20, 1))))
-
-        training_set = pd.DataFrame(np.array(training_set), columns=_column_names)
-        test_set = pd.DataFrame(np.array(test_set), columns=_column_names)
-        data_list = [[DataSet(self.config, (training_set, test_set), self.args, self.kwargs)]]
-
-        return data_list
-
-
-class DataSet(AbstractDataset):
+class DataSet(metaclass=DataSetRequiredAttributesController):
     """
     Load train and test dataset
     """
@@ -246,16 +137,25 @@ class DataSet(AbstractDataset):
         # users = list(data['userId'].unique())
 
         "Conversion to Dictionary"
-        ratings = data.set_index('userId')[['itemId', 'rating']].apply(lambda x: (x['itemId'], float(x['rating'])), 1)\
-            .groupby(level=0).agg(lambda x: dict(x.values)).to_dict()
+        #ratings = data.set_index('userId')[['itemId', 'rating']].apply(lambda x: (x['itemId'], float(x['rating'])), 1)\
+        #    .groupby(level=0).agg(lambda x: dict(x.values)).to_dict()
+        ratings = {
+            user: {item: float(rating) for item, rating in zip(group['itemId'], group['rating'])}
+            for user, group in data.groupby('userId')
+        }
+
         # for u in users:
         #     sel_ = data[data['userId'] == u]
         #     ratings[u] = dict(zip(sel_['itemId'], sel_['rating']))
         return ratings
 
     def build_dict(self, dataframe):
-        ratings = dataframe.set_index('userId')[['itemId', 'rating']].apply(lambda x: (x['itemId'], float(x['rating'])), 1)\
-            .groupby(level=0).agg(lambda x: dict(x.values)).to_dict()
+        #ratings = dataframe.set_index('userId')[['itemId', 'rating']].apply(lambda x: (x['itemId'], float(x['rating'])), 1)\
+        #    .groupby(level=0).agg(lambda x: dict(x.values)).to_dict()
+        ratings = {
+            user: {item: float(rating) for item, rating in zip(group['itemId'], group['rating'])}
+            for user, group in dataframe.groupby('userId')
+        }
         # for u in users:
         #     sel_ = dataframe[dataframe['userId'] == u]
         #     ratings[u] = dict(zip(sel_['itemId'], sel_['rating']))
