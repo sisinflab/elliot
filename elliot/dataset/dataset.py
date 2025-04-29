@@ -15,6 +15,7 @@ import numpy as np
 import scipy.sparse as sp
 import logging as pylog
 
+from elliot.dataset.sparse_builder import SparseBuilder
 from elliot.negative_sampling.negative_sampling import NegativeSampler
 from elliot.utils import logging
 
@@ -81,7 +82,7 @@ class DataSet(metaclass=DataSetRequiredAttributesController):
         else:
             self.side_information = side_information_data
 
-        self.users, self.items = self._compute_users_items(self.train_dict)
+        self.users, self.items = self._get_users_list_and_items_list(self.train_dict)
         self.num_users = len(self.users)
         self.num_items = len(self.items)
 
@@ -100,8 +101,8 @@ class DataSet(metaclass=DataSetRequiredAttributesController):
         self.i_train_dict = {self.public_users[user]: {self.public_items[i]: v for i, v in items.items()}
                              for user, items in self.train_dict.items()}
 
-        self.sp_i_train = self._build_sparse(self.i_train_dict, self.users, self.items)
-        self.sp_i_train_ratings = self._build_sparse_ratings(self.i_train_dict, self.users, self.items)
+        self.sp_i_train = SparseBuilder.build_sparse(self.i_train_dict, self.users, self.items)
+        self.sp_i_train_ratings = SparseBuilder.build_sparse_ratings(self.i_train_dict, self.users, self.items)
         self.allunrated_mask = np.where((self.sp_i_train.toarray() == 0), True, False)
 
     def _handle_val_test_sets(self, data_tuple):
@@ -112,15 +113,10 @@ class DataSet(metaclass=DataSetRequiredAttributesController):
             self.val_dict = self._dataframe_to_dict(data_tuple[1])
             self.test_dict = self._dataframe_to_dict(data_tuple[2])
 
-        self._handle_negative_sampling()
+        if hasattr(self.config, "negative_sampling"):
+            self._handle_negative_sampling()
 
-        self.val_users, self.val_items = self._compute_users_items(self.val_dict)
-        self.test_users, self.test_items = self._compute_users_items(self.test_dict)
-
-        #self.sp_i_val = self._build_sparse(self.i_val_dict, self.users, self.items)
-        #self.sp_i_val_ratings = self._build_sparse_ratings(self.i_val_dict, self.users, self.items)
-
-    def _compute_users_items(self, dict):
+    def _get_users_list_and_items_list(self, dict):
         users = list(dict.keys())
         item_set = set()
         for user_ratings in dict.values():
@@ -129,24 +125,29 @@ class DataSet(metaclass=DataSetRequiredAttributesController):
         return users, items
 
     def _handle_negative_sampling(self):
-        if hasattr(self.config, "negative_sampling"):
-            val_neg_samples, test_neg_samples = NegativeSampler.sample(
-                self.config,
-                self.public_users,
-                self.public_items,
-                self.private_users,
-                self.private_items,
-                self.sp_i_train,
-                self.val_dict,
-                self.test_dict
+        val_neg_samples, test_neg_samples = NegativeSampler.sample(
+            self.config,
+            self.public_users,
+            self.public_items,
+            self.private_users,
+            self.private_items,
+            self.sp_i_train,
+            self.val_dict,
+            self.test_dict
+        )
+
+        if self.val_dict:
+            sp_i_val = SparseBuilder.build_sparse_public(
+                self.val_dict, self.public_users, self.public_items, dtype='bool'
             )
-            if self.val_dict:
-                sp_i_val = self._to_bool_sparse(self.val_dict)
-                val_candidate_items = val_neg_samples + sp_i_val
-                self.val_mask = val_candidate_items.toarray()
-            sp_i_test = self._to_bool_sparse(self.test_dict)
-            test_candidate_items = test_neg_samples + sp_i_test
-            self.test_mask = test_candidate_items.toarray()
+            val_candidate_items = val_neg_samples + sp_i_val
+            self.val_mask = val_candidate_items.toarray()
+
+        sp_i_test = SparseBuilder.build_sparse_public(
+            self.val_dict, self.public_users, self.public_items, dtype='bool'
+        )
+        test_candidate_items = test_neg_samples + sp_i_test
+        self.test_mask = test_candidate_items.toarray()
 
     def _dataframe_to_dict(self, data):
         # users = list(data['userId'].unique())
@@ -164,35 +165,34 @@ class DataSet(metaclass=DataSetRequiredAttributesController):
         #     ratings[u] = dict(zip(sel_['itemId'], sel_['rating']))
         return ratings
 
-    def _build_sparse(self, dict, users, items):
-
+    """def _build_sparse(self, dict, users, items):
         rows_cols = [(u, i) for u, items in dict.items() for i in items.keys()]
-        rows = [u for u, _ in rows_cols]
-        cols = [i for _, i in rows_cols]
+        rows, cols = map(list, zip(*rows_cols))
+        #rows, cols = list(rows), list(cols)
         data = sp.csr_matrix((np.ones_like(rows), (rows, cols)), dtype='float32',
                              shape=(len(users), len(items)))
         return data
 
     def _build_sparse_ratings(self, dict, users, items):
         rows_cols_ratings = [(u, i, r) for u, items in dict.items() for i, r in items.items()]
-        rows = [u for u, _, _ in rows_cols_ratings]
-        cols = [i for _, i, _ in rows_cols_ratings]
-        ratings = [r for _, _, r in rows_cols_ratings]
-
+        rows, cols, ratings = map(list, zip(*rows_cols_ratings))
+        #rows = [u for u, _, _ in rows_cols_ratings]
+        #cols = [i for _, i, _ in rows_cols_ratings]
+        #ratings = [r for _, _, r in rows_cols_ratings]
         data = sp.csr_matrix((ratings, (rows, cols)), dtype='float32',
                              shape=(len(users), len(items)))
-
         return data
 
     def _to_bool_sparse(self, test_dict):
         i_test = [(self.public_users[user], self.public_items[i])
                   for user, items in test_dict.items() if user in self.public_users.keys()
                   for i in items.keys() if i in self.public_items.keys()]
-        rows = [u for u, _ in i_test]
-        cols = [i for _, i in i_test]
+        rows, cols = map(list, zip(*i_test))
+        #rows = [u for u, _ in i_test]
+        #cols = [i for _, i in i_test]
         i_test = sp.csr_matrix((np.ones_like(rows), (rows, cols)), dtype='bool',
                                shape=(len(self.public_users.keys()), len(self.public_items.keys())))
-        return i_test
+        return i_test"""
 
     def get_test(self):
         return self.test_dict
