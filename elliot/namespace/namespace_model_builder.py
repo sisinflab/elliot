@@ -29,12 +29,14 @@ class Builder(ABC):
 
 class NameSpaceBuilder(Builder):
 
-    def __init__(self, config_path, base_folder_path_elliot, base_folder_path_config) -> None:
+    def __init__(
+            self, base_folder_path_elliot, base_folder_path_config, config_path=None, config_dict=None
+    ) -> None:
         """
         A fresh builder instance should contain a blank product object, which is
         used in further assembly.
         """
-        self._namespace = NameSpaceModel(config_path, base_folder_path_elliot, base_folder_path_config)
+        self._namespace = NameSpaceModel(base_folder_path_elliot, base_folder_path_config, config_path, config_dict)
 
     @property
     def base(self) -> NameSpaceModel:

@@ -31,6 +31,13 @@ class DataSetLoader:
 
         self._load_ratings()
         self._load_additional_features()
+        self._preprocess_data()
+
+        if isinstance(self.tuple_list[0][1], list):
+            self.logger.warning("You are using a splitting strategy with folds. "
+                                "Paired TTest and Wilcoxon Test are not available!")
+            self.config.evaluation.paired_ttest = False
+            self.config.evaluation.wilcoxon_test = False
 
     def _load_ratings(self):
         """
@@ -66,25 +73,23 @@ class DataSetLoader:
             self.dataframe = self._load_data(path_dataset, check_timestamp=True)
             # self.logger.info(('{0} - Loaded'.format(path_dataset)))
 
-            self.dataframe = PreFilter.filter(self.dataframe, self.config)
-            self.logger.info("There will be the splitting")
-            splitter = Splitter(self.dataframe, self.config.splitting, self.config.random_seed)
-            self.tuple_list = splitter.process_splitting()
-
         else:
             raise Exception("Strategy option not recognized")
 
-        if isinstance(self.tuple_list[0][1], list):
-            self.logger.warning("You are using a splitting strategy with folds. "
-                                "Paired TTest and Wilcoxon Test are not available!")
-            self.config.evaluation.paired_ttest = False
-            self.config.evaluation.wilcoxon_test = False
-
     def _load_additional_features(self):
-        self.dataframe, self.side_information = self.coordinate_information(self.dataframe,
+        dataframe = self.dataframe if hasattr(self, 'dataframe') else self.tuple_list
+        self.dataframe, self.side_information = self.coordinate_information(dataframe,
                                                                             sides=self.config.data_config.side_information,
                                                                             logger=self.logger)
         # pass
+
+    def _preprocess_data(self):
+        if self.config.data_config.strategy != "dataset":
+            return
+        self.dataframe = PreFilter.filter(self.dataframe, self.config)
+        self.logger.info("There will be the splitting")
+        splitter = Splitter(self.dataframe, self.config.splitting, self.config.random_seed)
+        self.tuple_list = splitter.process_splitting()
 
     def _load_data(self, file_path, check_timestamp=False):
         dataframe = pd.read_csv(file_path, sep='\t', header=None, names=self.column_names)

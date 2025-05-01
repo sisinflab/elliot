@@ -64,14 +64,19 @@ _backend = 'backend'
 
 
 class NameSpaceModel:
-    def __init__(self, config_path, base_folder_path_elliot, base_folder_path_config):
+    def __init__(self, base_folder_path_elliot, base_folder_path_config, config_path=None, config_dict=None):
         self.base_namespace = SimpleNamespace()
 
         self._base_folder_path_elliot = base_folder_path_elliot
         self._base_folder_path_config = base_folder_path_config
 
-        self.config_file = open(config_path)
-        self.config = load(self.config_file, Loader=FullLoader)
+        if config_path:
+            self.config_file = open(config_path)
+            self.config = load(self.config_file, Loader=FullLoader)
+        elif config_dict:
+            self.config = config_dict
+        else:
+            raise ValueError("Parameters 'config_path' and 'config_dict' cannot both be None")
 
         os.environ['CUDA_VISIBLE_DEVICES'] = str(self.config[_experiment].get(_gpu, -1))
 
