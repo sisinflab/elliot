@@ -1,45 +1,26 @@
 import importlib
-import sys
 from pathlib import Path
-import pandas as pd
+from utils import *
 
 import pytest
 from unittest.mock import patch
 
 current_path = Path(__file__).resolve().parent
-sys.path.append(str(current_path))
-
-from elliot.namespace.namespace_model_builder import NameSpaceBuilder
 
 
 def dataloader(config_dict):
-    base_folder_path_elliot = str(current_path.parents[1] / 'elliot')
-    base_folder_path_config = str(current_path.parents[1] / 'config_files')
-
     def wrap_data_config(data_config):
-        dataset = True if data_config['strategy'] == 'dataset' else False
+        data_config['side_information'] = []
         return {
-            'experiment': {
-                'dataset': 'test-dataset',
-                'data_config': data_config,
-                **({'splitting': {'test_splitting': {'strategy': 'random_subsampling'}}} if dataset else {})
-            }
+            'data_config': data_config,
+            'splitting': {'test_splitting': {'strategy': 'random_subsampling'}},
+            'random_seed': 42,
+            'binarize': False,
+            'config_test': False
         }
-
-    name_space = NameSpaceBuilder(
-        base_folder_path_elliot, base_folder_path_config, config_dict=wrap_data_config(config_dict)
-    )
-    config = name_space.base.base_namespace
-    dataloader_class = getattr(importlib.import_module("elliot.dataset"), config.data_config.dataloader)
-    return dataloader_class(config)
-
-
-def read_and_split_mock_dataset(dataset_path):
-    column_names = ['userId', 'itemId', 'rating', 'timestamp']
-    df_mock = pd.read_csv(dataset_path, sep='\t', names=column_names)
-    train_df = df_mock.iloc[:4]
-    test_df = df_mock.iloc[4:]
-    return df_mock, train_df, test_df
+    ns = create_namespace(wrap_data_config(config_dict))
+    dataloader_class = getattr(importlib.import_module("elliot.dataset"), 'DataSetLoader')
+    return dataloader_class(ns)
 
 
 class TestDataSetLoader:
@@ -88,7 +69,9 @@ class TestDataSetLoader:
             'dataset_path': dataset_path
         }
 
-        df_mock, train_df, test_df = read_and_split_mock_dataset(dataset_path)
+        df_mock = read_dataset(dataset_path, cols=True)
+        train_df = df_mock.iloc[:4]
+        test_df = df_mock.iloc[4:]
 
         with (
             patch(

@@ -7,4 +7,4 @@ __version__ = '0.3.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
-from . import standard_prefilters
+from elliot.prefiltering.standard_prefilters import PreFilter

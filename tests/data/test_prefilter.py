@@ -1,13 +1,10 @@
+import importlib
 from pathlib import Path
-import sys
 from utils import *
 
 import pytest
 
 current_path = Path(__file__).resolve().parent
-sys.path.append(str(current_path))
-
-from elliot.prefiltering.standard_prefilters import PreFilter
 
 
 class TestPreFilter:
@@ -17,7 +14,8 @@ class TestPreFilter:
     def _apply_filter(self, config):
         ns = create_namespace(config)
         self._sample_df = read_dataset(self._dataset_path, cols=True)
-        filtered = PreFilter.single_filter(self._sample_df, ns)
+        prefiltering_class = getattr(importlib.import_module('elliot.prefiltering'), 'PreFilter')
+        filtered = prefiltering_class.single_filter(self._sample_df, ns)
         return filtered
 
     def test_global_threshold(self):
