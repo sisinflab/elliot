@@ -14,13 +14,58 @@ from elliot.dataset.dataset import DataSet
 
 class DataSetLoader:
     """
-    Dataset loader.
+    The DataSetLoader class is responsible for loading and preparing datasets for training, validation, and testing.
 
-    Load ratings according to the provided strategy.
-    (to be developed) Load item features, if required
+    It supports multiple loading strategies (`"fixed"`, `"hierarchy"`, `"dataset"`) and integrates optional
+    pre-filtering and side information loading. The final output is a list of `DataSet` objects, ready to be
+    consumed by the recommendation pipeline.
+
+    Attributes:
+        config (SimpleNamespace): Configuration namespace object defining data paths, splitting strategy, filters, etc.
+        args (tuple): Additional positional arguments.
+        kwargs (dict): Additional keyword arguments.
+        column_names (list): Default column names used for reading interaction files.
+        logger (Logger): Logger instance for the class.
+        tuple_list (list): Contains train-validation-test splits depending on the strategy.
+        dataframe (pd.DataFrame): DataFrame with interactions (if applicable).
+        side_information (SimpleNamespace): Loaded side information, if specified.
+
+    Supported Loading Strategies:
+        - fixed: Loads train/test/(optional) validation sets from files.
+        - hierarchy: Loads multiple folds from a nested directory structure.
+        - dataset: Loads a single dataset and later applies pre-filtering and splitting.
+
+    To configure the data loading, include the appropriate
+    settings in the configuration file using the pattern shown below.
+
+    .. code:: yaml
+
+      data_config:
+        strategy: dataset|fixed|hierarchy
+        dataset_path: this/is/the/path.tsv
+        root_folder: this/is/the/path
+        train_path: this/is/the/path.tsv
+        validation_path: this/is/the/path.tsv
+        test_path: this/is/the/path.tsv
+      binarize: True|False
+        side_information:
+          - dataloader: FeatureLoader1
+            map: this/is/the/path.tsv
+            features: this/is/the/path.tsv
+            properties: this/is/the/path.conf
+          - dataloader: FeatureLoader2
+            folder_map_features: this/is/the/path/folder
     """
 
     def __init__(self, config, *args, **kwargs):
+        """
+        Initializes the DataSetLoader object.
+
+        Args:
+            config (SimpleNamespace): Configuration namespace object.
+            *args: Additional positional arguments.
+            **kwargs: Additional keyword arguments.
+        """
         self.logger = logging.get_logger(self.__class__.__name__)
         self.args = args
         self.kwargs = kwargs
@@ -41,12 +86,10 @@ class DataSetLoader:
 
     def _load_ratings(self):
         """
-        User interactions loader.
+        Load user-item interaction data according to the selected strategy.
 
-        Strategy:
-        - fixed: read train, test and val (optional) data
-        - hierarchy: read splitting
-        - dataset: read dataset and perform pre-filtering and splitting
+        Raises:
+            Exception: If an unsupported strategy is specified.
         """
         if self.config.data_config.strategy == "fixed":
             path_train_data = self.config.data_config.train_path
@@ -77,6 +120,10 @@ class DataSetLoader:
             raise Exception("Strategy option not recognized")
 
     def _load_additional_features(self):
+        """
+        Loads and coordinates side information features (e.g., item content or user metadata),
+        if specified in the configuration.
+        """
         dataframe = self.dataframe if hasattr(self, 'dataframe') else self.tuple_list
         self.dataframe, self.side_information = self.coordinate_information(dataframe,
                                                                             sides=self.config.data_config.side_information,
@@ -84,6 +131,10 @@ class DataSetLoader:
         # pass
 
     def _preprocess_data(self):
+        """
+        Applies optional pre-filtering and performs dataset splitting,
+        only if the `"dataset"` strategy is used.
+        """
         if self.config.data_config.strategy != "dataset":
             return
         if hasattr(self.config, 'prefiltering'):
@@ -94,6 +145,16 @@ class DataSetLoader:
         self.tuple_list = splitter.process_splitting()
 
     def _load_data(self, file_path, check_timestamp=False):
+        """
+        Read interaction data from a file.
+
+        Args:
+            file_path (str): Path to the TSV file containing interactions.
+            check_timestamp (bool): Whether to drop the timestamp column if it's empty.
+
+        Returns:
+            pd.DataFrame: The loaded data.
+        """
         dataframe = pd.read_csv(file_path, sep='\t', header=None, names=self.column_names)
         if check_timestamp and all(dataframe["timestamp"].isna()):
             dataframe = dataframe.drop(columns=["timestamp"]).reset_index(drop=True)
@@ -102,6 +163,15 @@ class DataSetLoader:
         return dataframe
 
     def read_splitting(self, folder_path):
+        """
+        Reads train/val/test splits organized in a hierarchical folder structure.
+
+        Args:
+            folder_path (str): Root folder path containing the splits.
+
+        Returns:
+            list: A nested list of (train, val, test) splits for each fold.
+        """
         tuple_list = []
         for dirs in os.listdir(folder_path):
             for test_dir in dirs:

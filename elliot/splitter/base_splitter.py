@@ -62,7 +62,66 @@ Nested Hold-Out
 
 
 class Splitter:
+    """
+    The Splitter class is responsible for performing various dataset splitting strategies,
+    such as Train/Test, Train/Validation/Test, K-Folds, temporal splits, and random subsampling.
+    It supports both in-memory splits and optionally saving the results to disk.
+
+    This class is designed to work with user-item interaction data in a recommender systems context,
+    where splitting must often respect user-level chronology.
+
+    Attributes:
+        data (pd.DataFrame): The dataset to be split, typically containing at least
+            'userId' and 'timestamp' columns.
+        splitting_ns (SimpleNamespace): Namespace object containing configuration
+            for the desired splitting strategy.
+        random_seed (int): Seed for reproducibility of random-based strategies.
+        save_on_disk (bool): Indicates whether the generated splits should be saved to disk.
+        save_folder (str or None): Directory path to store the splits if saving is enabled.
+
+    Supported Splitting Strategies:
+        - fixed_timestamp: Splits data using a predefined or computed timestamp threshold.
+        - best_timestamp: Automatically selects the best timestamp across users for splitting.
+        - temporal_hold_out: Uses the most recent interactions (per user) for testing.
+        - temporal_leave_n_out: Leaves the last N events per user as the test set.
+        - random_subsampling: Randomly subsamples training and testing data across folds.
+        - random_cross_validation (K-Folds): Performs stratified K-Fold cross-validation.
+
+    Raises:
+        Exception: If required strategy parameters are missing or invalid.
+
+    To configure the data splitting, include the appropriate
+    settings in the configuration file using the pattern shown below.
+    Note: Splitting is required and will be applied only if `data_config.strategy` is set to `"dataset"`.
+
+    .. code:: yaml
+
+      splitting:
+        save_on_disk: True|False
+        save_path: "path"
+        test_splitting:
+          strategy: fixed_timestamp|temporal_hold_out|random_subsampling|random_cross_validation
+          timestamp: best|1609786061
+          test_ratio: 0.2
+          leave_n_out: 1
+          folds: 5
+        validation_splitting:
+          strategy: fixed_timestamp|temporal_hold_out|random_subsampling|random_cross_validation
+          timestamp: best|1609786061
+          test_ratio: 0.2
+          leave_n_out: 1
+          folds: 5
+    """
+
     def __init__(self, data: pd.DataFrame, splitting_ns: SimpleNamespace, random_seed=42):
+        """
+        Initializes the Splitter object to manage dataset splitting strategies.
+
+        Args:
+            data (pd.DataFrame): The dataset to be split.
+            splitting_ns (SimpleNamespace): A namespace object containing splitting configuration.
+            random_seed (int, optional): Random seed for reproducibility. Defaults to 42.
+        """
         self.random_seed = random_seed
         self.data = data
         self.splitting_ns = splitting_ns
@@ -70,6 +129,15 @@ class Splitter:
         self.save_folder = None
 
     def process_splitting(self):
+        """
+        Executes the configured splitting strategy (Train/Test or Train/Validation/Test).
+
+        Returns:
+            list: A list of (train, test) or ((train, val), test) tuples.
+
+        Raises:
+            Exception: If required options such as test splitting or save paths are missing.
+        """
         np.random.seed(self.random_seed)
         data = self.data
         splitting_ns = self.splitting_ns
@@ -107,6 +175,12 @@ class Splitter:
         return tuple_list
 
     def store_splitting(self, tuple_list):
+        """
+        Saves the generated splits to disk as TSV files if enabled.
+
+        Args:
+            tuple_list (list): A list of split tuples to be saved on disk.
+        """
         for i, (train_val, test) in enumerate(tuple_list):
             actual_test_folder = create_folder_by_index(self.save_folder, str(i))
             test.to_csv(os.path.abspath(os.sep.join([actual_test_folder, "test.tsv"])), sep='\t', index=False, header=False)
@@ -130,7 +204,19 @@ class Splitter:
 
     def handle_hierarchy(self, data: pd.DataFrame, valtest_splitting_ns: SimpleNamespace) -> t.List[
         t.Tuple[pd.DataFrame, pd.DataFrame]]:
+        """
+        Handles the splitting logic based on the selected strategy.
 
+        Args:
+            data (pd.DataFrame): The dataset to be split.
+            valtest_splitting_ns (SimpleNamespace): Namespace containing strategy parameters.
+
+        Returns:
+            list: A list of (train, test) tuples.
+
+        Raises:
+            Exception: If the strategy or required parameters are not defined or invalid.
+        """
         data = data.reset_index(drop=True)
 
         strategy = getattr(valtest_splitting_ns, "strategy", None)
@@ -200,6 +286,16 @@ class Splitter:
     #     pass
 
     def splitting_temporal_holdout(self, d: pd.DataFrame, ratio=0.2):
+        """
+        Splits the dataset using temporal hold-out strategy.
+
+        Args:
+            d (pd.DataFrame): The dataset to split.
+            ratio (float): Ratio of data to assign to the test set. Defaults to 0.2.
+
+        Returns:
+            list: A list containing one (train, test) tuple.
+        """
         tuple_list = []
         user_size = d.groupby('userId').size()
         user_threshold = np.floor(user_size * (1 - ratio)).astype(int)
@@ -212,6 +308,16 @@ class Splitter:
         return tuple_list
 
     def splitting_temporal_leave_n_out(self, d: pd.DataFrame, n=1):
+        """
+        Splits the dataset by leaving the last n items (per user) as test data.
+
+        Args:
+            d (pd.DataFrame): The dataset to split.
+            n (int): Number of items per user to leave out for testing. Defaults to 1.
+
+        Returns:
+            list: A list containing one (train, test) tuple.
+        """
         tuple_list = []
 
         rank = d.groupby('userId')['timestamp'].rank(method='first', ascending=False)
@@ -222,6 +328,16 @@ class Splitter:
         return tuple_list
 
     def splitting_passed_timestamp(self, d: pd.DataFrame, timestamp=1):
+        """
+        Splits the dataset based on a fixed timestamp threshold.
+
+        Args:
+            d (pd.DataFrame): The dataset to split.
+            timestamp (int): Timestamp threshold to separate train and test sets.
+
+        Returns:
+            list: A list containing one (train, test) tuple.
+        """
         tuple_list = []
 
         mask = d['timestamp'] >= timestamp
@@ -231,6 +347,20 @@ class Splitter:
         return tuple_list
 
     def splitting_best_timestamp(self, d: pd.DataFrame, min_below=1, min_over=1):
+        """
+        Splits the dataset based on the best timestamp, i.e., the one that maximizes user coverage.
+
+        Args:
+            d (pd.DataFrame): The dataset to split.
+            min_below (int): Minimum number of interactions before the timestamp. Defaults to 1.
+            min_over (int): Minimum number of interactions after the timestamp. Defaults to 1.
+
+        Returns:
+            list: A list containing one (train, test) tuple.
+
+        Raises:
+            ValueError: If no valid timestamp is found for the split.
+        """
         data = d.copy()
         data.sort_values(by=["userId", "timestamp"], inplace=True)
 
@@ -261,6 +391,16 @@ class Splitter:
         return self.splitting_passed_timestamp(d, best_ts)
 
     def splitting_k_folds(self, d: pd.DataFrame, folds):
+        """
+        Performs K-Fold cross-validation splitting by user.
+
+        Args:
+            d (pd.DataFrame): The dataset to split.
+            folds (int): Number of folds.
+
+        Returns:
+            list: A list of (train, test) tuples, one per fold.
+        """
         fold_indices = [[] for _ in range(folds)]
         user_groups = d.groupby('userId')
 
@@ -275,6 +415,17 @@ class Splitter:
         return self._split_k_folds(d, fold_indices=fold_indices)
 
     def splitting_random_subsampling_k_folds(self, d: pd.DataFrame, folds=5, ratio=0.2):
+        """
+        Performs random subsampling across multiple folds based on a test ratio.
+
+        Args:
+            d (pd.DataFrame): The dataset to split.
+            folds (int): Number of folds. Defaults to 5.
+            ratio (float): Proportion of data per fold to use as test set. Defaults to 0.2.
+
+        Returns:
+            list: A list of (train, test) tuples.
+        """
         def subsampling_list_generator(length):
             train = int(math.floor(length * (1 - ratio)))
             test = length - train
@@ -285,6 +436,17 @@ class Splitter:
         return self._split_k_folds(d, subsampling_list_generator, folds=folds)
 
     def splitting_random_subsampling_k_folds_leave_n_out(self, d: pd.DataFrame, folds=5, n=1):
+        """
+        Performs random leave-n-out subsampling across multiple folds.
+
+        Args:
+            d (pd.DataFrame): The dataset to split.
+            folds (int): Number of folds. Defaults to 5.
+            n (int): Number of interactions per user to leave out for testing. Defaults to 1.
+
+        Returns:
+            list: A list of (train, test) tuples.
+        """
         def subsampling_leave_n_out_list_generator(length):
             test = n
             train = length - test
@@ -295,6 +457,31 @@ class Splitter:
         return self._split_k_folds(d, subsampling_leave_n_out_list_generator, folds=folds)
 
     def _split_k_folds(self, data, generator=None, folds=None, fold_indices=None):
+        """
+        Utility function to perform K-Fold splitting.
+
+        If the method is called without the `fold_indices` parameter,
+        both `folds` and `generator` must be provided.
+        In this case, the splitting process will first compute in a standard way the fold indices
+        and then apply the split.
+
+        If the method is called with the `fold_indices` parameter
+        (i.e., the split has already been precomputed in a custom way),
+        the `folds` and `generator` parameters will be ignored,
+        and the splitting will be applied directly using the provided indices.
+
+        Args:
+            data (pd.DataFrame): The dataset to split.
+            generator (callable, optional): A function that generates a test mask.
+            folds (int, optional): Number of folds.
+            fold_indices (list, optional): Predefined indices for each fold.
+
+        Returns:
+            list: A list of (train, test) tuples.
+
+        Raises:
+            ValueError: If both folds and fold_indices are None, or generator is missing when required.
+        """
         tuple_list = []
 
         if fold_indices is None:
@@ -321,6 +508,16 @@ class Splitter:
 
     @staticmethod
     def _split_with_mask(data, mask):
+        """
+        Utility function to split the dataset into train and test using a boolean mask.
+
+        Args:
+            data (pd.DataFrame): The dataset to split.
+            mask (pd.Series or np.array): Boolean array indicating the test set.
+
+        Returns:
+            tuple: A (train, test) tuple of DataFrames.
+        """
         test = data[mask].reset_index(drop=True)
         train = data[~mask].reset_index(drop=True)
         return train, test
