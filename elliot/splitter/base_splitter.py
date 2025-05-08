@@ -5,6 +5,7 @@ import math
 import shutil
 import os
 
+from collections import Counter
 from types import SimpleNamespace
 
 from elliot.utils.folder import create_folder_by_index
@@ -73,7 +74,7 @@ class Splitter:
         data = self.data
         splitting_ns = self.splitting_ns
 
-        if hasattr(splitting_ns, "save_on_disk"):
+        if getattr(splitting_ns, "save_on_disk", False):
             if hasattr(splitting_ns, "save_folder"):
                 self.save_on_disk = True
                 self.save_folder = splitting_ns.save_folder
@@ -90,14 +91,10 @@ class Splitter:
             tuple_list = self.handle_hierarchy(data, splitting_ns.test_splitting)
 
             if hasattr(splitting_ns, "validation_splitting"):
-                exploded_train_list = []
-                for single_train, single_test in tuple_list:
-                    # [(train_0,test_0), (train_1,test_1), (train_2,test_2), (train_3,test_3), (train_4,test_4)]
-                    train_val_test_tuples_list = self.handle_hierarchy(single_train,
-                                                                       splitting_ns.validation_splitting)
-                    exploded_train_list.append(train_val_test_tuples_list)
-                tuple_list = self.rearrange_data(tuple_list, exploded_train_list)
-
+                tuple_list = [
+                    (self.handle_hierarchy(train, splitting_ns.validation_splitting), test)
+                    for train, test in tuple_list
+                ]
                 print("\nRealized a Train/Validation Test splitting strategy\n")
             else:
                 print("\nRealized a Train/Test splitting strategy\n")
@@ -133,184 +130,197 @@ class Splitter:
 
     def handle_hierarchy(self, data: pd.DataFrame, valtest_splitting_ns: SimpleNamespace) -> t.List[
         t.Tuple[pd.DataFrame, pd.DataFrame]]:
-        if hasattr(valtest_splitting_ns, "strategy"):
-            if valtest_splitting_ns.strategy == "fixed_timestamp":
-                if hasattr(valtest_splitting_ns, "timestamp"):
-                    if valtest_splitting_ns.timestamp.isdigit():
-                        tuple_list = self.splitting_passed_timestamp(data, int(valtest_splitting_ns.timestamp))
-                    elif valtest_splitting_ns.timestamp == "best":
-                        print("Here")
-                        kwargs = {}
-                        if hasattr(valtest_splitting_ns, "min_below"):
-                            kwargs["min_below"] = int(valtest_splitting_ns.min_below)
-                        if hasattr(valtest_splitting_ns, "min_over"):
-                            kwargs["min_over"] = int(valtest_splitting_ns.min_over)
-                        tuple_list = self.splitting_best_timestamp(data, **kwargs)
 
-                    else:
-                        raise Exception("Timestamp option value is not valid")
-                else:
-                    raise Exception(f"Option timestamp missing for {valtest_splitting_ns.strategy} strategy")
-            elif valtest_splitting_ns.strategy == "temporal_hold_out":
-                if hasattr(valtest_splitting_ns, "test_ratio"):
-                    tuple_list = self.splitting_temporal_holdout(data, float(valtest_splitting_ns.test_ratio))
-                elif hasattr(valtest_splitting_ns, "leave_n_out"):
-                    tuple_list = self.splitting_temporal_leavenout(data, int(valtest_splitting_ns.leave_n_out))
-                else:
-                    raise Exception(f"Option missing for {valtest_splitting_ns.strategy} strategy")
-            elif valtest_splitting_ns.strategy == "random_subsampling":
-                if hasattr(valtest_splitting_ns, "folds"):
-                    if str(valtest_splitting_ns.folds).isdigit():
-                        pass
-                    else:
-                        raise Exception("Folds option value is not valid")
-                else:
-                    valtest_splitting_ns.folds = 1
-                    print("Folds option value is missing. It has been set to 1")
-                    # raise Exception(f"Option missing for {valtest_splitting_ns.strategy} strategy")
+        data = data.reset_index(drop=True)
 
-                if hasattr(valtest_splitting_ns, "test_ratio"):
-                    tuple_list = self.splitting_randomsubsampling_kfolds(data, int(valtest_splitting_ns.folds),
-                                                                         float(valtest_splitting_ns.test_ratio))
-                elif hasattr(valtest_splitting_ns, "leave_n_out"):
-                    tuple_list = self.splitting_randomsubsampling_kfolds_leavenout(data, int(valtest_splitting_ns.folds),
-                                                                                   int(valtest_splitting_ns.leave_n_out))
-                else:
-                    raise Exception(f"Option missing for {valtest_splitting_ns.strategy} strategy")
-            elif valtest_splitting_ns.strategy == "random_cross_validation":
-                if hasattr(valtest_splitting_ns, "folds"):
-                    if str(valtest_splitting_ns.folds).isdigit():
-                        tuple_list = self.splitting_kfolds(data, int(valtest_splitting_ns.folds))
-                    else:
-                        raise Exception("Folds option value is not valid")
-                else:
-                    raise Exception(f"Option missing for {valtest_splitting_ns.strategy} strategy")
-            else:
-                raise Exception(f"Unrecognized Test Strategy:\t{valtest_splitting_ns.strategy}")
-        else:
+        strategy = getattr(valtest_splitting_ns, "strategy", None)
+        if not strategy:
             raise Exception("Strategy option not found")
 
-        return tuple_list  # it returns a list tuples (pairs) of train test dataframes
+        if strategy == "fixed_timestamp":
+            timestamp = getattr(valtest_splitting_ns, "timestamp", None)
+            if not timestamp:
+                raise Exception(f"Option 'timestamp' missing for '{strategy}' strategy")
 
-    def rearrange_data(self, train_test: t.List[t.Tuple[pd.DataFrame, pd.DataFrame]],
-                       train_val: t.List[t.List[t.Tuple[pd.DataFrame, pd.DataFrame]]]):
-        return [(train_val[p], v[1]) for p, v in enumerate(train_test)]
+            if str(timestamp).isdigit():
+                tuple_list = self.splitting_passed_timestamp(data, int(timestamp))
+            elif timestamp == "best":
+                kwargs = {}
+                min_below = getattr(valtest_splitting_ns, "min_below", None)
+                min_over = getattr(valtest_splitting_ns, "min_over", None)
+                if min_below is not None:
+                    kwargs["min_below"] = int(min_below)
+                if min_over is not None:
+                    kwargs["min_over"] = int(min_over)
+                tuple_list = self.splitting_best_timestamp(data, **kwargs)
+            else:
+                raise Exception("Timestamp option value is not valid")
 
-    def generic_split_function(self, data: pd.DataFrame, **kwargs) -> t.List[t.Tuple[pd.DataFrame, pd.DataFrame]]:
-        pass
+        elif strategy == "temporal_hold_out":
+            test_ratio = getattr(valtest_splitting_ns, "test_ratio", None)
+            leave_n_out = getattr(valtest_splitting_ns, "leave_n_out", None)
 
-    def fold_list_generator(self, length, folds=5):
-        def infinite_looper(folds=5):
-            while True:
-                for f in range(folds):
-                    yield f
+            if test_ratio is not None:
+                tuple_list = self.splitting_temporal_holdout(data, float(test_ratio))
+            elif leave_n_out is not None:
+                tuple_list = self.splitting_temporal_leave_n_out(data, int(leave_n_out))
+            else:
+                raise Exception(f"Option missing for '{strategy}' strategy")
 
-        looper = infinite_looper(folds)
-        return [next(looper) for _ in range(length)]
+        elif strategy == "random_subsampling":
+            folds = getattr(valtest_splitting_ns, "folds", 1)
+            try:
+                folds = int(folds)
+            except ValueError:
+                raise Exception("Folds option value is not valid")
 
-    def splitting_kfolds(self, data: pd.DataFrame, folds=5):
-        tuple_list = []
-        user_groups = data.groupby(['userId'])
-        for name, group in user_groups:
-            data.loc[group.index, 'fold'] = self.fold_list_generator(len(group), folds)
-        data["fold"] = pd.to_numeric(data["fold"], downcast='integer')
-        for i in range(folds):
-            test = data[data["fold"] == i].drop(columns=["fold"]).reset_index(drop=True)
-            train = data[data["fold"] != i].drop(columns=["fold"]).reset_index(drop=True)
-            tuple_list.append((train, test))
+            test_ratio = getattr(valtest_splitting_ns, "test_ratio", None)
+            leave_n_out = getattr(valtest_splitting_ns, "leave_n_out", None)
+
+            if test_ratio is not None:
+                tuple_list = self.splitting_random_subsampling_k_folds(data, folds, float(test_ratio))
+            elif leave_n_out is not None:
+                tuple_list = self.splitting_random_subsampling_k_folds_leave_n_out(data, folds, int(leave_n_out))
+            else:
+                raise Exception(f"Option missing for '{strategy}' strategy")
+
+        elif strategy == "random_cross_validation":
+            folds = getattr(valtest_splitting_ns, "folds", None)
+            if folds is None or not str(folds).isdigit():
+                raise Exception("Folds option value is not valid")
+
+            tuple_list = self.splitting_k_folds(data, int(folds))
+
+        else:
+            raise Exception(f"Unrecognized Test Strategy: {strategy}")
+
         return tuple_list
+
+    # def generic_split_function(self, data: pd.DataFrame, **kwargs) -> t.List[t.Tuple[pd.DataFrame, pd.DataFrame]]:
+    #     pass
 
     def splitting_temporal_holdout(self, d: pd.DataFrame, ratio=0.2):
         tuple_list = []
-        data = d.copy()
-        user_size = data.groupby(['userId'], as_index=True).size()
-        user_threshold = user_size.apply(lambda x: math.floor(x * (1 - ratio)))
-        data['rank_first'] = data.groupby(['userId'])['timestamp'].rank(method='first', ascending=True, axis=1)
-        data["test_flag"] = data.apply(
-            lambda x: x["rank_first"] > user_threshold.loc[x["userId"]], axis=1)
-        test = data[data["test_flag"] == True].drop(columns=["rank_first", "test_flag"]).reset_index(drop=True)
-        train = data[data["test_flag"] == False].drop(columns=["rank_first", "test_flag"]).reset_index(drop=True)
-        tuple_list.append((train, test))
+        user_size = d.groupby('userId').size()
+        user_threshold = np.floor(user_size * (1 - ratio)).astype(int)
+
+        rank = d.groupby('userId')['timestamp'].rank(method='first', ascending=True)
+        mask = rank > d['userId'].map(user_threshold)
+
+        tuple_list.append(self._split_with_mask(d, mask))
+
         return tuple_list
 
-    def splitting_temporal_leavenout(self, d: pd.DataFrame, n=1):
+    def splitting_temporal_leave_n_out(self, d: pd.DataFrame, n=1):
         tuple_list = []
-        data = d.copy()
-        data['rank_first'] = data.groupby(['userId'])['timestamp'].rank(method='first', ascending=False, axis=1)
-        data["test_flag"] = data.apply(
-            lambda x: x["rank_first"] <= n, axis=1)
-        test = data[data["test_flag"] == True].drop(columns=["rank_first", "test_flag"]).reset_index(drop=True)
-        train = data[data["test_flag"] == False].drop(columns=["rank_first", "test_flag"]).reset_index(drop=True)
-        tuple_list.append((train, test))
+
+        rank = d.groupby('userId')['timestamp'].rank(method='first', ascending=False)
+        mask = rank <= n
+
+        tuple_list.append(self._split_with_mask(d, mask))
+
         return tuple_list
 
     def splitting_passed_timestamp(self, d: pd.DataFrame, timestamp=1):
         tuple_list = []
-        data = d.copy()
-        data["test_flag"] = data.apply(lambda x: x["timestamp"] >= timestamp, axis=1)
-        test = data[data["test_flag"] == True].drop(columns=["test_flag"]).reset_index(drop=True)
-        train = data[data["test_flag"] == False].drop(columns=["test_flag"]).reset_index(drop=True)
-        tuple_list.append((train, test))
-        return tuple_list
 
-    def subsampling_list_generator(self, length, ratio=0.2):
-        train = int(math.floor(length * (1 - ratio)))
-        test = length - train
-        list_ = [0] * train + [1] * test
-        np.random.shuffle(list_)
-        return list_
+        mask = d['timestamp'] >= timestamp
 
-    def splitting_randomsubsampling_kfolds(self, d: pd.DataFrame, folds=5, ratio=0.2):
-        tuple_list = []
-        data = d.copy()
-        user_groups = data.groupby(['userId'])
-        for i in range(folds):
-            for name, group in user_groups:
-                data.loc[group.index, 'test_flag'] = self.subsampling_list_generator(len(group), ratio)
-            data["test_flag"] = pd.to_numeric(data["test_flag"], downcast='integer')
-            test = data[data["test_flag"] == 1].drop(columns=["test_flag"]).reset_index(drop=True)
-            train = data[data["test_flag"] == 0].drop(columns=["test_flag"]).reset_index(drop=True)
-            tuple_list.append((train, test))
-        return tuple_list
+        tuple_list.append(self._split_with_mask(d, mask))
 
-    def subsampling_leavenout_list_generator(self, length, n=1):
-        test = n
-        train = length - test
-        list_ = [0] * train + [1] * test
-        np.random.shuffle(list_)
-        return list_
-
-    def splitting_randomsubsampling_kfolds_leavenout(self, d: pd.DataFrame, folds=5, n=1):
-        tuple_list = []
-        data = d.copy()
-        user_groups = data.groupby(['userId'])
-        for i in range(folds):
-            for name, group in user_groups:
-                data.loc[group.index, 'test_flag'] = self.subsampling_leavenout_list_generator(len(group), n)
-            data["test_flag"] = pd.to_numeric(data["test_flag"], downcast='integer')
-            test = data[data["test_flag"] == 1].drop(columns=["test_flag"]).reset_index(drop=True)
-            train = data[data["test_flag"] == 0].drop(columns=["test_flag"]).reset_index(drop=True)
-            tuple_list.append((train, test))
         return tuple_list
 
     def splitting_best_timestamp(self, d: pd.DataFrame, min_below=1, min_over=1):
         data = d.copy()
-        unique_timestamps = data["timestamp"].unique()
-        user_groups = data.groupby(['userId'])
-        ts_dict = {}
-        nuniques = len(unique_timestamps)
-        i = 0
-        for ts in unique_timestamps:
-            print(nuniques - i)
-            i += 1
-            ts_dict[ts] = 0
-            for name, group in user_groups:
-                below = group[group["timestamp"] < ts]["timestamp"].count()
-                over = len(group) - below
-                if (below >= min_below) and (over >= min_over):
-                    ts_dict[ts] += 1
-        max_val = max(ts_dict.values())
-        best_tie = [ts for ts,v in ts_dict.items() if v == max_val]
-        max_ts = max(best_tie)
-        print(f"Best Timestamp: {max_ts}")
-        return self.splitting_passed_timestamp(d, max_ts)
+        data.sort_values(by=["userId", "timestamp"], inplace=True)
+
+        ts_counter = Counter()
+        user_groups = data.groupby("userId")
+
+        for _, group in user_groups:
+            timestamps = group["timestamp"].to_numpy()
+            n = len(timestamps)
+            # Skip users with not enough total events
+            if n < (min_below + min_over):
+                continue
+            # Valid indices range
+            start = min_below
+            end = n - min_over
+            if start >= end:
+                continue  # No valid split point
+            valid_timestamps = timestamps[start:end]
+            ts_counter.update(valid_timestamps)
+
+        if not ts_counter:
+            raise ValueError("No valid timestamp found. Try lowering min_below or min_over.")
+
+        max_votes = max(ts_counter.values())
+        best_ts = max(ts for ts, count in ts_counter.items() if count == max_votes)
+
+        print(f"Best Timestamp: {best_ts}")
+        return self.splitting_passed_timestamp(d, best_ts)
+
+    def splitting_k_folds(self, d: pd.DataFrame, folds):
+        fold_indices = [[] for _ in range(folds)]
+        user_groups = d.groupby('userId')
+
+        def fold_list_generator(length):
+            return [i % folds for i in range(length)]
+
+        for _, group in user_groups:
+            fold_ids = fold_list_generator(len(group))
+            for idx, fold_id in zip(group.index, fold_ids):
+                fold_indices[fold_id].append(idx)
+
+        return self._split_k_folds(d, fold_indices=fold_indices)
+
+    def splitting_random_subsampling_k_folds(self, d: pd.DataFrame, folds=5, ratio=0.2):
+        def subsampling_list_generator(length):
+            train = int(math.floor(length * (1 - ratio)))
+            test = length - train
+            list_ = [False] * train + [True] * test
+            np.random.shuffle(list_)
+            return list_
+
+        return self._split_k_folds(d, subsampling_list_generator, folds=folds)
+
+    def splitting_random_subsampling_k_folds_leave_n_out(self, d: pd.DataFrame, folds=5, n=1):
+        def subsampling_leave_n_out_list_generator(length):
+            test = n
+            train = length - test
+            list_ = [False] * train + [True] * test
+            np.random.shuffle(list_)
+            return list_
+
+        return self._split_k_folds(d, subsampling_leave_n_out_list_generator, folds=folds)
+
+    def _split_k_folds(self, data, generator=None, folds=None, fold_indices=None):
+        tuple_list = []
+
+        if fold_indices is None:
+            if folds is None:
+                raise ValueError("Parameters 'folds' and 'fold_indices' cannot both be None")
+            if generator is None:
+                raise ValueError("Parameter 'generator' cannot be None if 'fold_indices' is None")
+            fold_indices = [[] for _ in range(folds)]
+            user_groups = data.groupby('userId')
+
+            for fold_id in range(folds):
+                for _, group in user_groups:
+                    group_mask = generator(len(group))
+                    fold_indices[fold_id].extend(group.index[group_mask])
+
+        for i in range(len(fold_indices)):
+            test_idx = fold_indices[i]
+            mask = data.index.isin(test_idx)
+            mask[test_idx] = True
+
+            tuple_list.append(self._split_with_mask(data, mask))
+
+        return tuple_list
+
+    @staticmethod
+    def _split_with_mask(data, mask):
+        test = data[mask].reset_index(drop=True)
+        train = data[~mask].reset_index(drop=True)
+        return train, test
