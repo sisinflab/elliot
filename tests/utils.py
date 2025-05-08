@@ -2,8 +2,8 @@ from types import SimpleNamespace
 import pandas as pd
 
 
-def read_dataset(dataset_path, cols=False):
-    column_names = ['userId', 'itemId', 'rating', 'timestamp'] if cols else None
+def read_dataset(dataset_path, cols=None):
+    column_names = ['userId', 'itemId', 'rating', 'timestamp'] if cols is None else cols
     df_mock = pd.read_csv(dataset_path, sep='\t', names=column_names)
     return df_mock
 

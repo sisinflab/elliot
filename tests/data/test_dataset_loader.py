@@ -1,6 +1,6 @@
 import importlib
 from pathlib import Path
-from utils import *
+from tests.utils import *
 
 import pytest
 from unittest.mock import patch
@@ -69,7 +69,7 @@ class TestDataSetLoader:
             'dataset_path': dataset_path
         }
 
-        df_mock = read_dataset(dataset_path, cols=True)
+        df_mock = read_dataset(dataset_path)
         train_df = df_mock.iloc[:4]
         test_df = df_mock.iloc[4:]
 

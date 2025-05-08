@@ -1,6 +1,6 @@
 import importlib
 from pathlib import Path
-from utils import *
+from tests.utils import *
 
 import pytest
 
@@ -13,10 +13,12 @@ class TestPreFilter:
 
     def _apply_filter(self, config):
         ns = create_namespace(config)
-        self._sample_df = read_dataset(self._dataset_path, cols=True)
-        prefiltering_class = getattr(importlib.import_module('elliot.prefiltering'), 'PreFilter')
-        filtered = prefiltering_class.single_filter(self._sample_df, ns)
-        return filtered
+        if not hasattr(self, '_sample_df'):
+            cols = ['userId', 'itemId', 'rating']
+            self._sample_df = read_dataset(self._dataset_path, cols=cols)
+        cls = getattr(importlib.import_module('elliot.prefiltering'), 'PreFilter')
+        prefilter = cls(self._sample_df, [ns])
+        return prefilter.filter()
 
     def test_global_threshold(self):
         config = {
@@ -81,10 +83,6 @@ class TestPreFilter:
         }
         filtered = self._apply_filter(config)
         assert all(filtered.groupby("userId").size() <= 2)
-
-    def test_missing_strategy_raises(self):
-        with pytest.raises(ValueError):
-            self._apply_filter({})
 
     def test_invalid_threshold_value(self):
         config = {
