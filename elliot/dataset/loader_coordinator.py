@@ -86,7 +86,9 @@ class DataSetLoader:
     def _preprocess_data(self):
         if self.config.data_config.strategy != "dataset":
             return
-        self.dataframe = PreFilter.filter(self.dataframe, self.config)
+        if hasattr(self.config, 'prefiltering'):
+            prefilter = PreFilter(self.dataframe, self.config.prefiltering)
+            self.dataframe = prefilter.filter()
         self.logger.info("There will be the splitting")
         splitter = Splitter(self.dataframe, self.config.splitting, self.config.random_seed)
         self.tuple_list = splitter.process_splitting()
