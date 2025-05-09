@@ -5,7 +5,6 @@ import math
 import shutil
 import os
 
-from collections import Counter
 from types import SimpleNamespace
 
 from elliot.utils.folder import create_folder_by_index
@@ -361,34 +360,33 @@ class Splitter:
         Raises:
             ValueError: If no valid timestamp is found for the split.
         """
-        data = d.copy()
-        data.sort_values(by=["userId", "timestamp"], inplace=True)
+        all_timestamps = np.sort(d["timestamp"].unique())
+        counter_array = np.zeros(len(all_timestamps), dtype=np.uint32)
 
-        ts_counter = Counter()
-        user_groups = data.groupby("userId")
+        user_groups = d.groupby("userId")
 
         for _, group in user_groups:
-            timestamps = group["timestamp"].to_numpy()
-            n = len(timestamps)
-            # Skip users with not enough total events
-            if n < (min_below + min_over):
+            user_ts = np.sort(group["timestamp"].to_numpy())
+            n = len(user_ts)
+            if n < (min_below + min_over + 1):
                 continue
-            # Valid indices range
-            start = min_below
-            end = n - min_over
-            if start >= end:
-                continue  # No valid split point
-            valid_timestamps = timestamps[start:end]
-            ts_counter.update(valid_timestamps)
+            start = user_ts[min_below]
+            end = user_ts[n - min_over - 1]
+            # Extract all the timestamps within the interval of the current user...
+            start_idx = np.searchsorted(all_timestamps, start, side="left")
+            end_idx = np.searchsorted(all_timestamps, end, side="right")
+            # ...and update their counters
+            counter_array[start_idx:end_idx] += 1
 
-        if not ts_counter:
+        if counter_array.sum() == 0:
             raise ValueError("No valid timestamp found. Try lowering min_below or min_over.")
 
-        max_votes = max(ts_counter.values())
-        best_ts = max(ts for ts, count in ts_counter.items() if count == max_votes)
+        max_votes = np.max(counter_array)
+        max_indices = np.where(counter_array == max_votes)[0]
+        best_ts = all_timestamps[max_indices[-1]]
 
         print(f"Best Timestamp: {best_ts}")
-        return self.splitting_passed_timestamp(d, best_ts)
+        return self.splitting_passed_timestamp(d, int(best_ts))
 
     def splitting_k_folds(self, d: pd.DataFrame, folds):
         """
