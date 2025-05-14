@@ -40,11 +40,12 @@ class TestDataSetLoader:
 
         loader = dataloader(config)
 
-        assert loader.train_dataframe.shape[0] == 1
-        assert loader.test_dataframe.shape[0] == 1
+        assert loader.tuple_list[0][1].shape[0] == 1
         if val:
-            assert loader.validation_dataframe.shape[0] == 1
+            assert loader.tuple_list[0][0][0][0].shape[0] == 1
+            assert loader.tuple_list[0][0][0][1].shape[0] == 1
         else:
+            assert loader.tuple_list[0][0].shape[0] == 1
             assert hasattr(loader, "validation_dataframe") is False
         assert isinstance(loader.tuple_list, list)
         assert len(loader.tuple_list[0][0]) == 1
@@ -75,10 +76,6 @@ class TestDataSetLoader:
 
         with (
             patch(
-                "elliot.dataset.loader_coordinator.PreFilter.filter",
-                return_value=df_mock
-            ) as mock_filter,
-            patch(
                 "elliot.dataset.loader_coordinator.Splitter.process_splitting",
                 return_value=[(train_df, test_df)]
             ) as mock_splitter
@@ -86,7 +83,6 @@ class TestDataSetLoader:
 
             loader = dataloader(config)
 
-            mock_filter.assert_called_once()
             mock_splitter.assert_called_once()
 
             assert loader.dataframe.shape[0] == 5

@@ -27,7 +27,7 @@ class DataSetLoader:
         column_names (list): Default column names used for reading interaction files.
         logger (Logger): Logger instance for the class.
         tuple_list (list): Contains train-validation-test splits depending on the strategy.
-        dataframe (pd.DataFrame): DataFrame with interactions (if applicable).
+        dataframe (pd.DataFrame): DataFrame with interactions (only for `"dataset"` strategy).
         side_information (SimpleNamespace): Loaded side information, if specified.
 
     Supported Loading Strategies:
@@ -74,9 +74,9 @@ class DataSetLoader:
         if config.config_test:
             return
 
-        self._load_ratings()
-        self._load_additional_features()
-        self._preprocess_data()
+        df = self._load_ratings()
+        df = self._load_additional_features(df)
+        self.tuple_list = self._preprocess_data(df) if self.config.data_config.strategy == 'dataset' else df
 
         if isinstance(self.tuple_list[0][1], list):
             self.logger.warning("You are using a splitting strategy with folds. "
@@ -88,6 +88,12 @@ class DataSetLoader:
         """
         Load user-item interaction data according to the selected strategy.
 
+        Returns:
+            dataframe: the loaded dataset(s), either as:
+                - A list of (train, test) tuples,
+                - A list of ((train, validation), test) tuples, or
+                - A single DataFrame for unstructured datasets.
+
         Raises:
             Exception: If an unsupported strategy is specified.
         """
@@ -96,53 +102,79 @@ class DataSetLoader:
             path_val_data = getattr(self.config.data_config, "validation_path", None)
             path_test_data = self.config.data_config.test_path
 
-            self.train_dataframe = self._load_data(path_train_data, check_timestamp=True)
-            self.test_dataframe = self._load_data(path_test_data, check_timestamp=True)
+            train_dataframe = self._load_data(path_train_data, check_timestamp=True)
+            test_dataframe = self._load_data(path_test_data, check_timestamp=True)
 
             self.logger.info(f"{path_train_data} - Loaded")
 
             if path_val_data:
-                self.validation_dataframe = self._load_data(path_val_data, check_timestamp=True)
-                self.tuple_list = [([(self.train_dataframe, self.validation_dataframe)], self.test_dataframe)]
+                validation_dataframe = self._load_data(path_val_data, check_timestamp=True)
+                dataframe = [([(train_dataframe, validation_dataframe)], test_dataframe)]
             else:
-                self.tuple_list = [(self.train_dataframe, self.test_dataframe)]
+                dataframe = [(train_dataframe, test_dataframe)]
 
         elif self.config.data_config.strategy == "hierarchy":
-            self.tuple_list = self.read_splitting(self.config.data_config.root_folder)
+            dataframe = self.read_splitting(self.config.data_config.root_folder)
 
         elif self.config.data_config.strategy == "dataset":
             path_dataset = self.config.data_config.dataset_path
 
-            self.dataframe = self._load_data(path_dataset, check_timestamp=True)
+            dataframe = self._load_data(path_dataset, check_timestamp=True)
             # self.logger.info(('{0} - Loaded'.format(path_dataset)))
 
         else:
             raise Exception("Strategy option not recognized")
 
-    def _load_additional_features(self):
+        return dataframe
+
+    def _load_additional_features(self, dataframe):
         """
         Loads and coordinates side information features (e.g., item content or user metadata),
         if specified in the configuration.
-        """
-        dataframe = self.dataframe if hasattr(self, 'dataframe') else self.tuple_list
-        self.dataframe, self.side_information = self.coordinate_information(dataframe,
-                                                                            sides=self.config.data_config.side_information,
-                                                                            logger=self.logger)
-        # pass
 
-    def _preprocess_data(self):
+        Args:
+            dataframe: Union[
+                List[Tuple[pd.DataFrame, pd.DataFrame]],
+                List[Tuple[List[Tuple[pd.DataFrame, pd.DataFrame]], pd.DataFrame]],
+                pd.DataFrame
+            ]
+                The loaded dataset(s), either as:
+                - A list of (train, test) tuples,
+                - A list of ((train, validation), test) tuples, or
+                - A single DataFrame for unstructured datasets.
+
+        Returns:
+            dataframe: The dataset(s) modified with side_information loading, either as:
+                - A list of (train, test) tuples,
+                - A list of ((train, validation), test) tuples, or
+                - A single DataFrame for unstructured datasets.
+        """
+        dataframe, self.side_information = self.coordinate_information(dataframe,
+                                                                       sides=self.config.data_config.side_information,
+                                                                       logger=self.logger)
+        return dataframe
+
+    def _preprocess_data(self, dataframe):
         """
         Applies optional pre-filtering and performs dataset splitting,
         only if the `"dataset"` strategy is used.
+
+        Args:
+            dataframe (pd.DataFrame): DataFrame with interactions.
+
+        Returns:
+            dataframe: The split dataset either as:
+                - A list of (train, test) tuples,
+                - A list of ((train, validation), test) tuples.
         """
-        if self.config.data_config.strategy != "dataset":
-            return
+        self.dataframe = dataframe
         if hasattr(self.config, 'prefiltering'):
             prefilter = PreFilter(self.dataframe, self.config.prefiltering)
             self.dataframe = prefilter.filter()
         self.logger.info("There will be the splitting")
         splitter = Splitter(self.dataframe, self.config.splitting, self.config.random_seed)
-        self.tuple_list = splitter.process_splitting()
+        tuple_list = splitter.process_splitting()
+        return tuple_list
 
     def _load_data(self, file_path, check_timestamp=False):
         """
