@@ -71,12 +71,24 @@ class DataSetLoader:
         self.kwargs = kwargs
         self.config = config
         self.column_names = ['userId', 'itemId', 'rating', 'timestamp']
-        if config.config_test:
+        self.dataframe = None
+        self.tuple_list = None
+        self.side_information = None
+
+        self._load_data()
+
+    def _load_data(self):
+        """
+        Fully loads and preprocesses the dataset.
+
+        Executes loading of ratings, optional side information, and dataset preprocessing.
+        """
+        if self.config.config_test:
             return
 
-        df = self._load_ratings()
-        df = self._load_additional_features(df)
-        self.tuple_list = self._preprocess_data(df) if self.config.data_config.strategy == 'dataset' else df
+        self._load_ratings()
+        self._load_side_information()
+        self._preprocess_data()
 
         if isinstance(self.tuple_list[0][1], list):
             self.logger.warning("You are using a splitting strategy with folds. "
@@ -86,13 +98,7 @@ class DataSetLoader:
 
     def _load_ratings(self):
         """
-        Load user-item interaction data according to the selected strategy.
-
-        Returns:
-            dataframe: the loaded dataset(s), either as:
-                - A list of (train, test) tuples,
-                - A list of ((train, validation), test) tuples, or
-                - A single DataFrame for unstructured datasets.
+        Loads user-item interaction data according to the selected strategy.
 
         Raises:
             Exception: If an unsupported strategy is specified.
@@ -102,99 +108,48 @@ class DataSetLoader:
             path_val_data = getattr(self.config.data_config, "validation_path", None)
             path_test_data = self.config.data_config.test_path
 
-            train_dataframe = self._load_data(path_train_data, check_timestamp=True)
-            test_dataframe = self._load_data(path_test_data, check_timestamp=True)
+            train_df = self._read_from_tsv(path_train_data, check_timestamp=True)
+            test_df = self._read_from_tsv(path_test_data, check_timestamp=True)
 
             self.logger.info(f"{path_train_data} - Loaded")
 
             if path_val_data:
-                validation_dataframe = self._load_data(path_val_data, check_timestamp=True)
-                dataframe = [([(train_dataframe, validation_dataframe)], test_dataframe)]
+                val_df = self._read_from_tsv(path_val_data, check_timestamp=True)
+                self.dataframe = [([(train_df, val_df)], test_df)]
             else:
-                dataframe = [(train_dataframe, test_dataframe)]
+                self.dataframe = [(train_df, test_df)]
 
         elif self.config.data_config.strategy == "hierarchy":
-            dataframe = self.read_splitting(self.config.data_config.root_folder)
+            self.dataframe = self._read_splitting(self.config.data_config.root_folder)
 
         elif self.config.data_config.strategy == "dataset":
             path_dataset = self.config.data_config.dataset_path
 
-            dataframe = self._load_data(path_dataset, check_timestamp=True)
+            self.dataframe = self._read_from_tsv(path_dataset, check_timestamp=True)
             # self.logger.info(('{0} - Loaded'.format(path_dataset)))
 
         else:
             raise Exception("Strategy option not recognized")
 
-        return dataframe
-
-    def _load_additional_features(self, dataframe):
+    def _read_from_tsv(self, file_path, check_timestamp=False):
         """
-        Loads and coordinates side information features (e.g., item content or user metadata),
-        if specified in the configuration.
-
-        Args:
-            dataframe: Union[
-                List[Tuple[pd.DataFrame, pd.DataFrame]],
-                List[Tuple[List[Tuple[pd.DataFrame, pd.DataFrame]], pd.DataFrame]],
-                pd.DataFrame
-            ]
-                The loaded dataset(s), either as:
-                - A list of (train, test) tuples,
-                - A list of ((train, validation), test) tuples, or
-                - A single DataFrame for unstructured datasets.
-
-        Returns:
-            dataframe: The dataset(s) modified with side_information loading, either as:
-                - A list of (train, test) tuples,
-                - A list of ((train, validation), test) tuples, or
-                - A single DataFrame for unstructured datasets.
-        """
-        dataframe, self.side_information = self.coordinate_information(dataframe,
-                                                                       sides=self.config.data_config.side_information,
-                                                                       logger=self.logger)
-        return dataframe
-
-    def _preprocess_data(self, dataframe):
-        """
-        Applies optional pre-filtering and performs dataset splitting,
-        only if the `"dataset"` strategy is used.
-
-        Args:
-            dataframe (pd.DataFrame): DataFrame with interactions.
-
-        Returns:
-            dataframe: The split dataset either as:
-                - A list of (train, test) tuples,
-                - A list of ((train, validation), test) tuples.
-        """
-        self.dataframe = dataframe
-        if hasattr(self.config, 'prefiltering'):
-            prefilter = PreFilter(self.dataframe, self.config.prefiltering)
-            self.dataframe = prefilter.filter()
-        self.logger.info("There will be the splitting")
-        splitter = Splitter(self.dataframe, self.config.splitting, self.config.random_seed)
-        tuple_list = splitter.process_splitting()
-        return tuple_list
-
-    def _load_data(self, file_path, check_timestamp=False):
-        """
-        Read interaction data from a file.
+        Loads a TSV file and optionally processes the timestamp or binarizes ratings.
 
         Args:
             file_path (str): Path to the TSV file containing interactions.
             check_timestamp (bool): Whether to drop the timestamp column if it's empty.
 
         Returns:
-            pd.DataFrame: The loaded data.
+            pd.DataFrame: The loaded and formatted DataFrame.
         """
-        dataframe = pd.read_csv(file_path, sep='\t', header=None, names=self.column_names)
-        if check_timestamp and all(dataframe["timestamp"].isna()):
-            dataframe = dataframe.drop(columns=["timestamp"]).reset_index(drop=True)
-        if self.config.binarize == True or all(dataframe["rating"].isna()):
-            dataframe["rating"] = 1
-        return dataframe
+        df = pd.read_csv(file_path, sep='\t', header=None, names=self.column_names)
+        if check_timestamp and all(df["timestamp"].isna()):
+            df.drop(columns=["timestamp"], inplace=True)
+        if self.config.binarize == True or all(df["rating"].isna()):
+            df["rating"] = 1
+        return df
 
-    def read_splitting(self, folder_path):
+    def _read_splitting(self, folder_path):
         """
         Reads train/val/test splits organized in a hierarchical folder structure.
 
@@ -207,20 +162,166 @@ class DataSetLoader:
         tuple_list = []
         for dirs in os.listdir(folder_path):
             for test_dir in dirs:
-                test_ = self._load_data(os.sep.join([folder_path, test_dir, "test.tsv"]))
+                test_ = self._read_from_tsv(os.sep.join([folder_path, test_dir, "test.tsv"]))
                 val_dirs = [os.sep.join([folder_path, test_dir, val_dir]) for val_dir in
                             os.listdir(os.sep.join([folder_path, test_dir])) if
                             os.path.isdir(os.sep.join([folder_path, test_dir, val_dir]))]
                 val_list = []
                 for val_dir in val_dirs:
-                    train_ = self._load_data(os.sep.join([val_dir, "train.tsv"]))
-                    val_ = self._load_data(os.sep.join([val_dir, "val.tsv"]))
+                    train_ = self._read_from_tsv(os.sep.join([val_dir, "train.tsv"]))
+                    val_ = self._read_from_tsv(os.sep.join([val_dir, "val.tsv"]))
                     val_list.append((train_, val_))
                 if not val_list:
-                    val_list = self._load_data(os.sep.join([folder_path, test_dir, "train.tsv"]))
+                    val_list = self._read_from_tsv(os.sep.join([folder_path, test_dir, "train.tsv"]))
                 tuple_list.append((val_list, test_))
 
         return tuple_list
+
+    def _load_side_information(self):
+        """
+        Loads side information (e.g., user/item features) using custom dataloaders defined in config.
+
+        Raises:
+            TypeError: If a provided loader does not inherit from AbstractLoader.
+        """
+        users, items = set(), set()
+        df = self.dataframe
+
+        if isinstance(df, list):
+            train, test = df[0]
+            users |= set(test["userId"].unique())
+            items |= set(test["itemId"].unique())
+            if isinstance(train, list):
+                tr, val = train[0]
+                users |= set(tr["userId"].unique()) | set(val["userId"].unique())
+                items |= set(tr["itemId"].unique()) | set(val["itemId"].unique())
+            else:
+                users |= set(train["userId"].unique())
+                items |= set(train["itemId"].unique())
+        else:
+            users = set(df["userId"].unique())
+            items = set(df["itemId"].unique())
+
+        self.users = users
+        self.items = items
+
+        side_info_objs = []
+        sides = self.config.data_config.side_information
+        for side in sides:
+            module = importlib.import_module("elliot.dataset.dataloader.loaders")
+            dataloader_class = getattr(module, side.dataloader)
+            if not issubclass(dataloader_class, AbstractLoader):
+                raise Exception("Custom Loaders must inherit from AbstractLoader")
+            side_obj = dataloader_class(users, items, side, self.logger)
+            side_info_objs.append(side_obj)
+
+        self.side_info_objs = side_info_objs
+        self._build_side_info_namespace()
+
+    def _build_side_info_namespace(self):
+        """
+        Builds a unified namespace from all loaded side information objects.
+        """
+        ns = SimpleNamespace()
+        for side_obj in self.side_info_objs:
+            side_ns = side_obj.create_namespace()
+            name = side_ns.__name__
+            setattr(ns, name, side_ns)
+        self.side_information = ns
+
+    def _preprocess_data(self):
+        """
+        Applies user/item filtering based on side information.
+        Performs optional pre-filtering and dataset splitting, only if the `"dataset"` strategy is used.
+        """
+        users, items = self._intersect_users_items()
+        self.dataframe = self._clean_all_dataframes(users, items)
+
+        if self.config.data_config.strategy != 'dataset':
+            self.tuple_list = self.dataframe
+            return
+
+        if hasattr(self.config, 'prefiltering'):
+            prefilter = PreFilter(self.dataframe, self.config.prefiltering)
+            self.dataframe = prefilter.filter()
+
+        self.logger.info("There will be the splitting")
+        splitter = Splitter(self.dataframe, self.config.splitting, self.config.random_seed)
+        self.tuple_list = splitter.process_splitting()
+
+    def _intersect_users_items(self):
+        """
+        Repeatedly intersects users/items with those available in side information.
+
+        Returns:
+            Tuple[Set, Set]: Final sets of users and items after intersection.
+        """
+        users = self.users
+        items = self.items
+        users_items = [side_obj.get_mapped() for side_obj in self.side_info_objs]
+
+        while True:
+            new_users, new_items = users.copy(), items.copy()
+            for us_, is_ in users_items:
+                new_users &= us_
+                new_items &= is_
+            if len(new_users) == len(users) and len(new_items) == len(items):
+                break
+            users = new_users
+            items = new_items
+            for side_obj in self.side_info_objs:
+                side_obj.filter(users, items)
+
+        del self.users, self.items, self.side_info_objs
+        return users, items
+
+    def _clean_all_dataframes(self, users, items):
+        """
+        Cleans all loaded DataFrames by filtering users/items and removing duplicates.
+
+        Args:
+            users (Set): Valid users to retain.
+            items (Set): Valid items to retain.
+
+        Returns:
+            Union[list, pd.DataFrame]: Cleaned dataset(s).
+        """
+        def clean(df): return self._clean_single_dataframe(df, users, items)
+
+        if isinstance(self.dataframe, list):
+            new_dataframe = []
+            for tr, te in self.dataframe:
+                test = clean(te)
+                if isinstance(tr, list):
+                    train_fold = [(clean(tr_), clean(va)) for tr_, va in tr]
+                else:
+                    train_fold = clean(tr)
+                new_dataframe.append((train_fold, test))
+            return new_dataframe
+
+        return clean(self.dataframe)
+
+    def _clean_single_dataframe(self, df, users, items):
+        """
+        Filters a single DataFrame based on valid users/items and applies basic cleanup.
+
+        Args:
+            df (pd.DataFrame): The DataFrame to clean.
+            users (Set): Valid users to retain.
+            items (Set): Valid items to retain.
+
+        Returns:
+            pd.DataFrame: Cleaned DataFrame.
+        """
+        df = df[df["userId"].isin(users) & df["itemId"].isin(items)].reset_index(drop=True)
+
+        mean_imputing_feats = ['timestamp']
+        for feat in mean_imputing_feats:
+            if feat in list(df.columns):
+                df[feat] = df[feat].fillna(df[feat].mean())
+
+        df.drop_duplicates(keep='first', inplace=True)
+        return df
 
     def generate_dataobjects(self) -> t.List[object]:
         data_list = []
@@ -255,82 +356,3 @@ class DataSetLoader:
         data_list = [[DataSet(self.config, (training_set, test_set), self.args, self.kwargs)]]
 
         return data_list
-
-    def coordinate_information(self, dataframe: t.Union[pd.DataFrame, t.List],
-                               sides: t.List[SimpleNamespace]=[],
-                               logger: object = None) -> t.Tuple[pd.DataFrame, SimpleNamespace]:
-        if isinstance(dataframe, list):
-            users = set()
-            items = set()
-            train, test = dataframe[0]
-            users = users | set(test["userId"].unique())
-            items = items | set(test["itemId"].unique())
-            if not isinstance(train, list):
-                users = users | set(train["userId"].unique())
-                items = items | set(train["itemId"].unique())
-            else:
-                train, val = train[0]
-                users = users | set(train["userId"].unique())
-                items = items | set(train["itemId"].unique())
-                users = users | set(val["userId"].unique())
-                items = items | set(val["itemId"].unique())
-        else:
-            users = set(dataframe["userId"].unique())
-            items = set(dataframe["itemId"].unique())
-
-        ns = SimpleNamespace()
-
-        side_info_objs = []
-        users_items = []
-        for side in sides:
-            dataloader_class = getattr(importlib.import_module("elliot.dataset.dataloader.loaders"), side.dataloader)
-            if issubclass(dataloader_class, AbstractLoader):
-                side_obj = dataloader_class(users, items, side, logger)
-                side_info_objs.append(side_obj)
-                users_items.append(side_obj.get_mapped())
-            else:
-                raise Exception("Custom Loaders must inherit from AbstractLoader")
-
-        while True:
-            new_users = users
-            new_items = items
-            for us_, is_ in users_items:
-                new_users = new_users & us_
-                new_items = new_items & is_
-            if (len(new_users) == len(users)) & (len(new_items) == len(items)):
-                break
-            else:
-                users = new_users
-                items = new_items
-
-                for side_obj in side_info_objs:
-                    side_obj.filter(users, items)
-
-        for side_obj in side_info_objs:
-            side_ns = side_obj.create_namespace()
-            name = side_ns.__name__
-            setattr(ns, name, side_ns)
-
-        if isinstance(dataframe, list):
-            new_dataframe = []
-            for tr, te in dataframe:
-                test = self.clean_dataframe(te, users, items)
-                if isinstance(tr, list):
-                    train_fold = []
-                    for tr_, va in tr:
-                        tr_ = self.clean_dataframe(tr_, users, items)
-                        va = self.clean_dataframe(va, users, items)
-                        train_fold.append((tr_, va))
-                else:
-                    train_fold = self.clean_dataframe(tr, users, items)
-                new_dataframe.append((train_fold, test))
-            dataframe = new_dataframe
-            # dataframe = [([(self.clean_dataframe(tr_, users, items), self.clean_dataframe(va, users, items)) for tr_, va in tr], self.clean_dataframe(te, users, items)) for tr, te in dataframe]
-        else:
-            dataframe = self.clean_dataframe(dataframe, users, items)
-
-        return dataframe, ns
-
-    def clean_dataframe(self, dataframe, users, items):
-        dataframe = dataframe[dataframe['userId'].isin(users)]
-        return dataframe[dataframe['itemId'].isin(items)]
