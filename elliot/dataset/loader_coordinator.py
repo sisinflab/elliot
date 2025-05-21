@@ -320,6 +320,7 @@ class DataSetLoader:
             if feat in list(df.columns):
                 df[feat] = df[feat].fillna(df[feat].mean())
 
+        df.dropna(inplace=True)
         df.drop_duplicates(keep='first', inplace=True)
         return df
 
