@@ -1,7 +1,12 @@
 import functools
 import time
+from pathlib import Path
 from types import SimpleNamespace
 import pandas as pd
+
+test_path = Path(__file__).parent / 'data'
+data_path = Path(__file__).parent.parent / 'data'
+
 
 def time_single_test(func):
     @functools.wraps(func)
@@ -17,7 +22,8 @@ def time_single_test(func):
 
 def read_dataset(dataset_path, cols=None):
     column_names = ['userId', 'itemId', 'rating', 'timestamp'] if cols is None else cols
-    df_mock = pd.read_csv(dataset_path, sep='\t', names=column_names)
+    df = pd.read_csv(dataset_path, sep='\t', names=column_names)
+    df_mock = df.dropna(axis=1, how='all')
     return df_mock
 
 def create_namespace(config, attr=None):

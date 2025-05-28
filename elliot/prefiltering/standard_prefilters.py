@@ -98,10 +98,10 @@ class PreFilter:
                 self.filter_ratings_by_user_average(data)
 
             case "user_k_core":
-                self.filter_users_by_profile_size(data, self._get_validated_attr(ns, "core"))
+                self.filter_user_k_core(data, self._get_validated_attr(ns, "core"))
 
             case "item_k_core":
-                self.filter_items_by_popularity(data, self._get_validated_attr(ns, "core"))
+                self.filter_item_k_core(data, self._get_validated_attr(ns, "core"))
 
             case "iterative_k_core":
                 return self.filter_iterative_k_core(data, self._get_validated_attr(ns, "core"))
@@ -109,7 +109,7 @@ class PreFilter:
             case "n_rounds_k_core":
                 core = self._get_validated_attr(ns, "core")
                 rounds = self._get_validated_attr(ns, "rounds")
-                return self.filter_rounds_k_core(data, core, rounds)
+                return self.filter_n_rounds_k_core(data, core, rounds)
 
             case "cold_users":
                 self.filter_retain_cold_users(data, self._get_validated_attr(ns, "threshold"))
@@ -134,7 +134,8 @@ class PreFilter:
            Any: The validated attribute value.
 
         Raises:
-           ValueError: If the attribute is missing or has an invalid type.
+           ValueError: If the attribute is missing.
+           TypeError: If the attribute has invalid type.
         """
         val = getattr(ns, attr, None)
         if required and val is None:
@@ -145,7 +146,7 @@ class PreFilter:
         else:
             msg = f"{attr} must be an integer"
         if not isinstance(val, expected_type):
-            raise ValueError(msg)
+            raise TypeError(msg)
 
         return val
 
@@ -189,7 +190,7 @@ class PreFilter:
         print(f"The transactions above threshold are {self._mask.sum()}")
         print(f"The transactions below threshold are {(~self._mask).sum()}\n")
 
-    def filter_users_by_profile_size(self, data: pd.DataFrame, threshold) -> None:
+    def filter_user_k_core(self, data: pd.DataFrame, threshold) -> None:
         """
         Retains only users with at least `threshold` interactions.
 
@@ -206,7 +207,7 @@ class PreFilter:
         print(f"The transactions after filtering are {self._mask.sum()}")
         print(f"The users after filtering are {data[self._mask]['userId'].nunique()}")
 
-    def filter_items_by_popularity(self, data: pd.DataFrame, threshold) -> None:
+    def filter_item_k_core(self, data: pd.DataFrame, threshold) -> None:
         """
         Retains only items with at least `threshold` interactions.
 
@@ -240,15 +241,15 @@ class PreFilter:
         print(f"Iterative {threshold}-core")
         while original_length != len(data):
             original_length = len(data)
-            self.filter_users_by_profile_size(data, threshold)
+            self.filter_user_k_core(data, threshold)
             data = data[self._mask]
-            self.filter_items_by_popularity(data, threshold)
+            self.filter_item_k_core(data, threshold)
             data = data[self._mask]
         print("**************************************\n")
 
         return data
 
-    def filter_rounds_k_core(self, data: pd.DataFrame, threshold, n_rounds) -> pd.DataFrame:
+    def filter_n_rounds_k_core(self, data: pd.DataFrame, threshold, n_rounds) -> pd.DataFrame:
         """
         Applies a fixed number of user/item k-core filtering rounds.
 
@@ -264,9 +265,9 @@ class PreFilter:
         print(f"{n_rounds} rounds of user/item {threshold}-core")
         for i in range(n_rounds):
             print(f"Iteration:\t{i}")
-            self.filter_users_by_profile_size(data, threshold)
+            self.filter_user_k_core(data, threshold)
             data = data[self._mask]
-            self.filter_items_by_popularity(data, threshold)
+            self.filter_item_k_core(data, threshold)
             data = data[self._mask]
         print("**************************************\n")
 
