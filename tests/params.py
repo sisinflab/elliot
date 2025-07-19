@@ -1,3 +1,4 @@
+from itertools import product
 from tests.utils import test_path, data_path
 
 _folder_movielens_1m = str(data_path / 'cat_dbpedia_movielens_1m_v030')
@@ -6,6 +7,8 @@ _path_movielens_1m = _folder_movielens_1m + '/dataset.tsv'
 _folder_movielens_10m = str(data_path / 'cat_dbpedia_movielens_10m')
 _path_movielens_10m = _folder_movielens_10m + '/dataset.tsv'
 
+
+# DataSetLoader
 
 params_dataset_loader = {
     'fixed_strategy': [
@@ -46,11 +49,6 @@ params_dataset_loader = {
         #    'df_shape': 10000054
         #}
     ],
-    'fixed_strategy_missing_file': [
-        {
-            'folder_path': str(test_path / 'fixed_strategy_missing_file')
-        }
-    ],
     'filter_nan': [
         {
             'dataset_folder': str(test_path / 'filter_nan'),
@@ -59,6 +57,26 @@ params_dataset_loader = {
     ]
 }
 
+params_dataset_loader_fail = {
+    'fixed_strategy_missing_file': [
+        {
+            'folder_path': str(test_path / 'fixed_strategy_missing_file')
+        }
+    ],
+    'hierarchy_strategy_missing_root_folder': [
+        {
+            'root_folder': 'non/existent/path'
+        }
+    ],
+    'dataset_strategy_missing_dataset': [
+        {
+            'dataset_path': 'nonexistent/file.tsv'
+        }
+    ]
+}
+
+
+# PreFilter
 
 params_pre_filtering = {
     #'dataset_path': _path_movielens_10m,
@@ -104,4 +122,37 @@ params_pre_filtering = {
             'threshold': 2
         }
     ]
+}
+
+params_pre_filtering_fail = {
+    'invalid_global_threshold': list(product(
+        params_pre_filtering['global_threshold'],
+        [[3], -3, 'invalid', None]
+    )),
+    'invalid_user_k_core': list(product(
+        params_pre_filtering['user_k_core'],
+        [-5, 'abc', None]
+    )),
+    'invalid_item_k_core': list(product(
+        params_pre_filtering['item_k_core'],
+        [-5, 2.5, None]
+    )),
+    'invalid_iterative_k_core': list(product(
+        params_pre_filtering['iterative_k_core'],
+        [-5, 'x', None]
+    )),
+    # Filter only invalid combinations for n_rounds_k_core
+    'invalid_n_rounds_combinations': [
+        (params, c, r)
+        for params, c, r in product(
+            params_pre_filtering['n_rounds_k_core'],
+            [2, -5, 'x', None],
+            [2, -5, 'y', None]
+        )
+        if not (c == 2 and r == 2)
+    ],
+    'invalid_cold_users': list(product(
+        params_pre_filtering['cold_users'],
+        [-99, 'cold', None]
+    ))
 }
