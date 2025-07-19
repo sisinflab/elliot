@@ -1,7 +1,7 @@
 import importlib
 from itertools import product
-from tests.test_params import params_pre_filtering
-from tests.test_utils import *
+from tests.params import params_pre_filtering
+from tests.utils import *
 
 import pytest
 
@@ -28,9 +28,12 @@ class TestPreFilter:
             'threshold': params['threshold']
         }
 
-        filtered = apply_filter(config, params['dataset_path'])
+        df = custom_read_dataset(params['dataset_path'])
+        filtered = apply_filter(config, df=df)
 
-        assert all(filtered["rating"] >= params['threshold'])
+        assert not filtered.empty
+        if len(filtered) < len(df):
+            assert all(filtered["rating"] >= params['threshold'])
 
     @pytest.mark.parametrize('params', params_pre_filtering['global_threshold'])
     def test_global_average(self, params):
@@ -65,9 +68,12 @@ class TestPreFilter:
             'core': params['core']
         }
 
-        filtered = apply_filter(config, params['dataset_path'])
+        df = custom_read_dataset(params['dataset_path'])
+        filtered = apply_filter(config, df=df)
 
-        assert filtered['userId'].value_counts().min() >= params['core']
+        assert not filtered.empty
+        if len(filtered) < len(df):
+            assert filtered['userId'].value_counts().min() >= params['core']
 
     @pytest.mark.parametrize('params', params_pre_filtering['item_k_core'])
     def test_item_k_core(self, params):
@@ -76,9 +82,12 @@ class TestPreFilter:
             'core': params['core']
         }
 
-        filtered = apply_filter(config, params['dataset_path'])
+        df = custom_read_dataset(params['dataset_path'])
+        filtered = apply_filter(config, df=df)
 
-        assert filtered['itemId'].value_counts().min() >= params['core']
+        assert not filtered.empty
+        if len(filtered) < len(df):
+            assert filtered['itemId'].value_counts().min() >= params['core']
 
     @pytest.mark.parametrize('params', params_pre_filtering['iterative_k_core'])
     def test_iterative_k_core(self, params):
@@ -87,10 +96,13 @@ class TestPreFilter:
             'core': params['core']
         }
 
-        filtered = apply_filter(config, params['dataset_path'])
+        df = custom_read_dataset(params['dataset_path'])
+        filtered = apply_filter(config, df=df)
 
-        assert filtered['userId'].value_counts().min() >= params['core']
-        assert filtered['itemId'].value_counts().min() >= params['core']
+        assert not filtered.empty
+        if len(filtered) < len(df):
+            assert filtered['userId'].value_counts().min() >= params['core']
+            assert filtered['itemId'].value_counts().min() >= params['core']
 
     @pytest.mark.parametrize('params', params_pre_filtering['n_rounds_k_core'])
     def test_n_rounds_k_core(self, params):
@@ -100,10 +112,13 @@ class TestPreFilter:
             'rounds': params['rounds']
         }
 
-        filtered = apply_filter(config, params['dataset_path'])
+        df = custom_read_dataset(params['dataset_path'])
+        filtered = apply_filter(config, df=df)
 
-        assert filtered['userId'].value_counts().min() >= params['core']
-        assert filtered['itemId'].value_counts().min() >= params['core']
+        assert not filtered.empty
+        if len(filtered) < len(df):
+            assert filtered['userId'].value_counts().min() >= params['core']
+            assert filtered['itemId'].value_counts().min() >= params['core']
 
     @pytest.mark.parametrize('params', params_pre_filtering['cold_users'])
     def test_retain_cold_users(self, params):
@@ -112,26 +127,33 @@ class TestPreFilter:
             'threshold': params['threshold']
         }
 
-        filtered = apply_filter(config, params['dataset_path'])
+        df = custom_read_dataset(params['dataset_path'])
+        filtered = apply_filter(config, df=df)
 
-        assert filtered['userId'].value_counts().min() <= params['threshold']
+        assert not filtered.empty
+        if len(filtered) < len(df):
+            assert filtered['userId'].value_counts().min() <= params['threshold']
 
 
 class TestPreFilterFailures:
+
+    def _assert_invalid_config(self, config, dataset_path):
+        with pytest.raises(Exception) as exc_info:
+            apply_filter(config, dataset_path)
+        assert isinstance(exc_info.value, (ValueError, TypeError))
 
     @pytest.mark.parametrize('params, th', list(product(
         params_pre_filtering['global_threshold'],
         [[3], -3, 'invalid', None]
     )))
     @time_single_test
-    @pytest.mark.xfail(raises=(ValueError, TypeError))
     def test_invalid_or_missing_global_threshold(self, params, th):
         config = {
             'strategy': 'global_threshold',
             **({'threshold': th} if th is not None else {})
         }
 
-        apply_filter(config, params['dataset_path'])
+        self._assert_invalid_config(config, params['dataset_path'])
 
     @pytest.mark.parametrize('params', params_pre_filtering['user_average'])
     def test_user_average_with_extra_param(self, params):
@@ -147,50 +169,52 @@ class TestPreFilterFailures:
         [-5, 'abc', None]
     )))
     @time_single_test
-    @pytest.mark.xfail(raises=(ValueError, TypeError))
     def test_invalid_or_missing_user_k_core(self, params, c):
         config = {
             'strategy': 'user_k_core',
             **({'core': c} if c is not None else {})
         }
 
-        apply_filter(config, params['dataset_path'])
+        self._assert_invalid_config(config, params['dataset_path'])
 
     @pytest.mark.parametrize('params, c', list(product(
         params_pre_filtering['item_k_core'],
         [-5, 2.5, None]
     )))
     @time_single_test
-    @pytest.mark.xfail(raises=(ValueError, TypeError))
     def test_invalid_or_missing_item_k_core(self, params, c):
         config = {
             'strategy': 'item_k_core',
             **({'core': c} if c is not None else {})
         }
 
-        apply_filter(config, params['dataset_path'])
+        self._assert_invalid_config(config, params['dataset_path'])
 
     @pytest.mark.parametrize('params, c', list(product(
         params_pre_filtering['iterative_k_core'],
         [-5, 'x', None]
     )))
     @time_single_test
-    @pytest.mark.xfail(raises=(ValueError, TypeError))
     def test_invalid_or_missing_iterative_k_core(self, params, c):
         config = {
             'strategy': 'iterative_k_core',
             **({'core': c} if c is not None else {})
         }
 
-        apply_filter(config, params['dataset_path'])
+        self._assert_invalid_config(config, params['dataset_path'])
 
-    @pytest.mark.parametrize('params, c, r', list(product(
-        params_pre_filtering['n_rounds_k_core'],
-        [2, -5, 'x', None],
-        [2, -5, 'y', None]
-    )))
+    # Filter only invalid combinations for n_rounds_k_core
+    _invalid_n_rounds_combinations = [
+        (params, c, r)
+        for params, c, r in product(
+            params_pre_filtering['n_rounds_k_core'],
+            [2, -5, 'x', None],
+            [2, -5, 'y', None]
+        )
+        if not (c == 2 and r == 2)
+    ]
+    @pytest.mark.parametrize('params, c, r', _invalid_n_rounds_combinations)
     @time_single_test
-    @pytest.mark.xfail(raises=(ValueError, TypeError))
     def test_invalid_or_missing_rounds_k_core(self, params, c, r):
         config = {
             'strategy': 'n_rounds_k_core',
@@ -198,21 +222,20 @@ class TestPreFilterFailures:
             **({'rounds': r} if r is not None else {})
         }
 
-        apply_filter(config, params['dataset_path'])
+        self._assert_invalid_config(config, params['dataset_path'])
 
     @pytest.mark.parametrize('params, th', list(product(
         params_pre_filtering['cold_users'],
         [-99, 'cold', None]
     )))
     @time_single_test
-    @pytest.mark.xfail(raises=(ValueError, TypeError))
     def test_invalid_or_missing_cold_users_threshold(self, params, th):
         config = {
             'strategy': 'cold_users',
             **({'threshold': th} if th is not None else {})
         }
 
-        apply_filter(config, params['dataset_path'])
+        self._assert_invalid_config(config, params['dataset_path'])
 
 
 if __name__ == '__main__':

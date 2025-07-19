@@ -1,4 +1,4 @@
-from tests.test_utils import test_path, data_path
+from tests.utils import test_path, data_path
 
 _folder_movielens_1m = str(data_path / 'cat_dbpedia_movielens_1m_v030')
 _path_movielens_1m = _folder_movielens_1m + '/dataset.tsv'
