@@ -1,6 +1,6 @@
 import importlib
-from tests.test_utils import *
-from tests.test_params import params_dataset_loader
+from tests.utils import *
+from tests.params import params_dataset_loader
 
 import pytest
 from unittest.mock import patch
@@ -125,7 +125,6 @@ class TestDataSetLoader:
 class TestDataSetLoaderFailures:
 
     @pytest.mark.parametrize('params', params_dataset_loader['fixed_strategy'])
-    @pytest.mark.xfail(raises=AttributeError)
     def test_fixed_strategy_missing_train_path(self, params):
         val = True if 'val_shape' in params.keys() else False
 
@@ -135,10 +134,10 @@ class TestDataSetLoaderFailures:
             **({'validation_path': params['folder_path'] + '/val.tsv'} if val else {})
         }
 
-        dataloader(config)
+        with pytest.raises(AttributeError):
+            dataloader(config)
 
     @pytest.mark.parametrize('params', params_dataset_loader['fixed_strategy_missing_file'])
-    @pytest.mark.xfail(raises=FileNotFoundError)
     def test_fixed_strategy_missing_file(self, params):
         val = True if 'val_shape' in params.keys() else False
 
@@ -149,28 +148,28 @@ class TestDataSetLoaderFailures:
             **({'validation_path': params['folder_path'] + '/val.tsv'} if val else {})
         }
 
-        dataloader(config)
+        with pytest.raises(FileNotFoundError):
+            dataloader(config)
 
-    @pytest.mark.xfail(raises=FileNotFoundError)
     def test_hierarchy_strategy_missing_root_folder(self):
         config = {
             'strategy': 'hierarchy',
             'root_folder': 'non/existent/path'
         }
 
-        dataloader(config)
+        with pytest.raises(FileNotFoundError):
+            dataloader(config)
 
-    @pytest.mark.xfail(raises=FileNotFoundError)
     def test_dataset_strategy_missing_dataset(self):
         config = {
             'strategy': 'dataset',
             'dataset_path': 'nonexistent/file.tsv'
         }
 
-        dataloader(config)
+        with pytest.raises(FileNotFoundError):
+            dataloader(config)
 
     @pytest.mark.parametrize('params', params_dataset_loader['dataset_strategy'])
-    @pytest.mark.xfail(raises=IndexError)
     def test_dataset_strategy_invalid_split(self, params, monkeypatch):
         dataset_path = params['dataset_folder'] + '/dataset.tsv'
 
@@ -187,7 +186,8 @@ class TestDataSetLoaderFailures:
             'dataset_path': dataset_path
         }
 
-        dataloader(config)
+        with pytest.raises(IndexError):
+            dataloader(config)
 
 
 if __name__ == '__main__':
