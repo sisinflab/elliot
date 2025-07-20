@@ -235,9 +235,7 @@ class DataSetLoader:
         Performs optional pre-filtering, and dataset splitting, only if the `"dataset"` strategy is used.
         """
         self._intersect_users_items()
-
-        cleaner = Cleaner(self.dataframe, self._users, self._items)
-        self.dataframe = cleaner.process_cleaning()
+        self._clean()
 
         del self._items, self._users, self._side_info_objs
 
@@ -274,6 +272,50 @@ class DataSetLoader:
 
         self._users, self._items = users, items
 
+    def _clean(self):
+        """
+        Cleans all loaded DataFrames by filtering users/items and removing duplicates.
+
+        Returns:
+            Union[list, pd.DataFrame]: Cleaned dataset(s).
+        """
+        def clean(df): return self._clean_single_dataframe(df)
+
+        if isinstance(self.dataframe, list):
+            new_dataframe = []
+            for tr, te in self.dataframe:
+                test = clean(te)
+                if isinstance(tr, list):
+                    train_fold = [(clean(tr_), clean(va)) for tr_, va in tr]
+                else:
+                    train_fold = clean(tr)
+                new_dataframe.append((train_fold, test))
+            self.dataframe = new_dataframe
+        else:
+            self.dataframe = clean(self.dataframe)
+
+    def _clean_single_dataframe(self, df):
+        """
+        Filters a single DataFrame based on valid users/items and applies basic cleanup,
+        i.e., handles missing values in the 'timestamp' column (if present), and removes duplicates.
+
+        Args:
+            df (pd.DataFrame): The DataFrame to clean.
+
+        Returns:
+            pd.DataFrame: Cleaned DataFrame.
+        """
+        df = df[df["userId"].isin(self._users) & df["itemId"].isin(self._items)].reset_index(drop=True)
+
+        mean_imputing_feats = ['timestamp']
+        for feat in mean_imputing_feats:
+            if feat in list(df.columns):
+                df[feat] = df[feat].fillna(df[feat].mean())
+
+        df.dropna(inplace=True)
+        df.drop_duplicates(keep='first', inplace=True)
+        return df
+
     def generate_dataobjects(self) -> t.List[object]:
         data_list = []
         for p1, (train_val, test) in enumerate(self.tuple_list):
@@ -307,75 +349,3 @@ class DataSetLoader:
         data_list = [[DataSet(self.config, (training_set, test_set), self.args, self.kwargs)]]
 
         return data_list
-
-
-class Cleaner:
-    """
-    The Cleaner class is responsible for cleaning data for recommendation datasets.
-
-    It filters out entries in the provided dataset(s) based on valid user and item IDs, and applies basic cleanup.
-    It supports both single DataFrames and nested structures used for training/testing or cross-validation.
-
-    Attributes
-        df (pd.DataFrame or list): The dataset to be cleaned. Can be a single DataFrame or a list of (train, test) tuples,
-            where each train can also be a list of (train_fold, val_fold) pairs for cross-validation.
-        users (set): A set of valid user IDs used to filter the dataset(s).
-        items (set): A set of valid item IDs used to filter the dataset(s).
-    """
-
-    def __init__(self, df, users, items):
-        """
-        Initializes the Cleaner object.
-
-        Args:
-            df (pd.Dataframe or list): The dataset to be cleaned.
-            users (set): A set of valid user IDs.
-            items (set): A set of valid item IDs.
-        """
-        self.df = df
-        self.users = users
-        self.items = items
-
-    def process_cleaning(self):
-        """
-        Cleans all loaded DataFrames by filtering users/items and removing duplicates.
-
-        Returns:
-            Union[list, pd.DataFrame]: Cleaned dataset(s).
-        """
-        def clean(df): return self._clean_single_dataframe(df)
-
-        if isinstance(self.df, list):
-            new_dataframe = []
-            for tr, te in self.df:
-                test = clean(te)
-                if isinstance(tr, list):
-                    train_fold = [(clean(tr_), clean(va)) for tr_, va in tr]
-                else:
-                    train_fold = clean(tr)
-                new_dataframe.append((train_fold, test))
-            return new_dataframe
-
-        return clean(self.df)
-
-    def _clean_single_dataframe(self, df):
-        """
-        Filters a single DataFrame based on valid users/items and applies basic cleanup,
-        i.e., handles missing values in the 'timestamp' column (if present), and removes duplicates.
-
-        Args:
-            df (pd.DataFrame): The DataFrame to clean.
-
-        Returns:
-            pd.DataFrame: Cleaned DataFrame.
-        """
-        df = df[df["userId"].isin(self.users) & df["itemId"].isin(self.items)].reset_index(drop=True)
-
-        mean_imputing_feats = ['timestamp']
-        for feat in mean_imputing_feats:
-            if feat in list(df.columns):
-                df[feat] = df[feat].fillna(df[feat].mean())
-
-        df.dropna(inplace=True)
-        df.drop_duplicates(keep='first', inplace=True)
-        return df

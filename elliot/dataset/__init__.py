@@ -9,7 +9,6 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
 from elliot.dataset.dataset import DataSet
 from elliot.dataset.loader_coordinator import DataSetLoader
-from elliot.dataset.loader_coordinator import Cleaner
 from elliot.dataset.dataloader.knowledge_aware_chains import KnowledgeChainsLoader
 from elliot.dataset.dataloader.visual_dataloader import VisualLoader
 from elliot.dataset.dataloader.item_category_dataloader import ItemCategoryLoader
