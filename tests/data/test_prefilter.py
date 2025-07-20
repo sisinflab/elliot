@@ -1,9 +1,8 @@
+import pytest
 import importlib
 from tests.params import params_pre_filtering as p
 from tests.params import params_pre_filtering_fail as p_fail
 from tests.utils import *
-
-import pytest
 
 
 def custom_read_dataset(path):

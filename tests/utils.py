@@ -1,8 +1,8 @@
 import functools
 import time
+import pandas as pd
 from pathlib import Path
 from types import SimpleNamespace
-import pandas as pd
 
 test_path = Path(__file__).parent / 'data'
 data_path = Path(__file__).parent.parent / 'data'
@@ -20,22 +20,29 @@ def time_single_test(func):
             print(f"[{func.__name__}] executed in {duration:.4f} seconds")
     return wrapper
 
+
 def read_dataset(dataset_path, cols=None):
-    column_names = ['userId', 'itemId', 'rating', 'timestamp'] if cols is None else cols
-    df = pd.read_csv(dataset_path, sep='\t', names=column_names)
-    df_mock = df.dropna(axis=1, how='all')
-    return df_mock
+    default_cols = ['userId', 'itemId', 'rating', 'timestamp']
+    df_preview = pd.read_csv(dataset_path, sep='\t', nrows=1, header=None)
+
+    column_names = cols if (df_preview.shape[1] < 4 and cols is not None) else default_cols
+
+    df = pd.read_csv(dataset_path, sep='\t', names=column_names, header=None)
+    df_clean = df.dropna(axis=1, how='all')
+
+    return df_clean
+
 
 def create_namespace(config, attr=None):
     if attr:
         config = {attr: config}
-    ns = dict_to_namespace(config)
+    ns = _dict_to_namespace(config)
     return ns
 
-def dict_to_namespace(d):
+def _dict_to_namespace(d):
     if isinstance(d, dict):
-        return SimpleNamespace(**{k: dict_to_namespace(v) for k, v in d.items()})
+        return SimpleNamespace(**{k: _dict_to_namespace(v) for k, v in d.items()})
     elif isinstance(d, list):
-        return [dict_to_namespace(i) for i in d]
+        return [_dict_to_namespace(i) for i in d]
     else:
         return d
