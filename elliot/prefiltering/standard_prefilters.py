@@ -17,13 +17,14 @@ class PreFilter:
         _mask (pd.Series): Internal mask used during filtering steps.
 
     Supported Pre-filtering Strategies:
-        - global_threshold: Removes interactions with ratings below a fixed threshold or global average.
-        - user_average: Removes interactions with ratings below the user's average rating.
-        - user_k_core: Retains users with at least `core` interactions.
-        - item_k_core: Retains items with at least `core` interactions.
-        - iterative_k_core: Iteratively applies user and item k-core filtering until convergence.
-        - n_rounds_k_core: Applies k-core filtering for a fixed number of rounds.
-        - cold_users: Retains only users with interactions less than or equal to a specified threshold.
+
+    - global_threshold: Removes interactions with ratings below a fixed threshold or global average.
+    - user_average: Removes interactions with ratings below the user's average rating.
+    - user_k_core: Retains users with at least `core` interactions.
+    - item_k_core: Retains items with at least `core` interactions.
+    - iterative_k_core: Iteratively applies user and item k-core filtering until convergence.
+    - n_rounds_k_core: Applies k-core filtering for a fixed number of rounds.
+    - cold_users: Retains only users with interactions less than or equal to a specified threshold.
 
     To configure the data pre-filtering, include the appropriate
     settings in the configuration file using the pattern shown below.
@@ -78,110 +79,47 @@ class PreFilter:
             pd.DataFrame: The filtered dataset.
 
         Raises:
-            ValueError: If the strategy is missing or unrecognized, or if required parameters are invalid.
+            ValueError: If the strategy is invalid.
         """
-        strategy = getattr(ns, "strategy", None)
-        if not strategy:
-            raise ValueError("Missing strategy")
+        strategy = ns.strategy
 
         filtered_data = None
-        match strategy:
-            case "global_threshold":
-                threshold = self._get_validated_attr(ns, "threshold", expected_type=(int, str))
-                if isinstance(threshold, str):
-                    self.filter_ratings_by_global_average(data)
-                else:
-                    self.filter_ratings_by_threshold(data, self._get_validated_attr(ns, "threshold"))
+        if strategy == "global_threshold":
+            threshold = self._get_validated_attr(ns, "threshold", expected_type=(int, str))
+            if isinstance(threshold, str):
+                self.filter_ratings_by_global_average(data)
+            else:
+                self.filter_ratings_by_threshold(data, self._get_validated_attr(ns, "threshold"))
 
-            case "user_average":
-                threshold = None
-                self.filter_ratings_by_user_average(data)
+        elif strategy == "user_average":
+            threshold = None
+            self.filter_ratings_by_user_average(data)
 
-            case "user_k_core":
-                threshold = self._get_validated_attr(ns, "core")
-                self.filter_user_k_core(data, threshold)
+        elif strategy == "user_k_core":
+            threshold = self._get_validated_attr(ns, "core")
+            self.filter_user_k_core(data, threshold)
 
-            case "item_k_core":
-                threshold = self._get_validated_attr(ns, "core")
-                self.filter_item_k_core(data, threshold)
+        elif strategy == "item_k_core":
+            threshold = self._get_validated_attr(ns, "core")
+            self.filter_item_k_core(data, threshold)
 
-            case "iterative_k_core":
-                threshold = self._get_validated_attr(ns, "core")
-                filtered_data = self.filter_iterative_k_core(data, threshold)
+        elif strategy == "iterative_k_core":
+            threshold = self._get_validated_attr(ns, "core")
+            filtered_data = self.filter_iterative_k_core(data, threshold)
 
-            case "n_rounds_k_core":
-                threshold = self._get_validated_attr(ns, "core")
-                rounds = self._get_validated_attr(ns, "rounds")
-                filtered_data = self.filter_n_rounds_k_core(data, threshold, rounds)
+        elif strategy == "n_rounds_k_core":
+            threshold = self._get_validated_attr(ns, "core")
+            rounds = self._get_validated_attr(ns, "rounds")
+            filtered_data = self.filter_n_rounds_k_core(data, threshold, rounds)
 
-            case "cold_users":
-                threshold = self._get_validated_attr(ns, "threshold")
-                self.filter_retain_cold_users(data, threshold)
+        elif strategy == "cold_users":
+            threshold = self._get_validated_attr(ns, "threshold")
+            self.filter_retain_cold_users(data, threshold)
 
-            case _:
-                raise ValueError(f"Strategy '{strategy}' not recognized")
+        else:
+            raise ValueError(f"Unrecognized pre-filtering strategy: '{strategy}'.")
 
         return self._apply_mask_and_check(data, strategy, threshold, filtered_data)
-
-    def _get_validated_attr(self, ns, attr, expected_type=int, required=True):
-        """
-        Validates the presence and type of required attributes in the configuration namespace.
-
-        Args:
-           ns (SimpleNamespace): The configuration object.
-           attr (str): The name of the attribute to validate.
-           expected_type (type or tuple): Expected type(s) of the attribute.
-           required (bool): Whether the attribute is mandatory.
-
-        Returns:
-           Any: The validated attribute value.
-
-        Raises:
-           ValueError: If the attribute is missing.
-           TypeError: If the attribute has invalid type.
-        """
-        val = getattr(ns, attr, None)
-        if required and val is None:
-            raise ValueError(f"Missing required attribute: '{attr}'")
-        if val is not None and not isinstance(val, expected_type):
-            raise TypeError(f"Attribute '{attr}' must be of type {expected_type}, got {type(val).__name__}")
-
-        # Additional value constraints
-        if isinstance(val, int) and val < 0:
-            raise ValueError(f"Attribute '{attr}' must be a non-negative integer")
-        if isinstance(val, str) and val != 'average':
-            raise ValueError(f"Attribute '{attr}' must be 'average' if a string is used")
-
-        return val
-
-    def _apply_mask_and_check(self, data, strategy, th, filtered_data=None):
-        """
-        Applies a boolean mask to the data and checks whether the resulting filtered dataset
-        is sufficiently large to be considered valid. If not, returns the original data.
-
-        Args:
-            data (pd.DataFrame): The original dataset to be filtered.
-            strategy (str): The name of the filtering strategy applied (used in warnings).
-            th (Any): The threshold used for filtering (only used for reporting purposes).
-            filtered_data (pd.DataFrame, optional): Pre-filtered data to use instead of applying
-                the mask. If None, `self._mask` is applied to `data`.
-
-        Returns:
-            pd.DataFrame: The filtered dataset if the ratio of filtered rows is acceptable;
-                otherwise, the original unfiltered dataset.
-
-        Raises:
-            Warning: Emits a warning if the filtered dataset is too small (less than 5% of
-                original) or empty.
-        """
-        filtered_data = filtered_data if filtered_data is not None else data[self._mask]
-        ratio = len(filtered_data)/len(data)
-        if data.empty or ratio < 0.05:
-            warnings.warn(f"Pre-filtering with strategy {strategy} ignored: "
-                          f"dataset is empty or too reduced using threshold {th}.")
-            return data
-        else:
-            return filtered_data
 
     def filter_ratings_by_global_average(self, data: pd.DataFrame) -> None:
         """
@@ -192,12 +130,12 @@ class PreFilter:
         """
         threshold = data["rating"].mean()
         self._mask = data['rating'] >= threshold
-        print("\nPrefiltering with Global Average")
+        print("\nPre-filtering with Global Average")
         print(f"The rating average is {round(threshold, 1)}")
         print(f"The transactions above threshold are {self._mask.sum()}")
         print(f"The transactions below threshold are {(~self._mask).sum()}")
 
-    def filter_ratings_by_threshold(self, data: pd.DataFrame, threshold) -> None:
+    def filter_ratings_by_threshold(self, data: pd.DataFrame, threshold: float) -> None:
         """
         Filters out ratings below a fixed threshold.
 
@@ -206,7 +144,7 @@ class PreFilter:
             threshold (float): The rating threshold.
         """
         self._mask = data['rating'] >= threshold
-        print("\nPrefiltering with fixed threshold")
+        print("\nPre-filtering with fixed threshold")
         print(f"The rating threshold is {round(threshold, 1)}")
         print(f"The transactions above threshold are {self._mask.sum()}")
         print(f"The transactions below threshold are {(~self._mask).sum()}\n")
@@ -219,11 +157,11 @@ class PreFilter:
             data (pd.DataFrame): The input dataset.
         """
         self._mask = data['rating'] >= data.groupby('userId')['rating'].transform('mean')
-        print("\nPrefiltering with user average")
+        print("\nPre-filtering with user average")
         print(f"The transactions above threshold are {self._mask.sum()}")
         print(f"The transactions below threshold are {(~self._mask).sum()}\n")
 
-    def filter_user_k_core(self, data: pd.DataFrame, threshold) -> None:
+    def filter_user_k_core(self, data: pd.DataFrame, threshold: int) -> None:
         """
         Retains only users with at least `threshold` interactions.
 
@@ -234,13 +172,13 @@ class PreFilter:
         user_counts = data["userId"].value_counts()
         valid_users = user_counts[user_counts >= threshold].index
         self._mask = data["userId"].isin(valid_users)
-        print(f"\nPrefiltering with user {threshold}-core")
+        print(f"\nPre-filtering with user {threshold}-core")
         print(f"The transactions before filtering are {len(data)}")
         print(f"The users before filtering are {data['userId'].nunique()}")
         print(f"The transactions after filtering are {self._mask.sum()}")
         print(f"The users after filtering are {data[self._mask]['userId'].nunique()}")
 
-    def filter_item_k_core(self, data: pd.DataFrame, threshold) -> None:
+    def filter_item_k_core(self, data: pd.DataFrame, threshold: int) -> None:
         """
         Retains only items with at least `threshold` interactions.
 
@@ -251,13 +189,13 @@ class PreFilter:
         item_counts = data["itemId"].value_counts()
         valid_items = item_counts[item_counts >= threshold].index
         self._mask = data["itemId"].isin(valid_items)
-        print(f"\nPrefiltering with item {threshold}-core")
+        print(f"\nPre-filtering with item {threshold}-core")
         print(f"The transactions before filtering are {len(data)}")
         print(f"The items before filtering are {data['itemId'].nunique()}")
         print(f"The transactions after filtering are {self._mask.sum()}")
         print(f"The items after filtering are {data[self._mask]['itemId'].nunique()}")
 
-    def filter_iterative_k_core(self, data: pd.DataFrame, threshold) -> pd.DataFrame:
+    def filter_iterative_k_core(self, data: pd.DataFrame, threshold: int) -> pd.DataFrame:
         """
         Applies iterative k-core filtering by alternating between user and item filtering
         until convergence.
@@ -282,7 +220,7 @@ class PreFilter:
 
         return data
 
-    def filter_n_rounds_k_core(self, data: pd.DataFrame, threshold, n_rounds) -> pd.DataFrame:
+    def filter_n_rounds_k_core(self, data: pd.DataFrame, threshold: int, n_rounds: int) -> pd.DataFrame:
         """
         Applies a fixed number of user/item k-core filtering rounds.
 
@@ -306,7 +244,7 @@ class PreFilter:
 
         return data
 
-    def filter_retain_cold_users(self, data: pd.DataFrame, threshold) -> None:
+    def filter_retain_cold_users(self, data: pd.DataFrame, threshold: int) -> None:
         """
         Retains only 'cold' users, i.e., users with `threshold` or fewer interactions.
 
@@ -317,8 +255,88 @@ class PreFilter:
         user_counts = data["userId"].value_counts()
         cold_users = user_counts[user_counts <= threshold].index
         self._mask = data["userId"].isin(cold_users)
-        print(f"\nPrefiltering retaining cold users with {threshold} or less ratings")
+        print(f"\nPre-filtering retaining cold users with {threshold} or less ratings")
         print(f"The transactions before filtering are {len(data)}")
         print(f"The users before filtering are {data['userId'].nunique()}")
         print(f"The transactions after filtering are {self._mask.sum()}")
         print(f"The users after filtering are {data[self._mask]['userId'].nunique()}")
+
+    def _get_validated_attr(
+        self,
+        ns: SimpleNamespace,
+        attr: str,
+        expected_type: t.Union[t.Type, t.Tuple[t.Type, ...]] = int,
+        required: bool = True
+    ) -> t.Any:
+        """
+        Validates the presence and type of required attributes in the configuration namespace.
+
+        Args:
+           ns (SimpleNamespace): The configuration namespace object.
+           attr (str): The name of the attribute to validate.
+           expected_type (type | tuple[type, ...]): Expected type(s) of the attribute.
+           required (bool): Whether the attribute is mandatory.
+
+        Returns:
+           Any: The validated attribute value.
+
+        Raises:
+            AttributeError: If the attribute is required but missing.
+            TypeError: If the attribute exists but is not of the expected type.
+            ValueError: If the attribute value violates additional constraints
+                (if it is an `int`, it must be non-negative; if it is a `str`, it must be exactly 'average').
+        """
+        val = getattr(ns, attr, None)
+        allowed_type_names = (
+            [exp_t.__name__ for exp_t in expected_type]
+            if isinstance(expected_type, tuple)
+            else f"'{expected_type.__name__}'"
+        )
+
+        if required and val is None:
+            raise AttributeError(f"Missing required attribute: '{attr}'.")
+        if val is not None and not isinstance(val, expected_type):
+            raise TypeError(f"Attribute '{attr}' must be of type {allowed_type_names}, got '{type(val).__name__}'.")
+
+        # Additional value constraints
+        if isinstance(val, int) and val < 0:
+            raise ValueError(f"Attribute '{attr}' must be non-negative.")
+        if isinstance(val, str) and val != 'average':
+            raise ValueError(f"Attribute '{attr}' must be 'average' if type 'str' is used.")
+
+        return val
+
+    def _apply_mask_and_check(
+        self,
+        data: pd.DataFrame,
+        strategy: str,
+        th: t.Union[int, float, str],
+        filtered_data: pd.DataFrame = None
+    ) -> pd.DataFrame:
+        """
+        Applies a boolean mask to the data and checks whether the resulting filtered dataset
+        is sufficiently large to be considered valid. If not, returns the original data.
+
+        Args:
+            data (pd.DataFrame): The original dataset to be filtered.
+            strategy (str): The name of the filtering strategy applied (only used for reporting purposes).
+            th (int | float | str): The threshold used for filtering (only used for reporting purposes).
+            filtered_data (pd.DataFrame, optional): Pre-filtered data to use instead of applying
+                the mask. If None, `self._mask` is applied to `data`.
+
+        Returns:
+            pd.DataFrame: The filtered dataset if the ratio of filtered rows is acceptable;
+                otherwise, the original unfiltered dataset.
+
+        Raises:
+            Warning: Emits a warning if the filtered dataset is too small (less than 60% of
+                original) or empty.
+        """
+        filtered_data = filtered_data if filtered_data is not None else data[self._mask]
+        ratio = len(filtered_data) / len(data)
+        if data.empty or ratio < 0.6:
+            warnings.warn(f"Pre-filtering with strategy {strategy} ignored: "
+                          f"dataset is empty or too reduced using threshold {th}.")
+            return data
+        else:
+            return filtered_data
