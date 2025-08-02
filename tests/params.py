@@ -8,6 +8,25 @@ _folder_movielens_10m = str(data_path / 'cat_dbpedia_movielens_10m')
 _path_movielens_10m = _folder_movielens_10m + '/dataset.tsv'
 
 
+def generate_param_combinations(key_list, values, base=None):
+    if base is None:
+        base_list = [{}] * len(key_list)
+    elif not isinstance(base, list):
+        base_list = [base] * len(key_list)
+    else:
+        base_list = base
+    result = []
+    for keys, base in zip(key_list, base_list):
+        if not isinstance(keys, tuple):
+            keys = (keys,)
+        value_lists = [values[k] for k in keys]
+        for combo in product(*value_lists):
+            overrides = dict(zip(keys, combo))
+            config = {**base, **overrides}
+            result.append(config)
+    return result
+
+
 # DataSetLoader
 
 params_dataset_loader = {
@@ -38,11 +57,13 @@ params_dataset_loader = {
             'test_ratio': 0.2,
             'df_shape': 50
         },
+        # movielens_1m
         #{
         #    'dataset_folder': _folder_movielens_1m,
         #    'test_ratio': 0.2,
         #    'df_shape': 1000209
         #},
+        # movielens_10m
         #{
         #    'dataset_folder': _folder_movielens_10m,
         #    'test_ratio': 0.2,
@@ -94,7 +115,7 @@ params_pre_filtering = {
     'user_k_core': [
         {
             'dataset_path': str(test_path / 'filter_user_k_core/filter_user_k_core.tsv'),
-            'core': 3
+            'core': 2
         }
     ],
     'item_k_core': [
@@ -125,34 +146,129 @@ params_pre_filtering = {
 }
 
 params_pre_filtering_fail = {
-    'invalid_global_threshold': list(product(
-        params_pre_filtering['global_threshold'],
-        [[3], -3, 'invalid', None]
-    )),
-    'invalid_user_k_core': list(product(
-        params_pre_filtering['user_k_core'],
-        [-5, 'abc', None]
-    )),
-    'invalid_item_k_core': list(product(
-        params_pre_filtering['item_k_core'],
-        [-5, 2.5, None]
-    )),
-    'invalid_iterative_k_core': list(product(
-        params_pre_filtering['iterative_k_core'],
-        [-5, 'x', None]
-    )),
-    # Filter only invalid combinations for n_rounds_k_core
-    'invalid_n_rounds_combinations': [
-        (params, c, r)
-        for params, c, r in product(
-            params_pre_filtering['n_rounds_k_core'],
-            [2, -5, 'x', None],
-            [2, -5, 'y', None]
-        )
-        if not (c == 2 and r == 2)
+    'invalid_global_threshold': generate_param_combinations(
+        ['threshold'],
+        {'threshold': [[3], -3, 'invalid', None]},
+        params_pre_filtering['global_threshold']
+    ),
+    'invalid_user_k_core': generate_param_combinations(
+        ['core'],
+        {'core': [-5, 'abc', None]},
+        params_pre_filtering['user_k_core']
+    ),
+    'invalid_item_k_core': generate_param_combinations(
+        ['core'],
+        {'core': [-5, 2.5, None]},
+        params_pre_filtering['item_k_core']
+    ),
+    'invalid_iterative_k_core': generate_param_combinations(
+        ['core'],
+        {'core': [-5, 'x', None]},
+        params_pre_filtering['iterative_k_core']
+    ),
+    'invalid_n_rounds_combinations': generate_param_combinations(
+        [('core', 'rounds')],
+        {
+            'core': [2, -5, 'x', None],
+            'rounds': [2, -5, 'y', None]
+        },
+        params_pre_filtering['n_rounds_k_core']
+    ),
+    'invalid_cold_users': generate_param_combinations(
+        ['threshold'],
+        {'threshold': [-99, 'cold', None]},
+        params_pre_filtering['global_threshold']
+    )
+}
+
+
+# Splitter
+
+params_splitting = {
+    'dataset_path': str(test_path / 'splitting_strategies/dataset.tsv'),
+    #'dataset_path': _path_movielens_10m,
+    'save_folder': str(test_path / 'splitting_strategies/splitting'),
+    'temporal_hold_out': [
+        {
+            'test_ratio': 0.1,
+        },
+        {
+            'leave_n_out': 3
+        },
+        # movielens_1m
+        #{
+        #    'leave_n_out': 17
+        #},
+        # movielens_10m
+        #{
+        #    'leave_n_out': 15
+        #}
     ],
-    'invalid_cold_users': list(product(
-        params_pre_filtering['cold_users'],
-        [-99, 'cold', None]
-    ))
+    'random_subsampling': [
+        {
+            'folds': 10,
+            'test_ratio': 0.1
+        },
+        {
+            'folds': 3,
+            'leave_n_out': 2
+        },
+        # movielens_1m / movielens_10m
+        #{
+        #    'folds': 10,
+        #    'leave_n_out': 17
+        #}
+    ],
+    'random_cross_validation': [
+        {
+            'folds': 10
+        }
+    ],
+    'fixed_timestamp': [
+        {
+            'timestamp': 7
+        },
+        {
+            'min_below': 1,
+            'min_over': 1
+        },
+        # movielens_1m
+        #{
+        #    'timestamp': 974687965
+        #},
+        # movielens_10m
+        #{
+        #    'timestamp': 1079842786
+        #},
+    ]
+}
+
+params_splitting_fail = {
+    'invalid_temporal_hold_out': generate_param_combinations(
+        ['test_ratio', 'leave_n_out'],
+        {
+            'test_ratio': [0.0, [3], -3, 'x', None],
+            'leave_n_out': [300, 2.5, -3, 'y', None]
+        }
+    ),
+    'invalid_random_subsampling': generate_param_combinations(
+        [('folds', 'test_ratio'), ('folds', 'leave_n_out')],
+        {
+            'folds': [3, 31, 2.5, -3, 'abc', None],
+            'test_ratio': [0.1, 1.0, [3], -3, 'invalid', None],
+            'leave_n_out': [2, 200, 2.5, -3, 'z', None]
+        }
+    ),
+    'invalid_random_cross_validation': generate_param_combinations(
+        ['folds'],
+        {'folds': [31, 2.5, -3, 'fold', None]}
+    ),
+    'invalid_fixed_timestamp': generate_param_combinations(
+        ['timestamp', ('min_below', 'min_over')],
+        {
+            'timestamp': [50, 2.5, -3, 'time', None],
+            'min_below': [1, 100, 2.5, -3, 'below'],
+            'min_over': [1, 100, 2.5, -3, 'over']
+        }
+    )
 }
