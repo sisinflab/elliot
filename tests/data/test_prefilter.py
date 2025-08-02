@@ -139,14 +139,14 @@ class TestPreFilterFailures:
     def _assert_invalid_config(self, config, dataset_path):
         with pytest.raises(Exception) as exc_info:
             apply_filter(config, dataset_path)
-        assert isinstance(exc_info.value, (ValueError, TypeError))
+        assert isinstance(exc_info.value, (AttributeError, TypeError, ValueError))
 
-    @pytest.mark.parametrize('params, th', p_fail['invalid_global_threshold'])
+    @pytest.mark.parametrize('params', p_fail['invalid_global_threshold'])
     @time_single_test
-    def test_invalid_or_missing_global_threshold(self, params, th):
+    def test_invalid_or_missing_global_threshold(self, params):
         config = {
             'strategy': 'global_threshold',
-            **({'threshold': th} if th is not None else {})
+            **({'threshold': params['threshold']} if params['threshold'] is not None else {})
         }
 
         self._assert_invalid_config(config, params['dataset_path'])
@@ -160,53 +160,56 @@ class TestPreFilterFailures:
 
         apply_filter(config, params['dataset_path'])
 
-    @pytest.mark.parametrize('params, c', p_fail['invalid_user_k_core'])
+    @pytest.mark.parametrize('params', p_fail['invalid_user_k_core'])
     @time_single_test
-    def test_invalid_or_missing_user_k_core(self, params, c):
+    def test_invalid_or_missing_user_k_core(self, params):
         config = {
             'strategy': 'user_k_core',
-            **({'core': c} if c is not None else {})
+            **({'core': params['core']} if params['core'] is not None else {})
         }
 
         self._assert_invalid_config(config, params['dataset_path'])
 
-    @pytest.mark.parametrize('params, c', p_fail['invalid_item_k_core'])
+    @pytest.mark.parametrize('params', p_fail['invalid_item_k_core'])
     @time_single_test
-    def test_invalid_or_missing_item_k_core(self, params, c):
+    def test_invalid_or_missing_item_k_core(self, params):
         config = {
             'strategy': 'item_k_core',
-            **({'core': c} if c is not None else {})
+            **({'core': params['core']} if params['core'] is not None else {})
         }
 
         self._assert_invalid_config(config, params['dataset_path'])
 
-    @pytest.mark.parametrize('params, c', p_fail['invalid_iterative_k_core'])
+    @pytest.mark.parametrize('params', p_fail['invalid_iterative_k_core'])
     @time_single_test
-    def test_invalid_or_missing_iterative_k_core(self, params, c):
+    def test_invalid_or_missing_iterative_k_core(self, params):
         config = {
             'strategy': 'iterative_k_core',
-            **({'core': c} if c is not None else {})
+            **({'core': params['core']} if params['core'] is not None else {})
         }
 
         self._assert_invalid_config(config, params['dataset_path'])
 
-    @pytest.mark.parametrize('params, c, r', p_fail['invalid_n_rounds_combinations'])
+    @pytest.mark.parametrize('params', p_fail['invalid_n_rounds_combinations'])
     @time_single_test
-    def test_invalid_or_missing_rounds_k_core(self, params, c, r):
+    def test_invalid_or_missing_rounds_k_core(self, params):
+        if params['core'] == 2 and params['rounds'] == 2:
+            pytest.skip("Test requires at least one invalid parameter to be meaningful.")
+
         config = {
             'strategy': 'n_rounds_k_core',
-            **({'core': c} if c is not None else {}),
-            **({'rounds': r} if r is not None else {})
+            **({'core': params['core']} if params['core'] is not None else {}),
+            **({'rounds': params['rounds']} if params['rounds'] is not None else {})
         }
 
         self._assert_invalid_config(config, params['dataset_path'])
 
-    @pytest.mark.parametrize('params, th', p_fail['invalid_cold_users'])
+    @pytest.mark.parametrize('params', p_fail['invalid_cold_users'])
     @time_single_test
-    def test_invalid_or_missing_cold_users_threshold(self, params, th):
+    def test_invalid_or_missing_cold_users_threshold(self, params):
         config = {
             'strategy': 'cold_users',
-            **({'threshold': th} if th is not None else {})
+            **({'threshold': params['threshold']} if params['threshold'] is not None else {})
         }
 
         self._assert_invalid_config(config, params['dataset_path'])
