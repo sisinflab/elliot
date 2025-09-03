@@ -610,7 +610,7 @@ class Splitter:
         user_count = df['userId'].nunique()
         interaction_count = len(df)
 
-        self.param_ranges['folds'] = [3, 20]
+        self.param_ranges['folds'] = [3, 10]
 
         self.param_ranges['test_ratio'] = TEST_RATIO_RANGE
 

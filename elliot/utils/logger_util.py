@@ -1,6 +1,8 @@
 import atexit
+import copy
+import logging
 from logging.config import ConvertingList, ConvertingDict, valid_ident
-from logging.handlers import QueueHandler, QueueListener
+from logging.handlers import QueueListener
 from queue import Queue
 
 
@@ -31,11 +33,12 @@ def _resolve_queue(q):
     return result
 
 
-class QueueListenerHandler(QueueHandler):
+class QueueListenerHandler(logging.Handler):
 
     def __init__(self, handlers, respect_handler_level=False, auto_run=True, queue=Queue(-1)):
         queue = _resolve_queue(queue)
-        super().__init__(queue)
+        super().__init__()
+        self.queue = queue
         handlers = _resolve_handlers(handlers)
         self._listener = QueueListener(
             self.queue,
@@ -51,5 +54,19 @@ class QueueListenerHandler(QueueHandler):
     def stop(self):
         self._listener.stop()
 
+    def prepare(self, record):
+        msg = self.format(record)
+        record = copy.copy(record)
+        record.message = msg
+        record.msg = msg
+        record.args = None
+        record.exc_info = None
+        record.exc_text = None
+        record.stack_info = None
+        return record
+
     def emit(self, record):
-        return super().emit(record)
+        try:
+            self.queue.put_nowait(self.prepare(record))
+        except Exception:
+            self.handleError(record)
