@@ -8,6 +8,8 @@ __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
 import copy
+from collections import defaultdict
+from functools import cached_property
 from types import SimpleNamespace
 
 import numpy as np
@@ -15,9 +17,9 @@ import numpy as np
 import scipy.sparse as sp
 import logging as pylog
 
-from elliot.dataset.sparse_builder import SparseBuilder
+#from elliot.dataset.sparse_builder import SparseBuilder
 from elliot.negative_sampling.negative_sampling import NegativeSampler
-from elliot.utils import logging
+from elliot.utils import logging, sparse
 
 
 class DataSetRequiredAttributesController(type):
@@ -37,7 +39,8 @@ class DataSetRequiredAttributesController(type):
         "train_dict",  # comment
         "i_train_dict",  # comment
         "sp_i_train",  # comment
-        "test_dict"  # comment
+        "test_dict",  # comment
+        "inverted"
     ]
 
     def __call__(cls, *args, **kwargs):
@@ -70,9 +73,14 @@ class DataSet(metaclass=DataSetRequiredAttributesController):
         self.config = config
         self.args = args
         self.kwargs = kwargs
+        self.inverted = {'val_mask': False, 'test_mask': False, 'all_unrated_mask': True}
 
         self._handle_train_set(side_information_data, data_tuple)
         self._handle_val_test_sets(data_tuple)
+
+        if hasattr(self.config, "negative_sampling"):
+            for attr, candidate_items in self._handle_negative_sampling():
+                setattr(self, attr, candidate_items)
 
     def _handle_train_set(self, side_information_data, data_tuple):
         self.train_dict = self._dataframe_to_dict(data_tuple[0])
@@ -93,17 +101,45 @@ class DataSet(metaclass=DataSetRequiredAttributesController):
             f"Statistics\tUsers:\t{self.num_users}\tItems:\t{self.num_items}\tTransactions:\t{self.transactions}\t"
             f"Sparsity:\t{sparsity}")
 
-        self.private_users = {p: u for p, u in enumerate(self.users)}
-        self.public_users = {v: k for k, v in self.private_users.items()}
-        self.private_items = {p: i for p, i in enumerate(self.items)}
-        self.public_items = {v: k for k, v in self.private_items.items()}
+        self.private_users = self.users
+        self.public_users = {v: k for k, v in enumerate(self.private_users)}
+        self.private_items = self.items
+        self.public_items = {v: k for k, v in enumerate(self.private_items)}
 
         self.i_train_dict = {self.public_users[user]: {self.public_items[i]: v for i, v in items.items()}
                              for user, items in self.train_dict.items()}
 
-        self.sp_i_train = SparseBuilder.build_sparse(self.i_train_dict, self.users, self.items)
-        self.sp_i_train_ratings = SparseBuilder.build_sparse_ratings(self.i_train_dict, self.users, self.items)
-        self.allunrated_mask = np.where((self.sp_i_train.toarray() == 0), True, False)
+        shape = (len(self.users), len(self.items))
+        #self.sp_i_train = sparse.build_sparse(self.i_train_dict, shape)
+        self.sp_i_train_ratings = sparse.build_sparse_ratings(self.i_train_dict, shape)
+        #self.allunrated_mask = np.where((self.sp_i_train.toarray() == 0), True, False)
+        #self.all_rated_mask = self.sp_i_train_ratings.astype(bool)
+
+    #@cached_property
+    #def pr_items(self):
+    #    return list(self.public_items.values())
+
+    @property
+    def sp_i_train(self):
+        return sparse.build_sparse(self.i_train_dict, (len(self.users), len(self.items)))
+
+    #@property
+    #def sp_i_train_ratings(self):
+    #    return sparse.build_sparse_ratings(self.i_train_dict, (len(self.users), len(self.items)))
+
+    #@cached_property
+    #def val_mask(self):
+    #    return self._val_mask.toarray() if hasattr(self, '_val_mask') else None
+
+    #@cached_property
+    #def test_mask(self):
+    #    return self._test_mask.toarray() if hasattr(self, '_test_mask') else None
+
+    @property
+    def all_unrated_mask(self):
+        #return np.where((self.sp_i_train_ratings.toarray() == 0), True, False)
+        self.inverted['all_unrated_mask'] = True
+        return self.sp_i_train_ratings.astype(bool)
 
     def _handle_val_test_sets(self, data_tuple):
         if len(data_tuple) == 2:
@@ -113,20 +149,9 @@ class DataSet(metaclass=DataSetRequiredAttributesController):
             self.val_dict = self._dataframe_to_dict(data_tuple[1])
             self.test_dict = self._dataframe_to_dict(data_tuple[2])
 
-        if hasattr(self.config, "negative_sampling"):
-            self._handle_negative_sampling()
-
-    def _get_users_list_and_items_list(self, dict):
-        users = list(dict.keys())
-        item_set = set()
-        for user_ratings in dict.values():
-            item_set.update(user_ratings.keys())
-        items = list(item_set)
-        return users, items
-
     def _handle_negative_sampling(self):
-        val_neg_samples, test_neg_samples = NegativeSampler.sample(
-            self.config,
+        sampler = NegativeSampler(
+            self.config.negative_sampling,
             self.public_users,
             self.public_items,
             self.private_users,
@@ -135,35 +160,48 @@ class DataSet(metaclass=DataSetRequiredAttributesController):
             self.val_dict,
             self.test_dict
         )
+        val_neg_samples, test_neg_samples = sampler.sample()
 
-        if self.val_dict:
-            sp_i_val = SparseBuilder.build_sparse_public(
-                self.val_dict, self.public_users, self.public_items, dtype='bool'
-            )
-            val_candidate_items = val_neg_samples + sp_i_val
-            self.val_mask = val_candidate_items.toarray()
+        for is_validation, d, neg_samples, attr in [
+            (True, self.val_dict, val_neg_samples, "val_mask"),
+            (False, self.test_dict, test_neg_samples, "test_mask")
+        ]:
+            if is_validation and d is None:
+                continue
+            sp_matrix = sparse.build_sparse(d, (len(self.public_users), len(self.public_items)),
+                                            self.public_users, self.public_items, dtype='bool')
+            self.inverted[attr] = neg_samples[1]
+            candidate_items = neg_samples[0] + sp_matrix
+            yield attr, candidate_items
 
-        sp_i_test = SparseBuilder.build_sparse_public(
-            self.val_dict, self.public_users, self.public_items, dtype='bool'
-        )
-        test_candidate_items = test_neg_samples + sp_i_test
-        self.test_mask = test_candidate_items.toarray()
-
-    def _dataframe_to_dict(self, data):
+    @staticmethod
+    def _dataframe_to_dict(data):
         # users = list(data['userId'].unique())
 
         "Conversion to Dictionary"
         #ratings = data.set_index('userId')[['itemId', 'rating']].apply(lambda x: (x['itemId'], float(x['rating'])), 1)\
         #    .groupby(level=0).agg(lambda x: dict(x.values)).to_dict()
-        ratings = {
-            user: {item: float(rating) for item, rating in zip(group['itemId'], group['rating'])}
-            for user, group in data.groupby('userId')
-        }
-
+        #ratings = {
+        #    user: {item: float(rating) for item, rating in zip(group['itemId'], group['rating'])}
+        #    for user, group in data.groupby('userId')
+        #}
+        ratings = defaultdict(dict)
+        for user, item, rating in zip(data["userId"], data["itemId"], data["rating"]):
+            ratings[user][item] = float(rating)
+        ratings = dict(ratings)
         # for u in users:
         #     sel_ = data[data['userId'] == u]
         #     ratings[u] = dict(zip(sel_['itemId'], sel_['rating']))
         return ratings
+
+    @staticmethod
+    def _get_users_list_and_items_list(dict):
+        users = list(dict.keys())
+        item_set = set()
+        for user_ratings in dict.values():
+            item_set.update(user_ratings.keys())
+        items = list(item_set)
+        return users, items
 
     """def _build_sparse(self, dict, users, items):
         rows_cols = [(u, i) for u, items in dict.items() for i in items.keys()]
@@ -193,6 +231,14 @@ class DataSet(metaclass=DataSetRequiredAttributesController):
         i_test = sp.csr_matrix((np.ones_like(rows), (rows, cols)), dtype='bool',
                                shape=(len(self.public_users.keys()), len(self.public_items.keys())))
         return i_test"""
+
+    #@property
+    #def all_unrated_mask(self):
+    #    return self.sp_i_train.toarray() == 0
+
+    #@cached_property
+    #def sp_i_train_ratings(self):
+    #    return SparseBuilder.build_sparse_ratings(self.i_train_dict, self.users, self.items)
 
     def get_test(self):
         return self.test_dict

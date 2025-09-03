@@ -155,13 +155,13 @@ class Similarity(object):
     #     return [(real_indices[item], real_values[item]) for item in local_top_k]
 
     def get_user_recs(self, u, mask, k):
-        user_id = self._data.public_users.get(u)
-        user_recs = self._preds[user_id]
+        user_id = self._public_users[u]
+        """user_recs = self._preds[user_id]
         # user_items = self._ratings[u].keys()
         user_recs_mask = mask[user_id]
         user_recs[~user_recs_mask] = -np.inf
-        indices, values = zip(*[(self._data.private_items.get(u_list[0]), u_list[1])
-                              for u_list in enumerate(user_recs)])
+        indices, values = zip(*[(self._private_items[i], v)
+                                for i, v in enumerate(user_recs) if v != -np.inf])
 
         # indices, values = zip(*predictions.items())
         indices = np.array(indices)
@@ -171,7 +171,29 @@ class Similarity(object):
         real_values = values[partially_ordered_preds_indices]
         real_indices = indices[partially_ordered_preds_indices]
         local_top_k = real_values.argsort()[::-1]
-        return [(real_indices[item], real_values[item]) for item in local_top_k]
+        return [(real_indices[item], real_values[item]) for item in local_top_k]"""
+        #m = mask[user_id]
+        user_recs = np.where(~mask, -np.inf, self._preds[user_id])
+        local_k = min(k, mask.sum())
+        top_idx = np.argpartition(user_recs, -local_k)[-local_k:]
+
+        top_scores = user_recs[top_idx]
+        sorted_idx = top_idx[np.argsort(top_scores)[::-1]]
+
+        return [(self._private_items[i], user_recs[i]) for i in sorted_idx]
+
+        #allowed_idx = mask[user_id].indices
+        #allowed_idx = np.setdiff1d(self._data.private_i, forbidden_idx, assume_unique=True)
+        allowed_scores = self._preds[user_id][indices]
+
+        local_k = min(k, len(indices))
+        top_idx = np.argpartition(allowed_scores, -local_k)[-local_k:]
+        top_scores = allowed_scores[top_idx]
+
+        sorted_idx = top_idx[np.argsort(top_scores)[::-1]]
+        final_idx = indices[sorted_idx]
+
+        return [(self._private_items[i], self._preds[user_id][i]) for i in final_idx]
 
     # @staticmethod
     # def score_item(neighs, user_items):

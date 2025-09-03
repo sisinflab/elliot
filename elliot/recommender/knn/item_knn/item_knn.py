@@ -77,7 +77,11 @@ class ItemKNN(RecMixin, BaseRecommenderModel):
             self._model = Similarity(data=self._data, num_neighbors=self._num_neighbors, similarity=self._similarity, implicit=self._implicit)
 
     def get_single_recommendation(self, mask, k, *args):
-        return {u: self._model.get_user_recs(u, mask, k) for u in self._ratings.keys()}
+        #return {u: self._model.get_user_recs(u, mask, k) for u in self._ratings.keys()}
+        return {
+            u: self._model.get_user_recs(u, self.get_user_mask(mask, user_id=self._model._public_users[u]), k)
+            for u in self._ratings.keys()
+        }
 
     def get_recommendations(self, k: int = 10):
         predictions_top_k_val = {}

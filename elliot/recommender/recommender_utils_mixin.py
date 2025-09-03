@@ -78,14 +78,23 @@ class RecMixin(object):
             recs = self.get_single_recommendation(self.get_candidate_mask(), k, *args)
             return recs, recs
         else:
-            return self.get_single_recommendation(self.get_candidate_mask(validation=True), k, *args) if hasattr(self._data, "val_dict") else {}, \
+            return self.get_single_recommendation(self.get_candidate_mask(validation=True), k, *args) if self._data.val_dict is not None else {}, \
                    self.get_single_recommendation(self.get_candidate_mask(), k, *args)
 
     def get_single_recommendation(self, mask, k, predictions, offset, offset_stop):
-        v, i = self._model.get_top_k(predictions, mask[offset: offset_stop], k=k)
+        validated_mask = self.get_mask_portion(mask, offsets=(offset, offset_stop))
+        v, i = self._model.get_top_k(predictions, validated_mask, k=k)
         items_ratings_pair = [list(zip(map(self._data.private_items.get, u_list[0]), u_list[1]))
-                              for u_list in list(zip(i.numpy(), v.numpy()))]
+                             for u_list in list(zip(i.numpy(), v.numpy()))]
         return dict(zip(map(self._data.private_users.get, range(offset, offset_stop)), items_ratings_pair))
+
+    def get_user_mask(self, mask, user_id):
+        user_mask = mask[user_id].toarray().flatten()
+        return user_mask if not self._inverted else ~user_mask
+
+    def get_mask_portion(self, mask, offsets):
+        mask_portion = mask[offsets[0]:offsets[1]].toarray()
+        return mask_portion if not self._inverted else ~mask_portion
 
     def restore_weights(self):
         try:
@@ -102,11 +111,14 @@ class RecMixin(object):
     def get_candidate_mask(self, validation=False):
         if self._negative_sampling:
             if validation:
+                self._inverted = self._data.inverted['val_mask']
                 return self._data.val_mask
             else:
+                self._inverted = self._data.inverted['test_mask']
                 return self._data.test_mask
         else:
-            return self._data.allunrated_mask
+            self._inverted = self._data.inverted['all_unrated_mask']
+            return self._data.all_unrated_mask
 
     def get_loss(self):
         if self._optimize_internal_loss:
