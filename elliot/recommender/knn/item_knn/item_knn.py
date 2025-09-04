@@ -9,6 +9,7 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
 import pickle
 import time
+from tqdm import tqdm
 
 from elliot.recommender.recommender_utils_mixin import RecMixin
 from elliot.utils.write import store_recommendation
@@ -74,14 +75,17 @@ class ItemKNN(RecMixin, BaseRecommenderModel):
         else:
             if (not self._normalize) or (self._asymmetric_alpha) or (self._tversky_alpha) or (self._tversky_beta) or (self._row_weights) or (self._shrink):
                 self.logger.info("Options normalize, asymmetric_alpha, tversky_alpha, tversky_beta, row_weights are ignored with standard implementation. Try with implementation: aiolli")
-            self._model = Similarity(data=self._data, num_neighbors=self._num_neighbors, similarity=self._similarity, implicit=self._implicit)
+            self._model = Similarity(data=self._data, num_neighbors=self._num_neighbors, similarity=self._similarity, implicit=self._implicit, alpha=self._asymmetric_alpha, tversky_alpha=self._tversky_alpha, tversky_beta=self._tversky_beta)
 
     def get_single_recommendation(self, mask, k, *args):
-        #return {u: self._model.get_user_recs(u, mask, k) for u in self._ratings.keys()}
-        return {
-            u: self._model.get_user_recs(u, self.get_user_mask(mask, user_id=self._model._public_users[u]), k)
-            for u in self._ratings.keys()
-        }
+#        return {u: self._model.get_user_recs(u, mask, k) for u in self._ratings.keys()}
+        recs = {}
+        for i in tqdm(range(0, len(self._ratings.keys()), 1024), desc="Processing batches", total=len(self._ratings.keys()) // 1024 + (1 if len(self._ratings.keys()) % 1024 != 0 else 0)):
+            batch = list(self._ratings.keys())[i:i+1024]
+            mat = self._model.get_user_recs_batch(batch, mask, k)
+            proc_batch = dict(zip(batch, mat))
+            recs.update(proc_batch)
+        return recs
 
     def get_recommendations(self, k: int = 10):
         predictions_top_k_val = {}
@@ -125,5 +129,3 @@ class ItemKNN(RecMixin, BaseRecommenderModel):
         #             pickle.dump(self._model.get_model_state(), f)
         #     if self._save_recs:
         #         store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}.tsv")
-
-

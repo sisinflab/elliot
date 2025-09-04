@@ -111,14 +111,14 @@ class RecMixin(object):
     def get_candidate_mask(self, validation=False):
         if self._negative_sampling:
             if validation:
-                self._inverted = self._data.inverted['val_mask']
+                #self._inverted = self._data.inverted['val_mask']
                 return self._data.val_mask
             else:
-                self._inverted = self._data.inverted['test_mask']
+                #self._inverted = self._data.inverted['test_mask']
                 return self._data.test_mask
         else:
-            self._inverted = self._data.inverted['all_unrated_mask']
-            return self._data.all_unrated_mask
+            #self._inverted = self._data.inverted['all_unrated_mask']
+            return None #self._data.all_unrated_mask
 
     def get_loss(self):
         if self._optimize_internal_loss:

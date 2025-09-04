@@ -40,7 +40,6 @@ class DataSetRequiredAttributesController(type):
         "i_train_dict",  # comment
         "sp_i_train",  # comment
         "test_dict",  # comment
-        "inverted"
     ]
 
     def __call__(cls, *args, **kwargs):
@@ -73,7 +72,7 @@ class DataSet(metaclass=DataSetRequiredAttributesController):
         self.config = config
         self.args = args
         self.kwargs = kwargs
-        self.inverted = {'val_mask': False, 'test_mask': False, 'all_unrated_mask': True}
+        #self.inverted = {'val_mask': False, 'test_mask': False, 'all_unrated_mask': True}
 
         self._handle_train_set(side_information_data, data_tuple)
         self._handle_val_test_sets(data_tuple)
@@ -112,7 +111,7 @@ class DataSet(metaclass=DataSetRequiredAttributesController):
         shape = (len(self.users), len(self.items))
         #self.sp_i_train = sparse.build_sparse(self.i_train_dict, shape)
         self.sp_i_train_ratings = sparse.build_sparse_ratings(self.i_train_dict, shape)
-        #self.allunrated_mask = np.where((self.sp_i_train.toarray() == 0), True, False)
+        #self.all_unrated_mask = np.where((self.sp_i_train.toarray() == 0), True, False)
         #self.all_rated_mask = self.sp_i_train_ratings.astype(bool)
 
     #@cached_property
@@ -135,11 +134,11 @@ class DataSet(metaclass=DataSetRequiredAttributesController):
     #def test_mask(self):
     #    return self._test_mask.toarray() if hasattr(self, '_test_mask') else None
 
-    @property
-    def all_unrated_mask(self):
+    #@property
+    #def all_unrated_mask(self):
         #return np.where((self.sp_i_train_ratings.toarray() == 0), True, False)
-        self.inverted['all_unrated_mask'] = True
-        return self.sp_i_train_ratings.astype(bool)
+    #    self.inverted['all_unrated_mask'] = True
+    #    return self.sp_i_train_ratings.astype(bool)
 
     def _handle_val_test_sets(self, data_tuple):
         if len(data_tuple) == 2:

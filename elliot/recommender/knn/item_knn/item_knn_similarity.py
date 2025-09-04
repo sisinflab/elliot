@@ -5,6 +5,8 @@ from scipy import sparse
 from sklearn.metrics.pairwise import cosine_similarity, euclidean_distances, haversine_distances, chi2_kernel, manhattan_distances
 from sklearn.metrics import pairwise_distances
 from sklearn.preprocessing import normalize
+import similaripy as sim
+from operator import itemgetter
 
 
 class Similarity(object):
@@ -12,12 +14,15 @@ class Similarity(object):
     Simple kNN class
     """
 
-    def __init__(self, data, num_neighbors, similarity, implicit):
+    def __init__(self, data, num_neighbors, similarity, implicit, **kwargs):
         self._data = data
         self._ratings = data.train_dict
         self._num_neighbors = num_neighbors
         self._similarity = similarity
         self._implicit = implicit
+        self._alpha = kwargs['alpha']
+        self._tversky_alpha = kwargs['tversky_alpha']
+        self._tversky_beta= kwargs['tversky_beta']
 
         if self._implicit:
             self._URM = self._data.sp_i_train
@@ -48,38 +53,49 @@ class Similarity(object):
 
         # self._transactions = self._data.transactions
 
-        self._similarity_matrix = np.empty((len(self._items), len(self._items)))
+        # self._similarity_matrix = np.empty((len(self._items), len(self._items)))
 
-        self.process_similarity(self._similarity)
-
+        # self.process_similarity(self._similarity)
+        if self._similarity == "cosine":
+             W_sparse = sim.cosine(self._URM.T, k=self._num_neighbors, format_output='csr')
+        elif self._similarity == "asym":
+             W_sparse = sim.asymmetric_cosine(self._URM.T, alpha=self._alpha, k=self._num_neighbors, format_output='csr')
+        elif self._similarity == "dot":
+             W_sparse = sim.dot_product(self._URM.T, k=self._num_neighbors, format_output='csr')
+        elif self._similarity == "jaccard":
+             W_sparse = sim.jaccard(self._URM.T, k=self._num_neighbors, binary=True, format_output='csr')
+        elif self._similarity == "dice":
+             W_sparse = sim.dice(self._URM.T, k=self._num_neighbors, binary=True, format_output='csr')
+        elif self._similarity == "tversky":
+             W_sparse = sim.tversky(self._URM.T, k=self._num_neighbors, alpha=self._tversky_alpha, beta=self._tversky_beta, binary=True, format_output='csr')
         # self._similarity_matrix = normalize(self._similarity_matrix, norm='l1', axis=1)
 
         ##############
-        data, rows_indices, cols_indptr = [], [], []
+        # data, rows_indices, cols_indptr = [], [], []
 
-        column_row_index = np.arange(len(self._data.items), dtype=np.int32)
+        # column_row_index = np.arange(len(self._data.items), dtype=np.int32)
 
-        for item_idx in range(len(self._data.items)):
-            cols_indptr.append(len(data))
-            column_data = self._similarity_matrix[:, item_idx]
+        # for item_idx in range(len(self._data.items)):
+        #    cols_indptr.append(len(data))
+        #    column_data = self._similarity_matrix[:, item_idx]
 
-            non_zero_data = column_data != 0
+        #    non_zero_data = column_data != 0
 
-            idx_sorted = np.argsort(column_data[non_zero_data])  # sort by column
-            top_k_idx = idx_sorted[-self._num_neighbors:]
+        #    idx_sorted = np.argsort(column_data[non_zero_data])  # sort by column
+        #    top_k_idx = idx_sorted[-self._num_neighbors:]
 
-            data.extend(column_data[non_zero_data][top_k_idx])
-            rows_indices.extend(column_row_index[non_zero_data][top_k_idx])
+        #    data.extend(column_data[non_zero_data][top_k_idx])
+        #    rows_indices.extend(column_row_index[non_zero_data][top_k_idx])
 
-        cols_indptr.append(len(data))
+        #cols_indptr.append(len(data))
 
-        W_sparse = sparse.csc_matrix((data, rows_indices, cols_indptr),
-                                     shape=(len(self._data.items), len(self._data.items)), dtype=np.float32).tocsr()
-        self._preds = self._URM.dot(W_sparse).toarray()
+        #W_sparse = sparse.csc_matrix((data, rows_indices, cols_indptr),
+        #                             shape=(len(self._data.items), len(self._data.items)), dtype=np.float32).tocsr()
+        self._preds = self._URM.dot(W_sparse)
         ##############
         # self.compute_neighbors()
 
-        del self._similarity_matrix
+        # del self._similarity_matrix
 
     # def compute_neighbors(self):
     #     self._neighbors = {}
@@ -155,13 +171,13 @@ class Similarity(object):
     #     return [(real_indices[item], real_values[item]) for item in local_top_k]
 
     def get_user_recs(self, u, mask, k):
-        user_id = self._public_users[u]
-        """user_recs = self._preds[user_id]
+        user_id = self._data.public_users.get(u)
+        user_recs = self._preds[user_id]
         # user_items = self._ratings[u].keys()
         user_recs_mask = mask[user_id]
         user_recs[~user_recs_mask] = -np.inf
-        indices, values = zip(*[(self._private_items[i], v)
-                                for i, v in enumerate(user_recs) if v != -np.inf])
+        indices, values = zip(*[(self._data.private_items.get(u_list[0]), u_list[1])
+                              for u_list in enumerate(user_recs)])
 
         # indices, values = zip(*predictions.items())
         indices = np.array(indices)
@@ -171,30 +187,21 @@ class Similarity(object):
         real_values = values[partially_ordered_preds_indices]
         real_indices = indices[partially_ordered_preds_indices]
         local_top_k = real_values.argsort()[::-1]
-        return [(real_indices[item], real_values[item]) for item in local_top_k]"""
-        #m = mask[user_id]
-        user_recs = np.where(~mask, -np.inf, self._preds[user_id])
-        local_k = min(k, mask.sum())
-        top_idx = np.argpartition(user_recs, -local_k)[-local_k:]
+        return [(real_indices[item], real_values[item]) for item in local_top_k]
 
-        top_scores = user_recs[top_idx]
-        sorted_idx = top_idx[np.argsort(top_scores)[::-1]]
-
-        return [(self._private_items[i], user_recs[i]) for i in sorted_idx]
-
-        #allowed_idx = mask[user_id].indices
-        #allowed_idx = np.setdiff1d(self._data.private_i, forbidden_idx, assume_unique=True)
-        allowed_scores = self._preds[user_id][indices]
-
-        local_k = min(k, len(indices))
-        top_idx = np.argpartition(allowed_scores, -local_k)[-local_k:]
-        top_scores = allowed_scores[top_idx]
-
-        sorted_idx = top_idx[np.argsort(top_scores)[::-1]]
-        final_idx = indices[sorted_idx]
-
-        return [(self._private_items[i], self._preds[user_id][i]) for i in final_idx]
-
+    def get_user_recs_batch(self, u, mask, k):
+        u_index = np.array(itemgetter(*u)(self._data.public_users))
+        row_idx, col_idx = self._URM[u_index].nonzero()
+        users_recs = self._preds[u_index].toarray()
+        users_recs[row_idx, col_idx] = -np.inf
+        #users_recs = np.where(mask[u_index, :], self._preds[u_index, :].toarray(), -np.inf)
+        index_ordered = np.argpartition(users_recs, -k, axis=1)[:, -k:]
+        value_ordered = np.take_along_axis(users_recs, index_ordered, axis=1)
+        local_top_k = np.take_along_axis(index_ordered, value_ordered.argsort(axis=1)[:, ::-1], axis=1)
+        value_sorted = np.take_along_axis(users_recs, local_top_k, axis=1)
+        #mapper = np.vectorize(self._data.private_items.get)
+        mapped_items = np.array(self._private_items)[local_top_k]
+        return [[*zip(item, val)] for item, val in zip(mapped_items, value_sorted)]
     # @staticmethod
     # def score_item(neighs, user_items):
     #     num = sum([v for k, v in neighs.items() if k in user_items])
