@@ -29,12 +29,12 @@ class Similarity(object):
         else:
             self._URM = self._data.sp_i_train_ratings
 
-        self._users = self._data.users
-        self._items = self._data.items
-        self._private_users = self._data.private_users
-        self._public_users = self._data.public_users
-        self._private_items = self._data.private_items
-        self._public_items = self._data.public_items
+        #self._users = self._data.users
+        #self._items = self._data.items
+        #self._private_users = self._data.private_users
+        #self._public_users = self._data.public_users
+        #self._private_items = self._data.private_items
+        #self._public_items = self._data.public_items
 
     def initialize(self):
         """
@@ -170,7 +170,7 @@ class Similarity(object):
     #     local_top_k = real_values.argsort()[::-1]
     #     return [(real_indices[item], real_values[item]) for item in local_top_k]
 
-    def get_user_recs(self, u, mask, k):
+    """def get_user_recs(self, u, mask, k):
         user_id = self._data.public_users.get(u)
         user_recs = self._preds[user_id]
         # user_items = self._ratings[u].keys()
@@ -187,19 +187,20 @@ class Similarity(object):
         real_values = values[partially_ordered_preds_indices]
         real_indices = indices[partially_ordered_preds_indices]
         local_top_k = real_values.argsort()[::-1]
-        return [(real_indices[item], real_values[item]) for item in local_top_k]
+        return [(real_indices[item], real_values[item]) for item in local_top_k]"""
 
-    def get_user_recs_batch(self, u, mask, k):
-        u_index = np.array(itemgetter(*u)(self._data.public_users))
-        row_idx, col_idx = self._URM[u_index].nonzero()
-        users_recs = self._preds[u_index].toarray()
-        users_recs[row_idx, col_idx] = -np.inf
+    def get_top_k(self, pr_batch, k, mask):
+        u_index = np.asarray(pr_batch)
+        users_recs = self.apply_mask(self._preds[u_index], mask)
+        #row_idx, col_idx = indices
+        #users_recs[*neg_indices] = -np.inf
         #users_recs = np.where(mask[u_index, :], self._preds[u_index, :].toarray(), -np.inf)
         index_ordered = np.argpartition(users_recs, -k, axis=1)[:, -k:]
         value_ordered = np.take_along_axis(users_recs, index_ordered, axis=1)
         local_top_k = np.take_along_axis(index_ordered, value_ordered.argsort(axis=1)[:, ::-1], axis=1)
         value_sorted = np.take_along_axis(users_recs, local_top_k, axis=1)
         #mapper = np.vectorize(self._data.private_items.get)
+        return local_top_k, value_sorted
         mapped_items = np.array(self._private_items)[local_top_k]
         return [[*zip(item, val)] for item, val in zip(mapped_items, value_sorted)]
     # @staticmethod
