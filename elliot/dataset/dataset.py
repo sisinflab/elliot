@@ -90,11 +90,11 @@ class DataSet(metaclass=DataSetRequiredAttributesController):
             train_data = self.sp_i_train_ratings[batch_start:batch_end]
 
             neg_val, neg_test = None, None
-            if hasattr(self, "val_neg_indices"):
-                neg_val = self.val_neg_indices[i]
+            if hasattr(self, "val_neg_mask"):
+                neg_val = self.val_neg_mask[batch_start:batch_end]
                 #neg_val = (val_mask_portion == 0).nonzero()
-            if hasattr(self, "test_neg_indices"):
-                neg_test = self.test_neg_indices[i]
+            if hasattr(self, "test_neg_mask"):
+                neg_test = self.test_neg_mask[batch_start:batch_end]
                 #neg_test = (test_mask_portion == 0).nonzero()
             else:
                 neg_test = train_data
@@ -173,9 +173,9 @@ class DataSet(metaclass=DataSetRequiredAttributesController):
 
     def _handle_negative_sampling(self):
         sampler = NegativeSampler(self)
-        val_neg_indices, test_neg_indices = sampler.sample()
-        if val_neg_indices is not None: self.val_neg_indices = val_neg_indices
-        if test_neg_indices is not None: self.test_neg_indices = test_neg_indices
+        val_neg_mask, test_neg_mask = sampler.sample()
+        if val_neg_mask is not None: self.val_neg_mask = val_neg_mask
+        if test_neg_mask is not None: self.test_neg_mask = test_neg_mask
         """for is_validation, d, neg_samples, attr in [
             (True, self.val_dict, val_neg_samples, "val_neg_indices"),
             (False, self.test_dict, test_neg_samples, "test_neg_indices")

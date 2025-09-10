@@ -14,10 +14,16 @@ class RecMixin(object):
     def _make_item_mask_function(self):
         if self._negative_sampling:
             def apply_mask(matrix, mask):
-                return (matrix.multiply(mask)).toarray()
+                if isinstance(matrix, np.ndarray):
+                    filtered = np.multiply(matrix, mask.toarray())
+                else:
+                    filtered = matrix.multiply(mask).toarray()
+                return filtered
         else:
             def apply_mask(matrix, mask):
-                result = matrix.copy().toarray()
+                result = matrix.copy()
+                if not isinstance(matrix, np.ndarray):
+                    result = result.toarray()
                 result[mask.nonzero()] = -np.inf
                 return result
         return apply_mask
