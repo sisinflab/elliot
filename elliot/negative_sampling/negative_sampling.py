@@ -41,11 +41,8 @@ class NegativeSampler:
         strategy = getattr(self.ns, "strategy", None)
         if strategy == "random":
             self._strategy = self._random_strategy
-            self._file_path = getattr(self.ns, "file_path", None)
-            self._num_items = getattr(self.ns, "num_items", None)
         elif strategy == "fixed":
             self._strategy = self._fixed_strategy
-            self._files = getattr(self.ns, "files", None)
         else:
             raise ValueError(f"Unsupported sampling strategy: {strategy}")
 
@@ -64,9 +61,7 @@ class NegativeSampler:
         shape = (len(self.public_users), len(self.private_items))
         i_test = sparse.build_sparse(self.test, shape, self.public_users, self.public_items)
         i_val = sparse.build_sparse(self.val, shape, self.public_users, self.public_items) if validation else None
-        #candidate_mask = np.where(((self.i_train + i_test).toarray() == 0), True, False)
 
-        #masks = []
         rows, cols = [], []
         text_message = f"Applying negative sampling using {"test" if not validation else "validation"} data"
 
@@ -76,19 +71,11 @@ class NegativeSampler:
                 batch_train = self.i_train[batch_start:batch_end]
                 batch_test = i_test[batch_start:batch_end]
                 batch_candidates = np.where(((batch_train + batch_test).toarray() == 0), True, False)
-                #batch_candidates = candidate_mask[batch_start:batch_end]
 
                 batch_rows, batch_cols = self._strategy(batch_candidates, batch_start, validation)
-                rows.append(batch_rows + batch_start)
+                rows.append(batch_rows)
                 cols.append(batch_cols)
 
-                #batch_set = (i_val if validation else i_test)[batch_start:batch_end]
-                #batch_mask = mask + batch_set
-                #masks.append(batch_mask)
-                #batch_mask = (mask + batch_set).toarray()
-                #batch_rows, batch_cols = (batch_mask == 0).nonzero()
-                #rows.append(batch_rows)
-                #cols.append(batch_cols)
                 tq.update()
 
         rows = np.concatenate(rows)
@@ -98,17 +85,20 @@ class NegativeSampler:
         return mask
 
     def _random_strategy(self, candidate_negatives, batch_start, validation) -> t.Tuple[np.ndarray, np.ndarray]:
-        if not isinstance(self._num_items, int):
+        file_path = getattr(self.ns, "file_path", None)
+        num_items = getattr(self.ns, "num_items", None)
+
+        if not isinstance(num_items, int):
             raise ValueError("`num_items` must be an integer in negative_sampling config")
 
-        negative_items = self._sample_by_random_uniform(candidate_negatives)
+        rows, cols = self._sample_by_random_uniform(candidate_negatives, num_items)
 
-        #if self._file_path:
-        #    self._save_to_file(negative_items, batch_start)
+        rows += batch_start
+        self._save_to_file(file_path, rows, cols, batch_start)
 
-        return negative_items
+        return rows, cols
 
-    def _fixed_strategy(self, candidate_negatives, batch_start, validation) -> sp.csr_matrix:
+    def _fixed_strategy(self, candidate_negatives, batch_start, validation) -> t.Tuple[np.ndarray, np.ndarray]:
         files = getattr(self.ns, "files", None)
         if files is None:
             raise ValueError("Missing `files` option for fixed strategy")
@@ -116,19 +106,18 @@ class NegativeSampler:
         if not isinstance(files, list):
             files = [files]
 
-        # Se validation=True, usa il secondo file
         file_ = files[1] if validation and len(files) > 1 else files[0]
-        return self._read_from_files(file_)
+        return self._read_from_file(file_, batch_start)
 
-    def _sample_by_random_uniform(self, data) -> t.Tuple[np.ndarray, np.ndarray]:
+    def _sample_by_random_uniform(self, data, num_items) -> t.Tuple[np.ndarray, np.ndarray]:
         """Campiona negativi per ogni utente da una matrice CSR di candidati."""
         rows, cols = [], []
 
         for row in range(data.shape[0]):
             candidate_negatives = np.flatnonzero(data[row])
 
-            if len(candidate_negatives) > self._num_items:
-                sampled = np.random.choice(candidate_negatives, size=self._num_items, replace=False)
+            if len(candidate_negatives) > num_items:
+                sampled = np.random.choice(candidate_negatives, size=num_items, replace=False)
             else:
                 sampled = candidate_negatives
 
@@ -137,30 +126,30 @@ class NegativeSampler:
 
         return np.concatenate(rows), np.concatenate(cols)
 
-    def _save_to_file(self, negative_items: sp.csr_matrix, batch_start):
+    def _save_to_file(self, file_path, rows, cols, batch_start):
         """Salva i campioni negativi su file TSV."""
         mode = "w" if batch_start == 0 else "a"
-        nnz = negative_items.nonzero()
-        with open(self._file_path, mode) as f:
-            old_ind = 0
-            for u, v in enumerate(negative_items.indptr[1:]):
-                global_u = batch_start + u
-                user_id = self.private_users[global_u]
-                items = [self.private_items[i] for i in nnz[1][old_ind:v]]
-                old_ind = v
-                f.write(f"{(user_id,)}\t" + "\t".join(map(str, items)) + "\n")
+        user_to_items = {}
+        for r, c in zip(rows, cols):
+            user_to_items.setdefault(r, []).append(c)
 
-    def _read_from_files(self, filepath: str, batch_start: int, batch_size: int) -> sp.csr_matrix:
+        with open(file_path, mode) as f:
+            for u, items in user_to_items.items():
+                user_id = self.private_users[u]
+                mapped_items = [self.private_items[i] for i in items]
+                f.write(f"{(user_id,)}\t" + "\t".join(map(str, mapped_items)) + "\n")
+
+    def _read_from_file(self, file_path: str, batch_start: int) -> t.Tuple[np.ndarray, np.ndarray]:
         """
         Legge campioni negativi predefiniti da file, restituendo solo il batch richiesto.
         File formato: <user_id>\t<item_1>\t<item_2>...
         """
         rows, cols = [], []
-        with open(filepath) as file:
+        with open(file_path) as file:
             for idx, line in enumerate(file):
                 if idx < batch_start:
                     continue
-                if idx >= batch_start + batch_size:
+                if idx >= batch_start + self.batch_size:
                     break
 
                 line = line.rstrip("\n").split('\t')
@@ -176,10 +165,7 @@ class NegativeSampler:
                         rows.append(row)
                         cols.append(col)
 
-        if not rows:
-            return sp.csr_matrix((batch_size, len(self.public_items)), dtype=bool)
-
-        return sparse.build_sparse_mask(rows, cols, shape=(batch_size, len(self.public_items)))
+        return np.array(rows), np.array(cols)
 
 
 """class NegativeSampler:
