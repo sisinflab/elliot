@@ -19,7 +19,7 @@ import random
 from torch_sparse import SparseTensor
 
 
-class NGCFModel(torch.nn.Module, ABC):
+class NGCFModel(torch.nn.Module):
     def __init__(self,
                  num_users,
                  num_items,
@@ -151,6 +151,5 @@ class NGCFModel(torch.nn.Module, ABC):
 
         return loss.detach().cpu().numpy()
 
-    def get_top_k(self, preds, train_mask, k=100):
-        return torch.topk(torch.where(torch.tensor(train_mask).to(self.device), preds.to(self.device),
-                                      torch.tensor(-np.inf).to(self.device)), k=k, sorted=True)
+    def get_top_k(self, preds, mask, k=100):
+        return torch.topk(self.apply_mask(preds, mask), k=k, sorted=True)

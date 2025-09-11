@@ -40,7 +40,6 @@ class DataSetRequiredAttributesController(type):
         "i_train_dict",  # comment
         "sp_i_train",  # comment
         "test_dict",  # comment
-        "inverted"
     ]
 
     def __call__(cls, *args, **kwargs):
@@ -73,14 +72,37 @@ class DataSet(metaclass=DataSetRequiredAttributesController):
         self.config = config
         self.args = args
         self.kwargs = kwargs
-        self.inverted = {'val_mask': False, 'test_mask': False, 'all_unrated_mask': True}
+        self.batch_size = 1024
+        #self.inverted = {'val_mask': False, 'test_mask': False, 'all_unrated_mask': True}
 
         self._handle_train_set(side_information_data, data_tuple)
         self._handle_val_test_sets(data_tuple)
 
         if hasattr(self.config, "negative_sampling"):
-            for attr, candidate_items in self._handle_negative_sampling():
-                setattr(self, attr, candidate_items)
+            self._handle_negative_sampling()
+
+    def __len__(self):
+        return (self.num_users + self.batch_size - 1) // self.batch_size
+
+    def __iter__(self):
+        for i, batch_start in enumerate(range(0, self.num_users, self.batch_size)):
+            batch_end = batch_start + self.batch_size
+            train_data = self.sp_i_train_ratings[batch_start:batch_end]
+
+            neg_val, neg_test = None, None
+            if hasattr(self, "val_neg_mask"):
+                neg_val = self.val_neg_mask[batch_start:batch_end]
+                #neg_val = (val_mask_portion == 0).nonzero()
+            if hasattr(self, "test_neg_mask"):
+                neg_test = self.test_neg_mask[batch_start:batch_end]
+                #neg_test = (test_mask_portion == 0).nonzero()
+            else:
+                neg_test = train_data
+
+            yield (batch_start, batch_end), (neg_val, neg_test)
+
+    #def get_batch_mask(self, candidate_negatives, validation=False):
+    #    return self.sampler.sample(candidate_negatives, validation) if hasattr(self, "sampler") else None
 
     def _handle_train_set(self, side_information_data, data_tuple):
         self.train_dict = self._dataframe_to_dict(data_tuple[0])
@@ -112,7 +134,7 @@ class DataSet(metaclass=DataSetRequiredAttributesController):
         shape = (len(self.users), len(self.items))
         #self.sp_i_train = sparse.build_sparse(self.i_train_dict, shape)
         self.sp_i_train_ratings = sparse.build_sparse_ratings(self.i_train_dict, shape)
-        #self.allunrated_mask = np.where((self.sp_i_train.toarray() == 0), True, False)
+        #self.all_unrated_mask = np.where((self.sp_i_train.toarray() == 0), True, False)
         #self.all_rated_mask = self.sp_i_train_ratings.astype(bool)
 
     #@cached_property
@@ -135,11 +157,11 @@ class DataSet(metaclass=DataSetRequiredAttributesController):
     #def test_mask(self):
     #    return self._test_mask.toarray() if hasattr(self, '_test_mask') else None
 
-    @property
-    def all_unrated_mask(self):
+    #@property
+    #def all_unrated_mask(self):
         #return np.where((self.sp_i_train_ratings.toarray() == 0), True, False)
-        self.inverted['all_unrated_mask'] = True
-        return self.sp_i_train_ratings.astype(bool)
+    #    self.inverted['all_unrated_mask'] = True
+    #    return self.sp_i_train_ratings.astype(bool)
 
     def _handle_val_test_sets(self, data_tuple):
         if len(data_tuple) == 2:
@@ -150,29 +172,21 @@ class DataSet(metaclass=DataSetRequiredAttributesController):
             self.test_dict = self._dataframe_to_dict(data_tuple[2])
 
     def _handle_negative_sampling(self):
-        sampler = NegativeSampler(
-            self.config.negative_sampling,
-            self.public_users,
-            self.public_items,
-            self.private_users,
-            self.private_items,
-            self.sp_i_train,
-            self.val_dict,
-            self.test_dict
-        )
-        val_neg_samples, test_neg_samples = sampler.sample()
-
-        for is_validation, d, neg_samples, attr in [
-            (True, self.val_dict, val_neg_samples, "val_mask"),
-            (False, self.test_dict, test_neg_samples, "test_mask")
+        sampler = NegativeSampler(self)
+        val_neg_mask, test_neg_mask = sampler.sample()
+        if val_neg_mask is not None: self.val_neg_mask = val_neg_mask
+        if test_neg_mask is not None: self.test_neg_mask = test_neg_mask
+        """for is_validation, d, neg_samples, attr in [
+            (True, self.val_dict, val_neg_samples, "val_neg_indices"),
+            (False, self.test_dict, test_neg_samples, "test_neg_indices")
         ]:
             if is_validation and d is None:
                 continue
             sp_matrix = sparse.build_sparse(d, (len(self.public_users), len(self.public_items)),
                                             self.public_users, self.public_items, dtype='bool')
-            self.inverted[attr] = neg_samples[1]
-            candidate_items = neg_samples[0] + sp_matrix
-            yield attr, candidate_items
+            #self.inverted[attr] = neg_samples
+            candidate_items = neg_samples + sp_matrix
+            setattr(self, attr, candidate_items)"""
 
     @staticmethod
     def _dataframe_to_dict(data):

@@ -28,13 +28,13 @@ def build_sparse_mask(rows, cols, shape):
         # normale: True nei punti specificati
         data = np.ones(len(rows), dtype=bool)
         mask = create_sparse_matrix((data, (rows, cols)), dtype=bool, shape=shape)
-        return mask, False
+        return mask
     else:
         # più conveniente memorizzare i False
         dense_bool = np.ones(shape, dtype=bool)
         dense_bool[rows, cols] = False
         inv_mask = create_sparse_matrix(dense_bool, dtype=bool)
-        return inv_mask, True
+        return inv_mask
 
 
 def create_sparse_matrix(data, dtype, shape=None) -> sp.csr_matrix:

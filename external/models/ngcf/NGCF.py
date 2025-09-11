@@ -90,6 +90,8 @@ class NGCF(RecMixin, BaseRecommenderModel):
             random_seed=self._seed
         )
 
+        RecMixin.__init__(self)
+
     @property
     def name(self):
         return "NGCF" \
@@ -104,7 +106,7 @@ class NGCF(RecMixin, BaseRecommenderModel):
             loss = 0
             steps = 0
             self._model.train()
-            with tqdm(total=int(self._data.transactions // self._batch_size), disable=not self._verbose) as t:
+            with tqdm(total=int(self._data.transactions // self._batch_size), desc=f"Epoch {it+1}") as t:
                 for batch in self._sampler.step(self._data.transactions, self._batch_size):
                     steps += 1
                     loss += self._model.train_step(batch)
@@ -118,19 +120,23 @@ class NGCF(RecMixin, BaseRecommenderModel):
         predictions_top_k_val = {}
         self._model.eval()
         with torch.no_grad():
-            for index, offset in enumerate(range(0, self._num_users, self._batch_size)):
-                offset_stop = min(offset + self._batch_size, self._num_users)
-                predictions = self._model.predict(offset, offset_stop)
-                recs_val, recs_test = self.process_protocol(k, predictions, offset, offset_stop)
+            for (start, stop), masks in tqdm(self._data, desc="Processing batches", total=len(self._data)):
+                #offset_stop = min(offset + self._batch_size, self._num_users)
+                predictions = self._model.predict(start, stop)
+                recs_val, recs_test = self.process_protocol(k, masks, predictions, start, stop)
                 predictions_top_k_val.update(recs_val)
                 predictions_top_k_test.update(recs_test)
         return predictions_top_k_val, predictions_top_k_test
 
-    def get_single_recommendation(self, mask, k, predictions, offset, offset_stop):
-        v, i = self._model.get_top_k(predictions, mask[offset: offset_stop], k=k)
-        items_ratings_pair = [list(zip(map(self._data.private_items.get, u_list[0]), u_list[1]))
-                              for u_list in list(zip(i.detach().cpu().numpy(), v.detach().cpu().numpy()))]
-        return dict(zip(map(self._data.private_users.get, range(offset, offset_stop)), items_ratings_pair))
+    def get_single_recommendation(self, k, mask, predictions, start, stop):
+        v, i = self._model.get_top_k(predictions, mask, k=k)
+        mapped_items = np.array(self._data.private_items)[i.detach().cpu().numpy()]
+        mat = [[*zip(item, val)] for item, val in zip(mapped_items, v.detach().cpu().numpy())]
+        proc_batch = dict(zip(self._data.private_users[start:stop], mat))
+        return proc_batch
+        #items_ratings_pair = [list(zip(map(self._data.private_items.get, u_list[0]), u_list[1]))
+        #                      for u_list in list(zip(i.detach().cpu().numpy(), v.detach().cpu().numpy()))]
+        #return dict(zip(map(self._data.private_users.get, range(start, stop)), items_ratings_pair))
 
     def evaluate(self, it=None, loss=0):
         if (it is None) or (not (it + 1) % self._validation_rate):

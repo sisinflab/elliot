@@ -1,12 +1,35 @@
 import os
 
+import torch
 import numpy as np
+import scipy.sparse as sp
 from tqdm import tqdm
 
 from elliot.utils.write import store_recommendation
 
 
 class RecMixin(object):
+    def __init__(self):
+        if hasattr(self, "_model"):
+            self._model.apply_mask = self._make_item_mask_function()
+
+    def _make_item_mask_function(self):
+        if self._negative_sampling:
+            def apply_mask(matrix, mask):
+                if isinstance(matrix, np.ndarray):
+                    filtered = np.multiply(matrix, mask.toarray())
+                elif isinstance(matrix, sp.csr_matrix):
+                    filtered = matrix.multiply(mask).toarray()
+                else:
+                    filtered = matrix * torch.tensor(mask.toarray())
+                return filtered
+        else:
+            def apply_mask(matrix, mask):
+                if isinstance(matrix, sp.csr_matrix):
+                    matrix = matrix.toarray()
+                matrix[mask.nonzero()] = -np.inf
+                return matrix
+        return apply_mask
 
     def train(self):
         if self._restore:
@@ -61,40 +84,46 @@ class RecMixin(object):
 
 
     def get_recommendations(self, k: int = 100):
-        predictions_top_k_test = {}
+        """predictions_top_k_test = {}
         predictions_top_k_val = {}
-        for index, offset in enumerate(range(0, self._num_users, self._batch_size)):
-            offset_stop = min(offset + self._batch_size, self._num_users)
-            predictions = self._model.predict(self._data.sp_i_train[offset:offset_stop].toarray())
-            recs_val, recs_test = self.process_protocol(k, predictions, offset, offset_stop)
+
+        for (start, stop), masks in tqdm(self._data, desc="Processing batches", total=len(self._data)):
+            #offset_stop = min(offset + self._batch_size, self._num_users)
+            predictions = self._model.predict(batch.toarray())
+            recs_val, recs_test = self.process_protocol(k, masks, predictions, start, stop)
             predictions_top_k_val.update(recs_val)
             predictions_top_k_test.update(recs_test)
 
-        return predictions_top_k_val, predictions_top_k_test
+        return predictions_top_k_val, predictions_top_k_test"""
 
-    def process_protocol(self, k, *args):
-
-        if not self._negative_sampling:
-            recs = self.get_single_recommendation(self.get_candidate_mask(), k, *args)
+    def process_protocol(self, k, masks, predictions, start, stop):
+        val_mask, test_mask = masks
+        test_recs = self.get_single_recommendation(k, test_mask, predictions, start, stop)
+        val_recs = self.get_single_recommendation(k, val_mask, predictions, start, stop) if val_mask else test_recs
+        return val_recs, test_recs
+        """if not val_mask:
+            self._current_mask = test_mask
+            recs = self.get_single_recommendation(neg_test_indices, k, *args)
             return recs, recs
-        else:
-            return self.get_single_recommendation(self.get_candidate_mask(validation=True), k, *args) if self._data.val_dict is not None else {}, \
-                   self.get_single_recommendation(self.get_candidate_mask(), k, *args)
+        
+            return self.get_single_recommendation(neg_val_indices, k, *args) if self._data.val_dict is not None else {}, \
+                   self.get_single_recommendation(neg_test_indices, k, *args)"""
 
-    def get_single_recommendation(self, mask, k, predictions, offset, offset_stop):
-        validated_mask = self.get_mask_portion(mask, offsets=(offset, offset_stop))
-        v, i = self._model.get_top_k(predictions, validated_mask, k=k)
-        items_ratings_pair = [list(zip(map(self._data.private_items.get, u_list[0]), u_list[1]))
-                             for u_list in list(zip(i.numpy(), v.numpy()))]
-        return dict(zip(map(self._data.private_users.get, range(offset, offset_stop)), items_ratings_pair))
+    def get_single_recommendation(self, k, mask, predictions, start, stop):
+        pass
+        #validated_mask = self.get_mask_portion(mask, offsets=(offset, offset_stop))
+        #v, i = self._model.get_top_k(predictions, mask.toarray(), k=k)
+        #items_ratings_pair = [list(zip(map(self._data.private_items.get, u_list[0]), u_list[1]))
+        #                     for u_list in list(zip(i.numpy(), v.numpy()))]
+        #return dict(zip(map(self._data.private_users.get, range(offset, offset_stop)), items_ratings_pair))
 
-    def get_user_mask(self, mask, user_id):
+    """def get_user_mask(self, mask, user_id):
         user_mask = mask[user_id].toarray().flatten()
         return user_mask if not self._inverted else ~user_mask
 
     def get_mask_portion(self, mask, offsets):
         mask_portion = mask[offsets[0]:offsets[1]].toarray()
-        return mask_portion if not self._inverted else ~mask_portion
+        return mask_portion if not self._inverted else ~mask_portion"""
 
     def restore_weights(self):
         try:
@@ -108,17 +137,17 @@ class RecMixin(object):
 
         return False
 
-    def get_candidate_mask(self, validation=False):
+    """def get_candidate_mask(self, validation=False):
         if self._negative_sampling:
             if validation:
-                self._inverted = self._data.inverted['val_mask']
+                #self._inverted = self._data.inverted['val_mask']
                 return self._data.val_mask
             else:
-                self._inverted = self._data.inverted['test_mask']
+                #self._inverted = self._data.inverted['test_mask']
                 return self._data.test_mask
         else:
-            self._inverted = self._data.inverted['all_unrated_mask']
-            return self._data.all_unrated_mask
+            #self._inverted = self._data.inverted['all_unrated_mask']
+            return None #self._data.all_unrated_mask"""
 
     def get_loss(self):
         if self._optimize_internal_loss:

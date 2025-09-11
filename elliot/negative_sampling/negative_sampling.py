@@ -8,6 +8,8 @@ import numpy as np
 import random
 from ast import literal_eval as make_tuple
 
+from tqdm import tqdm
+
 #from elliot.dataset.sparse_builder import SparseBuilder
 from elliot.utils import sparse
 
@@ -24,19 +26,27 @@ prefiltering:
 
 class NegativeSampler:
 
-    def __init__(self, ns, public_users, public_items, private_users, private_items, i_train, val=None, test=None):
-        self.ns = ns
-        self.public_users = public_users
-        self.public_items = public_items
-        self.private_users = private_users
-        self.private_items = private_items
-        self.i_train = i_train
-        self.val = val
-        self.test = test
+    def __init__(self, data):
+        self.ns = data.config.negative_sampling
+        self.public_users = data.public_users
+        self.public_items = data.public_items
+        self.private_users = data.private_users
+        self.private_items = data.private_items
+        self.i_train = data.sp_i_train_ratings
+        self.batch_size = data.batch_size
+        self.n_batches = len(data)
+        self.val = data.val_dict
+        self.test = data.test_dict
+
+        strategy = getattr(self.ns, "strategy", None)
+        if strategy == "random":
+            self._strategy = self._random_strategy
+        elif strategy == "fixed":
+            self._strategy = self._fixed_strategy
+        else:
+            raise ValueError(f"Unsupported sampling strategy: {strategy}")
 
     def sample(self) -> t.Tuple[t.Optional[sp.csr_matrix], t.Optional[sp.csr_matrix]]:
-        """Entry point: genera negative samples per validazione e test."""
-
         val_negative_items = None
         if self.val is not None:
             val_negative_items = self._process_sampling(validation=True)
@@ -47,42 +57,48 @@ class NegativeSampler:
 
         return val_negative_items, test_negative_items
 
-    def _process_sampling(self, validation: bool = False) -> sp.csr_matrix:
-
+    def _process_sampling(self, validation: bool = False):
         shape = (len(self.public_users), len(self.private_items))
         i_test = sparse.build_sparse(self.test, shape, self.public_users, self.public_items)
+        i_val = sparse.build_sparse(self.val, shape, self.public_users, self.public_items) if validation else None
 
-        candidate_negatives = np.where(((self.i_train + i_test).toarray() == 0), True, False)
-        #all_true = SparseBuilder.create_sparse_matrix(np.ones(self.i_train.shape, dtype=bool), 'bool')
-        #candidate_negatives = all_true - mask
-        #del all_true, mask
+        rows, cols = [], []
+        text_message = f"Applying negative sampling using {"test" if not validation else "validation"} data"
 
-        strategy = getattr(self.ns, "strategy", None)
+        with tqdm(total=self.n_batches, desc=text_message) as tq:
+            for batch_start in range(0, len(self.public_users), self.batch_size):
+                batch_end = min(batch_start + self.batch_size, len(self.public_users))
+                batch_train = self.i_train[batch_start:batch_end]
+                batch_test = i_test[batch_start:batch_end]
+                batch_candidates = np.where(((batch_train + batch_test).toarray() == 0), True, False)
 
-        if strategy == "random":
-            return self._random_strategy(candidate_negatives)
+                batch_rows, batch_cols = self._strategy(batch_candidates, batch_start, validation)
+                rows.append(batch_rows)
+                cols.append(batch_cols)
 
-        elif strategy == "fixed":
-            return self._fixed_strategy(validation)
+                tq.update()
 
-        else:
-            raise ValueError(f"Unsupported sampling strategy: {strategy}")
+        rows = np.concatenate(rows)
+        cols = np.concatenate(cols)
+        sampled_mask = sparse.build_sparse_mask(rows, cols, shape=self.i_train.shape)
+        mask = sampled_mask + (i_val if validation else i_test)
+        return mask
 
-    def _random_strategy(self, candidate_negatives) -> sp.csr_matrix:
+    def _random_strategy(self, candidate_negatives, batch_start, validation) -> t.Tuple[np.ndarray, np.ndarray]:
+        file_path = getattr(self.ns, "file_path", None)
         num_items = getattr(self.ns, "num_items", None)
-        #file_path = getattr(self.ns, "file_path", None)
 
         if not isinstance(num_items, int):
             raise ValueError("`num_items` must be an integer in negative_sampling config")
 
-        negative_items = self._sample_by_random_uniform(candidate_negatives, num_items)
+        rows, cols = self._sample_by_random_uniform(candidate_negatives, num_items)
 
-        #if file_path:
-        #    self._save_to_file(negative_items, file_path)
+        rows += batch_start
+        self._save_to_file(file_path, rows, cols, batch_start)
 
-        return negative_items
+        return rows, cols
 
-    def _fixed_strategy(self, validation: bool) -> sp.csr_matrix:
+    def _fixed_strategy(self, candidate_negatives, batch_start, validation) -> t.Tuple[np.ndarray, np.ndarray]:
         files = getattr(self.ns, "files", None)
         if files is None:
             raise ValueError("Missing `files` option for fixed strategy")
@@ -90,18 +106,15 @@ class NegativeSampler:
         if not isinstance(files, list):
             files = [files]
 
-        # Se validation=True, usa il secondo file
         file_ = files[1] if validation and len(files) > 1 else files[0]
-        return self._read_from_files(file_)
+        return self._read_from_file(file_, batch_start)
 
-    @staticmethod
-    def _sample_by_random_uniform(data, num_items=99) -> sp.csr_matrix:
+    def _sample_by_random_uniform(self, data, num_items) -> t.Tuple[np.ndarray, np.ndarray]:
         """Campiona negativi per ogni utente da una matrice CSR di candidati."""
         rows, cols = [], []
 
         for row in range(data.shape[0]):
-            mask = data[row]
-            candidate_negatives = mask.nonzero()[0]
+            candidate_negatives = np.flatnonzero(data[row])
 
             if len(candidate_negatives) > num_items:
                 sampled = np.random.choice(candidate_negatives, size=num_items, replace=False)
@@ -111,33 +124,48 @@ class NegativeSampler:
             rows.append(np.full(sampled.shape, row, dtype=int))
             cols.append(sampled)
 
-        rows = np.concatenate(rows)
-        cols = np.concatenate(cols)
-        return sparse.build_sparse_mask(rows, cols, shape=data.shape)
+        return np.concatenate(rows), np.concatenate(cols)
 
-    def _save_to_file(self, negative_items: sp.csr_matrix, file_path: str):
+    def _save_to_file(self, file_path, rows, cols, batch_start):
         """Salva i campioni negativi su file TSV."""
-        nnz = negative_items.nonzero()
-        with open(file_path, "w") as f:
-            old_ind = 0
-            for u, v in enumerate(negative_items.indptr[1:]):
+        mode = "w" if batch_start == 0 else "a"
+        user_to_items = {}
+        for r, c in zip(rows, cols):
+            user_to_items.setdefault(r, []).append(c)
+
+        with open(file_path, mode) as f:
+            for u, items in user_to_items.items():
                 user_id = self.private_users[u]
-                items = [self.private_items[i] for i in nnz[1][old_ind:v]]
-                old_ind = v
-                f.write(f"{(user_id,)}\t" + "\t".join(map(str, items)) + "\n")
+                mapped_items = [self.private_items[i] for i in items]
+                f.write(f"{(user_id,)}\t" + "\t".join(map(str, mapped_items)) + "\n")
 
-    def _read_from_files(self, filepath: str) -> sp.csr_matrix:
-        """Legge campioni negativi predefiniti da file."""
-        map_ = {}
-        with open(filepath) as file:
-            for line in file:
+    def _read_from_file(self, file_path: str, batch_start: int) -> t.Tuple[np.ndarray, np.ndarray]:
+        """
+        Legge campioni negativi predefiniti da file, restituendo solo il batch richiesto.
+        File formato: <user_id>\t<item_1>\t<item_2>...
+        """
+        rows, cols = [], []
+        with open(file_path) as file:
+            for idx, line in enumerate(file):
+                if idx < batch_start:
+                    continue
+                if idx >= batch_start + self.batch_size:
+                    break
+
                 line = line.rstrip("\n").split('\t')
-                user_id = self.public_users[int(make_tuple(line[0])[0])]
-                int_set = {self.public_items[int(i)] for i in line[1:] if int(i) in self.public_items}
-                map_[user_id] = int_set
+                user_id = int(make_tuple(line[0])[0])
+                if user_id not in self.public_users:
+                    continue
 
-        return sparse.build_sparse(map_, (len(self.public_users), len(self.public_items)),
-                                   self.public_users, self.public_items, dtype=bool)
+                row = self.public_users[user_id]
+                for i in line[1:]:
+                    item = int(i)
+                    if item in self.public_items:
+                        col = self.public_items[item]
+                        rows.append(row)
+                        cols.append(col)
+
+        return np.array(rows), np.array(cols)
 
 
 """class NegativeSampler:

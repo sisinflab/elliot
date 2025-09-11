@@ -11,6 +11,8 @@ import pickle
 
 import numpy as np
 
+from elliot.utils import sparse
+
 
 class MFModel(object):
     def __init__(self, F,
@@ -48,6 +50,8 @@ class MFModel(object):
             np.random.normal(loc=loc, scale=scale, size=(len(self._users), self._factors))
         self._item_factors = \
             np.random.normal(loc=loc, scale=scale, size=(len(self._items), self._factors))
+        #self._user_factors = sparse.create_sparse_matrix(user_factors_dense, float)
+        #self._item_factors = sparse.create_sparse_matrix(item_factors_dense, float)
 
     @property
     def name(self):
@@ -57,7 +61,16 @@ class MFModel(object):
         return self._global_bias + self._user_bias[user] + self._item_bias[item] \
                + self._user_factors[user] @ self._item_factors[item]
 
-    def get_user_predictions(self, user_id, mask, top_k=10):
+    def get_top_k(self, preds, mask, k):
+        #u_index = np.asarray(pr_batch)
+        users_recs = self.apply_mask(preds, mask)
+        index_ordered = np.argpartition(users_recs, -k, axis=1)[:, -k:]
+        value_ordered = np.take_along_axis(users_recs, index_ordered, axis=1)
+        local_top_k = np.take_along_axis(index_ordered, value_ordered.argsort(axis=1)[:, ::-1], axis=1)
+        value_sorted = np.take_along_axis(users_recs, local_top_k, axis=1)
+        return local_top_k, value_sorted
+
+    """def get_user_predictions(self, user_id, mask, top_k=10):
         user_id = self._public_users.get(user_id)
         # b = self._train[user_id].dot(W_sparse)
         # b = self._global_bias + self._user_bias[user_id] + self._item_bias \
@@ -75,7 +88,7 @@ class MFModel(object):
         real_values = values[partially_ordered_preds_indices]
         real_indices = indices[partially_ordered_preds_indices]
         local_top_k = real_values.argsort()[::-1]
-        return [(real_indices[item], real_values[item]) for item in local_top_k]
+        return [(real_indices[item], real_values[item]) for item in local_top_k]"""
 
     def train_step(self, batch, **kwargs):
         sum_of_loss = 0
@@ -89,7 +102,7 @@ class MFModel(object):
             ib_ = self._item_bias[item]
 
             prediction = gb_ + ub_ + ib_ + np.dot(uf_, if_)
-            # prediction = gb_ + ub_ + ib_ + uf_ @ if_
+            #prediction = gb_ + ub_ + ib_ + uf_ @ if_
 
             if prediction > 0:
                 one_plus_exp_minus_pred = 1.0 + np.exp(-prediction)
@@ -103,8 +116,11 @@ class MFModel(object):
 
             grad = rating - sigmoid
 
-            self._user_factors[user] += lr * (grad * if_ - reg * uf_)
-            self._item_factors[item] += lr * (grad * uf_ - reg * if_)
+            new_uf = uf_ + lr * (grad * if_ - reg * uf_)
+            new_if = if_ + lr * (grad * uf_ - reg * if_)
+
+            self._user_factors[user, :] = new_uf
+            self._item_factors[item, :] = new_if
             self._user_bias[user] += lr * (grad - reg * ub_)
             self._item_bias[item] += lr * (grad - reg * ib_)
             self._global_bias += lr * (grad - reg * gb_)
@@ -112,10 +128,11 @@ class MFModel(object):
 
         return sum_of_loss
 
-    def prepare_predictions(self):
-        self._preds = np.expand_dims(self._user_bias, axis=1) + (self._global_bias + self._item_bias + self._user_factors @ self._item_factors.T)
+    def predict(self, start, stop):
+        return (np.expand_dims(self._user_bias[start:stop], axis=1) +
+                (self._global_bias + self._item_bias + self._user_factors[start:stop] @ self._item_factors.T))
 
-    def update_factors(self, user: int, item: int, rating: float):
+    """def update_factors(self, user: int, item: int, rating: float):
         uf_ = self._user_factors[user]
         if_ = self._item_factors[item]
         ub_ = self._user_bias[user]
@@ -146,7 +163,7 @@ class MFModel(object):
         self._item_bias[item] += lr * (grad - reg * ib_)
         self._global_bias += lr * (grad - reg * gb_)
 
-        return this_loss
+        return this_loss"""
 
     def get_all_topks(self, mask, k, user_map, item_map):
         masking = np.where(mask, self._preds, -np.inf)
