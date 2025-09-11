@@ -4,7 +4,7 @@ import torch
 import numpy as np
 
 
-class NodeDropout(torch.nn.Module, ABC):
+class NodeDropout(torch.nn.Module):
     # as presented in the original paper
     def __init__(self, node_dropout, num_users, num_items):
         super(NodeDropout, self).__init__()
