@@ -61,9 +61,9 @@ class MFModel(object):
         return self._global_bias + self._user_bias[user] + self._item_bias[item] \
                + self._user_factors[user] @ self._item_factors[item]
 
-    def get_top_k(self, pr_batch, k, mask):
-        u_index = np.asarray(pr_batch)
-        users_recs = self.apply_mask(self._preds(u_index), mask)
+    def get_top_k(self, preds, mask, k):
+        #u_index = np.asarray(pr_batch)
+        users_recs = self.apply_mask(preds, mask)
         index_ordered = np.argpartition(users_recs, -k, axis=1)[:, -k:]
         value_ordered = np.take_along_axis(users_recs, index_ordered, axis=1)
         local_top_k = np.take_along_axis(index_ordered, value_ordered.argsort(axis=1)[:, ::-1], axis=1)
@@ -91,80 +91,13 @@ class MFModel(object):
         return [(real_indices[item], real_values[item]) for item in local_top_k]"""
 
     def train_step(self, batch, **kwargs):
-        lr = self._lr
-        reg = self._reg
-
-        gb_ = self._global_bias
-        uf_ = self._user_factors[batch[:, 0]]
-        if_ = self._item_factors[batch[:, 1]]
-        ub_ = self._user_bias[batch[:, 0]]
-        ib_ = self._item_bias[batch[:, 1]]
-
-        prediction = gb_ + ub_ + ib_ + (uf_ * if_).sum(axis=-1)
-
-        exp_pred = np.where(prediction > 0, 1.0 + np.exp(-prediction), np.exp(prediction))
-        sigmoid = np.where(prediction > 0, 1.0 / exp_pred, exp_pred / (1.0 + exp_pred))
-
-        rating = batch[:, 2]
-        this_loss = np.where(prediction > 0, np.log(exp_pred) + (1 - rating) * prediction,
-                             -rating * prediction + np.log(1.0 + exp_pred))
-
-        grad = rating - sigmoid
-
-        np.add.at(self._user_factors, batch[:, 0], lr * (np.expand_dims(grad, axis=-1) * if_ - reg * uf_))
-        np.add.at(self._item_factors, batch[:, 1], lr * (np.expand_dims(grad, axis=-1) * uf_ - reg * if_))
-        np.add.at(self._user_bias, batch[:, 0], lr * (grad - reg * ub_))
-        np.add.at(self._item_bias, batch[:, 1], lr * (grad - reg * ib_))
-        self._global_bias += lr * (np.sum(grad) - reg * gb_)
-
-        return np.sum(this_loss)
-        """lr = self._lr
-        reg = self._reg
-
-        users = batch[:, 0].astype(int)
-        items = batch[:, 1].astype(int)
-        ratings = batch[:, 2]
-
-        uf = self._user_factors[users]  # shape (B, F)
-        if_ = self._item_factors[items]  # shape (B, F)
-        ub = self._user_bias[users]  # shape (B,)
-        ib = self._item_bias[items]  # shape (B,)
-        gb = self._global_bias  # scalare
-
-        # predizioni batch
-        preds = gb + ub + ib + np.sum(uf * if_, axis=1)
-
-        # logistic loss e sigmoid in modo numericamente stabile
-        sigmoid = np.empty_like(preds)
-        loss = np.empty_like(preds)
-
-        mask = preds > 0
-        sigmoid[mask] = 1.0 / (1.0 + np.exp(-preds[mask]))
-        loss[mask] = np.log(1.0 + np.exp(-preds[mask])) + (1.0 - ratings[mask]) * preds[mask]
-
-        exp_preds = np.exp(preds[~mask])
-        sigmoid[~mask] = exp_preds / (1.0 + exp_preds)
-        loss[~mask] = -ratings[~mask] * preds[~mask] + np.log(1.0 + exp_preds)
-
-        grad = ratings - sigmoid  # shape (B,)
-
-        # aggiornamenti fattori
-        self._user_factors[users] += lr * (grad[:, None] * if_ - reg * uf)
-        self._item_factors[items] += lr * (grad[:, None] * uf - reg * if_)
-        self._user_bias[users] += lr * (grad - reg * ub)
-        self._item_bias[items] += lr * (grad - reg * ib)
-        #self._global_bias += lr * (np.sum(grad) - reg * gb)
-        for g in grad:
-            self._global_bias += lr * (g - reg * self._global_bias)
-
-        return np.sum(loss)"""
-        """sum_of_loss = 0
+        sum_of_loss = 0
         lr = self._lr
         reg = self._reg
         for user, item, rating in batch:
             gb_ = self._global_bias
-            uf_ = self._user_factors[user] #.getrow(user).toarray().flatten()
-            if_ = self._item_factors[item] #.getrow(item).toarray().flatten()
+            uf_ = self._user_factors[user]
+            if_ = self._item_factors[item]
             ub_ = self._user_bias[user]
             ib_ = self._item_bias[item]
 
@@ -193,11 +126,11 @@ class MFModel(object):
             self._global_bias += lr * (grad - reg * gb_)
             sum_of_loss += this_loss
 
-        return sum_of_loss"""
+        return sum_of_loss
 
-    def _preds(self, user_idx):
-        return (np.expand_dims(self._user_bias[user_idx], axis=1) +
-                (self._global_bias + self._item_bias + self._user_factors[user_idx] @ self._item_factors.T))
+    def predict(self, start, stop):
+        return (np.expand_dims(self._user_bias[start:stop], axis=1) +
+                (self._global_bias + self._item_bias + self._user_factors[start:stop] @ self._item_factors.T))
 
     """def update_factors(self, user: int, item: int, rating: float):
         uf_ = self._user_factors[user]

@@ -189,9 +189,12 @@ class Similarity(object):
         local_top_k = real_values.argsort()[::-1]
         return [(real_indices[item], real_values[item]) for item in local_top_k]"""
 
-    def get_top_k(self, pr_batch, k, mask):
-        u_index = np.asarray(pr_batch)
-        users_recs = self.apply_mask(self._preds[u_index], mask)
+    def predict(self, start, stop):
+        return self._preds[start:stop]
+
+    def get_top_k(self, preds, k, mask):
+        #u_index = np.asarray(pr_batch)
+        users_recs = self.apply_mask(preds, mask)
         #row_idx, col_idx = indices
         #users_recs[*neg_indices] = -np.inf
         #users_recs = np.where(mask[u_index, :], self._preds[u_index, :].toarray(), -np.inf)

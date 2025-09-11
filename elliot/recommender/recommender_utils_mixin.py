@@ -1,6 +1,8 @@
 import os
 
+import torch
 import numpy as np
+import scipy.sparse as sp
 from tqdm import tqdm
 
 from elliot.utils.write import store_recommendation
@@ -16,16 +18,17 @@ class RecMixin(object):
             def apply_mask(matrix, mask):
                 if isinstance(matrix, np.ndarray):
                     filtered = np.multiply(matrix, mask.toarray())
-                else:
+                elif isinstance(matrix, sp.csr_matrix):
                     filtered = matrix.multiply(mask).toarray()
+                else:
+                    filtered = matrix * torch.tensor(mask.toarray())
                 return filtered
         else:
             def apply_mask(matrix, mask):
-                result = matrix.copy()
-                if not isinstance(matrix, np.ndarray):
-                    result = result.toarray()
-                result[mask.nonzero()] = -np.inf
-                return result
+                if isinstance(matrix, sp.csr_matrix):
+                    matrix = matrix.toarray()
+                matrix[mask.nonzero()] = -np.inf
+                return matrix
         return apply_mask
 
     def train(self):
@@ -81,22 +84,22 @@ class RecMixin(object):
 
 
     def get_recommendations(self, k: int = 100):
-        predictions_top_k_test = {}
+        """predictions_top_k_test = {}
         predictions_top_k_val = {}
 
-        for batch, masks in tqdm(self._data, desc="Processing batches", total=len(self._data)):
+        for (start, stop), masks in tqdm(self._data, desc="Processing batches", total=len(self._data)):
             #offset_stop = min(offset + self._batch_size, self._num_users)
             predictions = self._model.predict(batch.toarray())
-            recs_val, recs_test = self.process_protocol(k, masks, predictions)
+            recs_val, recs_test = self.process_protocol(k, masks, predictions, start, stop)
             predictions_top_k_val.update(recs_val)
             predictions_top_k_test.update(recs_test)
 
-        return predictions_top_k_val, predictions_top_k_test
+        return predictions_top_k_val, predictions_top_k_test"""
 
-    def process_protocol(self, k, masks, *args):
+    def process_protocol(self, k, masks, predictions, start, stop):
         val_mask, test_mask = masks
-        test_recs = self.get_single_recommendation(k, test_mask, *args)
-        val_recs = self.get_single_recommendation(k, val_mask, *args) if val_mask else test_recs
+        test_recs = self.get_single_recommendation(k, test_mask, predictions, start, stop)
+        val_recs = self.get_single_recommendation(k, val_mask, predictions, start, stop) if val_mask else test_recs
         return val_recs, test_recs
         """if not val_mask:
             self._current_mask = test_mask
@@ -106,7 +109,7 @@ class RecMixin(object):
             return self.get_single_recommendation(neg_val_indices, k, *args) if self._data.val_dict is not None else {}, \
                    self.get_single_recommendation(neg_test_indices, k, *args)"""
 
-    def get_single_recommendation(self, k, mask, predictions, offset, offset_stop):
+    def get_single_recommendation(self, k, mask, predictions, start, stop):
         pass
         #validated_mask = self.get_mask_portion(mask, offsets=(offset, offset_stop))
         #v, i = self._model.get_top_k(predictions, mask.toarray(), k=k)

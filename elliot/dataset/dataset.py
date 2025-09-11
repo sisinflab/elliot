@@ -99,7 +99,7 @@ class DataSet(metaclass=DataSetRequiredAttributesController):
             else:
                 neg_test = train_data
 
-            yield train_data, (neg_val, neg_test)
+            yield (batch_start, batch_end), (neg_val, neg_test)
 
     #def get_batch_mask(self, candidate_negatives, validation=False):
     #    return self.sampler.sample(candidate_negatives, validation) if hasattr(self, "sampler") else None

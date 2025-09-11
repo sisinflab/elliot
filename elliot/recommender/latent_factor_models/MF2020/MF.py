@@ -94,31 +94,31 @@ class MF2020(RecMixin, BaseRecommenderModel):
     def get_single_recommendation(self, mask, k, *args):
         return {u: self._model.get_user_predictions(u, mask, k) for u in self._data.train_dict.keys()}"""
 
-    def get_single_recommendation(self, k, mask, *args):
+    def get_single_recommendation(self, k, mask, predictions, start, stop):
         #        return {u: self._model.get_user_recs(u, mask, k) for u in self._ratings.keys()}
         # recs = {}
         # for i in tqdm(range(0, len(self._ratings.keys()), 1024), desc="Processing batches", total=len(self._ratings.keys()) // 1024 + (1 if len(self._ratings.keys()) % 1024 != 0 else 0)):
         #    batch = list(self._ratings.keys())[i:i+1024]
-        batch = args[0]
-        pr_batch = itemgetter(*batch)(self._data.public_users)
-        i, v = self._model.get_top_k(pr_batch, k, mask)
+        #batch = args[0]
+        #pr_batch = itemgetter(*batch)(self._data.public_users)
+        i, v = self._model.get_top_k(predictions, mask, k)
         mapped_items = np.array(self._data.private_items)[i]
         mat = [[*zip(item, val)] for item, val in zip(mapped_items, v)]
-        proc_batch = dict(zip(batch, mat))
+        proc_batch = dict(zip(list(self._ratings.keys())[start:stop], mat))
         return proc_batch
         # return recs
 
     def get_recommendations(self, k: int = 10):
         predictions_top_k_test = {}
         predictions_top_k_val = {}
-        iter_data = tqdm(self._data, desc="Processing batches", total=len(self._data))
 
-        for i, (_, masks) in enumerate(iter_data):
+        for (start, stop), masks in tqdm(self._data, desc="Processing batches", total=len(self._data)):
             # offset_stop = min(offset + self._batch_size, self._num_users)
             # predictions = self._model.predict(batch.toarray())
-            start, end = i * self._data.batch_size, (i + 1) * self._data.batch_size
-            batch = list(self._ratings.keys())[start:end]
-            recs_val, recs_test = self.process_protocol(k, masks, batch)
+            #start, end = i * self._data.batch_size, (i + 1) * self._data.batch_size
+            #batch = list(self._ratings.keys())[start:stop]
+            predictions = self._model.predict(start, stop)
+            recs_val, recs_test = self.process_protocol(k, masks, predictions, start, stop)
             predictions_top_k_val.update(recs_val)
             predictions_top_k_test.update(recs_test)
 
