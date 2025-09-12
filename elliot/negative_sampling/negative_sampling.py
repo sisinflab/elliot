@@ -1,32 +1,68 @@
-from signal import valid_signals
-
-import pandas as pd
-from types import SimpleNamespace
-import typing as t
-from scipy import sparse as sp
-import numpy as np
+import warnings
 import random
+import typing as t
+import numpy as np
+from scipy import sparse as sp
 from ast import literal_eval as make_tuple
-
 from tqdm import tqdm
 
-#from elliot.dataset.sparse_builder import SparseBuilder
 from elliot.utils import sparse
 
 np.random.seed(42)
 random.seed(42)
 
-"""
-prefiltering:
-    strategy: global_threshold|user_average|user_k_core|item_k_core|iterative_k_core|n_rounds_k_core|cold_users
-    threshold: 3|average
-    core: 5
-    rounds: 2
-"""
 
 class NegativeSampler:
+    """
+    The NegativeSampler class is responsible for performing negative sampling in a recommendation system.
+
+    This class generates negative samples for training, validation, and testing,
+    using configurable strategies.
+
+    Supported sampling strategies:
+
+    - `random`: Uniformly samples a predefined number of negative items for each user.
+    - `fixed`: Uses negative items provided in an external file.
+
+    Attributes:
+        ns (SimpleNamespace): Configuration object containing negative sampling settings.
+        public_users (list): Mapping of public user IDs.
+        public_items (dict): Mapping of public item IDs.
+        private_users (list): Mapping of private user IDs.
+        private_items (dict): Mapping of private item IDs.
+        i_train (sp.csr_matrix): Sparse matrix of training interactions.
+        batch_size (int): Size of each batch for sampling.
+        n_batches (int): Total number of batches.
+        val (dict): Validation data dictionary.
+        test (dict): Test data dictionary.
+        param_ranges (dict): Valid ranges for configuration parameters.
+        _strategy (callable): Sampling strategy function selected based on configuration.
+        _num_items (int): Number of negative items to sample per user.
+        _file_path (str): File path for saving/loading fixed samples.
+        _files (list): List of file paths for fixed sampling.
+
+    To configure the negative sampling, include the appropriate
+    settings in the configuration file using the pattern shown below.
+
+    .. code:: yaml
+
+      negative_sampling:
+        strategy: random|fixed
+        num_items: 5
+        files: [ path/to/file ]
+    """
 
     def __init__(self, data):
+        """
+        Initializes the NegativeSampler object.
+
+        Args:
+            data (DataSet): Dataset object containing users, items, ratings, configuration,
+                validation, and test sets.
+
+        Raises:
+            ValueError: If the specified sampling strategy is unrecognized.
+        """
         self.ns = data.config.negative_sampling
         self.public_users = data.public_users
         self.public_items = data.public_items
@@ -38,32 +74,55 @@ class NegativeSampler:
         self.val = data.val_dict
         self.test = data.test_dict
 
-        strategy = getattr(self.ns, "strategy", None)
+        self.param_ranges = {}
+        self._compute_param_ranges()
+
+        strategy = self._get_validated_attr("strategy", str)
         if strategy == "random":
-            self._strategy = self._random_strategy
+            self._strategy = self.random_strategy
+            self._num_items = self._get_validated_attr("num_items")
+            self._file_path = self._get_validated_attr("file_path", str, False)
         elif strategy == "fixed":
-            self._strategy = self._fixed_strategy
+            self._strategy = self.fixed_strategy
+            self._files = self._get_validated_attr("files", str)
         else:
-            raise ValueError(f"Unsupported sampling strategy: {strategy}")
+            raise ValueError(f"Unrecognized sampling strategy: '{strategy}'.")
 
     def sample(self) -> t.Tuple[t.Optional[sp.csr_matrix], t.Optional[sp.csr_matrix]]:
+        """
+        Generates negative samples for validation and test sets.
+
+        Returns:
+            tuple[sp.csr_matrix | None, sp.csr_matrix | None]: A pair of sparse matrices representing
+                negative samples for validation and test sets. Each element may be None if
+                the corresponding dictionary is not provided.
+        """
         val_negative_items = None
         if self.val is not None:
-            val_negative_items = self._process_sampling(validation=True)
+            val_negative_items = self.process_sampling(validation=True)
 
         test_negative_items = None
         if self.test is not None:
-            test_negative_items = self._process_sampling(validation=False)
+            test_negative_items = self.process_sampling(validation=False)
 
         return val_negative_items, test_negative_items
 
-    def _process_sampling(self, validation: bool = False):
+    def process_sampling(self, validation: bool = False) -> sp.csr_matrix:
+        """
+        Performs batch-wise negative sampling for validation or test data.
+
+        Args:
+            validation (bool, optional): Whether to process validation data. Defaults to False.
+
+        Returns:
+            sp.csr_matrix: Sparse mask containing negative samples combined with positive interactions.
+        """
         shape = (len(self.public_users), len(self.private_items))
         i_test = sparse.build_sparse(self.test, shape, self.public_users, self.public_items)
         i_val = sparse.build_sparse(self.val, shape, self.public_users, self.public_items) if validation else None
 
         rows, cols = [], []
-        text_message = f"Applying negative sampling using {"test" if not validation else "validation"} data"
+        text_message = f"Performing negative sampling using {"test" if not validation else "validation"} data"
 
         with tqdm(total=self.n_batches, desc=text_message) as tq:
             for batch_start in range(0, len(self.public_users), self.batch_size):
@@ -84,40 +143,74 @@ class NegativeSampler:
         mask = sampled_mask + (i_val if validation else i_test)
         return mask
 
-    def _random_strategy(self, candidate_negatives, batch_start, validation) -> t.Tuple[np.ndarray, np.ndarray]:
-        file_path = getattr(self.ns, "file_path", None)
-        num_items = getattr(self.ns, "num_items", None)
+    def random_strategy(
+        self,
+        candidate_negatives: np.ndarray,
+        batch_start: int,
+        validation: bool
+    ) -> t.Tuple[np.ndarray, np.ndarray]:
+        """
+        Randomly samples negative items for each user in the batch.
 
-        if not isinstance(num_items, int):
-            raise ValueError("`num_items` must be an integer in negative_sampling config")
+        Args:
+            candidate_negatives (np.ndarray): Boolean array indicating candidate negative items
+                (True for eligible negatives).
+            batch_start (int): Index of the first user in the current batch.
+            validation (bool): Only for compatibility.
 
-        rows, cols = self._sample_by_random_uniform(candidate_negatives, num_items)
+        Returns:
+            tuple[np.ndarray, np.ndarray]: A pair of arrays containing rows and cols indices
+                of sampled negatives.
+        """
+        rows, cols = self._sample_by_random_uniform(candidate_negatives)
 
         rows += batch_start
-        self._save_to_file(file_path, rows, cols, batch_start)
+        self._save_to_file(rows, cols, batch_start)
 
         return rows, cols
 
-    def _fixed_strategy(self, candidate_negatives, batch_start, validation) -> t.Tuple[np.ndarray, np.ndarray]:
-        files = getattr(self.ns, "files", None)
-        if files is None:
-            raise ValueError("Missing `files` option for fixed strategy")
+    def fixed_strategy(
+        self,
+        candidate_negatives: np.ndarray,
+        batch_start: int,
+        validation: bool
+    ) -> t.Tuple[np.ndarray, np.ndarray]:
+        """
+        Loads fixed negative samples from file for the batch.
 
-        if not isinstance(files, list):
-            files = [files]
+        Args:
+            candidate_negatives (np.ndarray): Only for compatibility.
+            batch_start (int): Index of the first user in the current batch.
+            validation (bool): Whether the batch belongs to validation data.
 
-        file_ = files[1] if validation and len(files) > 1 else files[0]
+        Returns:
+            tuple[np.ndarray, np.ndarray]: A pair of arrays containing rows and cols indices
+                of sampled negatives.
+        """
+        if not isinstance(self._files, list):
+            self._files = [self._files]
+
+        file_ = self._files[1] if validation and len(self._files) > 1 else self._files[0]
         return self._read_from_file(file_, batch_start)
 
-    def _sample_by_random_uniform(self, data, num_items) -> t.Tuple[np.ndarray, np.ndarray]:
-        """Campiona negativi per ogni utente da una matrice CSR di candidati."""
+    def _sample_by_random_uniform(self, data: np.ndarray) -> t.Tuple[np.ndarray, np.ndarray]:
+        """
+        Randomly samples negative items row by row from the current batch.
+
+        Args:
+            data (np.ndarray): Boolean array indicating candidate negative items for each user.
+
+        Returns:
+            tuple[np.ndarray, np.ndarray]: A pair of arrays containing rows and cols indices
+                of sampled negatives, referring to the current batch.
+        """
         rows, cols = [], []
 
         for row in range(data.shape[0]):
             candidate_negatives = np.flatnonzero(data[row])
 
-            if len(candidate_negatives) > num_items:
-                sampled = np.random.choice(candidate_negatives, size=num_items, replace=False)
+            if len(candidate_negatives) > self._num_items:
+                sampled = np.random.choice(candidate_negatives, size=self._num_items, replace=False)
             else:
                 sampled = candidate_negatives
 
@@ -126,14 +219,21 @@ class NegativeSampler:
 
         return np.concatenate(rows), np.concatenate(cols)
 
-    def _save_to_file(self, file_path, rows, cols, batch_start):
-        """Salva i campioni negativi su file TSV."""
+    def _save_to_file(self, rows: np.ndarray, cols: np.ndarray, batch_start: int) -> None:
+        """
+        Saves negative samples of the current batch to file.
+
+        Args:
+            rows (np.ndarray): Row indices of sampled negatives.
+            cols (np.ndarray): Column indices of sampled negatives.
+            batch_start (int): Starting index of the batch (used to append or overwrite file).
+        """
         mode = "w" if batch_start == 0 else "a"
         user_to_items = {}
         for r, c in zip(rows, cols):
             user_to_items.setdefault(r, []).append(c)
 
-        with open(file_path, mode) as f:
+        with open(self._file_path, mode) as f:
             for u, items in user_to_items.items():
                 user_id = self.private_users[u]
                 mapped_items = [self.private_items[i] for i in items]
@@ -141,8 +241,15 @@ class NegativeSampler:
 
     def _read_from_file(self, file_path: str, batch_start: int) -> t.Tuple[np.ndarray, np.ndarray]:
         """
-        Legge campioni negativi predefiniti da file, restituendo solo il batch richiesto.
-        File formato: <user_id>\t<item_1>\t<item_2>...
+        Reads negative samples from a file for the current batch.
+
+        Args:
+            file_path (str): Path to the file containing fixed negative samples.
+            batch_start (int): Index of the first user in the batch.
+
+        Returns:
+            tuple[np.ndarray, np.ndarray]: A pair of arrays containing rows and cols indices
+                of negative samples.
         """
         rows, cols = [], []
         with open(file_path) as file:
@@ -167,126 +274,90 @@ class NegativeSampler:
 
         return np.array(rows), np.array(cols)
 
+    def _get_validated_attr(
+        self,
+        attr: str,
+        expected_type: t.Type = int,
+        required: bool = True
+    ) -> t.Any:
+        """
+        Retrieves and validates a single attribute from the configuration namespace.
 
-"""class NegativeSampler:
+        This method performs several checks:
 
-    @staticmethod
-    def sample(ns: SimpleNamespace, public_users: t.Dict, public_items: t.Dict, private_users: t.Dict,
-               private_items: t.Dict, i_train: sp.csr_matrix,
-               val: t.Dict = None, test: t.Dict = None) -> t.Tuple[sp.csr_matrix, sp.csr_matrix]:
+        - Ensures the attribute exists if `required` is True.
+        - Confirms the value is of the expected type.
+        - For numeric values, ensures it is non-negative and within a valid range
+          computed from the dataset (`data`), using `_compute_param_ranges` and `_check_interval`.
 
-        val_negative_items = NegativeSampler._process_sampling(ns, public_users, public_items, private_users,
-                                                              private_items, i_train,
-                                                              test, validation=True) if val != None else None
+        Args:
+            attr (str): The attribute name to retrieve and validate.
+            expected_type (type, optional): The expected data type for the attribute. Defaults to int.
+            required (bool, optional): Whether the attribute is required to be present. Defaults to True.
 
-        test_negative_items = NegativeSampler._process_sampling(ns, public_users, public_items, private_users,
-                                                              private_items, i_train,
-                                                               test) if test != None else None
+        Returns:
+            Any: The validated value of the attribute.
 
-        return (val_negative_items, test_negative_items) if val_negative_items else (test_negative_items, test_negative_items)
+        Raises:
+            AttributeError: If the attribute is missing and `required` is True.
+            TypeError: If the attribute is not of the expected type.
+            ValueError: If the attribute is a numeric value outside valid bounds.
+        """
+        val = getattr(self.ns, attr, None)
+        allowed_type_names = f"'{expected_type.__name__}'"
 
-    @staticmethod
-    def _process_sampling(ns: SimpleNamespace, public_users: t.Dict, public_items: t.Dict, private_users: t.Dict,
-                         private_items: t.Dict, i_train: sp.csr_matrix,
-                         test: t.Dict, validation=False) -> sp.csr_matrix:
-        i_test = SparseBuilder.build_sparse(test, public_users, public_items)
+        if required and val is None:
+            raise AttributeError(f"Missing required attribute: '{attr}'.")
+        if val is not None and not isinstance(val, expected_type):
+            raise TypeError(f"Attribute '{attr}' must be of type {allowed_type_names}, got '{type(val).__name__}'.")
 
-        candidate_negatives = ((i_test + i_train).astype('bool') != True)
-        ns = ns.negative_sampling
+        # Optional value constraints
+        if isinstance(val, int):
+            self._check_interval(attr, val)
 
-        strategy = getattr(ns, "strategy", None)
+        return val
 
-        if strategy == "random":
-            num_items = getattr(ns, "num_items", None)
-            file_path = getattr(ns, "file_path", None)
-            if num_items is not None:
-                if str(num_items).isdigit():
-                    negative_items = NegativeSampler._sample_by_random_uniform(candidate_negatives, num_items)
+    def _compute_param_ranges(self) -> None:
+        """
+        Computes and sets valid parameter ranges for different sampling strategies
+        based on the characteristics of the dataset.
 
-                    nnz = negative_items.nonzero()
-                    old_ind = 0
-                    basic_negative = []
-                    for u, v in enumerate(negative_items.indptr[1:]):
-                        basic_negative.append([(private_users[u],), list(map(private_items.get, nnz[1][old_ind:v]))])
-                        old_ind = v
+        The computed ranges are stored in `self.param_ranges` and include:
 
-                    with open(file_path, "w") as file:
-                        for ele in basic_negative:
-                            line = str(ele[0]) + '\t' + '\t'.join(map(str, ele[1]))+'\n'
-                            file.write(line)
+        - `num_items`: Minimum and maximum number of negative items to sample per user.
 
-                    pass
-                else:
-                    raise Exception("Number of negative items value not recognized")
-            else:
-                raise Exception("Number of negative items option is missing")
-        elif strategy == "fixed":
-            files = getattr(ns, "files", None)
-            if files is not None:
-                if not isinstance(files, list):
-                    files = [files]
-                file_ = files[0] if validation == False else files[1]
-                negative_items = NegativeSampler._read_from_files(public_users, public_items, file_)
-            pass
+        Raises:
+            Warning: Emits a warning if there are too few items for negative sampling.
+        """
+        min_items = 100
+        positives = np.diff(self.i_train.indptr).mean()
+        N = self.i_train.shape[1]
+        if N < min_items:
+            self.val = self.test = None
+            warnings.warn(f"Cannot perform negative sampling: "
+                          f"at least {min_items} items are required (current: {N}).")
         else:
-            raise Exception("Missing strategy")
+            self.param_ranges["num_items"] = [
+                round(0.00001 * N * positives) * 10,
+                round(0.0001 * N * positives) * 10
+            ]
 
-        return negative_items
+    def _check_interval(self, attr: str, val: int) -> None:
+        """
+        Validates that a numeric attribute value falls within a predefined acceptable range.
 
-    @staticmethod
-    def _sample_by_random_uniform(data: sp.csr_matrix, num_items=99) -> sp.csr_matrix:
-        rows = []
-        cols = []
-        for row in range(data.shape[0]):
-            candidate_negatives = list(zip(*data.getrow(row).nonzero()))
-            sampled_negatives = np.array(candidate_negatives)[random.sample(range(len(candidate_negatives)), num_items)]
-            rows.extend(list(np.ones(len(sampled_negatives), dtype=int) * row))
-            cols.extend(sampled_negatives[:, 1])
-        indptr = data.indptr
-        indices = data.indices
+        The valid range for the attribute is retrieved from `self.param_ranges[attr]`.
 
-        for row in range(data.shape[0]):
-            start, end = indptr[row], indptr[row + 1]
-            candidate_negatives = indices[start:end]
+        Args:
+            attr (str): The name of the attribute to validate.
+            val (int | float): The value to check.
 
-            if len(candidate_negatives) > num_items:
-                sampled = np.random.choice(candidate_negatives, size=num_items, replace=False)
-            else:
-                sampled = candidate_negatives
-
-            rows.append(np.full(sampled.shape, row, dtype=int))
-            cols.append(sampled)
-
-        rows = np.concatenate(rows)
-        cols = np.concatenate(cols)
-        negative_samples = SparseBuilder.create_sparse_matrix(
-            (np.ones_like(rows), (rows, cols)), dtype='bool', shape=data.shape
-        )
-        return negative_samples
-
-    @staticmethod
-    def _read_from_files(public_users: t.Dict, public_items: t.Dict, filepath: str) -> sp.csr_matrix:
-
-        map_ = {}
-        with open(filepath) as file:
-            for line in file:
-                line = line.rstrip("\n").split('\t')
-                int_set = {public_items[int(i)] for i in line[1:] if int(i) in public_items.keys()}
-                map_[public_users[int(make_tuple(line[0])[0])]] = int_set
-
-        #rows_cols = [(u, i) for u, items in map_.items() for i in items]
-        #rows, cols = zip(*rows_cols)
-        # rows = [u for u, _ in rows_cols]
-        # cols = [i for _, i in rows_cols]
-        negative_samples = SparseBuilder.build_sparse(map_, public_users, public_items, dtype='bool')
-        return negative_samples
-
-    @staticmethod
-    def build_sparse(map_ : t.Dict, nusers: int, nitems: int):
-
-        rows_cols = [(u, i) for u, items in map_.items() for i in items.keys()]
-        rows = [u for u, _ in rows_cols]
-        cols = [i for _, i in rows_cols]
-        data = sp.csr_matrix((np.ones_like(rows), (rows, cols)), dtype='float32',
-                             shape=(nusers, nitems))
-        return data"""
+        Raises:
+            ValueError: If `val` is outside the valid range for the given attribute.
+        """
+        if attr not in self.param_ranges:
+            return
+        min_val, max_val = self.param_ranges[attr]
+        if not (min_val <= val <= max_val):
+            raise ValueError(f"Attribute '{attr}' must be between {min_val} and {max_val}, "
+                             f"based on the provided dataset.")

@@ -16,19 +16,18 @@ class PreFilter:
         prefiltering_ns (List[SimpleNamespace]): A list of configurations specifying filtering strategies.
         _mask (pd.Series): Internal mask used during filtering steps.
 
-    Supported Pre-filtering Strategies:
+    Supported pre-filtering strategies:
 
-    - global_threshold: Removes interactions with ratings below a fixed threshold or global average.
-    - user_average: Removes interactions with ratings below the user's average rating.
-    - user_k_core: Retains users with at least `core` interactions.
-    - item_k_core: Retains items with at least `core` interactions.
-    - iterative_k_core: Iteratively applies user and item k-core filtering until convergence.
-    - n_rounds_k_core: Applies k-core filtering for a fixed number of rounds.
-    - cold_users: Retains only users with interactions less than or equal to a specified threshold.
+    - `global_threshold`: Removes interactions with ratings below a fixed threshold or global average.
+    - `user_average`: Removes interactions with ratings below the user's average rating.
+    - `user_k_core`: Retains users with at least `core` interactions.
+    - `item_k_core`: Retains items with at least `core` interactions.
+    - `iterative_k_core`: Iteratively applies user and item k-core filtering until convergence.
+    - `n_rounds_k_core`: Applies k-core filtering for a fixed number of rounds.
+    - `cold_users`: Retains only users with interactions less than or equal to a specified threshold.
 
     To configure the data pre-filtering, include the appropriate
     settings in the configuration file using the pattern shown below.
-    Note: Pre-filtering is optional and can be applied regardless of the `data_config.strategy` value.
 
     .. code:: yaml
 
@@ -41,6 +40,9 @@ class PreFilter:
           threshold: 3|average
           core: 5
           rounds: 2
+
+    Notes:
+        Pre-filtering is optional and can be applied regardless of the `data_config.strategy` value.
     """
 
     def __init__(self, data: pd.DataFrame, prefiltering_ns: t.List[SimpleNamespace]):

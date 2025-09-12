@@ -30,12 +30,12 @@ class Splitter:
 
     Supported splitting strategies:
 
-    - fixed_timestamp: Splits data using a predefined or computed timestamp threshold.
-    - best_timestamp: Automatically selects the best timestamp across users for splitting.
-    - temporal_hold_out: Uses the most recent interactions (per user) for testing.
-    - temporal_leave_n_out: Leaves the last N events per user as the test set.
-    - random_subsampling: Randomly subsamples training and testing data across folds.
-    - random_cross_validation (K-Folds): Performs stratified K-Fold cross-validation.
+    - `fixed_timestamp`: Splits data using a predefined or computed timestamp threshold.
+    - `best_timestamp`: Automatically selects the best timestamp across users for splitting.
+    - `temporal_hold_out`: Uses the most recent interactions (per user) for testing.
+    - `temporal_leave_n_out`: Leaves the last N events per user as the test set.
+    - `random_subsampling`: Randomly subsamples training and testing data across folds.
+    - `random_cross_validation (K-Folds)`: Performs stratified K-Fold cross-validation.
 
     To configure the data splitting, include the appropriate
     settings in the configuration file using the pattern shown below.
