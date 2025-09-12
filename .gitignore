@@ -12,9 +12,9 @@
 [Ll]ocal
 [Ss]cripts
 pyvenv.cfg
-.venv
+/.venv/
 /venv/
-_profiling/
+/_profiling/
 pip-selfcheck.json
 
 .idea
@@ -22,6 +22,7 @@ pip-selfcheck.json
 
 /results/
 /data/*
+**/splitting/
 /share/
 **/__pycache__/**
 *.log
