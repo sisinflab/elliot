@@ -36,7 +36,7 @@ class Sampler:
         # self._num_pos_examples = len(self._nonzero[0])
         # self._positive_pairs = list(zip(*self._nonzero, np.ones(len(self._nonzero[0]), dtype=np.int32)))
 
-    def step(self, batch_size):
+    def step(self):
         """Converts a list of positive pairs into a two class dataset.
         Args:
           positive_pairs: an array of shape [n, 2], each row representing a positive
@@ -100,5 +100,5 @@ class Sampler:
         samples_indices = random.sample(range(training_matrix.shape[0]), training_matrix.shape[0])
         training_matrix = training_matrix[samples_indices]
         print(f"Sampling has taken {round(time.time() - time_start, 2)} seconds")
-        for start in range(0, training_matrix.shape[0], batch_size):
-            yield training_matrix[start:min(start + batch_size, training_matrix.shape[0])]
+        for start in range(0, training_matrix.shape[0], self.batch_size):
+            yield training_matrix[start:min(start + self.batch_size, training_matrix.shape[0])]

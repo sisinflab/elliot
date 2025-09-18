@@ -13,6 +13,7 @@ import numpy as np
 import logging as pylog
 import time
 
+from elliot.recommender.base_recommender import get_model
 from elliot.utils import logging
 
 from hyperopt import STATUS_OK
@@ -61,7 +62,8 @@ class ModelCoordinator(object):
             self.logger.info(f"Exploration: Hyperparameter exploration number {self.model_config_index+1}")
             self.logger.info(f"Exploration: Test Fold exploration number {self.test_fold_index+1}")
             self.logger.info(f"Exploration: Train-Validation Fold exploration number {trainval_index+1}")
-            model = self.model_class(data=data_obj, config=self.base, params=model_params)
+            model = get_model(data_obj, self.base, model_params, self.model_class)
+            #model = self.model_class(data=data_obj, config=self.base, params=model_params)
             tic = time.perf_counter()
             model.train()
             toc = time.perf_counter()
@@ -107,7 +109,8 @@ class ModelCoordinator(object):
         for trainval_index, data_obj in enumerate(self.data_objs):
             self.logger.info(f"Exploration: Test Fold exploration number {self.test_fold_index+1}")
             self.logger.info(f"Exploration: Train-Validation Fold exploration number {trainval_index+1}")
-            model = self.model_class(data=data_obj, config=self.base, params=self.params)
+            model = get_model(data_obj, self.base, self.params, self.model_class)
+            #model = self.model_class(data=data_obj, config=self.base, params=self.params)
             tic = time.perf_counter()
             model.train()
             toc = time.perf_counter()

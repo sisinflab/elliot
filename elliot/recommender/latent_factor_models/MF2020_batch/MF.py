@@ -4,152 +4,182 @@ Module description:
 """
 
 __version__ = '0.3.1'
-__author__ = 'Vito Walter Anelli, Claudio Pomo'
-__email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
+__author__ = 'Vito Walter Anelli, Claudio Pomo, Antonio Ferrara'
+__email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, antonio.ferrara@poliba.it'
 
 import pickle
-from tqdm import tqdm
 
+import numpy as np
+
+from elliot.recommender.base_recommender import GeneralRecommender
 from elliot.recommender.latent_factor_models.MF2020 import custom_sampler_rendle as ps
-from elliot.recommender.base_recommender_model import BaseRecommenderModel
-from elliot.recommender.base_recommender_model import init_charger
-from elliot.recommender.recommender_utils_mixin import RecMixin
-from elliot.utils.write import store_recommendation
-
-from elliot.recommender.latent_factor_models.MF2020_batch.MF_model import MFModel
 
 
-class MF2020_batch(RecMixin, BaseRecommenderModel):
-    r"""
-    Matrix Factorization (implementation from "Neural Collaborative Filtering vs. Matrix Factorization Revisited")
-
-    For further details, please refer to the `paper <https://dl.acm.org/doi/pdf/10.1145/3383313.3412488>`_
-
-    Args:
-        factors: Number of latent factors
-        lr: Learning rate
-        bias_regularization: Regularization coefficient for the bias
-        user_regularization: Regularization coefficient for user latent factors
-        positive_item_regularization: Regularization coefficient for positive item latent factors
-        negative_item_regularization: Regularization coefficient for negative item latent factors
-        update_negative_item_factors:
-        update_users:
-        update_items:
-        update_bias:
-
-    To include the recommendation model, add it to the config file adopting the following pattern:
-
-    .. code:: yaml
-
-      models:
-        MF:
-          meta:
-            save_recs: True
-          epochs: 10
-          factors: 10
-          lr: 0.001
-          reg: 0.0025
-    """
-
-    @init_charger
-    def __init__(self, data, config, params, *args, **kwargs):
+class MF2020_batch(GeneralRecommender):
+    def __init__(self, data, params, random_seed, logger, *args):
+        super().__init__(data, params, random_seed, logger)
+        np.random.seed(random_seed)
 
         self._params_list = [
             ("_factors", "factors", "f", 10, int, None),
-            ("_learning_rate", "lr", "lr", 0.05, None, None),
-            ("_regularization", "reg", "reg", 0, None, None),
+            ("_lr", "lr", "lr", 0.05, None, None),
+            ("_reg", "reg", "reg", 0, None, None),
             ("_m", "m", "m", 0, int, None),
         ]
-        self.autoset_params()
+        self.auto_set_params(params)
 
-        self._ratings = self._data.train_dict
-        self._sampler = ps.Sampler(self._data.i_train_dict, self._m, self._data.sp_i_train, self._seed)
+        self.transactions = data.transactions * (self._m + 1)
+        self.sampler = ps.Sampler(data.i_train_dict, self._m, data.sp_i_train, random_seed)
 
-        # This is not a real batch size. Its only purpose is the live visualization of the training
-        if self._batch_size < 1:
-            self._batch_size = self._data.transactions
+        self._initialize(*args)
 
-        self._model = MFModel(self._factors,
-                              self._data,
-                              self._learning_rate,
-                              self._regularization,
-                              self._seed)
-
-    def get_recommendations(self, k: int = 10):
-        self._model.prepare_predictions()
-
-        # predictions_top_k_val = {}
-        # predictions_top_k_test = {}
-        #
-        # recs_val, recs_test = self.process_protocol(k)
-        #
-        # predictions_top_k_val.update(recs_val)
-        # predictions_top_k_test.update(recs_test)
-        #
-        # return predictions_top_k_val, predictions_top_k_test
-
-        return self._model.get_all_topks(self.get_candidate_mask(validation=True), k,
-                                         self._data.private_users,
-                                         self._data.private_items) \
-                   if hasattr(self._data, "val_dict") \
-                   else {}, self._model.get_all_topks(self.get_candidate_mask(), k,
-                                                      self._data.private_users,
-                                                      self._data.private_items)
-
-    def get_single_recommendation(self, mask, k, *args):
-        return {u: self._model.get_user_predictions(u, mask, k) for u in self._data.train_dict.keys()}
-
-    def predict(self, u: int, i: int):
+    def _initialize(self, loc: float = 0, scale: float = 0.1):
         """
-        Get prediction on the user item pair.
-
-        Returns:
-            A single float vaue.
+        This function initializes the data model
+        :param loc:
+        :param scale:
+        :return:
         """
-        return self._model.predict(u, i)
+
+        self._global_bias = 0
+
+        "same parameters as np.randn"
+        self._user_bias = np.zeros(len(self._users))
+        self._item_bias = np.zeros(len(self._items))
+        self._user_factors = \
+            np.random.normal(loc=loc, scale=scale, size=(len(self._users), self._factors))
+        self._item_factors = \
+            np.random.normal(loc=loc, scale=scale, size=(len(self._items), self._factors))
 
     @property
     def name(self):
-        return "MF2020" \
-               + f"_{self.get_base_params_shortcut()}" \
-               + f"_{self.get_params_shortcut()}"
+        return "MF2020"
 
-    def train(self):
-        if self._restore:
-            return self.restore_weights()
+    def indexed_predict(self, user, item):
+        return self._global_bias + self._user_bias[user] + self._item_bias[item] \
+               + self._user_factors[user] @ self._item_factors[item]
 
-        print(f"Transactions: {self._data.transactions}")
+    """def get_user_predictions(self, user_id, mask, top_k=10):
+        user_id = self._public_users.get(user_id)
+        # b = self._train[user_id].dot(W_sparse)
+        # b = self._global_bias + self._user_bias[user_id] + self._item_bias \
+        #        + self._user_factors[user_id] @ self._item_factors.T
+        b = self._preds[user_id]
+        a = mask[user_id]
+        b[~a] = -np.inf
+        indices, values = zip(*[(self._private_items.get(u_list[0]), u_list[1])
+                              for u_list in enumerate(b.data)])
 
-        for it in self.iterate(self._epochs):
-            print(f"\n********** Iteration: {it + 1}")
-            loss = 0
-            steps = 0
+        indices = np.array(indices)
+        values = np.array(values)
+        local_k = min(top_k, len(values))
+        partially_ordered_preds_indices = np.argpartition(values, -local_k)[-local_k:]
+        real_values = values[partially_ordered_preds_indices]
+        real_indices = indices[partially_ordered_preds_indices]
+        local_top_k = real_values.argsort()[::-1]
+        return [(real_indices[item], real_values[item]) for item in local_top_k]"""
 
-            with tqdm(total=int(self._data.transactions * (self._m + 1) // self._batch_size), disable=not self._verbose) as t:
-                for batch in self._sampler.step(self._batch_size):
-                    steps += 1
-                    loss += self._model.train_step(batch)/len(batch)
-                    t.set_postfix({'loss': f'{loss/steps:.5f}'})
-                    t.update()
+    def train_step(self, batch, **kwargs):
+        lr = self._lr
+        reg = self._reg
 
-            self.evaluate(it, loss/(it + 1))
+        gb_ = self._global_bias
+        uf_ = self._user_factors[batch[:, 0]]
+        if_ = self._item_factors[batch[:, 1]]
+        ub_ = self._user_bias[batch[:, 0]]
+        ib_ = self._item_bias[batch[:, 1]]
 
-    def restore_weights(self):
-        try:
-            with open(self._saving_filepath, "rb") as f:
-                self._model.set_model_state(pickle.load(f))
-            print(f"Model correctly Restored")
+        prediction = gb_ + ub_ + ib_ + (uf_ * if_).sum(axis=-1)
 
-            recs = self.get_recommendations(self.evaluator.get_needed_recommendations())
-            result_dict = self.evaluator.eval(recs)
-            self._results.append(result_dict)
+        exp_pred = np.where(prediction > 0, 1.0 + np.exp(-prediction), np.exp(prediction))
+        sigmoid = np.where(prediction > 0, 1.0 / exp_pred, exp_pred / (1.0 + exp_pred))
 
-            print("******************************************")
-            if self._save_recs:
-                store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}.tsv")
-            return True
+        rating = batch[:, 2]
+        this_loss = np.where(prediction > 0, np.log(exp_pred) + (1 - rating) * prediction,
+                             -rating * prediction + np.log(1.0 + exp_pred))
 
-        except Exception as ex:
-            print(f"Error in model restoring operation! {ex}")
+        grad = rating - sigmoid
 
-        return False
+        np.add.at(self._user_factors, batch[:, 0], lr * (np.expand_dims(grad, axis=-1) * if_ - reg * uf_))
+        np.add.at(self._item_factors, batch[:, 1], lr * (np.expand_dims(grad, axis=-1) * uf_ - reg * if_))
+        np.add.at(self._user_bias, batch[:, 0], lr * (grad - reg * ub_))
+        np.add.at(self._item_bias, batch[:, 1], lr * (grad - reg * ib_))
+        self._global_bias += lr * (np.sum(grad) - reg * gb_)
+
+        return np.sum(this_loss)
+
+    def predict(self, start, stop):
+        #self._preds = np.expand_dims(self._user_bias, axis=1) + (
+        #            self._global_bias + self._item_bias + self._user_factors @ self._item_factors.T)
+        return (np.expand_dims(self._user_bias[start:stop], axis=1) +
+                (self._global_bias + self._item_bias + self._user_factors[start:stop] @ self._item_factors.T))
+
+    def update_factors(self, user: int, item: int, rating: float):
+        uf_ = self._user_factors[user]
+        if_ = self._item_factors[item]
+        ub_ = self._user_bias[user]
+        ib_ = self._item_bias[item]
+        gb_ = self._global_bias
+        lr = self._lr
+        reg = self._reg
+
+
+        prediction = gb_ + ub_ + ib_ + np.dot(uf_,if_)
+        # prediction = gb_ + ub_ + ib_ + uf_ @ if_
+
+        if prediction > 0:
+            one_plus_exp_minus_pred = 1.0 + np.exp(-prediction)
+            sigmoid = 1.0 / one_plus_exp_minus_pred
+            this_loss = (np.log(one_plus_exp_minus_pred) +
+                         (1.0 - rating) * prediction)
+        else:
+            exp_pred = np.exp(prediction)
+            sigmoid = exp_pred / (1.0 + exp_pred)
+            this_loss = -rating * prediction + np.log(1.0 + exp_pred)
+
+        grad = rating - sigmoid
+
+        self._user_factors[user] += lr * (grad * if_ - reg * uf_)
+        self._item_factors[item] += lr * (grad * uf_ - reg * if_)
+        self._user_bias[user] += lr * (grad - reg * ub_)
+        self._item_bias[item] += lr * (grad - reg * ib_)
+        self._global_bias += lr * (grad - reg * gb_)
+
+        return this_loss
+
+    """def get_all_topks(self, mask, k, user_map, item_map):
+        masking = np.where(mask, self._preds, -np.inf)
+        partial_index = np.argpartition(masking, -k, axis=1)[:, -k:]
+        masking_partition = np.take_along_axis(masking, partial_index, axis=1)
+        masking_partition_index = masking_partition.argsort(axis=1)[:, ::-1]
+        partial_index = np.take_along_axis(partial_index, masking_partition_index, axis=1)
+        masking_partition = np.take_along_axis(masking_partition, masking_partition_index, axis=1)
+        predictions_top_k = {
+            user_map[u]: list(map(lambda x: (item_map.get(x[0]), x[1]), zip(*map(lambda x: x, top)))) for
+            u, top in enumerate(zip(*(partial_index.tolist(), masking_partition.tolist())))}
+        return predictions_top_k"""
+
+    def get_model_state(self):
+        saving_dict = {}
+        saving_dict['_global_bias'] = self._global_bias
+        saving_dict['_user_bias'] = self._user_bias
+        saving_dict['_item_bias'] = self._item_bias
+        saving_dict['_user_factors'] = self._user_factors
+        saving_dict['_item_factors'] = self._item_factors
+        return saving_dict
+
+    def set_model_state(self, saving_dict):
+        self._global_bias = saving_dict['_global_bias']
+        self._user_bias = saving_dict['_user_bias']
+        self._item_bias = saving_dict['_item_bias']
+        self._user_factors = saving_dict['_user_factors']
+        self._item_factors = saving_dict['_item_factors']
+
+    def load_weights(self, path):
+        with open(path, "rb") as f:
+            self.set_model_state(pickle.load(f))
+
+    def save_weights(self, path):
+        with open(path, "wb") as f:
+            pickle.dump(self.get_model_state(), f)
+
