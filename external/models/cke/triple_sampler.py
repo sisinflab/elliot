@@ -11,11 +11,13 @@ import random
 
 import numpy as np
 
+from elliot.dataset.samplers.base_sampler import TraditionalSampler
 
-class Sampler:
-    def __init__(self, entity_to_idx, Xs, Xp, Xo, events
-                 ):
-        random.seed(42)
+
+class Sampler(TraditionalSampler):
+    def __init__(self, entity_to_idx, Xs, Xp, Xo, events, seed=42):
+        super().__init__(seed)
+        #random.seed(42)
         self.events = events
         self.Xs, self.Xp, self.Xo = Xs, Xp, Xo
         # self.headDict = {(p, o): s for s, p, o in zip(Xs, Xp, Xo)}
@@ -27,7 +29,19 @@ class Sampler:
             self.tailDict.setdefault((s, p), []).append(o)
         self.entity_total = list(range(len(entity_to_idx)))
 
-    def step(self, batch_size: int):
+    def initialize(self):
+        ntriples = len(self.Xs)
+        # shuffled_list = random.sample(range(ntriples), self.events)
+        self._shuffled_list = [random.choice(range(ntriples)) for _ in range(self.events)]
+
+    def _sample(self, bs, bsize):
+        ph = self.Xs[self._shuffled_list[bs:bs + bsize]]
+        pr = self.Xp[self._shuffled_list[bs:bs + bsize]]
+        pt = self.Xo[self._shuffled_list[bs:bs + bsize]]
+        nh, nr, nt = self.getTrainTripleBatch(zip(ph, pr, pt))
+        return ph, pr, pt, nh, nr, nt
+
+    """def step(self, batch_size: int):
         ntriples = len(self.Xs)
         # shuffled_list = random.sample(range(ntriples), self.events)
         shuffled_list = [random.choice(range(ntriples)) for _ in range(self.events)]
@@ -36,7 +50,7 @@ class Sampler:
             end_idx = min(start_idx + batch_size, self.events)
             ph, pr, pt = self.Xs[shuffled_list[start_idx:end_idx]], self.Xp[shuffled_list[start_idx:end_idx]], self.Xo[shuffled_list[start_idx:end_idx]]
             nh, nr, nt = self.getTrainTripleBatch(zip(ph, pr, pt))
-            yield ph, pr, pt, nh, nr, nt
+            yield ph, pr, pt, nh, nr, nt"""
 
     def getTrainTripleBatch(self, triple_batch):
         negTripleList = [self.corrupt_head_filter(triple) if random.random() < 0.5
@@ -69,7 +83,7 @@ class Sampler:
                     break
             else:
                 raise Exception("No head dictionary found")
-        return (newHead, triple[1], triple[2])
+        return newHead, triple[1], triple[2]
 
     def corrupt_tail_filter(self, triple):
         while True:
@@ -90,4 +104,4 @@ class Sampler:
                     break
             else:
                 raise Exception("No tail dictionary found")
-        return (triple[0], triple[1], newTail)
+        return triple[0], triple[1], newTail

@@ -10,11 +10,14 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malite
 import random
 import numpy as np
 
+from elliot.dataset.samplers.base_sampler import TraditionalSampler
 
-class Sampler:
-    def __init__(self, ui_dict, iu_dict, public_users, public_items, users_tokens, items_tokens):
-        np.random.seed(42)
-        random.seed(42)
+
+class Sampler(TraditionalSampler):
+    def __init__(self, ui_dict, iu_dict, public_users, public_items, users_tokens, items_tokens, seed=42):
+        super().__init__(seed)
+        #np.random.seed(42)
+        #random.seed(42)
         self._ui_dict = ui_dict
         self._iu_dict = iu_dict
         self._users = list(self._ui_dict.keys())
@@ -27,7 +30,36 @@ class Sampler:
         self._users_tokens = {self._public_users[u]: v for u, v in users_tokens.items()}
         self._items_tokens = {self._public_items[i]: v for i, v in items_tokens.items()}
 
-    def step(self, events: int, batch_size: int):
+    def _sample(self, **kwargs):
+        u = self._r_int(self._nusers)
+        ui = self._ui_dict[u]
+        lui = self._lui_dict[u]
+        if lui == self._nitems:
+            self._sample()
+        b = random.getrandbits(1)
+        if b:
+            i = ui[self._r_int(lui)]
+        else:
+            i = self._r_int(self._nitems)
+            while i in ui:
+                i = self._r_int(self._nitems)
+
+        iu = self._iu_dict[i]
+
+        u_ratings = np.zeros((1, self._nitems))
+        i_ratings = np.zeros((1, self._nusers))
+        u_ratings[0, ui] = 1.0
+        i_ratings[0, iu] = 1.0
+
+        u_reviews = self._users_tokens[u]
+        i_reviews = self._items_tokens[i]
+
+        return u, i, b, u_ratings, i_ratings, u_reviews, i_reviews
+
+    def prepare_output(self, user, item, bit, u_ra, i_ra, u_re, i_re):
+        return user, item, bit.astype('float32'), u_ra, i_ra, u_re, i_re
+
+    """def step(self, events: int, batch_size: int):
         r_int = np.random.randint
         n_users = self._nusers
         n_items = self._nitems
@@ -68,7 +100,7 @@ class Sampler:
                                                                           range(batch_start,
                                                                                 min(batch_start + batch_size,
                                                                                     events))]))
-            yield user, item, bit.astype('float32'), u_ra, i_ra, u_re, i_re
+            yield user, item, bit.astype('float32'), u_ra, i_ra, u_re, i_re"""
 
     @property
     def users_tokens(self):

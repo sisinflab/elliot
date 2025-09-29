@@ -9,12 +9,15 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
 import numpy as np
 
+from elliot.dataset.samplers.base_sampler import TraditionalSampler
 
-class Sampler:
-    def __init__(self, indexed_ratings, sparse_i_ratings):
-        np.random.seed(42)
+
+class Sampler(TraditionalSampler):
+    def __init__(self, indexed_ratings, sparse_i_ratings, seed=42):
+        super().__init__(indexed_ratings, seed)
+        #np.random.seed(42)
         self._sparse_i_ratings = sparse_i_ratings
-        self._indexed_ratings = indexed_ratings
+        """self._indexed_ratings = indexed_ratings
         self._users = list(self._indexed_ratings.keys())
         self._nusers = len(self._users)
         self._items = list({k for a in self._indexed_ratings.values() for k in a.keys()})
@@ -28,25 +31,26 @@ class Sampler:
         n_items = self._nitems
         ui_dict = self._ui_dict
         lui_dict = self._lui_dict
+        boolean_list = [0, 1]"""
+
+    def _sample(self, **kwargs):
         boolean_list = [0, 1]
+        u = self._r_int(self._nusers)
+        ui = self._ui_dict[u]
+        lui = self._lui_dict[u]
+        if lui == self._nitems:
+            self._sample()
+        np.random.shuffle(boolean_list)
 
-        def sample():
-            u = r_int(n_users)
-            ui = ui_dict[u]
-            lui = lui_dict[u]
-            if lui == n_items:
-                sample()
-            np.random.shuffle(boolean_list)
-
-            if boolean_list[0]:
-                i = ui[r_int(lui)]
-                r = self._indexed_ratings[u][i]
-            else:
-                i = r_int(n_items)
-                while i in ui:
-                    i = r_int(n_items)
-                r = 0
-            return u, i, r
+        if boolean_list[0]:
+            i = ui[self._r_int(lui)]
+            r = self._indexed_ratings[u][i]
+        else:
+            i = self._r_int(self._nitems)
+            while i in ui:
+                i = self._r_int(self._nitems)
+            r = 0
+        return u, i, r
 
         for batch_start in range(0, events, batch_size):
             u, i, r = map(np.array, zip(*[sample() for _ in range(batch_start, min(batch_start + batch_size, events))]))

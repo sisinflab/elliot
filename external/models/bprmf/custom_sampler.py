@@ -9,17 +9,20 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
 import numpy as np
 
+from elliot.dataset.samplers.base_sampler import TraditionalSampler
 
-class Sampler:
+
+class Sampler(TraditionalSampler):
     def __init__(self, indexed_ratings, seed=42):
-        np.random.seed(seed)
+        super().__init__(seed, indexed_ratings)
+        """np.random.seed(seed)
         self._indexed_ratings = indexed_ratings
         self._users = list(self._indexed_ratings.keys())
         self._nusers = len(self._users)
         self._items = list({k for a in self._indexed_ratings.values() for k in a.keys()})
         self._nitems = len(self._items)
         self._ui_dict = {u: list(set(indexed_ratings[u])) for u in indexed_ratings}
-        self._lui_dict = {u: len(v) for u, v in self._ui_dict.items()}
+        self._lui_dict = {u: len(v) for u, v in self._ui_dict.items()}"""
         self._freq_users = dict.fromkeys(self._users, 0)
         self._freq_items = dict.fromkeys(self._items, 0)
 
@@ -31,7 +34,24 @@ class Sampler:
     def freq_items(self):
         return self._freq_items
 
-    def step(self, events: int, batch_size: int):
+    def _sample(self, **kwargs):
+        u = self._r_int(self._nusers)
+        self._freq_users[u] += 1
+        ui = self._ui_dict[u]
+        lui = self._lui_dict[u]
+        if lui == self._nitems:
+            self._freq_users[u] -= 1
+            self._sample()
+        i = ui[self._r_int(lui)]
+        self._freq_items[i] += 1
+
+        j = self._r_int(self._nitems)
+        while j in ui:
+            j = self._r_int(self._nitems)
+        self._freq_items[j] += 1
+        return u, i, j
+
+    """def step(self, events: int, batch_size: int):
         r_int = np.random.randint
         n_users = self._nusers
         n_items = self._nitems
@@ -59,4 +79,4 @@ class Sampler:
             bui, bii, bij = map(np.array,
                                 zip(*[sample() for _ in
                                       range(batch_start, min(batch_start + batch_size, events))]))
-            yield bui[:, None], bii[:, None], bij[:, None]
+            yield bui[:, None], bii[:, None], bij[:, None]"""

@@ -11,11 +11,14 @@ import numpy as np
 import random
 import time
 
+from elliot.dataset.samplers.base_sampler import TraditionalSampler
 
-class Sampler:
+
+class Sampler(TraditionalSampler):
     def __init__(self, indexed_ratings, m, sparse_matrix, seed):
-        np.random.seed(seed)
-        random.seed(seed)
+        super().__init__(indexed_ratings, seed)
+        #np.random.seed(seed)
+        #random.seed(seed)
 
         ratings = sparse_matrix.nonzero()
         self.rating_users = ratings[0]
@@ -26,9 +29,9 @@ class Sampler:
         #self._sparse = sparse_matrix
         # self._indexed_ratings = indexed_ratings
         # self._users = list(self._indexed_ratings.keys())
-        self._nusers = len(self._users)
-        self._items = np.unique(self.rating_items)
-        self._nitems = len(self._items)
+        #self._nusers = len(self._users)
+        #self._items = np.unique(self.rating_items)
+        #self._nitems = len(self._items)
         # self._ui_dict = {u: list(set(indexed_ratings[u])) for u in indexed_ratings}
         # self._lui_dict = {u: len(v) for u, v in self._ui_dict.items()}
         self._m = m
@@ -36,7 +39,7 @@ class Sampler:
         # self._num_pos_examples = len(self._nonzero[0])
         # self._positive_pairs = list(zip(*self._nonzero, np.ones(len(self._nonzero[0]), dtype=np.int32)))
 
-    def step(self, batch_size):
+    def initialize(self):
         """Converts a list of positive pairs into a two class dataset.
         Args:
           positive_pairs: an array of shape [n, 2], each row representing a positive
@@ -98,7 +101,11 @@ class Sampler:
         # # samples += list(neg)
 
         samples_indices = random.sample(range(training_matrix.shape[0]), training_matrix.shape[0])
-        training_matrix = training_matrix[samples_indices]
+        self._samples = training_matrix[samples_indices]
         print(f"Sampling has taken {round(time.time() - time_start, 2)} seconds")
-        for start in range(0, training_matrix.shape[0], batch_size):
-            yield training_matrix[start:min(start + batch_size, training_matrix.shape[0])]
+        #for start in range(0, training_matrix.shape[0], batch_size):
+        #    yield training_matrix[start:min(start + batch_size, training_matrix.shape[0])]
+
+    def _sample(self, bs, bsize):
+        u, pos, neg = self._samples[bs:bs + bsize].T
+        return u, pos, neg

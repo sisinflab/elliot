@@ -10,22 +10,42 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 import numpy as np
 import random
 
+from elliot.dataset.samplers.base_sampler import TraditionalSampler
 
-class Sampler:
-    def __init__(self, indexed_ratings, m, sparse_matrix, seed):
-        np.random.seed(seed)
-        random.seed(seed)
+
+class Sampler(TraditionalSampler):
+    def __init__(self, indexed_ratings, m, sparse_matrix, seed=42):
+        super().__init__(indexed_ratings, seed)
+        #np.random.seed(seed)
+        #random.seed(seed)
         self._sparse = sparse_matrix
-        self._indexed_ratings = indexed_ratings
+        """self._indexed_ratings = indexed_ratings
         self._users = list(self._indexed_ratings.keys())
         self._nusers = len(self._users)
         self._items = list({k for a in self._indexed_ratings.values() for k in a.keys()})
         self._nitems = len(self._items)
         self._ui_dict = {u: list(set(indexed_ratings[u])) for u in indexed_ratings}
-        self._lui_dict = {u: len(v) for u, v in self._ui_dict.items()}
+        self._lui_dict = {u: len(v) for u, v in self._ui_dict.items()}"""
         self._m = m
 
-    def step(self, batch_size):
+    def initialize(self):
+        nonzero = self._sparse.nonzero()
+        pos = list(zip(*nonzero, np.ones(len(nonzero[0]), dtype=np.int32)))
+
+        neg = set()
+        for u, i, _ in pos:
+            for _ in range(self._m):
+                neg.add((u, self._r_int(self._nitems), 0))
+
+        # samples = list(pos)
+        samples = pos + list(neg)
+        self._samples = random.sample(samples, len(samples))
+
+    def _sample(self, bs, bsize):
+        samples = self._samples[bs:bs + bsize]
+        return tuple(list(c) for c in zip(*samples))
+
+    """def step(self, batch_size):
         # t1 = time()
         r_int = np.random.randint
         n_users = self._nusers
@@ -50,4 +70,4 @@ class Sampler:
         # print('Epoch sampling [%.1f s]', t2 - t1)
 
         for start in range(0, len(samples), batch_size):
-            yield samples[start:min(start + batch_size, len(samples))]
+            yield samples[start:min(start + batch_size, len(samples))]"""

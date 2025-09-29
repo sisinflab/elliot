@@ -10,22 +10,63 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 import numpy as np
 import random
 
+from elliot.dataset.samplers.base_sampler import TraditionalSampler
 
-class Sampler:
-    def __init__(self, indexed_ratings, m, sparse_matrix, seed):
-        np.random.seed(seed)
-        random.seed(seed)
+
+class Sampler(TraditionalSampler):
+    def __init__(self, indexed_ratings, m, sparse_matrix, seed=42):
+        super().__init__(indexed_ratings, seed)
+        #np.random.seed(seed)
+        #random.seed(seed)
         self._sparse = sparse_matrix
-        self._indexed_ratings = indexed_ratings
+        """self._indexed_ratings = indexed_ratings
         self._users = list(self._indexed_ratings.keys())
         self._nusers = len(self._users)
         self._items = list({k for a in self._indexed_ratings.values() for k in a.keys()})
         self._nitems = len(self._items)
         self._ui_dict = {u: list(set(indexed_ratings[u])) for u in indexed_ratings}
-        self._lui_dict = {u: len(v) for u, v in self._ui_dict.items()}
+        self._lui_dict = {u: len(v) for u, v in self._ui_dict.items()}"""
         self._m = m
 
-    def step(self, batch_size):
+    def initialize(self):
+        nonzero = self._sparse.nonzero()
+        pos = list(zip(*nonzero, np.ones(len(nonzero[0]), dtype=np.int32)))
+
+        neg = list()
+        for u, i, _ in pos:
+            neg_samples = random.sample(range(self._nitems), self._m)
+            neg += list(zip(np.ones(len(neg_samples), dtype=np.int32) * u, neg_samples,
+                            np.zeros(len(neg_samples), dtype=np.int32)))
+            pass
+            # for _ in range(self._m):
+            #     neg.add((u, r_int(n_items), 0))
+
+        # samples = list(pos)
+        samples = pos + neg
+        self._samples = random.sample(samples, len(samples))
+
+        """nonzero = self._sparse.nonzero()
+        pos_u = np.array(nonzero[0], dtype=np.int32)
+        pos_i = np.array(nonzero[1], dtype=np.int32)
+        pos_y = np.ones(len(pos_u), dtype=np.int32)
+        pos = np.stack([pos_u, pos_i, pos_y], axis=1)
+
+        n_pos = len(pos_u)
+        neg_u = np.repeat(pos_u, self._m)
+        neg_i = np.random.randint(0, self._nitems, size=n_pos * self._m, dtype=np.int32)
+        neg_y = np.zeros(n_pos * self._m, dtype=np.int32)
+        neg = np.stack([neg_u, neg_i, neg_y], axis=1)
+
+        samples = np.concatenate([pos, neg], axis=0)
+        np.random.shuffle(samples)
+
+        self._samples = samples"""
+
+    def _sample(self, bs, bsize):
+        samples = self._samples[bs:bs + bsize]
+        return tuple(list(c) for c in zip(*samples))
+
+    """def step(self, batch_size):
         r_int = np.random.randint
         n_users = self._nusers
         n_items = self._nitems
@@ -72,4 +113,4 @@ class Sampler:
 
         for start in range(0, len(samples), batch_size):
             # u, i, b = samples[start:min(start + batch_size, len(samples))]
-            yield samples[start:min(start + batch_size, len(samples))]
+            yield samples[start:min(start + batch_size, len(samples))]"""

@@ -13,25 +13,28 @@ from PIL import Image
 import numpy as np
 import random
 
+from elliot.dataset.samplers.base_sampler import PipelineSampler
 
-class Sampler:
-    def __init__(self, indexed_ratings, item_indices, images_path, output_image_size, epochs):
-        np.random.seed(42)
+
+class Sampler(PipelineSampler):
+    def __init__(self, indexed_ratings, item_indices, images_path, output_image_size, seed=42):
+        super().__init__(indexed_ratings, seed)
+        """np.random.seed(42)
         random.seed(42)
-        self._indexed_ratings = indexed_ratings
+        self._indexed_ratings = indexed_ratings"""
         self._item_indices = item_indices
-        self._users = list(self._indexed_ratings.keys())
+        """self._users = list(self._indexed_ratings.keys())
         self._nusers = len(self._users)
         self._items = list({k for a in self._indexed_ratings.values() for k in a.keys()})
         self._nitems = len(self._items)
         self._ui_dict = {u: list(set(indexed_ratings[u])) for u in indexed_ratings}
-        self._lui_dict = {u: len(v) for u, v in self._ui_dict.items()}
+        self._lui_dict = {u: len(v) for u, v in self._ui_dict.items()}"""
 
         self._images_path = images_path
         self._output_image_size = output_image_size
-        self._epochs = epochs
+        #self._epochs = epochs
 
-    def read_images_triple(self, user, pos, neg):
+    def read_training_features(self, user, pos, neg):
         # load positive and negative item images
         im_pos = Image.open(self._images_path + str(pos.numpy()) + '.jpg')
         im_neg = Image.open(self._images_path + str(neg.numpy()) + '.jpg')
@@ -55,7 +58,20 @@ class Sampler:
         im_neg = (np.array(im_neg.resize(self._output_image_size)) - np.float32(127.5)) / np.float32(127.5)
         return user.numpy(), pos.numpy(), im_pos, neg.numpy(), im_neg
 
-    def step(self, events: int, batch_size: int):
+    def _sample(self, **kwargs):
+        u = self._r_int(self._nusers)
+        ui = self._ui_dict[u]
+        lui = self._lui_dict[u]
+        if lui == self._nitems:
+            self._sample()
+        i = ui[self._r_int(lui)]
+
+        j = self._r_int(self._nitems)
+        while j in ui:
+            j = self._r_int(self._nitems)
+        return u, i, j
+
+    """def step(self, events: int, batch_size: int):
         r_int = np.random.randint
         n_users = self._nusers
         n_items = self._nitems
@@ -68,18 +84,7 @@ class Sampler:
 
         counter_inter = 1
 
-        def sample():
-            u = r_int(n_users)
-            ui = ui_dict[u]
-            lui = lui_dict[u]
-            if lui == n_items:
-                sample()
-            i = ui[r_int(lui)]
-
-            j = r_int(n_items)
-            while j in ui:
-                j = r_int(n_items)
-            user.append(u), pos.append(i), neg.append(j)
+        
 
         for ep in range(self._epochs):
             for _ in range(0, events):
@@ -105,10 +110,14 @@ class Sampler:
         data = data.batch(batch_size=batch_size)
         data = data.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
 
-        return data
+        return data"""
+
+    def _sample_eval(self, *args):
+        for item in self._items:
+            yield item
 
     # this is only for evaluation
-    def pipeline_eval(self, batch_size):
+    """def pipeline_eval(self, batch_size):
         def load_func(i):
             b = tf.py_function(
                 self.read_image,
@@ -122,10 +131,10 @@ class Sampler:
         data = data.batch(batch_size=batch_size)
         data = data.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
 
-        return data
+        return data"""
 
     # this is only for evaluation
-    def read_image(self, item):
+    def read_eval_features(self, item):
         # load positive image
         im = Image.open(self._images_path + str(item.numpy()) + '.jpg')
 

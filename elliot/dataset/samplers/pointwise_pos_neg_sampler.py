@@ -10,10 +10,13 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 import random
 import numpy as np
 
+from elliot.dataset.samplers.base_sampler import TraditionalSampler
 
-class Sampler:
-    def __init__(self, indexed_ratings):
-        np.random.seed(42)
+
+class Sampler(TraditionalSampler):
+    def __init__(self, indexed_ratings, seed=42):
+        super().__init__(indexed_ratings, seed)
+        """np.random.seed(42)
         random.seed(42)
         self._indexed_ratings = indexed_ratings
         self._users = list(self._indexed_ratings.keys())
@@ -28,22 +31,22 @@ class Sampler:
         n_users = self._nusers
         n_items = self._nitems
         ui_dict = self._ui_dict
-        lui_dict = self._lui_dict
+        lui_dict = self._lui_dict"""
 
-        def sample():
-            u = r_int(n_users)
-            ui = ui_dict[u]
-            lui = lui_dict[u]
-            if lui == n_items:
-                sample()
-            b = random.getrandbits(1)
-            if b:
-                i = ui[r_int(lui)]
-            else:
-                i = r_int(n_items)
-                while i in ui:
-                    i = r_int(n_items)
-            return u, i, b
+    def _sample(self, **kwargs):
+        u = self._r_int(self._nusers)
+        ui = self._ui_dict[u]
+        lui = self._lui_dict[u]
+        if lui == self._nitems:
+            self._sample()
+        b = random.getrandbits(1)
+        if b:
+            i = ui[self._r_int(lui)]
+        else:
+            i = self._r_int(self._nitems)
+            while i in ui:
+                i = self._r_int(self._nitems)
+        return u, i, b
 
         for batch_start in range(0, events, batch_size):
             u, i, b = map(np.array, zip(*[sample() for _ in range(batch_start, min(batch_start + batch_size, events))]))

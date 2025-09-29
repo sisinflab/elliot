@@ -10,10 +10,13 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 import numpy as np
 import random
 
+from elliot.dataset.samplers.base_sampler import TraditionalSampler
 
-class Sampler:
+
+class Sampler(TraditionalSampler):
     def __init__(self, indexed_ratings, seed=42):
-        np.random.seed(seed)
+        super().__init__(indexed_ratings, seed)
+        """np.random.seed(seed)
         random.seed(seed)
         self._indexed_ratings = indexed_ratings
         self._users = list(self._indexed_ratings.keys())
@@ -27,23 +30,23 @@ class Sampler:
         r_int = np.random.randint
         n_items = self._nitems
         ui_dict = self._ui_dict
-        lui_dict = self._lui_dict
+        lui_dict = self._lui_dict"""
 
-        def sample(bs):
-            users = random.sample(self._users, bs)
-            pos_items, neg_items = [], []
-            for u in users:
-                ui = ui_dict[u]
-                lui = lui_dict[u]
-                if lui == n_items:
-                    sample(bs)
-                i = ui[r_int(lui)]
+    def _sample(self, bsize, **kwargs):
+        users = random.sample(self._users, bsize)
+        pos_items, neg_items = [], []
+        for u in users:
+            ui = self._ui_dict[u]
+            lui = self._lui_dict[u]
+            if lui ==self._nitems:
+                self._sample(bsize)
+            i = ui[self._r_int(lui)]
 
-                j = r_int(n_items)
-                while j in ui:
-                    j = r_int(n_items)
-                pos_items.append(i), neg_items.append(j)
-            return users, pos_items, neg_items
+            j = self._r_int(self._nitems)
+            while j in ui:
+                j = self._r_int(self._nitems)
+            pos_items.append(i), neg_items.append(j)
+        return users, pos_items, neg_items
 
         for batch_start in range(0, events, batch_size):
             batch_stop = min(batch_start + batch_size, events)

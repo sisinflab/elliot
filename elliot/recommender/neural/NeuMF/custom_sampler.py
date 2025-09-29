@@ -10,10 +10,13 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 import numpy as np
 import random
 
+from elliot.dataset.samplers.base_sampler import TraditionalSampler
 
-class Sampler:
-    def __init__(self, indexed_ratings, m):
-        np.random.seed(42)
+
+class Sampler(TraditionalSampler):
+    def __init__(self, indexed_ratings, m, seed=42):
+        super().__init__(seed, indexed_ratings)
+        """np.random.seed(42)
         random.seed(42)
         self._indexed_ratings = indexed_ratings
         self._users = list(self._indexed_ratings.keys())
@@ -21,11 +24,11 @@ class Sampler:
         self._items = list({k for a in self._indexed_ratings.values() for k in a.keys()})
         self._nitems = len(self._items)
         self._ui_dict = {u: list(set(indexed_ratings[u])) for u in indexed_ratings}
-        self._lui_dict = {u: len(v) for u, v in self._ui_dict.items()}
+        self._lui_dict = {u: len(v) for u, v in self._ui_dict.items()}"""
         self._m = m
 
-    def step(self, batch_size: int):
-        r_int = np.random.randint
+    def initialize(self):
+        r_int = self._r_int
         n_items = self._nitems
         ui_dict = self._ui_dict
         pos = {(u, i, 1) for u, items in ui_dict.items() for i in items}
@@ -41,8 +44,12 @@ class Sampler:
 
         samples = list(pos)
         samples.extend(list(neg))
-        samples = random.sample(samples, len(samples))
+        self._samples = random.sample(samples, len(samples))
 
-        for start in range(0, len(samples), batch_size):
-            u, i, b = map(np.array, zip(*samples[start:min(start + batch_size, len(samples))]))
-            yield u, i, b
+    def _sample(self, bs, bsize):
+        u, i, b = self._samples[bs:bs + bsize]
+        return u, i, b
+
+    #    for start in range(0, len(samples), batch_size):
+    #        u, i, b = map(np.array, zip(*samples[start:min(start + batch_size, len(samples))]))
+    #        yield u, i, b

@@ -13,31 +13,47 @@ import os
 import numpy as np
 import random
 
+from elliot.dataset.samplers.base_sampler import PipelineSampler
 
-class Sampler:
-    def __init__(self, indexed_ratings, item_indices, cnn_features_path, epochs):
-        np.random.seed(42)
-        random.seed(42)
-        self._indexed_ratings = indexed_ratings
+
+class Sampler(PipelineSampler):
+    def __init__(self, indexed_ratings, item_indices, cnn_features_path, seed=42):
+        super().__init__(seed, indexed_ratings)
+        #np.random.seed(42)
+        #random.seed(42)
+        #self._indexed_ratings = indexed_ratings
         self._item_indices = item_indices
-        self._users = list(self._indexed_ratings.keys())
+        """self._users = list(self._indexed_ratings.keys())
         self._nusers = len(self._users)
         self._items = list({k for a in self._indexed_ratings.values() for k in a.keys()})
         self._nitems = len(self._items)
         self._ui_dict = {u: list(set(indexed_ratings[u])) for u in indexed_ratings}
-        self._lui_dict = {u: len(v) for u, v in self._ui_dict.items()}
+        self._lui_dict = {u: len(v) for u, v in self._ui_dict.items()}"""
 
         self._cnn_features_path = cnn_features_path
-        self._epochs = epochs
+        #self._epochs = epochs
 
-    def read_features_triple(self, user, pos, neg):
+    def read_training_features(self, user, pos, neg):
         # load positive and negative item features
         feat_pos = np.load(os.path.join(self._cnn_features_path, str(pos.numpy())) + '.npy')
         feat_neg = np.load(os.path.join(self._cnn_features_path, str(neg.numpy())) + '.npy')
 
         return user.numpy(), pos.numpy(), feat_pos, neg.numpy(), feat_neg
 
-    def step(self, events: int, batch_size: int):
+    def _sample(self, **kwargs):
+        u = self._r_int(self._nusers)
+        ui = self._ui_dict[u]
+        lui = self._lui_dict[u]
+        if lui == self._nitems:
+            self._sample()
+        i = ui[self._r_int(lui)]
+
+        j = self._r_int(self._nitems)
+        while j in ui:
+            j = self._r_int(self._nitems)
+        return u, i, j
+
+    """def step(self, events: int, batch_size: int):
         r_int = np.random.randint
         n_users = self._nusers
         n_items = self._nitems
@@ -86,14 +102,14 @@ class Sampler:
         data = data.batch(batch_size=batch_size)
         data = data.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
 
-        return data
+        return data"""
 
-    def step_eval(self):
+    def _sample_eval(self, **kwargs):
         for i_rel, i_abs in enumerate(self._item_indices):
             yield i_rel, i_abs
 
     # this is only for evaluation
-    def pipeline_eval(self, batch_size):
+    """def pipeline_eval(self, batch_size):
         def load_func(i_r, i_a):
             b = tf.py_function(
                 self.read_features_eval,
@@ -109,10 +125,10 @@ class Sampler:
         data = data.batch(batch_size=batch_size)
         data = data.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
 
-        return data
+        return data"""
 
     # this is only for evaluation
-    def read_features_eval(self, item_rel, item_abs):
+    def read_eval_features(self, item_rel, item_abs):
         feat = np.load(os.path.join(self._cnn_features_path, str(item_abs.numpy())) + '.npy')
 
         return item_rel, item_abs, feat
