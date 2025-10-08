@@ -1,4 +1,3 @@
-from .item_knn import ItemKNN
-from .user_knn import UserKNN
+from .knn import ItemKNN, UserKNN
 from .attribute_item_knn import AttributeItemKNN
 from .attribute_user_knn import AttributeUserKNN
