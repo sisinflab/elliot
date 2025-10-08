@@ -2,6 +2,7 @@ import inspect
 import random
 import logging as pylog
 import os
+import time
 
 import torch
 import numpy as np
@@ -18,24 +19,6 @@ from elliot.utils import logging
 
 
 class AbstractTrainer(ABC):
-    @abstractmethod
-    def _train_epoch(self):
-        pass
-
-    @abstractmethod
-    def train(self):
-        pass
-
-    @abstractmethod
-    def evaluate(self):
-        pass
-
-    @abstractmethod
-    def get_recommendations(self):
-        pass
-
-
-class BaseTrainer(AbstractTrainer):
     def __init__(self, data, config, params, model_class, *args, **kwargs):
         """
         This class represents a recommender model. You can load a pretrained model
@@ -77,7 +60,7 @@ class BaseTrainer(AbstractTrainer):
         self._verbose = getattr(self._params.meta, "verbose", None)
         self._validation_rate = getattr(self._params.meta, "validation_rate", 1)
         self._optimize_internal_loss = getattr(self._params.meta, "optimize_internal_loss", False)
-        self._epochs = int(getattr(self._params, "epochs", 2))
+        self._epochs = int(getattr(self._params, "epochs", 1))
         self._seed = getattr(self._params, "seed", 42)
         self._early_stopping = EarlyStopping(SimpleNamespace(**getattr(self._params, "early_stopping", {})),
                                              self._validation_metric, self._validation_k, _cutoff_k,
@@ -109,6 +92,7 @@ class BaseTrainer(AbstractTrainer):
         # Sampler
         self._sampler = self._model.sampler
         self._sampler.batch_size = self._batch_size
+        self._sampler.events = data.transactions
 
         # Other params
         self._num_items = self._data.num_items
@@ -148,79 +132,21 @@ class BaseTrainer(AbstractTrainer):
              for p in self._params_list]
         )
 
-    @staticmethod
-    def _batch_remove(original_str: str, char_list):
-        for c in char_list:
-            original_str = original_str.replace(c, "")
-        return original_str
+    @abstractmethod
+    def _train_epoch(self):
+        pass
 
-    def _train_epoch(self, *args):
-        loss = 0
-        steps = 0
-        with tqdm(total=int(self._model.transactions // self._batch_size), desc="Training") as t:
-            for batch in self._sampler.step():
-                steps += 1
-                loss += self._model.train_step(batch, *args)
-                t.set_postfix({'loss': f'{loss / steps:.5f}'})
-                t.update()
-        return loss
-
+    @abstractmethod
     def train(self):
-        if self._restore:
-            return self.restore_weights()
+        pass
 
-        print(f"Transactions: {self._data.transactions}")
+    @abstractmethod
+    def evaluate(self, it, loss):
+        pass
 
-        for it in range(self._epochs):
-            print(f"\n********** Iteration: {it + 1}")
-            loss = self._train_epoch()
-            if (it is None) or (not (it + 1) % self._validation_rate):
-                self.evaluate(it, loss / (it + 1))
-
-    def evaluate(self, it=None, loss=0):
-        recs = self.get_recommendations(self.evaluator.get_needed_recommendations())
-        result_dict = self.evaluator.eval(recs)
-
-        self._losses.append(loss)
-
-        self._results.append(result_dict)
-
-        if it is not None:
-            self.logger.info(f'Epoch {(it + 1)}/{self._epochs} loss {loss / (it + 1):.5f}')
-        #else:
-        #    self.logger.info(f'Finished')
-
-        if self._save_recs:
-            self.logger.info(f"Writing recommendations at: {self._config.path_output_rec_result}")
-            if it is not None:
-                store_recommendation(recs[1], os.path.abspath(
-                    os.sep.join([self._config.path_output_rec_result, f"{self.name}_it={it + 1}.tsv"])))
-            else:
-                store_recommendation(recs[1], os.path.abspath(
-                    os.sep.join([self._config.path_output_rec_result, f"{self.name}.tsv"])))
-
-        if (len(self._results) - 1) == self.get_best_arg():
-            if it is not None:
-                self._params.best_iteration = it + 1
-            self.logger.info("******************************************")
-            self.best_metric_value = self._results[-1][self._validation_k]["val_results"][self._validation_metric]
-            if self._save_weights:
-                if hasattr(self, "_model"):
-                    self._model.save_weights(self._saving_filepath)
-                else:
-                    self.logger.warning("Saving weights FAILED. No model to save.")
-
-    def get_recommendations(self, k: int = 100):
-        predictions_top_k_test = {}
-        predictions_top_k_val = {}
-
-        for (start, stop), masks in tqdm(self._data, desc="Processing batches", total=len(self._data)):
-            predictions = self._model.predict(start, stop)
-            recs_val, recs_test = self.process_protocol(k, masks, predictions, start, stop)
-            predictions_top_k_val.update(recs_val)
-            predictions_top_k_test.update(recs_test)
-
-        return predictions_top_k_val, predictions_top_k_test
+    @abstractmethod
+    def get_recommendations(self):
+        pass
 
     def process_protocol(self, k, masks, predictions, start, stop):
         val_mask, test_mask = masks
@@ -235,25 +161,17 @@ class BaseTrainer(AbstractTrainer):
         proc_batch = dict(zip(self._data.private_users[start:stop], mat))
         return proc_batch
 
+    @abstractmethod
     def _full_rank_eval(self, k, mask, preds):
-        if isinstance(preds, sp.csr_matrix):
-            preds = preds.toarray()
-        preds[mask.nonzero()] = -np.inf
-        return self._get_top_k(preds, k)
+        raise NotImplementedError()
 
+    @abstractmethod
     def _negative_sampling_eval(self, k, mask, preds):
-        if isinstance(preds, sp.csr_matrix):
-            preds = preds.multiply(mask).toarray()
-        else:
-            preds = np.multiply(preds, mask.toarray())
-        return self._get_top_k(preds, k)
+        raise NotImplementedError()
 
+    @abstractmethod
     def _get_top_k(self, users_recs, k):
-        index_ordered = np.argpartition(users_recs, -k, axis=1)[:, -k:]
-        value_ordered = np.take_along_axis(users_recs, index_ordered, axis=1)
-        local_top_k = np.take_along_axis(index_ordered, value_ordered.argsort(axis=1)[:, ::-1], axis=1)
-        value_sorted = np.take_along_axis(users_recs, local_top_k, axis=1)
-        return local_top_k, value_sorted
+        raise NotImplementedError()
 
     def restore_weights(self):
         try:
@@ -292,12 +210,119 @@ class BaseTrainer(AbstractTrainer):
             else:
                 yield iteration
 
+    #@staticmethod
+    #def _batch_remove(original_str: str, char_list):
+    #    for c in char_list:
+    #        original_str = original_str.replace(c, "")
+    #    return original_str
 
-class GeneralTrainer(BaseTrainer):
-    pass
+
+class Trainer(AbstractTrainer):
+    def __init__(self, data, config, params, model_class):
+        super().__init__(data, config, params, model_class)
+
+    def _train_epoch(self, *args):
+        loss = 0
+        steps = 0
+        self._sampler.initialize()
+        with tqdm(total=int(self._model.transactions // self._batch_size), desc="Training") as t:
+            for batch in self._sampler.step():
+                steps += 1
+                loss += self._model.train_step(batch, *args)
+                t.set_postfix({'loss': f'{loss / steps:.5f}'})
+                t.update()
+        return loss
+
+    def train(self):
+        if self._restore:
+            return self.restore_weights()
+
+        print(f"Transactions: {self._data.transactions}")
+
+        for it in self.iterate(self._epochs):
+            print(f"\n********** Iteration: {it + 1}")
+            start = time.perf_counter()
+            loss = self._train_epoch()
+            end = time.perf_counter()
+            print(f"Duration: {end - start}")
+            if not (it + 1) % self._validation_rate:
+                self.evaluate(it, loss / (it + 1))
+
+    def evaluate(self, it, loss):
+        recs = self.get_recommendations(self.evaluator.get_needed_recommendations())
+        result_dict = self.evaluator.eval(recs)
+
+        self._losses.append(loss)
+
+        self._results.append(result_dict)
+
+        #if it is not None:
+        self.logger.info(f'Epoch {(it + 1)}/{self._epochs} loss {loss / (it + 1):.5f}')
+        #else:
+        #    self.logger.info(f'Finished')
+
+        if self._save_recs:
+            self.logger.info(f"Writing recommendations at: {self._config.path_output_rec_result}")
+            #if it is not None:
+            store_recommendation(recs[1], os.path.abspath(
+                os.sep.join([self._config.path_output_rec_result, f"{self.name}_it={it + 1}.tsv"])))
+            #else:
+            #    store_recommendation(recs[1], os.path.abspath(
+            #        os.sep.join([self._config.path_output_rec_result, f"{self.name}.tsv"])))
+
+        if (len(self._results) - 1) == self.get_best_arg():
+            #if it is not None:
+            self._params.best_iteration = it + 1
+            self.logger.info("******************************************")
+            self.best_metric_value = self._results[-1][self._validation_k]["val_results"][self._validation_metric]
+            if self._save_weights:
+                if hasattr(self, "_model"):
+                    self._model.save_weights(self._saving_filepath)
+                else:
+                    self.logger.warning("Saving weights FAILED. No model to save.")
+
+    def get_recommendations(self, k: int = 100):
+        predictions_top_k_test = {}
+        predictions_top_k_val = {}
+
+        for (start, stop), masks in tqdm(self._data, desc="Processing batches", total=len(self._data)):
+            predictions = self._model.predict(start, stop)
+            recs_val, recs_test = self.process_protocol(k, masks, predictions, start, stop)
+            predictions_top_k_val.update(recs_val)
+            predictions_top_k_test.update(recs_test)
+
+        return predictions_top_k_val, predictions_top_k_test
+
+    def _full_rank_eval(self, k, mask, preds):
+        if isinstance(preds, sp.csr_matrix):
+            preds = preds.toarray()
+        preds[mask.nonzero()] = -np.inf
+        return self._get_top_k(preds, k)
+
+    def _negative_sampling_eval(self, k, mask, preds):
+        if isinstance(preds, sp.csr_matrix):
+            preds = preds.multiply(mask).toarray()
+        else:
+            preds = np.multiply(preds, mask.toarray())
+        return self._get_top_k(preds, k)
+
+    def _get_top_k(self, users_recs, k):
+        index_ordered = np.argpartition(users_recs, -k, axis=1)[:, -k:]
+        value_ordered = np.take_along_axis(users_recs, index_ordered, axis=1)
+        local_top_k = np.take_along_axis(index_ordered, value_ordered.argsort(axis=1)[:, ::-1], axis=1)
+        value_sorted = np.take_along_axis(users_recs, local_top_k, axis=1)
+        return local_top_k, value_sorted
 
 
-class TraditionalTrainer(BaseTrainer):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+class TraditionalTrainer(Trainer):
+    def __init__(self, data, config, params, model_class):
+        super().__init__(data, config, params, model_class)
         self._epochs = 1
+
+    def _train_epoch(self, *args):
+        self._model.initialize()
+        return 0
+
+
+class GeneralTrainer(AbstractTrainer):
+    pass

@@ -1,32 +1,35 @@
 import numpy as np
-
 from abc import ABC, abstractmethod
-from enum import Enum
 
-from elliot.recommender.base_trainer import GeneralTrainer, TraditionalTrainer
-
-
-class ModelType(Enum):
-    GENERAL = 1
-    TRADITIONAL = 2
+from elliot.dataset.samplers.base_sampler import FakeSampler
+from elliot.recommender.utils import ModelType
 
 
 class AbstractRecommender(ABC):
     type: ModelType
 
-    def __init__(self, data, params, seed, logger, *args):
-        self._params_list = []
+    def __init__(self, data, params, seed, logger):
+        self._data = data
+        self._params = params
         self._users = data.users
         self._items = data.items
         self.transactions = data.transactions
         self.logger = logger
         np.random.seed(seed)
 
+        self.auto_set_params()
+        if hasattr(self, '_loader') or hasattr(self, '_loaders'):
+            self.set_side_info()
+
+    @property
+    def name(self):
+        return self.__class__.__name__
+
     @abstractmethod
     def predict(self, start, stop):
         raise NotImplementedError()
 
-    def auto_set_params(self, params):
+    def auto_set_params(self):
         """
         Define Parameters as tuples: (variable_name, public_name, shortcut, default, reading_function, printing_function)
         Example:
@@ -39,18 +42,25 @@ class AbstractRecommender(ABC):
         ]
         """
         self.logger.info("Loading parameters")
-        for variable_name, public_name, shortcut, default, reading_function, _ in self._params_list:
+        params_list = self._params_list if hasattr(self, '_params_list') else []
+        for variable_name, public_name, shortcut, default, reading_function, _ in params_list:
             if reading_function is None:
-                setattr(self, variable_name, getattr(params, public_name, default))
+                setattr(self, variable_name, getattr(self._params, public_name, default))
             else:
-                setattr(self, variable_name, reading_function(getattr(params, public_name, default)))
+                setattr(self, variable_name, reading_function(getattr(self._params, public_name, default)))
             self.logger.info(f"Parameter {public_name} set to {getattr(self, variable_name)}")
-        if not self._params_list:
+        if not params_list:
             self.logger.info("No parameters defined")
 
+    def set_side_info(self, loader=None, mod=None):
+        name = f"_side{('_' + mod) if mod else ''}"
+        loader_name = loader if loader else self._loader
+        loader_obj = getattr(self._data.side_information, loader_name)
+        setattr(self, name, loader_obj)
 
-class GeneralRecommender(AbstractRecommender):
-    type = ModelType.GENERAL
+
+class Recommender(AbstractRecommender):
+    type = ModelType.BASE
 
     @abstractmethod
     def train_step(self, batch):
@@ -60,15 +70,10 @@ class GeneralRecommender(AbstractRecommender):
 class TraditionalRecommender(AbstractRecommender):
     type = ModelType.TRADITIONAL
 
+    def __init__(self, data, params, seed, logger):
+        super().__init__(data, params, seed, logger)
+        self.sampler = FakeSampler()
+
     @abstractmethod
     def initialize(self):
         raise NotImplementedError()
-
-
-def get_model(data, config, params, model_class: AbstractRecommender, *args, **kwargs):
-    #model = model_class(data, params)
-    if model_class.type == ModelType.GENERAL:
-        trainer = GeneralTrainer
-    elif model_class.type == ModelType.TRADITIONAL:
-        trainer = TraditionalTrainer
-    return trainer(data, config, params, model_class, *args, **kwargs)

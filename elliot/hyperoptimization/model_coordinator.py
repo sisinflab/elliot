@@ -13,7 +13,7 @@ import numpy as np
 import logging as pylog
 import time
 
-from elliot.recommender.base_recommender import get_model
+from elliot.recommender.utils import get_model
 from elliot.utils import logging
 
 from hyperopt import STATUS_OK
