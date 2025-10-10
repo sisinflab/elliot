@@ -116,7 +116,7 @@ class AbstractTrainer(ABC):
 
     @property
     def name(self):
-        return self._model.name + f"_{self.get_base_params_shortcut()}" + f"_{self.get_params_shortcut()}"
+        return self._model.name + f"_{self.get_base_params_shortcut()}" + f"_{self.get_model_params_shortcut()}"
 
     def get_base_params_shortcut(self):
         return "_".join([str(k) + "=" + str(v).replace(".", "$") for k, v in
@@ -125,11 +125,11 @@ class AbstractTrainer(ABC):
                                "bs": self._batch_size}).items()
                          ])
 
-    def get_params_shortcut(self):
+    def get_model_params_shortcut(self):
         return "_".join(
-            [str(p[2])+"="+ str(p[5](getattr(self, p[0]))
-                                if p[5] else getattr(self, p[0])).replace(".", "$")
-             for p in self._params_list]
+            [str(p[2])+"="+ str(p[5](getattr(self._model, p[0]))
+                                if p[5] else getattr(self._model, p[0])).replace(".", "$")
+             for p in self._model.params_list]
         )
 
     @abstractmethod

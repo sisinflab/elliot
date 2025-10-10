@@ -7,13 +7,13 @@ from elliot.recommender.knn.similarity import Similarity
 
 class KNN(TraditionalRecommender):
     def __init__(self, data, params, seed, logger, transpose):
-        self._params_list = [
+        self.params_list = [
             ("_num_neighbors", "neighbors", "nn", 40, int, None),
             ("_similarity", "similarity", "sim", "cosine", None, None),
             ("_implicit", "implicit", "bin", False, None, None),
             ("_asymmetric_alpha", "asymmetric_alpha", "asymalpha", False, None, lambda x: x if x else ""),
-            ("_tversky_alpha", "tversky_alpha", "tvalpha", False, None, lambda x: x if x else ""),
-            ("_tversky_beta", "tversky_beta", "tvbeta", False, None, lambda x: x if x else "")
+            ("_alpha", "alpha", "alpha", False, None, lambda x: x if x else ""),
+            ("_beta", "beta", "beta", False, None, lambda x: x if x else "")
         ]
         super().__init__(data, params, seed, logger)
 
@@ -24,8 +24,8 @@ class KNN(TraditionalRecommender):
                                    similarity=self._similarity,
                                    num_neighbors=self._num_neighbors,
                                    asymmetric_alpha=self._asymmetric_alpha,
-                                   tversky_alpha=self._tversky_alpha,
-                                   tversky_beta=self._tversky_beta)
+                                   alpha=self._alpha,
+                                   beta=self._beta)
 
     @abstractmethod
     def initialize(self):
@@ -62,7 +62,7 @@ class ItemKNN(KNN):
         super().__init__(data, params, seed, logger, transpose=True)
 
     def initialize(self):
-        w_sparse = self._backend.compute_similarity()
+        w_sparse = self._backend.compute_similarity().transpose()
         self._preds = self._URM.dot(w_sparse)
 
 

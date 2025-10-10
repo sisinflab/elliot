@@ -42,7 +42,7 @@ class AbstractRecommender(ABC):
         ]
         """
         self.logger.info("Loading parameters")
-        params_list = self._params_list if hasattr(self, '_params_list') else []
+        params_list = self.params_list if hasattr(self, 'params_list') else []
         for variable_name, public_name, shortcut, default, reading_function, _ in params_list:
             if reading_function is None:
                 setattr(self, variable_name, getattr(self._params, public_name, default))
