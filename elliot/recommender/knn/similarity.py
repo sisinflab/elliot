@@ -7,7 +7,7 @@ from elliot.utils import sparse
 
 
 class Similarity(object):
-    SUPPORTED_SIMILARITIES = {"cosine", "dot", "asym", "jaccard", "dice", "tversky"}
+    SUPPORTED_SIMILARITIES = {"cosine", "dot", "asym", "jaccard", "dice", "tversky", "rp3beta"}
     SUPPORTED_DISSIMILARITIES = {
         "euclidean", "manhattan", "haversine", "cityblock", "l1", "l2", #"chi2",
         "braycurtis", "canberra", "chebyshev", "correlation", "hamming", #"kulsinski", "mahalanobis",
@@ -16,7 +16,7 @@ class Similarity(object):
     }
 
     def __init__(self, train_data, item_profile=None, user_profile=None, similarity='cosine',
-                 num_neighbors=None, asymmetric_alpha=0.5, tversky_alpha=0.5, tversky_beta=0.5):
+                 num_neighbors=None, asymmetric_alpha=0.5, alpha=1.0, beta=1.0):
         if item_profile is not None and user_profile is not None:
             self.X, self.Y = user_profile, item_profile
         else:
@@ -25,9 +25,9 @@ class Similarity(object):
 
         self.train_data = train_data
         self.similarity = similarity
-        self.alpha = asymmetric_alpha
-        self.tversky_alpha = tversky_alpha
-        self.tversky_beta = tversky_beta
+        self.asym_alpha = asymmetric_alpha
+        self.alpha = alpha
+        self.beta = beta
 
         self.dim = train_data.shape[0]
         self.num_neighbors = num_neighbors or self.dim
@@ -54,16 +54,19 @@ class Similarity(object):
         if self.similarity == "cosine":
             w_mat = sim.cosine(self.X, self.Y, k=self.num_neighbors, format_output='csr')
         elif self.similarity == "asym":
-            w_mat = sim.asymmetric_cosine(self.X, self.Y, alpha=self.alpha, k=self.num_neighbors, format_output='csr')
+            w_mat = sim.asymmetric_cosine(self.X, self.Y, k=self.num_neighbors, alpha=self.asym_alpha, format_output='csr')
         elif self.similarity == "dot":
             w_mat = sim.dot_product(self.train_data, k=self.num_neighbors, format_output='csr')
         elif self.similarity == "jaccard":
             w_mat = sim.jaccard(self.X, self.Y, k=self.num_neighbors, binary=True, format_output='csr')
         elif self.similarity == "dice":
             w_mat = sim.dice(self.X, self.Y, k=self.num_neighbors, binary=True, format_output='csr')
+        elif self.similarity == "tversky":
+            w_mat = sim.tversky(self.X, self.Y, k=self.num_neighbors, alpha=self.alpha,
+                                   beta=self.beta, binary=True, format_output='csr')
         else:
-            w_mat = sim.tversky(self.X, self.Y, k=self.num_neighbors, alpha=self.tversky_alpha,
-                                   beta=self.tversky_beta, binary=True, format_output='csr')
+            w_mat = sim.rp3beta(self.X, self.Y, k=self.num_neighbors, alpha=self.alpha,
+                                beta=self.beta, binary=True, format_output='csr')
         return w_mat
 
     def _compute_distance_based_similarity(self):
@@ -92,13 +95,11 @@ class Similarity(object):
             for dist_chunk in dist_matrix:
                 chunk = 1 / (1 + dist_chunk)
 
-                index_ordered = np.argpartition(chunk, -k, axis=1)[:, -k:]
-                value_ordered = np.take_along_axis(chunk, index_ordered, axis=1)
-                local_top_n = np.take_along_axis(index_ordered, value_ordered.argsort(axis=1)[:, ::-1], axis=1)
-                value_sorted = np.take_along_axis(chunk, local_top_n, axis=1)
+                idx = np.argpartition(chunk, -k, axis=1)[:, -k:]
+                top_vals = np.take_along_axis(chunk, idx, axis=1)
 
-                data.extend(value_sorted.ravel())
-                cols_indices.extend(local_top_n.ravel())
+                data.extend(top_vals.ravel())
+                cols_indices.extend(idx.ravel())
 
                 last = row_indptr[-1]
                 new_ptrs = np.arange(last + k, last + k * (chunk.shape[0] + 1), k)
