@@ -62,8 +62,8 @@ class ItemKNN(KNN):
         super().__init__(data, params, seed, logger, transpose=True)
 
     def initialize(self):
-        w_sparse = self._backend.compute_similarity().transpose()
-        self._preds = self._URM.dot(w_sparse)
+        self._similarity_matrix = self._backend.compute_similarity().transpose()
+        self._preds = self._URM.dot(self._similarity_matrix)
 
 
 class UserKNN(KNN):
@@ -71,5 +71,5 @@ class UserKNN(KNN):
         super().__init__(data, params, seed, logger, transpose=False)
 
     def initialize(self):
-        w_sparse = self._backend.compute_similarity()
-        self._preds = w_sparse.dot(self._URM)
+        self._similarity_matrix = self._backend.compute_similarity()
+        self._preds = self._similarity_matrix.dot(self._URM)

@@ -37,8 +37,8 @@ class RP3beta(TraditionalRecommender):
         return self._preds[start:stop]
 
     def initialize(self):
-        w_sparse = self._compute_similarity()
-        self._preds = self._train.dot(w_sparse)
+        self._similarity_matrix = self._compute_similarity()
+        self._preds = self._train.dot(self._similarity_matrix)
 
     def _compute_similarity(self):
         # Neighborhood along rows

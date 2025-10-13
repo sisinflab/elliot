@@ -73,6 +73,8 @@ class TraditionalRecommender(AbstractRecommender):
     def __init__(self, data, params, seed, logger):
         super().__init__(data, params, seed, logger)
         self.sampler = FakeSampler()
+        self._similarity_matrix = None
+        self._preds = None
 
     @abstractmethod
     def initialize(self):
