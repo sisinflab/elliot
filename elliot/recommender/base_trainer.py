@@ -141,7 +141,7 @@ class AbstractTrainer(ABC):
         pass
 
     @abstractmethod
-    def evaluate(self, it, loss):
+    def evaluate(self, it=0, loss=0):
         pass
 
     @abstractmethod
@@ -248,7 +248,7 @@ class Trainer(AbstractTrainer):
             if not (it + 1) % self._validation_rate:
                 self.evaluate(it, loss / (it + 1))
 
-    def evaluate(self, it, loss):
+    def evaluate(self, it=0, loss=0):
         recs = self.get_recommendations(self.evaluator.get_needed_recommendations())
         result_dict = self.evaluator.eval(recs)
 

@@ -15,6 +15,8 @@ class AbstractRecommender(ABC):
         self._items = data.items
         self.transactions = data.transactions
         self.logger = logger
+
+        self.seed = seed
         np.random.seed(seed)
 
         self.auto_set_params()

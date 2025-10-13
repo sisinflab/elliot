@@ -7,19 +7,16 @@ __version__ = '0.3.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
-import numpy as np
 import pickle
+from tqdm import tqdm
+from scipy import sparse as sp
+from sklearn.utils.extmath import randomized_svd
 
-from elliot.recommender.recommender_utils_mixin import RecMixin
-from elliot.utils.write import store_recommendation
-
-from elliot.recommender.latent_factor_models.PureSVD.pure_svd_model import PureSVDModel
-from elliot.recommender.base_recommender_model import BaseRecommenderModel
-from elliot.recommender.base_recommender_model import init_charger
+from elliot.recommender.base_recommender import TraditionalRecommender
 
 
-class PureSVD(RecMixin, BaseRecommenderModel):
-    r"""
+class PureSVD(TraditionalRecommender):
+    """
     PureSVD
 
     For further details, please refer to the `paper <https://link.springer.com/chapter/10.1007/978-0-387-85820-3_5>`_
@@ -40,70 +37,44 @@ class PureSVD(RecMixin, BaseRecommenderModel):
           seed: 42
     """
 
-    @init_charger
-    def __init__(self, data, config, params, *args, **kwargs):
-
-        self._params_list = [
+    def __init__(self, data, params, seed, logger):
+        self.params_list = [
             ("_factors", "factors", "factors", 10, None, None)
         ]
-        self.autoset_params()
+        super().__init__(data, params, seed, logger)
 
-        self._ratings = self._data.train_dict
-        self._sp_i_train = self._data.sp_i_train
-        self._model = PureSVDModel(self._factors, self._data, self._seed)
+        self.user_vec, self.item_vec = None, None
 
-    def get_recommendations(self, k: int = 10):
-        predictions_top_k_val = {}
-        predictions_top_k_test = {}
+    def predict(self, start, stop):
+        return self.user_vec[start:stop].dot(self.item_vec)
 
-        recs_val, recs_test = self.process_protocol(k)
+    def initialize(self):
+        fake_iter = tqdm(range(1), desc="Computing")
 
-        predictions_top_k_val.update(recs_val)
-        predictions_top_k_test.update(recs_test)
+        for _ in fake_iter:
+            U, sigma, Vt = randomized_svd(self._data.sp_i_train,
+                                          n_components=self._factors,
+                                          random_state=self.seed)
+            s_Vt = sp.diags(sigma) * Vt
+            fake_iter.set_description("Done")
 
-        return predictions_top_k_val, predictions_top_k_test
+        self.user_vec = U
+        self.item_vec = s_Vt
 
-    def get_single_recommendation(self, mask, k, *args):
-        return {u: self._model.get_user_recs(u, mask, k) for u in self._ratings.keys()}
+    def get_model_state(self):
+        saving_dict = {}
+        saving_dict['user_vec'] = self.user_vec
+        saving_dict['item_vec'] = self.item_vec
+        return saving_dict
 
-    def predict(self, u: int, i: int):
-        """
-        Get prediction on the user item pair.
+    def set_model_state(self, saving_dict):
+        self.user_vec = saving_dict['user_vec']
+        self.item_vec = saving_dict['item_vec']
 
-        Returns:
-            A single float vaue.
-        """
-        return self._model.predict(u, i)
+    def load_weights(self, path):
+        with open(path, "rb") as f:
+            self.set_model_state(pickle.load(f))
 
-    @property
-    def name(self):
-        return f"PureSVD_{self.get_params_shortcut()}"
-
-    def train(self):
-
-        if self._restore:
-            return self.restore_weights()
-
-        self._model.train_step()
-
-        self.evaluate()
-
-    def restore_weights(self):
-        try:
-            with open(self._saving_filepath, "rb") as f:
-                self._model.set_model_state(pickle.load(f))
-            print(f"Model correctly Restored")
-
-            recs = self.get_recommendations(self.evaluator.get_needed_recommendations())
-            result_dict = self.evaluator.eval(recs)
-            self._results.append(result_dict)
-
-            print("******************************************")
-            if self._save_recs:
-                store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}.tsv")
-            return True
-
-        except Exception as ex:
-            print(f"Error in model restoring operation! {ex}")
-
-        return False
+    def save_weights(self, path):
+        with open(path, "wb") as f:
+            pickle.dump(self.get_model_state(), f)
