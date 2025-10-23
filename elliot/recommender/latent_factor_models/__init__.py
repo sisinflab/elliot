@@ -10,9 +10,9 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 from .BPRMF_batch import BPRMF_batch
 from .BPRMF import BPRMF
 from .WRMF import WRMF
-from .PureSVD import PureSVD
+from .pure_svd import PureSVD
 from .MF import MF
-from .FunkSVD import FunkSVD
+from .funk_svd import FunkSVD
 from .PMF import PMF
 from .LogisticMF import LMF
 from .NonNegMF import NonNegMF
@@ -23,7 +23,7 @@ from .BPRSlim import BPRSlim
 from .Slim import Slim
 from .CML import CML
 from .FISM import FISM
-from .SVDpp import SVDpp
+from .svdpp import SVDpp
 from .iALS import iALS
 from .MF2020 import MF2020
 from .MF2020_batch import MF2020_batch
