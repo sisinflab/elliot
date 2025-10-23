@@ -14,7 +14,7 @@ from elliot.dataset.samplers.base_sampler import TraditionalSampler
 
 class Sampler(TraditionalSampler):
     def __init__(self, indexed_ratings, sp_i_train, seed=42):
-        super().__init__(indexed_ratings, seed)
+        super().__init__(seed, indexed_ratings)
         self._sp_i_train = sp_i_train
         """np.random.seed(42)
         self._indexed_ratings = indexed_ratings
@@ -33,15 +33,32 @@ class Sampler(TraditionalSampler):
         ui_dict = self._ui_dict
         lui_dict = self._lui_dict"""
 
-    def _sample(self, **kwargs):
+    def _sample(self, bsize, **kwargs):
+        users = self._r_int(0, self._nusers, size=bsize)
+        items = np.empty(bsize, dtype=np.int64)
+        labels = np.empty(bsize, dtype=np.int64)
+
+        for idx, u in enumerate(users):
+            if self._lui_dict[u] == self._nitems:
+                while u in users:
+                    u = self._r_int(self._nusers)
+
+            ui = self._ui_dict[u]
+            lui = self._lui_dict[u]
+            i = ui[self._r_int(lui)]
+
+            items[idx] = i
+            labels[idx] = self._indexed_ratings[u][i]
+
+        return users, items, labels
         u = self._r_int(self._nusers)
         ui = self._ui_dict[u]
         lui = self._lui_dict[u]
         if lui == self._nitems:
-            self._sample()
+            return self._sample()
         i = ui[self._r_int(lui)]
         r = self._indexed_ratings[u][i]
-        return u, i, r, self._sp_i_train[u].toarray()[0]
+        return u, i, r#, self._sp_i_train[u].toarray()[0]
 
         """for batch_start in range(0, events, batch_size):
             u, i, r, pos = map(np.array, zip(*[sample() for _ in range(batch_start, min(batch_start + batch_size, events))]))

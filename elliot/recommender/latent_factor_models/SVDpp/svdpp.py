@@ -13,9 +13,8 @@ from tqdm import tqdm
 from elliot.dataset.samplers import custom_pointwise_sparse_sampler as cpss
 from elliot.recommender.base_recommender_model import BaseRecommenderModel
 from elliot.recommender.base_recommender_model import init_charger
-from elliot.recommender.latent_factor_models.SVDpp.svdpp_model import SVDppModel
+from elliot.recommender.latent_factor_models.svdpp_model import SVDppModel
 from elliot.recommender.recommender_utils_mixin import RecMixin
-from elliot.utils.write import store_recommendation
 
 
 class SVDpp(RecMixin, BaseRecommenderModel):

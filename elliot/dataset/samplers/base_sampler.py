@@ -51,11 +51,15 @@ class TraditionalSampler(AbstractSampler):
             batch_stop = min(batch_start + self.batch_size, self.events)
             current_batch_size = batch_stop - batch_start
             sample_out = self._sample(bs=batch_start, bsize=current_batch_size)
-            if isinstance(sample_out[0], (list, tuple, np.ndarray)):
-                res = map(np.array, sample_out)
-            else:
-                res = map(np.array, zip(*[self._sample(idx=i) for i in range(batch_start, batch_stop)]))
-            yield tuple(self.prepare_output(*res)) #tuple(r[:, None] for r in res)
+            # if isinstance(sample_out[0], (list, tuple, np.ndarray)):
+            #     res = map(np.array, sample_out)
+            # else:
+            #     res = map(np.array, zip(*[self._sample(idx=i) for i in range(batch_start, batch_stop)]))
+            yield tuple(self.prepare_output(*sample_out)) #tuple(r[:, None] for r in res)
+
+    @abstractmethod
+    def _sample(self, **kwargs):
+        raise NotImplementedError()
 
 
 class PipelineSampler(AbstractSampler):
