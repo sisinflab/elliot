@@ -4,7 +4,7 @@ import math
 import numpy as np
 from enum import Enum
 
-from elliot.recommender.base_trainer import Trainer, TraditionalTrainer
+from elliot.recommender.base_trainer import Trainer, TraditionalTrainer, GeneralTrainer
 
 
 class ModelType(Enum):
@@ -19,6 +19,8 @@ def get_model(data, config, params, model_class):
         trainer = Trainer
     elif model_class.type == ModelType.TRADITIONAL:
         trainer = TraditionalTrainer
+    elif model_class.type == ModelType.GENERAL:
+        trainer = GeneralTrainer
     return trainer(data, config, params, model_class)
 
 

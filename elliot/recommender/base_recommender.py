@@ -1,5 +1,12 @@
+from functools import cached_property
+
 import numpy as np
+import torch
+import tensorflow as tf
 from abc import ABC, abstractmethod
+from tensorflow import keras
+from torch import nn
+from torch_sparse import SparseTensor
 
 from elliot.dataset.samplers.base_sampler import FakeSampler
 from elliot.recommender.utils import ModelType
@@ -13,11 +20,11 @@ class AbstractRecommender(ABC):
         self._params = params
         self._users = data.users
         self._items = data.items
+        self._num_items = self._data.num_items
+        self._num_users = self._data.num_users
         self.transactions = data.transactions
         self.logger = logger
-
         self.seed = seed
-        np.random.seed(seed)
 
         self.auto_set_params()
         if hasattr(self, '_loader') or hasattr(self, '_loaders'):
@@ -64,12 +71,16 @@ class AbstractRecommender(ABC):
 class Recommender(AbstractRecommender):
     type = ModelType.BASE
 
+    def __init__(self, data, params, seed, logger):
+        super().__init__(data, params, seed, logger)
+        np.random.seed(seed)
+
     @abstractmethod
     def train_step(self, batch):
         raise NotImplementedError()
 
 
-class TraditionalRecommender(AbstractRecommender):
+class TraditionalRecommender(Recommender):
     type = ModelType.TRADITIONAL
 
     def __init__(self, data, params, seed, logger):
@@ -78,6 +89,29 @@ class TraditionalRecommender(AbstractRecommender):
         self._similarity_matrix = None
         self._preds = None
 
+    def train_step(self, batch):
+        pass
+
     @abstractmethod
     def initialize(self):
+        raise NotImplementedError()
+
+
+class GeneralRecommender(nn.Module, AbstractRecommender):
+    type = ModelType.GENERAL
+
+    def __init__(self, data, params, seed, logger):
+        AbstractRecommender.__init__(self, data, params, seed, logger)
+        super(GeneralRecommender, self).__init__()
+        torch.manual_seed(seed)
+
+    @cached_property
+    def _sp_i_train(self):
+        coo = self._data.sp_i_train.tocoo()
+        row = torch.tensor(coo.row, dtype=torch.long)
+        col = torch.tensor(coo.col, dtype=torch.long)
+        return SparseTensor(row=row, col=col, sparse_sizes=coo.shape)
+
+    @abstractmethod
+    def train_step(self, batch):
         raise NotImplementedError()
