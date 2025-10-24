@@ -44,6 +44,7 @@ class PureSVD(TraditionalRecommender):
         super().__init__(data, params, seed, logger)
 
         self.user_vec, self.item_vec = None, None
+        self.params_to_save = ['user_vec', 'item_vec']
 
     def predict(self, start, stop):
         return self.user_vec[start:stop].dot(self.item_vec)
@@ -60,21 +61,3 @@ class PureSVD(TraditionalRecommender):
 
         self.user_vec = U
         self.item_vec = s_Vt
-
-    def get_model_state(self):
-        saving_dict = {}
-        saving_dict['user_vec'] = self.user_vec
-        saving_dict['item_vec'] = self.item_vec
-        return saving_dict
-
-    def set_model_state(self, saving_dict):
-        self.user_vec = saving_dict['user_vec']
-        self.item_vec = saving_dict['item_vec']
-
-    def load_weights(self, path):
-        with open(path, "rb") as f:
-            self.set_model_state(pickle.load(f))
-
-    def save_weights(self, path):
-        with open(path, "wb") as f:
-            pickle.dump(self.get_model_state(), f)

@@ -1,12 +1,11 @@
-from functools import cached_property
-
+import pickle
 import numpy as np
 import torch
-import tensorflow as tf
-from abc import ABC, abstractmethod
-from tensorflow import keras
+
 from torch import nn
 from torch_sparse import SparseTensor
+from abc import ABC, abstractmethod
+from functools import cached_property
 
 from elliot.dataset.samplers.base_sampler import FakeSampler
 from elliot.recommender.utils import ModelType
@@ -25,6 +24,7 @@ class AbstractRecommender(ABC):
         self.transactions = data.transactions
         self.logger = logger
         self.seed = seed
+        self.params_to_save = []
 
         self.auto_set_params()
         if hasattr(self, '_loader') or hasattr(self, '_loaders'):
@@ -60,12 +60,21 @@ class AbstractRecommender(ABC):
             self.logger.info(f"Parameter {public_name} set to {getattr(self, variable_name)}")
         if not params_list:
             self.logger.info("No parameters defined")
+        self.params_to_save = params_list
 
     def set_side_info(self, loader=None, mod=None):
         name = f"_side{('_' + mod) if mod else ''}"
         loader_name = loader if loader else self._loader
         loader_obj = getattr(self._data.side_information, loader_name)
         setattr(self, name, loader_obj)
+
+    @abstractmethod
+    def save_weights(self, path):
+        raise NotImplementedError()
+
+    @abstractmethod
+    def load_weights(self, path):
+        raise NotImplementedError()
 
 
 class Recommender(AbstractRecommender):
@@ -78,6 +87,22 @@ class Recommender(AbstractRecommender):
     @abstractmethod
     def train_step(self, batch):
         raise NotImplementedError()
+
+    def save_weights(self, path):
+        with open(path, "wb") as f:
+            pickle.dump(self._get_model_state(), f)
+
+    def load_weights(self, path):
+        with open(path, "rb") as f:
+            self._set_model_state(pickle.load(f))
+
+    def _get_model_state(self):
+        return {p[0]: getattr(self, p[0]) for p in self.params_to_save}
+
+    def _set_model_state(self, saving_dict):
+        for k, v in saving_dict:
+            if k in self.params_to_save:
+                setattr(self, k, v)
 
 
 class TraditionalRecommender(Recommender):
@@ -104,6 +129,10 @@ class GeneralRecommender(nn.Module, AbstractRecommender):
         AbstractRecommender.__init__(self, data, params, seed, logger)
         super(GeneralRecommender, self).__init__()
         torch.manual_seed(seed)
+        torch.cuda.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
+        torch.backends.cudnn.deterministic = True
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     @cached_property
     def _sp_i_train(self):
@@ -115,3 +144,14 @@ class GeneralRecommender(nn.Module, AbstractRecommender):
     @abstractmethod
     def train_step(self, batch):
         raise NotImplementedError()
+
+    def save_weights(self, file_path):
+        torch.save({
+            'model_state_dict': self.state_dict(),
+            'optimizer_state_dict': self.optimizer.state_dict()
+        }, file_path)
+
+    def load_weights(self, file_path):
+        checkpoint = torch.load(file_path)
+        self.load_state_dict(checkpoint['model_state_dict'])
+        self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])

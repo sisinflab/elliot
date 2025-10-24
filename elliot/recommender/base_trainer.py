@@ -320,7 +320,7 @@ class GeneralTrainer(AbstractTrainer):
     def __init__(self, data, config, params, model_class):
         super().__init__(data, config, params, model_class)
         self.optimizer = self._model.optimizer
-        self.loss = self._model.loss
+        torch.manual_seed(self._seed)
 
     def _train_epoch(self, it, *args):
         self._model.train()

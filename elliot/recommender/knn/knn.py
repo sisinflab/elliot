@@ -1,4 +1,3 @@
-import pickle
 from abc import abstractmethod
 
 from elliot.recommender.base_recommender import TraditionalRecommender
@@ -27,34 +26,14 @@ class KNN(TraditionalRecommender):
                                    alpha=self._alpha,
                                    beta=self._beta)
 
+        self.params_to_save = ['_preds', '_similarity', '_num_neighbors', '_implicit']
+
     @abstractmethod
     def initialize(self):
         raise NotImplementedError()
 
     def predict(self, start, stop):
         return self._preds[start:stop]
-
-    def get_model_state(self):
-        saving_dict = {}
-        saving_dict['_preds'] = self._preds
-        saving_dict['_similarity'] = self._similarity
-        saving_dict['_num_neighbors'] = self._num_neighbors
-        saving_dict['_implicit'] = self._implicit
-        return saving_dict
-
-    def set_model_state(self, saving_dict):
-        self._preds = saving_dict['_preds']
-        self._similarity = saving_dict['_similarity']
-        self._num_neighbors = saving_dict['_num_neighbors']
-        self._implicit = saving_dict['_implicit']
-
-    def load_weights(self, path):
-        with open(path, "rb") as f:
-            self.set_model_state(pickle.load(f))
-
-    def save_weights(self, path):
-        with open(path, "wb") as f:
-            pickle.dump(self.get_model_state(), f)
 
 
 class ItemKNN(KNN):
