@@ -29,6 +29,8 @@ class AbstractRecommender(ABC):
         self.auto_set_params()
         if hasattr(self, '_loader') or hasattr(self, '_loaders'):
             self.set_side_info()
+        if hasattr(self, 'sampler'):
+            self.sampler.events = data.transactions
 
     @property
     def name(self):
@@ -142,7 +144,7 @@ class GeneralRecommender(nn.Module, AbstractRecommender):
         return SparseTensor(row=row, col=col, sparse_sizes=coo.shape)
 
     @abstractmethod
-    def train_step(self, batch):
+    def train_step(self, batch, *args):
         raise NotImplementedError()
 
     def save_weights(self, file_path):

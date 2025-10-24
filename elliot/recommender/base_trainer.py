@@ -92,7 +92,7 @@ class AbstractTrainer(ABC):
         # Sampler
         self._sampler = self._model.sampler
         self._sampler.batch_size = self._batch_size
-        self._sampler.events = data.transactions
+        # self._sampler.events = data.transactions
 
         # Other params
         self._num_items = self._data.num_items
@@ -331,8 +331,9 @@ class GeneralTrainer(AbstractTrainer):
                 steps += 1
                 self.optimizer.zero_grad()
                 batch = tuple(torch.tensor(b, dtype=torch.int64) for b in batch)
-                loss = self._model.train_step(batch, *args)
-                loss.backward()
+                res = self._model.train_step(batch, steps, *args)
+                loss, inputs = res if isinstance(res, tuple) else (res, None)
+                loss.backward(inputs=inputs)
                 total_loss += loss.detach().cpu().numpy()
                 self.optimizer.step()
                 t.set_postfix({'loss': f'{total_loss / steps:.5f}'})

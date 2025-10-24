@@ -22,9 +22,8 @@ class SVDpp(GeneralRecommender):
             ("_lambda_weights", "reg_w", "reg_w", 0.1, None, None),
             ("_lambda_bias", "reg_b", "reg_b", 0.001, None, None),
         ]
+        self.sampler = cpss.Sampler(data.i_train_dict, data.sp_i_train)
         super(SVDpp, self).__init__(data, params, seed, logger)
-
-        self.sampler = cpss.Sampler(self._data.i_train_dict, self._data.sp_i_train)
 
         self.user_mf_embedding = nn.Embedding(self._num_users, self._factors, dtype=torch.float32)
         self.item_mf_embedding = nn.Embedding(self._num_items, self._factors, dtype=torch.float32)
@@ -45,11 +44,25 @@ class SVDpp(GeneralRecommender):
 
     def forward(self, inputs):
         user, item = inputs
-        user_mf_e = self.user_mf_embedding(user)
-        item_mf_e = self.item_mf_embedding(item)
-        user_bias_e = self.user_bias_embedding(user)
-        item_bias_e = self.item_bias_embedding(item)
-        return user_mf_e, item_mf_e, user_bias_e, item_bias_e
+        u = self.user_mf_embedding(user)
+        i = self.item_mf_embedding(item)
+        ub = self.user_bias_embedding(user)
+        ib = self.item_bias_embedding(item)
+
+        offsets, indices, _ = self._sp_i_train[user].csr()
+        puyj = nn.functional.embedding_bag(
+            input=indices,
+            weight=self.item_y_embedding.weight,
+            offsets=offsets[:-1],
+            mode='mean'
+        )
+
+        if self.training:
+            output = torch.mul((puyj + u), i).sum(dim=-1) + ub.squeeze() + ib.squeeze() + self.bias_
+        else:
+            output = torch.matmul((puyj + u), i.T) + ub + ib.T + self.bias_
+
+        return output
 
     def l2_reg(self):
         return (
@@ -64,36 +77,14 @@ class SVDpp(GeneralRecommender):
             )
         )
 
-    def train_step(self, batch):
+    def train_step(self, batch, *args):
         user, item, label = batch
-        u, i, ub, ib = self.forward(inputs=(user, item))
-
-        offsets, indices, _ = self._sp_i_train[user].csr()
-        puyj = nn.functional.embedding_bag(
-            input=indices,
-            weight=self.item_y_embedding.weight,
-            offsets=offsets[:-1],
-            mode='mean'
-        )
-
-        output = torch.mul((puyj + u), i).sum(dim=-1) + ub.squeeze() + ib.squeeze() + self.bias_
-
+        output = self.forward(inputs=(user, item))
         loss = self.loss(label.float(), output) + self.l2_reg()
         return loss
 
     def predict(self, start, stop):
         user_indices = torch.arange(start, stop)
         item_indices = torch.arange(self._num_items)
-        u, i, ub, ib = self.forward(inputs=(user_indices, item_indices))
-
-        offsets, indices, _ = self._sp_i_train[user_indices].csr()
-        puyj = nn.functional.embedding_bag(
-            input=indices,
-            weight=self.item_y_embedding.weight,
-            offsets=offsets[:-1],
-            mode='mean'
-        )
-
-        output = torch.matmul((puyj + u), i.T) + ub + ib.T + self.bias_
-
+        output = self.forward(inputs=(user_indices, item_indices))
         return output

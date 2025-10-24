@@ -13,27 +13,47 @@ from torch import nn
 from elliot.dataset.samplers import pointwise_pos_neg_sampler as pws
 from elliot.recommender.base_recommender import GeneralRecommender
 
+# NOTE: Model with poor performance. Consider to use FunkSVD, instead.
+class MF(GeneralRecommender):
+    """
+    Matrix Factorization
 
-class FunkSVD(GeneralRecommender):
+    For further details, please refer to the `paper <https://datajobs.com/data-science-repo/Recommender-Systems-[Netflix].pdf>`_
+
+    Args:
+        factors: Number of latent factors
+        lr: Learning rate
+        reg: Regularization coefficient
+
+    To include the recommendation model, add it to the config file adopting the following pattern:
+
+    .. code:: yaml
+
+      models:
+        MF:
+          meta:
+            save_recs: True
+          epochs: 10
+          batch_size: 512
+          factors: 10
+          lr: 0.001
+          reg: 0.1
+    """
+
     def __init__(self, data, params, seed, logger):
         self.params_list = [
             ("_factors", "factors", "factors", 10, None, None),
             ("_learning_rate", "lr", "lr", 0.001, None, None),
-            ("_lambda_weights", "reg_w", "reg_w", 0.1, None, None),
-            ("_lambda_bias", "reg_b", "reg_b", 0.001, None, None),
+            ("_l_w", "reg", "reg", 0.1, None, None)
         ]
         self.sampler = pws.Sampler(data.i_train_dict)
-        super(FunkSVD, self).__init__(data, params, seed, logger)
+        super(MF, self).__init__(data, params, seed, logger)
 
         self.user_mf_embedding = nn.Embedding(self._num_users, self._factors, dtype=torch.float32)
         self.item_mf_embedding = nn.Embedding(self._num_items, self._factors, dtype=torch.float32)
-        self.user_bias_embedding = nn.Embedding(self._num_users, 1, dtype=torch.float32)
-        self.item_bias_embedding = nn.Embedding(self._num_items, 1, dtype=torch.float32)
 
         nn.init.xavier_uniform_(self.user_mf_embedding.weight)
         nn.init.xavier_uniform_(self.item_mf_embedding.weight)
-        nn.init.zeros_(self.user_bias_embedding.weight)
-        nn.init.zeros_(self.item_bias_embedding.weight)
 
         self.loss = nn.MSELoss()
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self._learning_rate)
@@ -42,30 +62,17 @@ class FunkSVD(GeneralRecommender):
         user, item = inputs
         u = self.user_mf_embedding(user)
         i = self.item_mf_embedding(item)
-        ub = self.user_bias_embedding(user)
-        ib = self.item_bias_embedding(item)
         if self.training:
-            output = torch.mul(u, i).sum(dim=1) + ub.squeeze() + ib.squeeze()
+            output = torch.mul(u, i).sum(dim=1)
         else:
-            output = torch.matmul(u, i.T) + ub + ib.T
+            output = torch.matmul(u, i.T)
         return output
-
-    def l2_reg(self):
-        return (
-            self._lambda_weights * (
-                self.user_mf_embedding.weight.pow(2).sum() +
-                self.item_mf_embedding.weight.pow(2).sum()
-            ) +
-            self._lambda_bias * (
-                self.user_bias_embedding.weight.pow(2).sum() +
-                self.item_bias_embedding.weight.pow(2).sum()
-            )
-        )
 
     def train_step(self, batch, *args):
         user, pos, label = batch
         output = self.forward(inputs=(user, pos))
-        loss = self.loss(label.float(), output) + self.l2_reg()
+        reg = self.user_mf_embedding.weight.pow(2).sum() + self.item_mf_embedding.weight.pow(2).sum()
+        loss = self.loss(label.float(), output) + self._l_w * reg
         return loss
 
     def predict(self, start, stop):

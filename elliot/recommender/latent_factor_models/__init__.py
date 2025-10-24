@@ -11,10 +11,10 @@ from .BPRMF_batch import BPRMF_batch
 from .BPRMF import BPRMF
 from .WRMF import WRMF
 from .pure_svd import PureSVD
-from .MF import MF
+from .mf import MF
 from .funk_svd import FunkSVD
-from .PMF import PMF
-from .LogisticMF import LMF
+from .pmf import PMF
+from .logistic_mf import LogisticMF
 from .NonNegMF import NonNegMF
 from .FM import FM
 from .FMnofeatures import FMnofeatures
@@ -25,5 +25,4 @@ from .CML import CML
 from .FISM import FISM
 from .svdpp import SVDpp
 from .iALS import iALS
-from .MF2020 import MF2020
-from .MF2020_batch import MF2020_batch
+from .mf2020 import MF2020, MF2020Batch

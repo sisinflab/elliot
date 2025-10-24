@@ -1,3 +1,5 @@
+import torch
+import torch.nn as nn
 import typing as t
 from collections import Counter
 import math
@@ -44,3 +46,13 @@ class TFIDF:
         profiles = {u: {f: profiles.get(u, {}).get(f, []) + [v] for i in items.keys() if i in self.__tfidf.keys() for f, v in self.__tfidf[i].items()} for u, items in ratings.items()}
         profiles = {u: {f: np.average(v) for f, v in f_dict.items()} for u, f_dict in profiles.items()}
         return profiles
+
+
+class GaussianNoise(nn.Module):
+    def __init__(self, stddev):
+        super().__init__()
+        self.stddev = stddev
+
+    def forward(self, x):
+        noise = torch.randn_like(x) * self.stddev
+        return x + noise
