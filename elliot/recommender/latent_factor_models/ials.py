@@ -1,0 +1,86 @@
+"""
+Module description:
+
+"""
+
+__version__ = '0.3.1'
+__author__ = 'Vito Walter Anelli, Claudio Pomo'
+__email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
+
+import numpy as np
+from scipy import sparse as sp
+from tqdm import tqdm
+
+from elliot.dataset.samplers.base_sampler import FakeSampler
+from elliot.recommender.base_recommender import Recommender
+
+
+class iALS(Recommender):
+    """
+    Simple Matrix Factorization class
+    """
+
+    def __init__(self, data, params, seed, logger):
+        self.params_list = [
+            ("_factors", "factors", "factors", 10, int, None),
+            ("_alpha", "alpha", "alpha", 1, float, None),
+            ("_epsilon", "epsilon", "epsilon", 1, float, None),
+            ("_reg", "reg", "reg", 0.1, float, None),
+            ("_scaling", "scaling", "scaling", "linear", None, None)
+        ]
+        self.sampler = FakeSampler()
+        super().__init__(data, params, seed, logger)
+
+        self.random = np.random
+        self.C = self._data.sp_i_train
+        if self._scaling == "linear":
+            self.C.data = 1.0 + self._alpha * self.C.data
+        elif self._scaling == "log":
+            self.C.data = 1.0 + self._alpha * np.log(1.0 + self.C.data / self._epsilon)
+        self.C_csc = self.C.tocsc()
+        self.train_dict = self._data.train_dict
+
+        self.X = self.random.normal(scale=0.01, size=(self._num_users, self._factors))
+        self.Y = self.random.normal(scale=0.01, size=(self._num_items, self._factors))
+
+        warm_item_mask = np.ediff1d(self._data.sp_i_train.tocsc().indptr) > 0
+        self.warm_items = np.arange(0, self._num_items, dtype=np.int32)[warm_item_mask]
+
+        self.X_eye = sp.eye(self._num_users)
+        self.Y_eye = sp.eye(self._num_items)
+        self.lambda_eye = self._reg * sp.eye(self._factors)
+
+        self.params_to_save = ['X', 'Y', 'C']
+
+    def train_step(self, *args):
+        yTy = self.Y.T.dot(self.Y)
+
+        C = self.C
+        for u in tqdm(range(self._num_users), desc="Computing"):
+            start = C.indptr[u]
+            end = C.indptr[u+1]
+
+            Cu = C.data[start:end]
+            Pu = self.Y[C.indices[start:end], :]
+
+            B = yTy + Pu.T.dot(((Cu - 1) * Pu.T).T) + self.lambda_eye
+
+            self.X[u] = np.dot(np.linalg.inv(B), Pu.T.dot(Cu))
+
+        xTx = self.X.T.dot(self.X)
+        C = self.C_csc
+        for i in self.warm_items:
+            start = C.indptr[i]
+            end = C.indptr[i + 1]
+
+            Cu = C.data[start:end]
+            Pi = self.X[C.indices[start:end], :]
+
+            B = xTx + Pi.T.dot(((Cu - 1) * Pi.T).T) + self.lambda_eye
+
+            self.Y[i] = np.dot(np.linalg.inv(B), Pi.T.dot(Cu))
+
+        return 0
+
+    def predict(self, start, stop):
+        return self.X[start:stop] @ self.Y.T

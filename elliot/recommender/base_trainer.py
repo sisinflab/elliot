@@ -11,6 +11,7 @@ from abc import ABC, abstractmethod
 from tqdm import tqdm
 from types import SimpleNamespace
 
+from elliot.dataset.samplers.base_sampler import FakeSampler
 from elliot.evaluation.evaluator import Evaluator
 from elliot.recommender.early_stopping import EarlyStopping
 from elliot.utils.folder import build_model_folder
@@ -57,7 +58,7 @@ class AbstractTrainer(ABC):
         self._validation_metric = self._validation_metric[0]
         self._save_weights = getattr(self._params.meta, "save_weights", False)
         self._save_recs = getattr(self._params.meta, "save_recs", False)
-        self._verbose = getattr(self._params.meta, "verbose", None)
+        self._verbose = getattr(self._params.meta, "verbose", True)
         self._validation_rate = getattr(self._params.meta, "validation_rate", 1)
         self._optimize_internal_loss = getattr(self._params.meta, "optimize_internal_loss", False)
         self._epochs = int(getattr(self._params, "epochs", 1))
@@ -92,6 +93,8 @@ class AbstractTrainer(ABC):
         # Sampler
         self._sampler = self._model.sampler
         self._sampler.batch_size = self._batch_size
+        if isinstance(self._sampler, FakeSampler):
+            self._verbose = False
         # self._sampler.events = data.transactions
 
         # Other params
@@ -265,7 +268,12 @@ class Trainer(AbstractTrainer):
         loss = 0
         steps = 0
         self._sampler.initialize()
-        with tqdm(total=int(self._model.transactions // self._batch_size), desc="Training") as t:
+        iter_ = tqdm(
+            total=int(self._model.transactions // self._batch_size),
+            desc="Training",
+            disable=not self._verbose
+        )
+        with iter_ as t:
             for batch in self._sampler.step():
                 steps += 1
                 loss += self._model.train_step(batch, *args)
@@ -326,7 +334,12 @@ class GeneralTrainer(AbstractTrainer):
         self._model.train()
         total_loss, steps = 0, 0
         self._sampler.initialize()
-        with tqdm(total=int(self._model.transactions // self._batch_size), desc="Training") as t:
+        iter_ = tqdm(
+            total=int(self._model.transactions // self._batch_size),
+            desc="Training",
+            disable=not self._verbose
+        )
+        with iter_ as t:
             for batch in self._sampler.step():
                 steps += 1
                 self.optimizer.zero_grad()

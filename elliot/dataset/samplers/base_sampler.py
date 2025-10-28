@@ -10,6 +10,8 @@ class AbstractSampler(ABC):
         np.random.seed(seed)
         random.seed(seed)
         self._r_int = np.random.randint
+        self._r_choice = np.random.choice
+        self._r_perm = np.random.permutation
         self.batch_size = 1
         self.events = 0
         if indexed_ratings is not None:
@@ -109,7 +111,10 @@ class FakeSampler(AbstractSampler):
         super().__init__(42, None)
 
     def step(self, *args):
-        return True
+        i = 0
+        while i == 0:
+            i = 1
+            yield True
 
     def _sample(self, **kwargs):
         return True

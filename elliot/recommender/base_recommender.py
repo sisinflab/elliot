@@ -87,7 +87,7 @@ class Recommender(AbstractRecommender):
         np.random.seed(seed)
 
     @abstractmethod
-    def train_step(self, batch):
+    def train_step(self, *args):
         raise NotImplementedError()
 
     def save_weights(self, path):
@@ -116,7 +116,7 @@ class TraditionalRecommender(Recommender):
         self._similarity_matrix = None
         self._preds = None
 
-    def train_step(self, batch):
+    def train_step(self, *args):
         pass
 
     @abstractmethod
