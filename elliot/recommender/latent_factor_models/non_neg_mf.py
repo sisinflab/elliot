@@ -36,27 +36,26 @@ class NonNegMF(Recommender):
           epochs: 10
           batch_size: 512
           factors: 10
-          lr: 0.001
-          reg: 0.1
+          learning_rate: 0.001
+          lambda_weights: 0.1
     """
+    factors: int = 10
+    learning_rate: float = 0.001
+    lambda_weights: float = 0.1
 
     def __init__(self, data, params, seed, logger):
-        self.params_list = [
-            ("_factors", "factors", "factors", 10, None, None),
-            ("_learning_rate", "lr", "lr", 0.001, None, None),
-            ("_l_w", "reg", "reg", 0.1, None, None),
-        ]
         self.sampler = FakeSampler()
         super().__init__(data, params, seed, logger)
 
         self._i_train = self._data.i_train_dict
-        self._random_state = np.random.default_rng(self.seed)
+        self._random_state = np.random.default_rng(seed)
         self._global_mean = np.mean(self._data.sp_i_train_ratings)
 
+        # Embeddings
+        self._user_embeddings = self._random_state.normal(size=(self._num_users, self.factors))
+        self._item_embeddings = self._random_state.normal(size=(self._num_items, self.factors))
         self._user_bias = np.zeros(self._num_users)
         self._item_bias = np.zeros(self._num_items)
-        self._user_embeddings = self._random_state.normal(size=(self._num_users, self._factors))
-        self._item_embeddings = self._random_state.normal(size=(self._num_items, self._factors))
 
         self.params_to_save = ['_user_bias', '_item_bias', '_user_embeddings', '_item_embeddings']
 
@@ -92,13 +91,13 @@ class NonNegMF(Recommender):
 
             # update user bias
             for e in err:
-                self._user_bias[u] += self._learning_rate * (
-                    e - self._l_w * self._user_bias[u]
+                self._user_bias[u] += self.learning_rate * (
+                    e - self.lambda_weights * self._user_bias[u]
                 )
 
             # update items biases
-            self._item_bias[items] += self._learning_rate * (
-                err - self._l_w * self._item_bias[items]
+            self._item_bias[items] += self.learning_rate * (
+                err - self.lambda_weights * self._item_bias[items]
             )
 
             # compute numerators and denominators
@@ -110,14 +109,14 @@ class NonNegMF(Recommender):
         # Update user factors
         n_ratings = np.array([len(v) for v in self._i_train.values()])
         self._user_embeddings *= user_num / (
-            user_denom + n_ratings[:, None] * self._l_w * self._user_embeddings
+            user_denom + n_ratings[:, None] * self.lambda_weights * self._user_embeddings
         )
 
         # Update item factors
         I_train_T = self._data.sp_i_train.tocsc()
         n_ratings_item = np.diff(I_train_T.indptr)
         self._item_embeddings *= item_num / (
-            item_denom + n_ratings_item[:, None] * self._l_w * self._item_embeddings
+            item_denom + n_ratings_item[:, None] * self.lambda_weights * self._item_embeddings
         )
 
         return 0

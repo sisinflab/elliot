@@ -17,21 +17,19 @@ from elliot.recommender.base_recommender import TraditionalRecommender
 
 
 class RP3beta(TraditionalRecommender):
+    neighborhood: int = 10
+    alpha: float = 1.0
+    beta: float = 0.6
+    normalize_similarity: bool = False
 
     def __init__(self, data, params, seed, logger):
-        self.params_list = [
-            ("_neighborhood", "neighborhood", "neighborhood", 10, int, None),
-            ("_alpha", "alpha", "alpha", 1., float, None),
-            ("_beta", "beta", "beta", 0.6, float, None),
-            ("_normalize_similarity", "normalize_similarity", "normalize_similarity", False, bool, None)
-        ]
         super().__init__(data, params, seed, logger)
 
         self._train = data.sp_i_train_ratings
         self._implicit_train = data.sp_i_train
 
-        if self._neighborhood == -1:
-            self._neighborhood = self._data.num_items
+        if self.neighborhood == -1:
+            self.neighborhood = self._data.num_items
 
     def predict(self, start, stop):
         return self._preds[start:stop]
@@ -49,10 +47,10 @@ class RP3beta(TraditionalRecommender):
         Piu = normalize(X_bool, norm='l1', axis=1)
         del X_bool
 
-        Pui = Pui.power(self._alpha)
-        Piu = Piu.power(self._alpha)
+        Pui = Pui.power(self.alpha)
+        Piu = Piu.power(self.alpha)
 
-        degree = np.where(X_bool_sum != 0.0, X_bool_sum ** (-self._beta), 0.0)
+        degree = np.where(X_bool_sum != 0.0, X_bool_sum ** (-self.beta), 0.0)
         D = sp.diags(degree)
 
         block_dim = 200
@@ -65,7 +63,7 @@ class RP3beta(TraditionalRecommender):
 
                 similarity_block = d_t_block.dot(Pui).dot(D).toarray()
                 np.fill_diagonal(similarity_block[:, start:end], 0.0)
-                idx = np.argpartition(similarity_block, -self._neighborhood, axis=1)[:, -self._neighborhood:]
+                idx = np.argpartition(similarity_block, -self.neighborhood, axis=1)[:, -self.neighborhood:]
                 top_vals = np.take_along_axis(similarity_block, idx, axis=1)
 
                 for i in range(similarity_block.shape[0]):
@@ -90,7 +88,7 @@ class RP3beta(TraditionalRecommender):
             data=(values, (rows, cols)), dtype=np.float32, shape=(Pui.shape[1], Pui.shape[1])
         )
 
-        if self._normalize_similarity:
+        if self.normalize_similarity:
             similarity_matrix = normalize(similarity_matrix, norm='l1', axis=1)
 
         return similarity_matrix
@@ -111,7 +109,7 @@ class RP3beta(TraditionalRecommender):
             non_zero_data = column_data != 0
 
             idx_sorted = np.argsort(column_data[non_zero_data])  # sort by column
-            top_k_idx = idx_sorted[-self._neighborhood:]
+            top_k_idx = idx_sorted[-self.neighborhood:]
 
             data.extend(column_data[non_zero_data][top_k_idx])
             rows_indices.extend(column_row_index[non_zero_data][top_k_idx])

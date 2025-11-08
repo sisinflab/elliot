@@ -36,11 +36,9 @@ class PureSVD(TraditionalRecommender):
           factors: 10
           seed: 42
     """
+    factors: int = 10
 
     def __init__(self, data, params, seed, logger):
-        self.params_list = [
-            ("_factors", "factors", "factors", 10, None, None)
-        ]
         super().__init__(data, params, seed, logger)
 
         self.user_vec, self.item_vec = None, None
@@ -54,8 +52,8 @@ class PureSVD(TraditionalRecommender):
 
         for _ in fake_iter:
             U, sigma, Vt = randomized_svd(self._data.sp_i_train,
-                                          n_components=self._factors,
-                                          random_state=self.seed)
+                                          n_components=self.factors,
+                                          random_state=self._seed)
             s_Vt = sp.diags(sigma) * Vt
             fake_iter.set_description("Done")
 

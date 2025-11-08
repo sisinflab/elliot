@@ -119,21 +119,21 @@ class AbstractTrainer(ABC):
 
     @property
     def name(self):
-        return self._model.name + f"_{self.get_base_params_shortcut()}" + f"_{self.get_model_params_shortcut()}"
+        return self._model.name + f"_{self.get_base_params_shortcut()}" + self._model.name_param
 
     def get_base_params_shortcut(self):
         return "_".join([str(k) + "=" + str(v).replace(".", "$") for k, v in
                          dict({"seed": self._seed,
-                               "e": self._epochs,
-                               "bs": self._batch_size}).items()
+                               "epochs": self._epochs,
+                               "batch_size": self._batch_size}).items()
                          ])
 
-    def get_model_params_shortcut(self):
-        return "_".join(
-            [str(p[2])+"="+ str(p[5](getattr(self._model, p[0]))
-                                if p[5] else getattr(self._model, p[0])).replace(".", "$")
-             for p in self._model.params_list]
-        )
+    # def get_model_params_shortcut(self):
+    #     return "_".join(
+    #         [str(p[2])+"="+ str(p[5](getattr(self._model, p[0]))
+    #                             if p[5] else getattr(self._model, p[0])).replace(".", "$")
+    #          for p in self._model.params_list]
+    #     )
 
     @abstractmethod
     def _train_epoch(self, it, *args):

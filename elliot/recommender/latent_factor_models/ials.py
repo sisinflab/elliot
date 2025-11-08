@@ -19,36 +19,37 @@ class iALS(Recommender):
     """
     Simple Matrix Factorization class
     """
+    factors: int = 10
+    alpha: float = 1.0
+    epsilon: float = 1.0
+    lambda_weights: float = 0.1
+    scaling: str = "linear"
 
     def __init__(self, data, params, seed, logger):
-        self.params_list = [
-            ("_factors", "factors", "factors", 10, int, None),
-            ("_alpha", "alpha", "alpha", 1, float, None),
-            ("_epsilon", "epsilon", "epsilon", 1, float, None),
-            ("_reg", "reg", "reg", 0.1, float, None),
-            ("_scaling", "scaling", "scaling", "linear", None, None)
-        ]
         self.sampler = FakeSampler()
         super().__init__(data, params, seed, logger)
 
-        self.random = np.random
         self.C = self._data.sp_i_train
-        if self._scaling == "linear":
-            self.C.data = 1.0 + self._alpha * self.C.data
-        elif self._scaling == "log":
-            self.C.data = 1.0 + self._alpha * np.log(1.0 + self.C.data / self._epsilon)
+
+        if self.scaling == "linear":
+            self.C.data = 1.0 + self.alpha * self.C.data
+        elif self.scaling == "log":
+            self.C.data = 1.0 + self.alpha * np.log(1.0 + self.C.data / self.epsilon)
+        else:
+            raise ValueError(f"Unknown option '{self.scaling}' for scaling")
+
         self.C_csc = self.C.tocsc()
         self.train_dict = self._data.train_dict
 
-        self.X = self.random.normal(scale=0.01, size=(self._num_users, self._factors))
-        self.Y = self.random.normal(scale=0.01, size=(self._num_items, self._factors))
+        self.X = self.random.normal(scale=0.01, size=(self._num_users, self.factors))
+        self.Y = self.random.normal(scale=0.01, size=(self._num_items, self.factors))
 
         warm_item_mask = np.ediff1d(self._data.sp_i_train.tocsc().indptr) > 0
         self.warm_items = np.arange(0, self._num_items, dtype=np.int32)[warm_item_mask]
 
         self.X_eye = sp.eye(self._num_users)
         self.Y_eye = sp.eye(self._num_items)
-        self.lambda_eye = self._reg * sp.eye(self._factors)
+        self.lambda_eye = self.lambda_weights * sp.eye(self.factors)
 
         self.params_to_save = ['X', 'Y', 'C']
 

@@ -36,47 +36,55 @@ class MF(GeneralRecommender):
           epochs: 10
           batch_size: 512
           factors: 10
-          lr: 0.001
-          reg: 0.1
+          learning_rate: 0.001
+          lambda_weights: 0.1
     """
+    factors: int = 10
+    learning_rate: float = 0.001
+    lambda_weights: float = 0.1
 
     def __init__(self, data, params, seed, logger):
-        self.params_list = [
-            ("_factors", "factors", "factors", 10, None, None),
-            ("_learning_rate", "lr", "lr", 0.001, None, None),
-            ("_l_w", "reg", "reg", 0.1, None, None)
-        ]
         self.sampler = pws.Sampler(data.i_train_dict)
         super(MF, self).__init__(data, params, seed, logger)
 
-        self.user_mf_embedding = nn.Embedding(self._num_users, self._factors, dtype=torch.float32)
-        self.item_mf_embedding = nn.Embedding(self._num_items, self._factors, dtype=torch.float32)
+        # Embeddings
+        self.user_mf_embedding = nn.Embedding(self._num_users, self.factors, dtype=torch.float32)
+        self.item_mf_embedding = nn.Embedding(self._num_items, self.factors, dtype=torch.float32)
 
-        nn.init.xavier_uniform_(self.user_mf_embedding.weight)
-        nn.init.xavier_uniform_(self.item_mf_embedding.weight)
-
+        # Loss and optimizer
         self.loss = nn.MSELoss()
-        self.optimizer = torch.optim.Adam(self.parameters(), lr=self._learning_rate)
+        self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
 
-    def forward(self, inputs):
-        user, item = inputs
+        # Init embedding weights
+        self._init_weights('xavier_uniform')
+
+        # Move to device
+        self.to(self._device)
+
+    def forward(self, user, item):
         u = self.user_mf_embedding(user)
         i = self.item_mf_embedding(item)
-        if self.training:
-            output = torch.mul(u, i).sum(dim=1)
-        else:
-            output = torch.matmul(u, i.T)
-        return output
+
+        return torch.mul(u, i).sum(dim=1)
 
     def train_step(self, batch, *args):
-        user, pos, label = batch
-        output = self.forward(inputs=(user, pos))
+        user, pos, label = [x.to(self._device) for x in batch]
+
+        output = self.forward(user, pos)
         reg = self.user_mf_embedding.weight.pow(2).sum() + self.item_mf_embedding.weight.pow(2).sum()
-        loss = self.loss(label.float(), output) + self._l_w * reg
+        loss = self.loss(label.float(), output) + self.lambda_weights * reg
+
         return loss
 
     def predict(self, start, stop):
         user_indices = torch.arange(start, stop)
-        item_indices = torch.arange(self._num_items)
-        output = self.forward(inputs=(user_indices, item_indices))
-        return output
+
+        # Retrieve embeddings
+        user_e_all = self.user_mf_embedding.weight
+        item_e_all = self.item_mf_embedding.weight
+
+        # Select only the embeddings in the current batch
+        u_embeddings_batch = user_e_all[user_indices]
+
+        predictions = torch.matmul(u_embeddings_batch, item_e_all.T)
+        return predictions.to(self._device)

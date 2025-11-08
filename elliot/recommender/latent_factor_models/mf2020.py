@@ -8,7 +8,6 @@ __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
 from abc import abstractmethod
-
 import numpy as np
 
 from elliot.dataset.samplers.mf_samplers import MFSampler, MFSamplerRendle
@@ -43,32 +42,31 @@ class AbstractMF2020(Recommender):
             save_recs: True
           epochs: 10
           factors: 10
-          lr: 0.001
-          reg: 0.0025
+          learning_rate: 0.001
+          lambda_weights: 0.0025
     """
+    factors: int
+    learning_rate: float
+    lambda_weights: float
+    m: int
+    loc: float
+    scale: float
 
     def __init__(self, data, params, seed, logger):
-        self.params_list = [
-            ("_factors", "factors", "f", 10, int, None),
-            ("_lr", "lr", "lr", 0.05, None, None),
-            ("_reg", "reg", "reg", 0, None, None),
-            ("_m", "m", "m", 0, int, None),
-            ("_loc", "loc", "loc", 0, float, None),
-            ("_scale", "scale", "scale", 0.1, float, None),
-        ]
         self.sampler = MFSamplerRendle(data.i_train_dict, data.sp_i_train, seed)
         super().__init__(data, params, seed, logger)
 
-        self._global_bias = 0
+        # Embeddings
+        self._user_factors = self.random.normal(loc=self.loc, scale=self.scale, size=(len(self._users), self.factors))
+        self._item_factors = self.random.normal(loc=self.loc, scale=self.scale, size=(len(self._items), self.factors))
         self._user_bias = np.zeros(len(self._users))
         self._item_bias = np.zeros(len(self._items))
-        self._user_factors = \
-            np.random.normal(loc=self._loc, scale=self._scale, size=(len(self._users), self._factors))
-        self._item_factors = \
-            np.random.normal(loc=self._loc, scale=self._scale, size=(len(self._items), self._factors))
 
-        self.transactions = data.transactions * (self._m + 1)
-        self.sampler.m = self._m
+        # Global bias
+        self._global_bias = 0
+
+        self.transactions = data.transactions * (self.m + 1)
+        self.sampler.m = self.m
 
         self.params_to_save = ['_global_bias', '_user_bias', '_item_bias', '_user_factor', '_item_factor']
 
@@ -86,13 +84,20 @@ class AbstractMF2020(Recommender):
 
 
 class MF2020(AbstractMF2020):
+    factors: int = 10
+    learning_rate: float = 0.05
+    lambda_weights: float = 0.0
+    m: int = 0
+    loc: float = 0.0
+    scale: float = 0.1
+
     def __init__(self, data, params, seed, logger):
         super().__init__(data, params, seed, logger)
 
     def train_step(self, batch, *args):
         sum_of_loss = 0
-        lr = self._lr
-        reg = self._reg
+        lr = self.learning_rate
+        reg = self.lambda_weights
         batch = np.column_stack(batch)
 
         for user, item, rating in batch:
@@ -130,13 +135,20 @@ class MF2020(AbstractMF2020):
 
 
 class MF2020Batch(AbstractMF2020):
+    factors: int = 10
+    learning_rate: float = 0.05
+    lambda_weights: float = 0.0
+    m: int = 0
+    loc: float = 0.0
+    scale: float = 0.1
+
     def __init__(self, data, params, seed, logger):
         super().__init__(data, params, seed, logger)
 
     def train_step(self, batch, *args):
         u_idx, i_idx, rating = batch
-        lr = self._lr
-        reg = self._reg
+        lr = self.learning_rate
+        reg = self.lambda_weights
 
         gb_ = self._global_bias
         uf_ = self._user_factors[u_idx]

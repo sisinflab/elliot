@@ -37,25 +37,22 @@ class WRMF(Recommender):
           epochs: 10
           factors: 50
           alpha: 1
-          reg: 0.1
+          lambda_weights: 0.1
     """
+    factors: int = 10
+    lambda_weights: float = 0.1
+    alpha: float = 1.0
 
     def __init__(self, data, params, seed, logger):
-        self.params_list = [
-            ("_factors", "factors", "factors", 10, None, None),
-            ("_alpha", "alpha", "alpha", 1, None, None),
-            ("_reg", "reg", "reg", 0.1, None, None)
-        ]
         self.sampler = FakeSampler()
         super().__init__(data, params, seed, logger)
 
-        self.random = np.random
-        self.C = self._alpha * self._data.sp_i_train
+        self.C = self.alpha * self._data.sp_i_train
 
-        self.X = self.random.normal(scale=0.01, size=(self._num_users, self._factors))
-        self.Y = self.random.normal(scale=0.01, size=(self._num_items, self._factors))
+        self.X = self.random.normal(scale=0.01, size=(self._num_users, self.factors))
+        self.Y = self.random.normal(scale=0.01, size=(self._num_items, self.factors))
 
-        self.lambda_eye = self._reg * np.eye(self._factors)
+        self.lambda_eye = self.lambda_weights * np.eye(self.factors)
 
         self.params_to_save = ['X', 'Y', 'C']
 

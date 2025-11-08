@@ -37,37 +37,39 @@ class LogisticMF(GeneralRecommender):
           epochs: 10
           batch_size: 512
           factors: 10
-          lr: 0.001
-          reg: 0.1
+          learning_rate: 0.001
+          lambda_weights: 0.1
           alpha: 0.5
     """
+    factors: int = 10
+    learning_rate: float = 0.001
+    lambda_weights: float = 0.1
+    alpha: float = 0.5
 
     def __init__(self, data, params, seed, logger):
-        self.params_list = [
-            ("_learning_rate", "lr", "lr", 0.001, None, None),
-            ("_factors", "factors", "factors", 10, None, None),
-            ("_l_w", "reg", "reg", 0.1, None, None),
-            ("_alpha", "alpha", "alpha", 0.5, None, None),
-        ]
         self.sampler = pws.Sampler(data.i_train_dict)
         super(LogisticMF, self).__init__(data, params, seed, logger)
 
-        self.Gu = nn.Parameter(torch.empty(self._num_users, self._factors))
-        self.Gi = nn.Parameter(torch.empty(self._num_items, self._factors))
+        # Embeddings
+        self.Gu = nn.Parameter(torch.empty(self._num_users, self.factors))
+        self.Gi = nn.Parameter(torch.empty(self._num_items, self.factors))
         self.Bu = nn.Parameter(torch.zeros(self._num_users))
         self.Bi = nn.Parameter(torch.zeros(self._num_items))
 
-        nn.init.xavier_uniform_(self.Gu)
-        nn.init.xavier_uniform_(self.Gi)
-
+        # Optimizer
         # NOTE: Removed Adagrad optimizer due to its poor performance
-        self.optimizer = torch.optim.Adam(self.parameters(), lr=self._learning_rate)
+        self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
 
         self.sampler.events = self._data.transactions * 2
         self.transactions = self._data.transactions * 2
 
-    def forward(self, inputs):
-        user, item = inputs
+        # Init embedding weights
+        self._init_weights('xavier_uniform', [self.Gu, self.Gi])
+
+        # Move to device
+        self.to(self._device)
+
+    def forward(self, user, item):
         gamma_u = self.Gu[user]
         gamma_i = self.Gi[item]
         beta_u = self.Bu[user]
@@ -77,14 +79,14 @@ class LogisticMF(GeneralRecommender):
         return xui, gamma_u, gamma_i
 
     def train_step(self, batch, *args):
-        user, pos, label = batch
+        user, pos, label = [x.to(self._device) for x in batch]
         label = label.float()
-        output, g_u, g_i = self.forward(inputs=(user, pos))
+        output, g_u, g_i = self.forward(user, pos)
 
-        loss = torch.sum(-(self._alpha * label * output -
-                           (1 + self._alpha * label) * torch.log1p(torch.exp(output))))
+        loss = torch.sum(-(self.alpha * label * output -
+                           (1 + self.alpha * label) * torch.log1p(torch.exp(output))))
 
-        reg_loss = self._l_w * (torch.sum(g_u.pow(2)) + torch.sum(g_i.pow(2)))
+        reg_loss = self.lambda_weights * (torch.sum(g_u.pow(2)) + torch.sum(g_i.pow(2)))
         loss = loss + reg_loss
 
         steps = args[0]
@@ -95,5 +97,6 @@ class LogisticMF(GeneralRecommender):
     def predict(self, start, stop):
         Bu_batch = self.Bu[start:stop].unsqueeze(-1)
         Bi_all = self.Bi.unsqueeze(0)
-        pred = Bu_batch + Bi_all + torch.matmul(self.Gu[start:stop], self.Gi.T)
-        return pred
+
+        predictions = torch.matmul(self.Gu[start:stop], self.Gi.T) + Bu_batch + Bi_all
+        return predictions.to(self._device)

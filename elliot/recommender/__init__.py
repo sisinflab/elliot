@@ -9,7 +9,7 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
 from .base_recommender_model import BaseRecommenderModel
 
-from .latent_factor_models import BPRMF, BPRMF_batch, WRMF, PureSVD, MF, FunkSVD, PMF, NonNegMF, FM, LogisticMF, \
+from .latent_factor_models import BPRMF, BPRMFBatch, WRMF, PureSVD, MF, FunkSVD, PMF, NonNegMF, FM, LogisticMF, \
     FFM, BPRSlim, Slim, CML, FISM, SVDpp, MF2020, iALS, MF2020Batch
 from .unpersonalized import Random, MostPop
 from .autoencoders import MultiDAE, MultiVAE, EASER

@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import typing as t
+from torch.nn.init import xavier_normal_, xavier_uniform_, zeros_
 from collections import Counter
 import math
 import numpy as np
@@ -13,6 +14,14 @@ class ModelType(Enum):
     BASE = 1
     TRADITIONAL = 2
     GENERAL = 3
+
+
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+
+class classproperty(property):
+    def __get__(self, obj, cls):
+        return self.fget(cls)
 
 
 def get_model(data, config, params, model_class):
@@ -56,3 +65,30 @@ class GaussianNoise(nn.Module):
     def forward(self, x):
         noise = torch.randn_like(x) * self.stddev
         return x + noise
+
+
+def zeros_initialization(module):
+    if isinstance(module, nn.Embedding):
+        zeros_(module.weight.data)
+
+
+def xavier_normal_initialization(module):
+    if isinstance(module, nn.Embedding):
+        xavier_normal_(module.weight.data)
+    elif isinstance(module, nn.Parameter):
+        xavier_normal_(module)
+    elif isinstance(module, nn.Linear):
+        xavier_normal_(module.weight.data)
+        if module.bias is not None:
+            zeros_(module.bias.data)
+
+
+def xavier_uniform_initialization(module):
+    if isinstance(module, nn.Embedding):
+        xavier_uniform_(module.weight.data)
+    elif isinstance(module, nn.Parameter):
+        xavier_uniform_(module)
+    elif isinstance(module, nn.Linear):
+        xavier_uniform_(module.weight.data)
+        if module.bias is not None:
+            zeros_(module.bias.data)

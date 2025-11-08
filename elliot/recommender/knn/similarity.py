@@ -15,8 +15,17 @@ class Similarity(object):
         "sokalmichener", "sokalsneath", "sqeuclidean", "yule"
     }
 
-    def __init__(self, train_data, item_profile=None, user_profile=None, similarity='cosine',
-                 num_neighbors=None, asymmetric_alpha=0.5, alpha=1.0, beta=1.0):
+    def __init__(
+        self,
+        train_data,
+        item_profile=None,
+        user_profile=None,
+        similarity='cosine',
+        num_neighbors=None,
+        asymmetric_alpha=0.5,
+        alpha=1.0,
+        beta=1.0
+    ):
         if item_profile is not None and user_profile is not None:
             self.X, self.Y = user_profile, item_profile
         else:

@@ -40,53 +40,64 @@ class PMF(GeneralRecommender):
           epochs: 10
           batch_size: 512
           factors: 50
-          lr: 0.001
-          reg: 0.0025
+          learning_rate: 0.001
+          lambda_weights: 0.0025
           gaussian_variance: 0.1
     """
+    factors: int = 10
+    learning_rate: float = 0.001
+    lambda_weights: float = 0.0025
+    gaussian_variance: float = 0.1
 
     def __init__(self, data, params, seed, logger):
-        self.params_list = [
-            ("_learning_rate", "lr", "lr", 0.001, None, None),
-            ("_factors", "factors", "factors", 50, None, None),
-            ("_l_w", "reg", "reg", 0.0025, None, None),
-            ("_gvar", "gaussian_variance", "gvar", 0.1, None, None),
-        ]
         self.sampler = pws.Sampler(data.i_train_dict)
         super(PMF, self).__init__(data, params, seed, logger)
 
-        self.user_mf_embedding = nn.Embedding(self._num_users, self._factors, dtype=torch.float32)
-        self.item_mf_embedding = nn.Embedding(self._num_items, self._factors, dtype=torch.float32)
+        # Embeddings
+        self.user_mf_embedding = nn.Embedding(self._num_users, self.factors, dtype=torch.float32)
+        self.item_mf_embedding = nn.Embedding(self._num_items, self.factors, dtype=torch.float32)
 
-        nn.init.normal_(self.user_mf_embedding.weight, std=0.01)
-        nn.init.normal_(self.item_mf_embedding.weight, std=0.01)
+        # Gaussian noise
+        self.noise = GaussianNoise(self.gaussian_variance)
 
-        self.noise = GaussianNoise(self._gvar)
-
+        # Activation function, loss and optimizer
         self.sigmoid = nn.Sigmoid()
         self.loss = nn.MSELoss()
-        self.optimizer = torch.optim.Adam(self.parameters(), lr=self._learning_rate)
+        self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
 
-    def forward(self, inputs):
-        user, item = inputs
+        # Init embedding weights
+        self._init_weights('xavier_normal')
+
+        # Move to device
+        self.to(self._device)
+
+    def forward(self, user, item):
         user_mf_e = self.user_mf_embedding(user)
         item_mf_e = self.item_mf_embedding(item)
-        if self.training:
-            mf_output = torch.mul(user_mf_e, item_mf_e).sum(dim=1)
-        else:
-            mf_output = torch.matmul(user_mf_e, item_mf_e.T)
+
+        mf_output = torch.mul(user_mf_e, item_mf_e).sum(dim=1)
         output = self.sigmoid(mf_output)
         return output
 
     def train_step(self, batch, *args):
-        user, pos, label = batch
-        output = self.noise(self.forward(inputs=(user, pos)))
+        user, pos, label = [x.to(self._device) for x in batch]
+
+        output = self.noise(self.forward(user, pos))
         reg = self.user_mf_embedding.weight.pow(2).sum() + self.item_mf_embedding.weight.pow(2).sum()
-        loss = self.loss(label.float(), output) + self._l_w * reg
+        loss = self.loss(label.float(), output) + self.lambda_weights * reg
+
         return loss
 
     def predict(self, start, stop):
         user_indices = torch.arange(start, stop)
-        item_indices = torch.arange(self._num_items)
-        output = self.forward(inputs=(user_indices, item_indices))
-        return output
+
+        # Retrieve embeddings
+        user_e_all = self.user_mf_embedding.weight
+        item_e_all = self.item_mf_embedding.weight
+
+        # Select only the embeddings in the current batch
+        u_embeddings_batch = user_e_all[user_indices]
+
+        predictions = torch.matmul(u_embeddings_batch, item_e_all.T)
+        predictions = self.sigmoid(predictions)
+        return predictions.to(self._device)

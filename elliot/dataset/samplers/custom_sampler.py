@@ -14,7 +14,7 @@ from elliot.dataset.samplers.base_sampler import TraditionalSampler
 
 class Sampler(TraditionalSampler):
     def __init__(self, indexed_ratings, seed=42):
-        super().__init__(indexed_ratings, seed)
+        super().__init__(seed, indexed_ratings)
         #np.random.seed(seed)
         #self._indexed_ratings = indexed_ratings
         #self._users = list(self._indexed_ratings.keys())
@@ -24,18 +24,38 @@ class Sampler(TraditionalSampler):
         #self._ui_dict = {u: list(set(indexed_ratings[u])) for u in indexed_ratings}
         #self._lui_dict = {u: len(v) for u, v in self._ui_dict.items()}
 
-    def _sample(self, **kwargs):
-        u = self._r_int(self._nusers)
-        ui = self._ui_dict[u]
-        lui = self._lui_dict[u]
-        if lui == self._nitems:
-            self._sample()
-        i = ui[self._r_int(lui)]
+    def _sample(self, bsize, **kwargs):
+        users = self._r_int(0, self._nusers, size=bsize)
+        pos_items = np.empty(bsize, dtype=np.int64)
+        neg_items = np.empty(bsize, dtype=np.int64)
 
-        j = self._r_int(self._nitems)
-        while j in ui:
-            j = self._r_int(self._nitems)
-        return u, i, j
+        for idx, u in enumerate(users):
+            if self._lui_dict[u] == self._nitems:
+                while u in users:
+                    u = self._r_int(self._nusers)
+
+            ui = self._ui_dict[u]
+            lui = self._lui_dict[u]
+
+            pos_items[idx] = ui[self._r_int(0, lui)]
+            while True:
+                neg_i = self._r_int(0, self._nitems)
+                if neg_i not in ui:
+                    neg_items[idx] = neg_i
+                    break
+
+        return users, pos_items, neg_items
+        # u = self._r_int(self._nusers)
+        # ui = self._ui_dict[u]
+        # lui = self._lui_dict[u]
+        # if lui == self._nitems:
+        #     return self._sample()
+        # i = ui[self._r_int(lui)]
+        #
+        # j = self._r_int(self._nitems)
+        # while j in ui:
+        #     j = self._r_int(self._nitems)
+        # return u, i, j
 
     """def step(self, events: int, batch_size: int):
         r_int = np.random.randint
