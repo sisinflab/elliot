@@ -10,8 +10,9 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 import numpy as np
 from tqdm import tqdm
 
-from elliot.dataset.samplers.base_sampler import FakeSampler
+from elliot.dataset.samplers import FakeSampler
 from elliot.recommender.base_recommender import Recommender
+from elliot.recommender.init import normal_init
 
 
 class WRMF(Recommender):
@@ -49,10 +50,15 @@ class WRMF(Recommender):
 
         self.C = self.alpha * self._data.sp_i_train
 
-        self.X = self.random.normal(scale=0.01, size=(self._num_users, self.factors))
-        self.Y = self.random.normal(scale=0.01, size=(self._num_items, self.factors))
+        # Embeddings
+        self.X = np.empty((self._num_users, self.factors))
+        self.Y = np.empty((self._num_items, self.factors))
 
         self.lambda_eye = self.lambda_weights * np.eye(self.factors)
+
+        # Init embedding weights
+        self.modules = [self.X, self.Y]
+        self.apply(normal_init)
 
         self.params_to_save = ['X', 'Y', 'C']
 

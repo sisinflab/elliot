@@ -10,8 +10,9 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it,daniele.malites
 import torch
 from torch import nn
 
-from elliot.dataset.samplers import pointwise_pos_neg_sampler as pws
+from elliot.dataset.samplers import PWPosNegSampler
 from elliot.recommender.base_recommender import GeneralRecommender
+from elliot.recommender.init import xavier_uniform_init
 
 
 class LogisticMF(GeneralRecommender):
@@ -47,14 +48,14 @@ class LogisticMF(GeneralRecommender):
     alpha: float = 0.5
 
     def __init__(self, data, params, seed, logger):
-        self.sampler = pws.Sampler(data.i_train_dict)
+        self.sampler = PWPosNegSampler(data.i_train_dict)
         super(LogisticMF, self).__init__(data, params, seed, logger)
 
         # Embeddings
-        self.Gu = nn.Parameter(torch.empty(self._num_users, self.factors))
-        self.Gi = nn.Parameter(torch.empty(self._num_items, self.factors))
-        self.Bu = nn.Parameter(torch.zeros(self._num_users))
-        self.Bi = nn.Parameter(torch.zeros(self._num_items))
+        self.Gu = nn.Embedding(self._num_users, self.factors, dtype=torch.float32)
+        self.Gi = nn.Embedding(self._num_items, self.factors, dtype=torch.float32)
+        self.Bu = nn.Embedding(self._num_users, 1, dtype=torch.float32)
+        self.Bi = nn.Embedding(self._num_items, 1, dtype=torch.float32)
 
         # Optimizer
         # NOTE: Removed Adagrad optimizer due to its poor performance
@@ -64,16 +65,17 @@ class LogisticMF(GeneralRecommender):
         self.transactions = self._data.transactions * 2
 
         # Init embedding weights
-        self._init_weights('xavier_uniform', [self.Gu, self.Gi])
+        self.bias = [self.Bu, self.Bi]
+        self.apply(xavier_uniform_init)
 
         # Move to device
         self.to(self._device)
 
     def forward(self, user, item):
-        gamma_u = self.Gu[user]
-        gamma_i = self.Gi[item]
-        beta_u = self.Bu[user]
-        beta_i = self.Bi[item]
+        gamma_u = self.Gu(user)
+        gamma_i = self.Gi(item)
+        beta_u = self.Bu(user)
+        beta_i = self.Bi(item)
 
         xui = torch.sum(gamma_u * gamma_i, dim=-1) + beta_u + beta_i
         return xui, gamma_u, gamma_i
@@ -90,13 +92,23 @@ class LogisticMF(GeneralRecommender):
         loss = loss + reg_loss
 
         steps = args[0]
-        inputs = [self.Gu, self.Bu] if steps > self._data.transactions else [self.Gi, self.Bi]
+        inputs = ([self.Gu.weight, self.Bu.weight] if steps > self._data.transactions
+                  else [self.Gi.weight, self.Bi.weight])
 
         return loss, inputs
 
     def predict(self, start, stop):
-        Bu_batch = self.Bu[start:stop].unsqueeze(-1)
-        Bi_all = self.Bi.unsqueeze(0)
+        user_indices = torch.arange(start, stop)
 
-        predictions = torch.matmul(self.Gu[start:stop], self.Gi.T) + Bu_batch + Bi_all
+        # Retrieve embeddings
+        user_e_all = self.Gu.weight
+        item_e_all = self.Gi.weight
+        user_b_all = self.Bu.weight
+        item_b_all = self.Bi.weight
+
+        # Select only the embeddings in the current batch
+        u_embeddings_batch = user_e_all[user_indices]
+        u_bias_batch = user_b_all[user_indices]
+
+        predictions = torch.matmul(u_embeddings_batch, item_e_all.T) + u_bias_batch + item_b_all.T
         return predictions.to(self._device)

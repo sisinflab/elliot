@@ -9,11 +9,12 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
 import random
 import numpy as np
+from tqdm import tqdm
 
 from elliot.dataset.samplers.base_sampler import TraditionalSampler
 
 
-class Sampler(TraditionalSampler):
+class PWPosNegSampler(TraditionalSampler):
     def __init__(self, indexed_ratings, seed=42):
         super().__init__(seed, indexed_ratings)
         """np.random.seed(42)
@@ -33,13 +34,20 @@ class Sampler(TraditionalSampler):
         ui_dict = self._ui_dict
         lui_dict = self._lui_dict"""
 
-    def _sample(self, bsize, **kwargs):
-        users = self._r_int(0, self._nusers, size=bsize)
-        labels = self._r_int(0, 2, size=bsize)
+    def _sample(self, **kwargs):
+        users = self._r_int(0, self._nusers, size=self.events)
+        labels = self._r_int(0, 2, size=self.events)
 
-        items = np.empty(bsize, dtype=np.int64)
+        items = np.empty(self.events, dtype=np.int64)
 
-        for idx, (u, b) in enumerate(zip(users, labels)):
+        iter_data = tqdm(
+            enumerate(zip(users, labels)),
+            total=self.events,
+            desc="Sampling",
+            leave=False
+        )
+
+        for idx, (u, b) in iter_data:
             if self._lui_dict[u] == self._nitems:
                 while u in users:
                     u = self._r_int(self._nusers)

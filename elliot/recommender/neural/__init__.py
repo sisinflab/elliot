@@ -1,4 +1,4 @@
-from .NeuMF import NeuMF
+from .neumf import NeuMF
 from .NFM import NFM
 from .DeepFM import DeepFM
 from .DMF import DMF

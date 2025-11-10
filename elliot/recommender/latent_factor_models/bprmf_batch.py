@@ -11,8 +11,9 @@ import json
 import torch
 from torch import nn
 
-from elliot.dataset.samplers.mf_samplers import BPRMFSampler
+from elliot.dataset.samplers import BPRMFSampler
 from elliot.recommender.base_recommender import GeneralRecommender
+from elliot.recommender.init import xavier_uniform_init
 
 
 class BPRMFBatch(GeneralRecommender):
@@ -56,7 +57,7 @@ class BPRMFBatch(GeneralRecommender):
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
 
         # Init embedding weights
-        self._init_weights('xavier_uniform')
+        self.apply(xavier_uniform_init)
 
         # Move to device
         self.to(self._device)

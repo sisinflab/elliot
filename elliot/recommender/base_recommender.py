@@ -1,17 +1,20 @@
+import ast
 import pickle
 import random
+from typing import Callable
 
 import numpy as np
 import torch
 
 from torch import nn
+from torch.nn.modules.module import T
 from torch_sparse import SparseTensor
 from abc import ABC, abstractmethod
 from functools import cached_property
 
 from elliot.dataset.samplers.base_sampler import FakeSampler
-from elliot.recommender.utils import ModelType, xavier_uniform_initialization, xavier_normal_initialization, \
-    zeros_initialization, device
+from elliot.recommender.init import zeros_init
+from elliot.recommender.utils import ModelType, device
 
 
 class AbstractRecommender(ABC):
@@ -77,6 +80,8 @@ class AbstractRecommender(ABC):
 
         for ann, data_type in self.__class__.__annotations__.items():
             value = getattr(params, ann, getattr(self, ann))
+            if data_type == tuple and isinstance(value, str):
+                value = ast.literal_eval(value)
             setattr(self, ann, data_type(value))
             self.logger.info(f"Parameter {ann} set to {value}")
             self.params_list.append(ann)
@@ -113,11 +118,19 @@ class Recommender(AbstractRecommender):
 
     def __init__(self, data, params, seed, logger):
         super().__init__(data, params, seed, logger)
-        self.random = np.random
+        self.modules = []
+        self.bias = []
 
     def set_seed(self, seed: int):
         random.seed(seed)
         np.random.seed(seed)
+
+    def apply(self, init_func, **kwargs):
+        for m in self.modules:
+            if any(m is x for x in self.bias):
+                zeros_init(m)
+            else:
+                init_func(m, **kwargs)
 
     @abstractmethod
     def train_step(self, *args):
@@ -163,6 +176,7 @@ class GeneralRecommender(nn.Module, AbstractRecommender):
     def __init__(self, data, params, seed, logger):
         AbstractRecommender.__init__(self, data, params, seed, logger)
         super(GeneralRecommender, self).__init__()
+        self.bias = []
         self._device = device
 
     def set_seed(self, seed: int):
@@ -178,6 +192,13 @@ class GeneralRecommender(nn.Module, AbstractRecommender):
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
 
+    def apply(self, init_func, **kwargs):
+        for m in self.modules():
+            if any(m is x for x in self.bias):
+                zeros_init(m)
+            else:
+                init_func(m, **kwargs)
+
     @cached_property
     def _sp_i_train(self):
         coo = self._data.sp_i_train.tocoo()
@@ -188,19 +209,6 @@ class GeneralRecommender(nn.Module, AbstractRecommender):
     @abstractmethod
     def train_step(self, batch, *args):
         raise NotImplementedError()
-
-    def _init_weights(self, init_type, modules=None):
-        init_types = {
-            'xavier_uniform': xavier_uniform_initialization,
-            'xavier_normal': xavier_normal_initialization,
-            'zeros': zeros_initialization
-        }
-        modules = modules if modules is not None else self.modules()
-        init_func = init_types.get(init_type)
-        if init_func is None:
-            raise NotImplementedError()
-        for m in modules:
-            init_func(m)
 
     def save_weights(self, file_path):
         torch.save({

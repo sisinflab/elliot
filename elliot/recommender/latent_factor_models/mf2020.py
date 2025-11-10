@@ -10,8 +10,9 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 from abc import abstractmethod
 import numpy as np
 
-from elliot.dataset.samplers.mf_samplers import MFSampler, MFSamplerRendle
+from elliot.dataset.samplers import MFSampler, MFSamplerRendle
 from elliot.recommender.base_recommender import Recommender
+from elliot.recommender.init import normal_init
 
 
 class AbstractMF2020(Recommender):
@@ -49,24 +50,27 @@ class AbstractMF2020(Recommender):
     learning_rate: float
     lambda_weights: float
     m: int
-    loc: float
-    scale: float
 
     def __init__(self, data, params, seed, logger):
         self.sampler = MFSamplerRendle(data.i_train_dict, data.sp_i_train, seed)
         super().__init__(data, params, seed, logger)
 
         # Embeddings
-        self._user_factors = self.random.normal(loc=self.loc, scale=self.scale, size=(len(self._users), self.factors))
-        self._item_factors = self.random.normal(loc=self.loc, scale=self.scale, size=(len(self._items), self.factors))
-        self._user_bias = np.zeros(len(self._users))
-        self._item_bias = np.zeros(len(self._items))
+        self._user_factors = np.empty((self._num_users, self.factors), dtype=np.float32)
+        self._item_factors = np.empty((self._num_items, self.factors), dtype=np.float32)
+        self._user_bias = np.empty(self._num_users, dtype=np.float32)
+        self._item_bias = np.empty(self._num_items, dtype=np.float32)
 
         # Global bias
         self._global_bias = 0
 
         self.transactions = data.transactions * (self.m + 1)
         self.sampler.m = self.m
+
+        # Init embedding weights
+        self.modules = [self._user_factors, self._item_factors, self._user_bias, self._item_bias]
+        self.bias = [self._user_bias, self._item_bias]
+        self.apply(normal_init)
 
         self.params_to_save = ['_global_bias', '_user_bias', '_item_bias', '_user_factor', '_item_factor']
 
@@ -88,8 +92,6 @@ class MF2020(AbstractMF2020):
     learning_rate: float = 0.05
     lambda_weights: float = 0.0
     m: int = 0
-    loc: float = 0.0
-    scale: float = 0.1
 
     def __init__(self, data, params, seed, logger):
         super().__init__(data, params, seed, logger)
@@ -139,8 +141,6 @@ class MF2020Batch(AbstractMF2020):
     learning_rate: float = 0.05
     lambda_weights: float = 0.0
     m: int = 0
-    loc: float = 0.0
-    scale: float = 0.1
 
     def __init__(self, data, params, seed, logger):
         super().__init__(data, params, seed, logger)

@@ -11,8 +11,9 @@ import numpy as np
 import torch
 from torch import nn
 
-from elliot.dataset.samplers import custom_sampler as cs
+from elliot.dataset.samplers import CustomSampler
 from elliot.recommender.base_recommender import Recommender, GeneralRecommender
+from elliot.recommender.init import normal_init, xavier_normal_init
 from elliot.recommender.utils import device, classproperty
 
 
@@ -25,17 +26,22 @@ class BPRMF_numpy(Recommender):
     lambda_neg_i: float = 0.00025
 
     def __init__(self, data, params, seed, logger):
-        self.sampler = cs.Sampler(data.i_train_dict)
+        self.sampler = CustomSampler(data.i_train_dict)
         super().__init__(data, params, seed, logger)
 
         # Embeddings
-        self._user_bias = np.zeros(self._num_users)
-        self._item_bias = np.zeros(self._num_items)
-        self._user_factors = self.random.normal(loc=0.0, scale=0.1, size=(self._num_users, self.factors))
-        self._item_factors = self.random.normal(loc=0.0, scale=0.1, size=(self._num_items, self.factors))
+        self._user_factors = np.empty((self._num_users, self.factors), dtype=np.float32)
+        self._item_factors = np.empty((self._num_items, self.factors), dtype=np.float32)
+        self._user_bias = np.empty(self._num_users, dtype=np.float32)
+        self._item_bias = np.empty(self._num_items, dtype=np.float32)
 
         # Global bias
         self._global_bias = 0
+
+        # Init embedding weights
+        self.modules = [self._user_factors, self._item_factors, self._user_bias, self._item_bias]
+        self.bias = [self._user_bias, self._item_bias]
+        self.apply(normal_init)
 
         self.params_to_save = ['_user_bias', '_item_bias', '_user_factors', '_item_factors']
 
@@ -96,7 +102,7 @@ class BPRMF_pytorch(GeneralRecommender):
     lambda_neg_i: float = 0.00025
 
     def __init__(self, data, params, seed, logger):
-        self.sampler = cs.Sampler(data.i_train_dict)
+        self.sampler = CustomSampler(data.i_train_dict)
         super().__init__(data, params, seed, logger)
 
         # Embeddings
@@ -106,14 +112,14 @@ class BPRMF_pytorch(GeneralRecommender):
         self._item_bias = nn.Embedding(self._num_items, 1, dtype=torch.float32)
 
         # Global bias
-        self._global_bias = nn.Parameter(torch.Tensor([0]))
+        self._global_bias = nn.Parameter(torch.zeros(1))
 
         # Optimizer
         self.optimizer = torch.optim.SGD(self.parameters(), lr=self.learning_rate)
 
         # Init embedding weights
-        self._init_weights('xavier_normal', [self._user_factors, self._item_factors])
-        self._init_weights('zeros', [self._user_bias, self._item_bias])
+        self.bias = [self._user_bias, self._item_bias]
+        self.apply(xavier_normal_init)
 
         # Move to device
         self.to(self._device)

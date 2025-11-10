@@ -11,8 +11,9 @@ import numpy as np
 from scipy import sparse as sp
 from tqdm import tqdm
 
-from elliot.dataset.samplers.base_sampler import FakeSampler
+from elliot.dataset.samplers import FakeSampler
 from elliot.recommender.base_recommender import Recommender
+from elliot.recommender.init import normal_init
 
 
 class iALS(Recommender):
@@ -41,8 +42,9 @@ class iALS(Recommender):
         self.C_csc = self.C.tocsc()
         self.train_dict = self._data.train_dict
 
-        self.X = self.random.normal(scale=0.01, size=(self._num_users, self.factors))
-        self.Y = self.random.normal(scale=0.01, size=(self._num_items, self.factors))
+        # Embeddings
+        self.X = np.empty((self._num_users, self.factors), dtype=np.float32)
+        self.Y = np.empty((self._num_items, self.factors), dtype=np.float32)
 
         warm_item_mask = np.ediff1d(self._data.sp_i_train.tocsc().indptr) > 0
         self.warm_items = np.arange(0, self._num_items, dtype=np.int32)[warm_item_mask]
@@ -50,6 +52,10 @@ class iALS(Recommender):
         self.X_eye = sp.eye(self._num_users)
         self.Y_eye = sp.eye(self._num_items)
         self.lambda_eye = self.lambda_weights * sp.eye(self.factors)
+
+        # Init embedding weights
+        self.modules = [self.X, self.Y]
+        self.apply(normal_init)
 
         self.params_to_save = ['X', 'Y', 'C']
 

@@ -136,7 +136,7 @@ class AbstractTrainer(ABC):
     #     )
 
     @abstractmethod
-    def _train_epoch(self, it, *args):
+    def _train_epoch(self, it, dataloader, *args):
         pass
 
     def train(self):
@@ -144,11 +144,12 @@ class AbstractTrainer(ABC):
             return self.restore_weights()
 
         print(f"Transactions: {self._data.transactions}")
+        train_dataloader = self._sampler.initialize()
 
         for it in self.iterate(self._epochs):
             print(f"\n********** Iteration: {it + 1}")
             start = time.perf_counter()
-            loss = self._train_epoch(it)
+            loss = self._train_epoch(it, train_dataloader)
             end = time.perf_counter()
             print(f"Duration: {end - start}")
             if not (it + 1) % self._validation_rate:
@@ -264,17 +265,16 @@ class Trainer(AbstractTrainer):
     def __init__(self, data, config, params, model_class):
         super().__init__(data, config, params, model_class)
 
-    def _train_epoch(self, it, *args):
+    def _train_epoch(self, it, dataloader, *args):
         loss = 0
         steps = 0
-        self._sampler.initialize()
         iter_ = tqdm(
             total=int(self._model.transactions // self._batch_size),
             desc="Training",
             disable=not self._verbose
         )
         with iter_ as t:
-            for batch in self._sampler.step():
+            for batch in dataloader:
                 steps += 1
                 loss += self._model.train_step(batch, *args)
                 t.set_postfix({'loss': f'{loss / steps:.5f}'})
@@ -285,7 +285,14 @@ class Trainer(AbstractTrainer):
         predictions_top_k_test = {}
         predictions_top_k_val = {}
 
-        for (start, stop), masks in tqdm(self._data, desc="Processing batches", total=len(self._data)):
+        iter_data = tqdm(
+            self._data,
+            desc="Processing batches",
+            total=len(self._data),
+            leave=False
+        )
+
+        for (start, stop), masks in iter_data:
             predictions = self._model.predict(start, stop)
             recs_val, recs_test = self.process_protocol(k, masks, predictions, start, stop)
             predictions_top_k_val.update(recs_val)
@@ -330,20 +337,19 @@ class GeneralTrainer(AbstractTrainer):
         self.optimizer = self._model.optimizer
         torch.manual_seed(self._seed)
 
-    def _train_epoch(self, it, *args):
+    def _train_epoch(self, it, dataloader, *args):
         self._model.train()
         total_loss, steps = 0, 0
-        self._sampler.initialize()
         iter_ = tqdm(
             total=int(self._model.transactions // self._batch_size),
             desc="Training",
             disable=not self._verbose
         )
         with iter_ as t:
-            for batch in self._sampler.step():
+            for batch in dataloader:
                 steps += 1
                 self.optimizer.zero_grad()
-                batch = tuple(torch.tensor(b, dtype=torch.int64) for b in batch)
+                batch = tuple(self._to_tensor(b) for b in batch)
                 res = self._model.train_step(batch, steps, *args)
                 loss, inputs = res if isinstance(res, tuple) else (res, None)
                 loss.backward(inputs=inputs)
@@ -362,7 +368,14 @@ class GeneralTrainer(AbstractTrainer):
         predictions_top_k_test = {}
         predictions_top_k_val = {}
 
-        for (start, stop), masks in tqdm(self._data, desc="Processing batches", total=len(self._data)):
+        iter_data = tqdm(
+            self._data,
+            desc="Processing batches",
+            total=len(self._data),
+            leave=False
+        )
+
+        for (start, stop), masks in iter_data:
             predictions = self._model.predict(start, stop)
             recs_val, recs_test = self.process_protocol(k, masks, predictions, start, stop)
             predictions_top_k_val.update(recs_val)
@@ -381,3 +394,9 @@ class GeneralTrainer(AbstractTrainer):
     def _get_top_k(self, users_recs, k):
         v, i = torch.topk(users_recs, k=k, sorted=True)
         return v.numpy(), i.numpy()
+
+    def _to_tensor(self, b):
+        if isinstance(b, torch.Tensor):
+            return b
+        else:
+            return torch.tensor(b, dtype=torch.int64)

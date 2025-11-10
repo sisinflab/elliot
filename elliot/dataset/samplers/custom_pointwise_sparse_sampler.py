@@ -8,11 +8,12 @@ __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
 import numpy as np
+from tqdm import tqdm
 
 from elliot.dataset.samplers.base_sampler import TraditionalSampler
 
 
-class Sampler(TraditionalSampler):
+class CustomPWSparseSampler(TraditionalSampler):
     def __init__(self, indexed_ratings, sp_i_train, seed=42):
         super().__init__(seed, indexed_ratings)
         self._sp_i_train = sp_i_train
@@ -33,12 +34,19 @@ class Sampler(TraditionalSampler):
         ui_dict = self._ui_dict
         lui_dict = self._lui_dict"""
 
-    def _sample(self, bsize, **kwargs):
-        users = self._r_int(0, self._nusers, size=bsize)
-        items = np.empty(bsize, dtype=np.int64)
-        labels = np.empty(bsize, dtype=np.int64)
+    def _sample(self, **kwargs):
+        users = self._r_int(0, self._nusers, size=self.events)
+        items = np.empty(self.events, dtype=np.int64)
+        labels = np.empty(self.events, dtype=np.int64)
 
-        for idx, u in enumerate(users):
+        iter_data = tqdm(
+            enumerate(users),
+            total=self.events,
+            desc="Sampling",
+            leave=False
+        )
+
+        for idx, u in iter_data:
             if self._lui_dict[u] == self._nitems:
                 while u in users:
                     u = self._r_int(self._nusers)

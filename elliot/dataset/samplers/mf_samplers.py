@@ -7,8 +7,8 @@ __version__ = '0.3.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
-import time
 import numpy as np
+from tqdm import tqdm
 
 from elliot.dataset.samplers.base_sampler import TraditionalSampler
 
@@ -28,14 +28,16 @@ class BPRMFSampler(TraditionalSampler):
     def freq_items(self):
         return dict(enumerate(self._freq_items))
 
-    def _sample(self, bsize, **kwargs):
-        users = self._r_int(0, self._nusers, size=bsize)
+    def _sample(self, **kwargs):
+        users = self._r_int(0, self._nusers, size=self.events)
         self._freq_users[users] += 1
 
-        pos_items = np.empty(bsize, dtype=np.int64)
-        neg_items = np.empty(bsize, dtype=np.int64)
+        pos_items = np.empty(self.events, dtype=np.int64)
+        neg_items = np.empty(self.events, dtype=np.int64)
 
-        for idx, u in enumerate(users):
+        iter_data = tqdm(enumerate(users), total=self.events, desc="Sampling", leave=False)
+
+        for idx, u in iter_data:
             if self._lui_dict[u] == self._nitems:
                 self._freq_users[u] -= 1
                 while u in users:
@@ -118,7 +120,7 @@ class MFSampler(TraditionalSampler):
         self.m = 0
         self.num_neg = lambda n: self.m
 
-    def initialize(self):
+    def _sample(self, **kwargs):
         """Converts a list of positive pairs into a two class dataset.
         Args:
           positive_pairs: an array of shape [n, 2], each row representing a positive
@@ -132,14 +134,14 @@ class MFSampler(TraditionalSampler):
           * num_negatives negative examples (user, item', 0) where item' is sampled
             uniformly at random.
         """
-        time_start = time.time()
-
         users = []
         items = []
         labels = []
         all_items = np.array(self._items, dtype=np.int64)
 
-        for u in self._users:
+        iter_data = tqdm(self._users, total=len(self._users), desc="Sampling", leave=False)
+
+        for u in iter_data:
             start, end = self.idx_start[u], self.idx_start[u] + self.count[u]
             pos_u = self.rating_items[start:end]
 
@@ -161,9 +163,8 @@ class MFSampler(TraditionalSampler):
 
         training_matrix = np.column_stack([users, items, labels])
         indices = self._r_perm(len(training_matrix))
-        self._samples = training_matrix[indices]
-
-        print(f"Sampling has taken {round(time.time() - time_start, 2)} seconds")
+        u, i, pos = training_matrix[indices].T
+        return u, i, pos
         # time_start = time.time()
         #
         # def user_training_matrix(u):
@@ -182,16 +183,15 @@ class MFSampler(TraditionalSampler):
         #for start in range(0, training_matrix.shape[0], batch_size):
         #    yield training_matrix[start:min(start + batch_size, training_matrix.shape[0])]
 
-    def _sample(self, bs, bsize):
-        u, i, pos = self._samples[bs:bs + bsize].T
-        return u, i, pos
+    # def _sample(self, bs, bsize):
+    #     u, i, pos = self._samples[bs:bs + bsize].T
+    #     return u, i, pos
 
 
 class MFSamplerRendle(MFSampler):
     def __init__(self, indexed_ratings, sparse_matrix, seed=42):
         super().__init__(indexed_ratings, sparse_matrix, seed)
         self.num_neg = lambda n: self.m * n
-
 
 # class Sampler(TraditionalSampler):
 #     def __init__(self, indexed_ratings, m, sparse_matrix, seed=42):

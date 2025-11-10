@@ -10,8 +10,9 @@ __email__ = 'felice.merra@poliba.it, vitowalter.anelli@poliba.it, claudio.pomo@p
 import numpy as np
 from tqdm import tqdm
 
-from elliot.dataset.samplers.base_sampler import FakeSampler
+from elliot.dataset.samplers import FakeSampler
 from elliot.recommender.base_recommender import Recommender
+from elliot.recommender.init import normal_init
 
 
 class NonNegMF(Recommender):
@@ -48,23 +49,27 @@ class NonNegMF(Recommender):
         super().__init__(data, params, seed, logger)
 
         self._i_train = self._data.i_train_dict
-        self._random_state = np.random.default_rng(seed)
         self._global_mean = np.mean(self._data.sp_i_train_ratings)
 
         # Embeddings
-        self._user_embeddings = self._random_state.normal(size=(self._num_users, self.factors))
-        self._item_embeddings = self._random_state.normal(size=(self._num_items, self.factors))
-        self._user_bias = np.zeros(self._num_users)
-        self._item_bias = np.zeros(self._num_items)
+        self._user_factors = np.empty((self._num_users, self.factors), dtype=np.float32)
+        self._item_factors = np.empty((self._num_items, self.factors), dtype=np.float32)
+        self._user_bias = np.empty(self._num_users, dtype=np.float32)
+        self._item_bias = np.empty(self._num_items, dtype=np.float32)
+
+        # Init embedding weights
+        self.modules = [self._user_factors, self._item_factors, self._user_bias, self._item_bias]
+        self.bias = [self._user_bias, self._item_bias]
+        self.apply(normal_init)
 
         self.params_to_save = ['_user_bias', '_item_bias', '_user_embeddings', '_item_embeddings']
 
     def train_step(self, *args):
         # (re)initialize nums and denominators to zero
-        user_num = np.zeros_like(self._user_embeddings)
-        user_denom = np.zeros_like(self._user_embeddings)
-        item_num = np.zeros_like(self._item_embeddings)
-        item_denom = np.zeros_like(self._item_embeddings)
+        user_num = np.zeros_like(self._user_factors)
+        user_denom = np.zeros_like(self._user_factors)
+        item_num = np.zeros_like(self._item_factors)
+        item_denom = np.zeros_like(self._item_factors)
 
         user_iter = tqdm(
             self._i_train.items(),
@@ -82,12 +87,12 @@ class NonNegMF(Recommender):
                 self._global_mean
                 + self._user_bias[u]
                 + self._item_bias[items]
-                + np.dot(self._user_embeddings[u], self._item_embeddings[items].T)
+                + np.dot(self._user_factors[u], self._item_factors[items].T)
             )
             err = r_ui - est
 
-            q_i = self._item_embeddings[items]
-            p_u = self._user_embeddings[u]
+            q_i = self._item_factors[items]
+            p_u = self._user_factors[u]
 
             # update user bias
             for e in err:
@@ -108,15 +113,15 @@ class NonNegMF(Recommender):
 
         # Update user factors
         n_ratings = np.array([len(v) for v in self._i_train.values()])
-        self._user_embeddings *= user_num / (
-            user_denom + n_ratings[:, None] * self.lambda_weights * self._user_embeddings
+        self._user_factors *= user_num / (
+            user_denom + n_ratings[:, None] * self.lambda_weights * self._user_factors
         )
 
         # Update item factors
         I_train_T = self._data.sp_i_train.tocsc()
         n_ratings_item = np.diff(I_train_T.indptr)
-        self._item_embeddings *= item_num / (
-            item_denom + n_ratings_item[:, None] * self.lambda_weights * self._item_embeddings
+        self._item_factors *= item_num / (
+            item_denom + n_ratings_item[:, None] * self.lambda_weights * self._item_factors
         )
 
         return 0
@@ -126,5 +131,5 @@ class NonNegMF(Recommender):
             self._global_mean
             + self._user_bias[start:stop, None]
             + self._item_bias[None, :]
-            + self._user_embeddings[start:stop] @ self._item_embeddings.T
+            + self._user_factors[start:stop] @ self._item_factors.T
         )

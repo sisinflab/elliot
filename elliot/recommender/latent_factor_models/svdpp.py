@@ -10,8 +10,9 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 import torch
 from torch import nn
 
-from elliot.dataset.samplers import custom_pointwise_sparse_sampler as cpss
+from elliot.dataset.samplers import CustomPWSparseSampler
 from elliot.recommender.base_recommender import GeneralRecommender
+from elliot.recommender.init import xavier_uniform_init
 
 
 class SVDpp(GeneralRecommender):
@@ -21,7 +22,7 @@ class SVDpp(GeneralRecommender):
     lambda_bias: float = 0.001
 
     def __init__(self, data, params, seed, logger):
-        self.sampler = cpss.Sampler(data.i_train_dict, data.sp_i_train)
+        self.sampler = CustomPWSparseSampler(data.i_train_dict, data.sp_i_train)
         super(SVDpp, self).__init__(data, params, seed, logger)
 
         # Embeddings
@@ -32,15 +33,15 @@ class SVDpp(GeneralRecommender):
         self.item_bias_embedding = nn.Embedding(self._num_items, 1, dtype=torch.float32)
 
         # Global bias
-        self.bias_ = nn.Parameter(torch.Tensor([0]))
+        self.bias_ = nn.Parameter(torch.zeros(1))
 
         # Loss and optimizer
         self.loss = nn.MSELoss()
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
 
         # Init embedding weights
-        self._init_weights('xavier_uniform', [self.user_mf_embedding, self.item_mf_embedding, self.item_y_embedding])
-        self._init_weights('zeros', [self.user_bias_embedding, self.item_bias_embedding])
+        self.bias = [self.user_bias_embedding, self.item_bias_embedding]
+        self.apply(xavier_uniform_init)
 
         # Move to device
         self.to(self._device)

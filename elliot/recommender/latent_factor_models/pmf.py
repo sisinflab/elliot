@@ -12,9 +12,10 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 import torch
 from torch import nn
 
-from elliot.dataset.samplers import pointwise_pos_neg_sampler as pws
+from elliot.dataset.samplers import PWPosNegSampler
 from elliot.recommender.base_recommender import GeneralRecommender
-from elliot.recommender.utils import GaussianNoise
+from elliot.recommender.init import xavier_normal_init
+from elliot.recommender.layers import GaussianNoise
 
 
 class PMF(GeneralRecommender):
@@ -50,7 +51,7 @@ class PMF(GeneralRecommender):
     gaussian_variance: float = 0.1
 
     def __init__(self, data, params, seed, logger):
-        self.sampler = pws.Sampler(data.i_train_dict)
+        self.sampler = PWPosNegSampler(data.i_train_dict)
         super(PMF, self).__init__(data, params, seed, logger)
 
         # Embeddings
@@ -66,7 +67,7 @@ class PMF(GeneralRecommender):
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
 
         # Init embedding weights
-        self._init_weights('xavier_normal')
+        self.apply(xavier_normal_init)
 
         # Move to device
         self.to(self._device)
