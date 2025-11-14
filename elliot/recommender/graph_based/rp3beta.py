@@ -17,6 +17,7 @@ from elliot.recommender.base_recommender import TraditionalRecommender
 
 
 class RP3beta(TraditionalRecommender):
+    # Model hyperparameters
     neighborhood: int = 10
     alpha: float = 1.0
     beta: float = 0.6
@@ -25,55 +26,62 @@ class RP3beta(TraditionalRecommender):
     def __init__(self, data, params, seed, logger):
         super().__init__(data, params, seed, logger)
 
-        self._train = data.sp_i_train_ratings
-        self._implicit_train = data.sp_i_train
-
         if self.neighborhood == -1:
             self.neighborhood = self._data.num_items
 
-    def predict(self, start, stop):
-        return self._preds[start:stop]
-
     def initialize(self):
-        self._similarity_matrix = self._compute_similarity()
-        self._preds = self._train.dot(self._similarity_matrix)
+        # Step 1: Normalize user-item matrix
+        Pui = normalize(self._train, norm="l1", axis=1)
 
-    def _compute_similarity(self):
-        # Neighborhood along rows
-        Pui = normalize(self._train, norm='l1', axis=1)
-
+        # Step 2: Get boolean item-user matrix
         X_bool = self._implicit_train.transpose(copy=True)
+
+        # Step 3: Calculate item popularity degrees
         X_bool_sum = np.array(X_bool.sum(axis=1)).ravel()
-        Piu = normalize(X_bool, norm='l1', axis=1)
-        del X_bool
-
-        Pui = Pui.power(self.alpha)
-        Piu = Piu.power(self.alpha)
-
-        degree = np.where(X_bool_sum != 0.0, X_bool_sum ** (-self.beta), 0.0)
+        degree = np.where(X_bool_sum != 0.0, np.power(X_bool_sum, -self.beta), 0.0)
         D = sp.diags(degree)
 
-        block_dim = 200
+        # Step 4: Normalize item-user matrix
+        Piu = normalize(X_bool, norm="l1", axis=1)
+        del X_bool
+
+        # Apply alpha exponent
+        if self.alpha != 1.0:
+            Pui = Pui.power(self.alpha)
+            Piu = Piu.power(self.alpha)
+
+        # Step 5: Compute similarity in blocks and apply top-k filtering
+        similarity_matrix = self._compute_blockwise_similarity(Piu, Pui, D)
+
+        # Step 6: Normalize if required
+        if self.normalize_similarity:
+            similarity_matrix = normalize(similarity_matrix, norm="l1", axis=1)
+
+        # Store computed similarity matrix
+        self.similarity_matrix = similarity_matrix
+
+    def _compute_blockwise_similarity(self, Piu, Pui, D, block_dim=200):
         rows, cols, values = [], [], []
 
         with tqdm(total=(Pui.shape[1] // block_dim), desc="Computing") as t:
+            # Process matrix in blocks along rows
             for start in range(0, Pui.shape[1], block_dim):
                 end = min(start + block_dim, Pui.shape[1])
                 d_t_block = Piu[start:end, :]
 
-                similarity_block = d_t_block.dot(Pui).dot(D).toarray()
-                np.fill_diagonal(similarity_block[:, start:end], 0.0)
-                idx = np.argpartition(similarity_block, -self.neighborhood, axis=1)[:, -self.neighborhood:]
-                top_vals = np.take_along_axis(similarity_block, idx, axis=1)
+                # Compute similarity block matrix product
+                similarity_block = (d_t_block @ Pui @ D).toarray()
 
-                for i in range(similarity_block.shape[0]):
-                    mask = top_vals[i] != 0.0
-                    cols_r = idx[i][mask]
-                    vals_r = top_vals[i][mask]
-                    if len(vals_r) > 0:
-                        rows.extend([start + i] * len(vals_r))
-                        cols.extend(cols_r)
-                        values.extend(vals_r)
+                # Set to 0 self-similarity entries (diagonal elements)
+                np.fill_diagonal(similarity_block[:, start:end], 0.0)
+
+                # Apply sparse top-k row filtering
+                b_rows, b_cols, b_data = self._get_top_k(similarity_block, start)
+
+                # Store computed values
+                rows.extend(b_rows)
+                cols.extend(b_cols)
+                values.extend(b_data)
 
                 t.update()
 
@@ -84,37 +92,37 @@ class RP3beta(TraditionalRecommender):
             t.set_description("Done")
             t.refresh()
 
-        similarity_matrix = sparse.create_sparse_matrix(
+        # Create final sparse matrix from accumulated values
+        return sparse.create_sparse_matrix(
             data=(values, (rows, cols)), dtype=np.float32, shape=(Pui.shape[1], Pui.shape[1])
         )
 
-        if self.normalize_similarity:
-            similarity_matrix = normalize(similarity_matrix, norm='l1', axis=1)
+    def _get_top_k(self, block, start):
+        b_row, b_col, b_data = [], [], []
 
-        return similarity_matrix
+        # Process each row individually
+        for i in range(block.shape[0]):
+            row = block[i]
+            cols = np.nonzero(row)[0]
 
-    def _process_along_cols(self, similarity_matrix):
-        # Neighborhood along cols
-        matrix = similarity_matrix.tocsc()
+            if not len(cols):
+                continue
 
-        data, rows_indices, cols_indptr = [], [], [0]
+            # Determine actual number of elements to keep
+            top_k = min(self.neighborhood, len(cols))
 
-        for item_idx in range(matrix.shape[1]):
-            start_position = matrix.indptr[item_idx]
-            end_position = matrix.indptr[item_idx + 1]
+            # Find indices of top-k largest values using argpartition
+            idx = np.argpartition(row, -top_k)[-top_k:]
 
-            column_data = matrix.data[start_position:end_position]
-            column_row_index = matrix.indices[start_position:end_position]
+            # Store top-k values in their original column positions
+            values = row[idx]
 
-            non_zero_data = column_data != 0
+            b_row.extend([i + start] * len(idx))
+            b_col.extend(idx)
+            b_data.extend(values)
 
-            idx_sorted = np.argsort(column_data[non_zero_data])  # sort by column
-            top_k_idx = idx_sorted[-self.neighborhood:]
+        return b_row, b_col, b_data
 
-            data.extend(column_data[non_zero_data][top_k_idx])
-            rows_indices.extend(column_row_index[non_zero_data][top_k_idx])
-            cols_indptr.append(len(data))
-
-        return sparse.create_sparse_matrix(
-            data=(data, rows_indices, cols_indptr), shape=matrix.shape, dtype=np.float32
-        ).tocsr()
+    def predict(self, start, stop):
+        predictions = self._train[start:stop] @ self.similarity_matrix
+        return predictions

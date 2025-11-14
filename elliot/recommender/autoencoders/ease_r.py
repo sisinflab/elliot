@@ -22,19 +22,10 @@ class EASER(TraditionalRecommender):
     def __init__(self, data, params, seed, logger):
         super().__init__(data, params, seed, logger)
 
-        self._train = data.sp_i_train_ratings
-
         if self.neighborhood == -1:
             self.neighborhood = self._data.num_items
 
-    def predict(self, start, stop):
-        return self._preds[start:stop]
-
     def initialize(self):
-        self._similarity_matrix = self._compute_similarity()
-        self._preds = self._train.dot(self._similarity_matrix)
-
-    def _compute_similarity(self):
         fake_iter = tqdm(range(1), desc="Computing")
         similarity_matrix, diagonal_indices = None, None
 
@@ -51,4 +42,8 @@ class EASER(TraditionalRecommender):
 
         similarity_matrix[diagonal_indices] = 0.0
 
-        return similarity_matrix
+        self.similarity_matrix = similarity_matrix
+
+    def predict(self, start, stop):
+        predictions = self._train[start:stop] @ self.similarity_matrix
+        return predictions

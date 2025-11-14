@@ -20,6 +20,8 @@ class iALS(Recommender):
     """
     Simple Matrix Factorization class
     """
+
+    # Model hyperparameters
     factors: int = 10
     alpha: float = 1.0
     epsilon: float = 1.0

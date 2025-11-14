@@ -35,8 +35,6 @@ for _backend in sys.modules["external"].backend:
         from .rmg.RMG import RMG
         from .narre.NARRE import NARRE
     elif _backend == "pytorch":
-        from .ngcf.NGCF import NGCF
-        from .lightgcn.LightGCN import LightGCN
         from .pinsage.PinSage import PinSage
         from .gat.GAT import GAT
         from .gcmc.GCMC import GCMC

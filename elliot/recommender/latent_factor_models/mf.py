@@ -40,6 +40,8 @@ class MF(GeneralRecommender):
           learning_rate: 0.001
           lambda_weights: 0.1
     """
+
+    # Model hyperparameters
     factors: int = 10
     learning_rate: float = 0.001
     lambda_weights: float = 0.1
@@ -72,6 +74,7 @@ class MF(GeneralRecommender):
         user, pos, label = [x.to(self._device) for x in batch]
 
         output = self.forward(user, pos)
+
         reg = self.user_mf_embedding.weight.pow(2).sum() + self.item_mf_embedding.weight.pow(2).sum()
         loss = self.loss(label.float(), output) + self.lambda_weights * reg
 

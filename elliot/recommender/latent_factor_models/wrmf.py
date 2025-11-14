@@ -40,6 +40,8 @@ class WRMF(Recommender):
           alpha: 1
           lambda_weights: 0.1
     """
+
+    # Model hyperparameters
     factors: int = 10
     lambda_weights: float = 0.1
     alpha: float = 1.0

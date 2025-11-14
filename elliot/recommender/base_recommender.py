@@ -1,13 +1,11 @@
 import ast
 import pickle
 import random
-from typing import Callable
 
 import numpy as np
 import torch
 
-from torch import nn
-from torch.nn.modules.module import T
+from torch import nn, Tensor
 from torch_sparse import SparseTensor
 from abc import ABC, abstractmethod
 from functools import cached_property
@@ -136,6 +134,10 @@ class Recommender(AbstractRecommender):
     def train_step(self, *args):
         raise NotImplementedError()
 
+    @abstractmethod
+    def predict(self, start, stop):
+        raise NotImplementedError()
+
     def save_weights(self, path):
         with open(path, "wb") as f:
             pickle.dump(self._get_model_state(), f)
@@ -159,14 +161,19 @@ class TraditionalRecommender(Recommender):
     def __init__(self, data, params, seed, logger):
         super().__init__(data, params, seed, logger)
         self.sampler = FakeSampler()
-        self._similarity_matrix = None
-        self._preds = None
+        self.similarity_matrix = None
+        self._train = data.sp_i_train_ratings
+        self._implicit_train = data.sp_i_train
 
     def train_step(self, *args):
         pass
 
     @abstractmethod
     def initialize(self):
+        raise NotImplementedError()
+
+    @abstractmethod
+    def predict(self, start, stop):
         raise NotImplementedError()
 
 
@@ -210,6 +217,10 @@ class GeneralRecommender(nn.Module, AbstractRecommender):
     def train_step(self, batch, *args):
         raise NotImplementedError()
 
+    @abstractmethod
+    def predict(self, start, stop):
+        raise NotImplementedError()
+
     def save_weights(self, file_path):
         torch.save({
             'model_state_dict': self.state_dict(),
@@ -220,3 +231,65 @@ class GeneralRecommender(nn.Module, AbstractRecommender):
         checkpoint = torch.load(file_path)
         self.load_state_dict(checkpoint['model_state_dict'])
         self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+
+
+class GraphBasedRecommender(GeneralRecommender):
+    def __init__(self, data, params, seed, logger):
+        super().__init__(data, params, seed, logger)
+
+    def get_adj_mat(self) -> SparseTensor:
+        """Get the normalized interaction matrix of users and items.
+
+        Returns:
+            SparseTensor: The sparse adjacency matrix.
+        """
+        # Extract user and items nodes
+        row, col = self._data.sp_i_train.nonzero()
+        user_nodes = row
+        item_nodes = col + self._num_users
+
+        # Unify arcs in both directions
+        row = np.concatenate([user_nodes, item_nodes])
+        col = np.concatenate([item_nodes, user_nodes])
+
+        # Create the edge tensor
+        edge_index_np = np.vstack([row, col])
+        # Creating a tensor directly from a numpy array instead of lists
+        edge_index = torch.tensor(edge_index_np, dtype=torch.int64)
+
+        size = self._num_items + self._num_users
+
+        # Create the SparseTensor using the edge indexes.
+        # This is the format expected by LGConv
+        adj = SparseTensor(
+            row=edge_index[0],
+            col=edge_index[1],
+            sparse_sizes=(size, size),
+        ).to(self._device)
+
+        return adj
+
+    def get_ego_embeddings(
+        self, user_embedding: nn.Embedding, item_embedding: nn.Embedding
+    ) -> Tensor:
+        """Get the initial embedding of users and items and combine to an embedding matrix.
+
+        Args:
+            user_embedding (nn.Embedding): The user embeddings.
+            item_embedding (nn.Embedding): The item embeddings.
+
+        Returns:
+            Tensor: Combined user and item embeddings.
+        """
+        user_embeddings = user_embedding.weight
+        item_embeddings = item_embedding.weight
+        ego_embeddings = torch.cat([user_embeddings, item_embeddings], dim=0)
+        return ego_embeddings
+
+    @abstractmethod
+    def train_step(self, batch, *args):
+        raise NotImplementedError()
+
+    @abstractmethod
+    def predict(self, start, stop):
+        raise NotImplementedError()

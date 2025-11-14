@@ -16,6 +16,7 @@ from elliot.recommender.init import xavier_uniform_init
 
 
 class SVDpp(GeneralRecommender):
+    # Model hyperparameters
     factors: int = 10
     learning_rate: float = 0.001
     lambda_weights: float = 0.1
@@ -67,7 +68,19 @@ class SVDpp(GeneralRecommender):
         user, item, label = [x.to(self._device) for x in batch]
 
         output = self.forward(user, item)
-        loss = self.loss(label.float(), output) + self._l2_reg()
+
+        reg = (
+            self.lambda_weights * (
+                self.user_mf_embedding.weight.pow(2).sum() +
+                self.item_mf_embedding.weight.pow(2).sum() +
+                self.item_y_embedding.weight.pow(2).sum()
+            ) +
+            self.lambda_bias * (
+                self.user_bias_embedding.weight.pow(2).sum() +
+                self.item_bias_embedding.weight.pow(2).sum()
+            )
+        )
+        loss = self.loss(label.float(), output) + reg
 
         return loss
 
@@ -95,16 +108,3 @@ class SVDpp(GeneralRecommender):
             (puyj + u_embeddings_batch), item_e_all.T
         ) + u_bias_batch + item_b_all.T + self.bias_
         return output
-
-    def _l2_reg(self):
-        return (
-            self.lambda_weights * (
-                self.user_mf_embedding.weight.pow(2).sum() +
-                self.item_mf_embedding.weight.pow(2).sum() +
-                self.item_y_embedding.weight.pow(2).sum()
-            ) +
-            self.lambda_bias * (
-                self.user_bias_embedding.weight.pow(2).sum() +
-                self.item_bias_embedding.weight.pow(2).sum()
-            )
-        )

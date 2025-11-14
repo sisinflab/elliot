@@ -42,6 +42,8 @@ class LogisticMF(GeneralRecommender):
           lambda_weights: 0.1
           alpha: 0.5
     """
+
+    # Model hyperparameters
     factors: int = 10
     learning_rate: float = 0.001
     lambda_weights: float = 0.1
@@ -72,24 +74,24 @@ class LogisticMF(GeneralRecommender):
         self.to(self._device)
 
     def forward(self, user, item):
-        gamma_u = self.Gu(user)
-        gamma_i = self.Gi(item)
-        beta_u = self.Bu(user)
-        beta_i = self.Bi(item)
+        user_e = self.Gu(user)
+        item_e = self.Gi(item)
+        user_b = self.Bu(user)
+        item_b = self.Bi(item)
 
-        xui = torch.sum(gamma_u * gamma_i, dim=-1) + beta_u + beta_i
-        return xui, gamma_u, gamma_i
+        xui = torch.mul(user_e, item_e).sum(dim=1) + user_b + item_b
+        return xui
 
     def train_step(self, batch, *args):
         user, pos, label = [x.to(self._device) for x in batch]
         label = label.float()
-        output, g_u, g_i = self.forward(user, pos)
 
-        loss = torch.sum(-(self.alpha * label * output -
-                           (1 + self.alpha * label) * torch.log1p(torch.exp(output))))
+        output = self.forward(user, pos)
 
-        reg_loss = self.lambda_weights * (torch.sum(g_u.pow(2)) + torch.sum(g_i.pow(2)))
-        loss = loss + reg_loss
+        reg = self.Gu.weight[user].pow(2).sum() + self.Gi.weight[pos].pow(2).sum()
+        loss = torch.sum(
+            - (self.alpha * label * output - (1 + self.alpha * label) * torch.log1p(torch.exp(output)))
+        ) + self.lambda_weights * reg
 
         steps = args[0]
         inputs = ([self.Gu.weight, self.Bu.weight] if steps > self._data.transactions

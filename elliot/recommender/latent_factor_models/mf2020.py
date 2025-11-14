@@ -46,6 +46,8 @@ class AbstractMF2020(Recommender):
           learning_rate: 0.001
           lambda_weights: 0.0025
     """
+
+    # Model hyperparameters
     factors: int
     learning_rate: float
     lambda_weights: float
@@ -88,6 +90,7 @@ class AbstractMF2020(Recommender):
 
 
 class MF2020(AbstractMF2020):
+    # Model hyperparameters
     factors: int = 10
     learning_rate: float = 0.05
     lambda_weights: float = 0.0
@@ -137,6 +140,7 @@ class MF2020(AbstractMF2020):
 
 
 class MF2020Batch(AbstractMF2020):
+    # Model hyperparameters
     factors: int = 10
     learning_rate: float = 0.05
     lambda_weights: float = 0.0

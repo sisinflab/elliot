@@ -41,6 +41,8 @@ class BPRMFBatch(GeneralRecommender):
           learning_rate: 0.001
           lambda_weights: 0.1
     """
+
+    # Model hyperparameters
     factors: int = 10
     learning_rate: float = 0.001
     lambda_weights: float = 0.1
@@ -53,7 +55,8 @@ class BPRMFBatch(GeneralRecommender):
         self.Gu = nn.Embedding(self._num_users, self.factors)
         self.Gi = nn.Embedding(self._num_items, self.factors)
 
-        # Optimizer
+        # Loss and optimizer
+        self.log_sigmoid = nn.LogSigmoid()
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
 
         # Init embedding weights
@@ -63,19 +66,23 @@ class BPRMFBatch(GeneralRecommender):
         self.to(self._device)
 
     def forward(self, user, item):
-        gamma_u = torch.squeeze(self.Gu(user))
-        gamma_i = torch.squeeze(self.Gi(item))
+        user_e = torch.squeeze(self.Gu(user))
+        item_e = torch.squeeze(self.Gi(item))
 
-        xui = torch.sum(gamma_u * gamma_i, 1)
-        return xui, gamma_u, gamma_i
+        xui = torch.mul(user_e, item_e).sum(dim=1)
+        return xui
 
     def train_step(self, batch, *args):
         user, pos, neg = [x.to(self._device) for x in batch]
 
-        xu_pos, gu, gi_pos = self.forward(user, pos)
-        xu_neg, _, gi_neg = self.forward(user, neg)
-        reg = 0.5 * (gu.square().sum() + gi_pos.square().sum() + gi_neg.square().sum()) / user.size(0)
-        loss = -torch.mean(nn.functional.logsigmoid(xu_pos - xu_neg)) + self.lambda_weights * reg
+        xu_pos = self.forward(user, pos)
+        xu_neg = self.forward(user, neg)
+
+        # Calculate BPR loss
+        reg = 0.5 * (self.Gu.weight[user].pow(2).sum() +
+                     self.Gu.weight[pos].pow(2).sum() +
+                     self.Gu.weight[neg].pow(2).sum()) / float(user.shape[0])
+        loss = -torch.mean(self.log_sigmoid(xu_pos - xu_neg)) + self.lambda_weights * reg
 
         return loss
 

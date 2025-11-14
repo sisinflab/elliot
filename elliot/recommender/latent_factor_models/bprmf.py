@@ -18,6 +18,7 @@ from elliot.recommender.utils import device, classproperty
 
 
 class BPRMF_numpy(Recommender):
+    # Model hyperparameters
     factors: int = 10
     learning_rate: float = 0.05
     lambda_bias: float = 0.0
@@ -94,6 +95,7 @@ class BPRMF_numpy(Recommender):
 
 
 class BPRMF_pytorch(GeneralRecommender):
+    # Model hyperparameters
     factors: int = 10
     learning_rate: float = 0.05
     lambda_bias: float = 0.0

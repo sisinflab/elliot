@@ -40,6 +40,8 @@ class NonNegMF(Recommender):
           learning_rate: 0.001
           lambda_weights: 0.1
     """
+
+    # Model hyperparameters
     factors: int = 10
     learning_rate: float = 0.001
     lambda_weights: float = 0.1

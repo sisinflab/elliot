@@ -16,6 +16,7 @@ from elliot.recommender.init import xavier_uniform_init
 
 
 class FunkSVD(GeneralRecommender):
+    # Model hyperparameters
     factors: int = 10
     learning_rate: float = 0.001
     lambda_weights: float = 0.1
@@ -54,7 +55,18 @@ class FunkSVD(GeneralRecommender):
         user, pos, label = [x.to(self._device) for x in batch]
 
         output = self.forward(user, pos)
-        loss = self.loss(label.float(), output) + self._l2_reg()
+
+        reg = (
+            self.lambda_weights * (
+                self.user_mf_embedding.weight.pow(2).sum() +
+                self.item_mf_embedding.weight.pow(2).sum()
+            ) +
+            self.lambda_bias * (
+                self.user_bias_embedding.weight.pow(2).sum() +
+                self.item_bias_embedding.weight.pow(2).sum()
+            )
+        )
+        loss = self.loss(label.float(), output) + reg
 
         return loss
 
@@ -73,15 +85,3 @@ class FunkSVD(GeneralRecommender):
 
         predictions = torch.matmul(u_embeddings_batch, item_e_all.T) + u_bias_batch + item_b_all.T
         return predictions.to(self._device)
-
-    def _l2_reg(self):
-        return (
-            self.lambda_weights * (
-                self.user_mf_embedding.weight.pow(2).sum() +
-                self.item_mf_embedding.weight.pow(2).sum()
-            ) +
-            self.lambda_bias * (
-                self.user_bias_embedding.weight.pow(2).sum() +
-                self.item_bias_embedding.weight.pow(2).sum()
-            )
-        )

@@ -21,7 +21,7 @@ class Similarity(object):
         item_profile=None,
         user_profile=None,
         similarity='cosine',
-        num_neighbors=None,
+        num_neighbors=-1,
         asymmetric_alpha=0.5,
         alpha=1.0,
         beta=1.0
@@ -39,7 +39,7 @@ class Similarity(object):
         self.beta = beta
 
         self.dim = train_data.shape[0]
-        self.num_neighbors = num_neighbors or self.dim
+        self.num_neighbors = num_neighbors if num_neighbors > -1 else self.dim
         self._neighborhood = num_neighbors is not None
 
     def compute_similarity(self):

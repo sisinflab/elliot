@@ -5,7 +5,7 @@ from elliot.recommender.knn.similarity import Similarity
 
 
 class KNN(TraditionalRecommender):
-    num_neighbors: int
+    neighborhood: int
     similarity: str
     implicit: bool
     asymmetric_alpha: float
@@ -15,28 +15,28 @@ class KNN(TraditionalRecommender):
     def __init__(self, data, params, seed, logger, transpose):
         super().__init__(data, params, seed, logger)
 
-        self._URM = data.sp_i_train if self.implicit else data.sp_i_train_ratings
+        self._URM = self._implicit_train if self.implicit else self._train
         train_data = self._URM if not transpose else self._URM.T
 
         self._backend = Similarity(train_data=train_data,
                                    similarity=self.similarity,
-                                   num_neighbors=self.num_neighbors,
+                                   num_neighbors=self.neighborhood,
                                    asymmetric_alpha=self.asymmetric_alpha,
                                    alpha=self.alpha,
                                    beta=self.beta)
 
-        self.params_to_save = ['_preds', 'similarity', 'num_neighbors', 'implicit']
+        self.params_to_save = ['similarity', 'num_neighbors', 'implicit']
+
+    def initialize(self):
+        self.similarity_matrix = self._backend.compute_similarity()
 
     @abstractmethod
-    def initialize(self):
-        raise NotImplementedError()
-
     def predict(self, start, stop):
-        return self._preds[start:stop]
+        raise NotImplementedError()
 
 
 class ItemKNN(KNN):
-    num_neighbors: int = 40
+    neighborhood: int = 40
     similarity: str = "cosine"
     implicit: bool = False
     asymmetric_alpha: float = 0.5
@@ -46,13 +46,13 @@ class ItemKNN(KNN):
     def __init__(self, data, params, seed, logger):
         super().__init__(data, params, seed, logger, transpose=True)
 
-    def initialize(self):
-        self._similarity_matrix = self._backend.compute_similarity().transpose()
-        self._preds = self._URM.dot(self._similarity_matrix)
+    def predict(self, start, stop):
+        predictions = self._URM[start:stop] @ self.similarity_matrix.T
+        return predictions
 
 
 class UserKNN(KNN):
-    num_neighbors: int = 40
+    neighborhood: int = 40
     similarity: str = "cosine"
     implicit: bool = False
     asymmetric_alpha: float = 0.5
@@ -62,6 +62,6 @@ class UserKNN(KNN):
     def __init__(self, data, params, seed, logger):
         super().__init__(data, params, seed, logger, transpose=False)
 
-    def initialize(self):
-        self._similarity_matrix = self._backend.compute_similarity()
-        self._preds = self._similarity_matrix.dot(self._URM)
+    def predict(self, start, stop):
+        predictions = self.similarity_matrix[start:stop] @ self._URM
+        return predictions

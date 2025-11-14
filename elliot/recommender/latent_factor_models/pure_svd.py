@@ -44,9 +44,6 @@ class PureSVD(TraditionalRecommender):
         self.user_vec, self.item_vec = None, None
         self.params_to_save = ['user_vec', 'item_vec']
 
-    def predict(self, start, stop):
-        return self.user_vec[start:stop].dot(self.item_vec)
-
     def initialize(self):
         fake_iter = tqdm(range(1), desc="Computing")
 
@@ -59,3 +56,7 @@ class PureSVD(TraditionalRecommender):
 
         self.user_vec = U
         self.item_vec = s_Vt
+
+    def predict(self, start, stop):
+        predictions = self.user_vec[start:stop] @ self.item_vec
+        return predictions

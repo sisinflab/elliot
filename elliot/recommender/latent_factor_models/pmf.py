@@ -45,6 +45,8 @@ class PMF(GeneralRecommender):
           lambda_weights: 0.0025
           gaussian_variance: 0.1
     """
+
+    # Model hyperparameters
     factors: int = 10
     learning_rate: float = 0.001
     lambda_weights: float = 0.0025
@@ -84,6 +86,7 @@ class PMF(GeneralRecommender):
         user, pos, label = [x.to(self._device) for x in batch]
 
         output = self.noise(self.forward(user, pos))
+
         reg = self.user_mf_embedding.weight.pow(2).sum() + self.item_mf_embedding.weight.pow(2).sum()
         loss = self.loss(label.float(), output) + self.lambda_weights * reg
 
