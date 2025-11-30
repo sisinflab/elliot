@@ -1,6 +1,8 @@
 import os
 import importlib
 import typing as t
+import warnings
+
 import numpy as np
 import pandas as pd
 from types import SimpleNamespace
@@ -10,6 +12,7 @@ from elliot.utils import logging
 from elliot.splitter.base_splitter import Splitter
 from elliot.prefiltering.standard_prefilters import PreFilter
 from elliot.dataset.dataset import DataSet
+from elliot.utils.read import read_tabular
 
 
 class DataSetLoader:
@@ -70,7 +73,6 @@ class DataSetLoader:
         self.args = args
         self.kwargs = kwargs
         self.config = config
-        self.column_names = ['userId', 'itemId', 'rating', 'timestamp']
         self.dataframe = None
         self.tuple_list = None
         self.side_information = None
@@ -108,13 +110,13 @@ class DataSetLoader:
             path_val_data = getattr(self.config.data_config, "validation_path", None)
             path_test_data = self.config.data_config.test_path
 
-            train_df = self._read_from_tsv(path_train_data, check_timestamp=True)
-            test_df = self._read_from_tsv(path_test_data, check_timestamp=True)
+            train_df = self._read_from_tsv(path_train_data)
+            test_df = self._read_from_tsv(path_test_data)
 
             self.logger.info(f"{path_train_data} - Loaded")
 
             if path_val_data:
-                val_df = self._read_from_tsv(path_val_data, check_timestamp=True)
+                val_df = self._read_from_tsv(path_val_data)
                 self.dataframe = [([(train_df, val_df)], test_df)]
             else:
                 self.dataframe = [(train_df, test_df)]
@@ -125,28 +127,42 @@ class DataSetLoader:
         elif self.config.data_config.strategy == "dataset":
             path_dataset = self.config.data_config.dataset_path
 
-            self.dataframe = self._read_from_tsv(path_dataset, check_timestamp=True)
+            self.dataframe = self._read_from_tsv(path_dataset)
             # self.logger.info(('{0} - Loaded'.format(path_dataset)))
 
         else:
             raise Exception("Strategy option not recognized")
 
-    def _read_from_tsv(self, file_path, check_timestamp=False):
+    def _read_from_tsv(self, file_path):
         """
         Loads a TSV file and optionally processes the timestamp or binarizes ratings.
 
         Args:
             file_path (str): Path to the TSV file containing interactions.
-            check_timestamp (bool): Whether to drop the timestamp column if it's empty.
 
         Returns:
             pd.DataFrame: The loaded and formatted DataFrame.
         """
-        df = pd.read_csv(file_path, sep='\t', header=None, names=self.column_names)
-        if check_timestamp and all(df["timestamp"].isna()):
-            df.drop(columns=["timestamp"], inplace=True)
-        if self.config.binarize == True or all(df["rating"].isna()):
-            df["rating"] = 1
+
+        cols = ['userId', 'itemId', 'rating', 'timestamp']
+        dtypes = ['str', 'str', 'float', 'float']
+
+        if hasattr(self.config.data_config, 'header'):
+            header: bool = self.config.data_config.header
+        else:
+            header: bool = False
+
+        df = read_tabular(
+            file_path,
+            cols=cols,
+            datatypes=dtypes,
+            sep='\t',
+            header=header
+        )
+
+        if self.config.binarize == True or 'rating' not in cols:
+            df["rating"] = 1.0
+
         return df
 
     def _read_splitting(self, folder_path):

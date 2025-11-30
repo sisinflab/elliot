@@ -7,12 +7,54 @@ __version__ = '0.3.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
+import warnings
 import pandas as pd
 import configparser
 import pickle
 import numpy as np
 import os
+
+from typing import List
 from types import SimpleNamespace
+
+
+def read_tabular(
+    file_path: str,
+    cols: List[str],
+    datatypes: List[str],
+    sep: str = '\t',
+    header: bool = False
+) -> pd.DataFrame:
+
+    n_rows, hd = (0, 0) if header else (1, None)
+
+    try:
+        file_cols = pd.read_csv(file_path, sep=sep, nrows=n_rows).columns.tolist()
+    except pd.errors.EmptyDataError:
+        warnings.warn(
+            "The data file is empty. Returning an empty DataFrame."
+        )
+        return pd.DataFrame(columns=cols)
+
+    if len(file_cols) < 2:
+        raise ValueError("Too few columns to read")
+
+    while len(cols) > len(file_cols):
+        cols.pop()
+
+    dtypes = {
+        col: dtype for col, dtype in zip(cols, datatypes)
+    }
+
+    df = pd.read_csv(
+        file_path,
+        sep=sep,
+        header=hd,
+        names=cols,
+        dtype=dtypes,
+    )
+
+    return df
 
 
 def read_csv(filename):
