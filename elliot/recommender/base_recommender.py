@@ -1,4 +1,3 @@
-import ast
 import pickle
 import random
 
@@ -13,6 +12,7 @@ from functools import cached_property
 from elliot.dataset.samplers.base_sampler import FakeSampler
 from elliot.recommender.init import zeros_init
 from elliot.recommender.utils import ModelType, device
+from elliot.utils.validation import build_recommender_validator
 
 
 class AbstractRecommender(ABC):
@@ -31,7 +31,7 @@ class AbstractRecommender(ABC):
         self.params_to_save = []
 
         self.set_seed(seed)
-        self.init_params(params)
+        self.set_params(params)
 
         if hasattr(self, '_loader') or hasattr(self, '_loaders'):
             self.set_side_info()
@@ -55,46 +55,33 @@ class AbstractRecommender(ABC):
         return name
 
     @abstractmethod
-    def predict(self, start, stop):
+    def train_step(self, batch, *args):
+        raise NotImplementedError()
+
+    @abstractmethod
+    def predict_full(self, user_indices):
+        raise NotImplementedError()
+
+    @abstractmethod
+    def predict_sampled(self, user_indices, item_indices):
         raise NotImplementedError()
 
     @abstractmethod
     def set_seed(self, seed: int):
         raise NotImplementedError()
 
-    def init_params(self, params):
-        """
-        Define Parameters as tuples: (variable_name, public_name, shortcut, default, reading_function, printing_function)
-        Example:
-
-        self._params_list = [
-            ("_similarity", "similarity", "sim", "cosine", None, None),
-            ("_user_profile_type", "user_profile", "up", "tfidf", None, None),
-            ("_item_profile_type", "item_profile", "ip", "tfidf", None, None),
-            ("_mlpunits", "mlp_units", "mlpunits", "(1,2,3)", lambda x: list(make_tuple(x)), lambda x: str(x).replace(",", "-")),
-        ]
-        """
+    def set_params(self, params):
         self.logger.info("Loading parameters")
 
-        for ann, data_type in self.__class__.__annotations__.items():
-            value = getattr(params, ann, getattr(self, ann))
-            if data_type == tuple and isinstance(value, str):
-                value = ast.literal_eval(value)
-            setattr(self, ann, data_type(value))
-            self.logger.info(f"Parameter {ann} set to {value}")
-            self.params_list.append(ann)
+        RecommenderValidator = build_recommender_validator(self.__class__)
+        validator = RecommenderValidator(**vars(params))
+        validated_params = validator.assign_to_original(self)
+
+        for k, v in validated_params.items():
+            self.logger.info(f"Parameter {k} set to {v}")
+            self.params_list.append(k)
 
         self.params_to_save = self.params_list.copy()
-        # params_list = self.params_list if hasattr(self, 'params_list') else []
-        # for variable_name, public_name, shortcut, default, reading_function, _ in params_list:
-        #     if reading_function is None:
-        #         setattr(self, variable_name, getattr(self._params, public_name, default))
-        #     else:
-        #         setattr(self, variable_name, reading_function(getattr(self._params, public_name, default)))
-        #     self.logger.info(f"Parameter {public_name} set to {getattr(self, variable_name)}")
-        # if not params_list:
-        #     self.logger.info("No parameters defined")
-        # self.params_to_save = params_list
 
     def set_side_info(self, loader=None, mod=None):
         name = f"_side{('_' + mod) if mod else ''}"
@@ -116,27 +103,19 @@ class Recommender(AbstractRecommender):
 
     def __init__(self, data, params, seed, logger):
         super().__init__(data, params, seed, logger)
-        self.modules = []
-        self.bias = []
+        self._modules = []
+        self._bias = []
 
     def set_seed(self, seed: int):
         random.seed(seed)
         np.random.seed(seed)
 
     def apply(self, init_func, **kwargs):
-        for m in self.modules:
-            if any(m is x for x in self.bias):
+        for m in self._modules:
+            if any(m is x for x in self._bias):
                 zeros_init(m)
             else:
                 init_func(m, **kwargs)
-
-    @abstractmethod
-    def train_step(self, *args):
-        raise NotImplementedError()
-
-    @abstractmethod
-    def predict(self, start, stop):
-        raise NotImplementedError()
 
     def save_weights(self, path):
         with open(path, "wb") as f:
@@ -172,10 +151,6 @@ class TraditionalRecommender(Recommender):
     def initialize(self):
         raise NotImplementedError()
 
-    @abstractmethod
-    def predict(self, start, stop):
-        raise NotImplementedError()
-
 
 class GeneralRecommender(nn.Module, AbstractRecommender):
     type = ModelType.GENERAL
@@ -183,7 +158,7 @@ class GeneralRecommender(nn.Module, AbstractRecommender):
     def __init__(self, data, params, seed, logger):
         AbstractRecommender.__init__(self, data, params, seed, logger)
         super(GeneralRecommender, self).__init__()
-        self.bias = []
+        self._bias = []
         self._device = device
 
     def set_seed(self, seed: int):
@@ -201,7 +176,7 @@ class GeneralRecommender(nn.Module, AbstractRecommender):
 
     def apply(self, init_func, **kwargs):
         for m in self.modules():
-            if any(m is x for x in self.bias):
+            if any(m is x for x in self._bias):
                 zeros_init(m)
             else:
                 init_func(m, **kwargs)
@@ -212,14 +187,6 @@ class GeneralRecommender(nn.Module, AbstractRecommender):
         row = torch.tensor(coo.row, dtype=torch.long)
         col = torch.tensor(coo.col, dtype=torch.long)
         return SparseTensor(row=row, col=col, sparse_sizes=coo.shape)
-
-    @abstractmethod
-    def train_step(self, batch, *args):
-        raise NotImplementedError()
-
-    @abstractmethod
-    def predict(self, start, stop):
-        raise NotImplementedError()
 
     def save_weights(self, file_path):
         torch.save({
@@ -285,11 +252,3 @@ class GraphBasedRecommender(GeneralRecommender):
         item_embeddings = item_embedding.weight
         ego_embeddings = torch.cat([user_embeddings, item_embeddings], dim=0)
         return ego_embeddings
-
-    @abstractmethod
-    def train_step(self, batch, *args):
-        raise NotImplementedError()
-
-    @abstractmethod
-    def predict(self, start, stop):
-        raise NotImplementedError()

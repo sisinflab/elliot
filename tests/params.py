@@ -1,11 +1,14 @@
 from itertools import product
 from tests.utils import test_path, data_path
 
-_folder_movielens_1m = str(data_path / 'cat_dbpedia_movielens_1m_v030')
+_folder_movielens_1m = str(data_path / 'movielens_1m_v030')
 _path_movielens_1m = _folder_movielens_1m + '/dataset.tsv'
 
-_folder_movielens_10m = str(data_path / 'cat_dbpedia_movielens_10m')
+_folder_movielens_10m = str(data_path / 'movielens_10m')
 _path_movielens_10m = _folder_movielens_10m + '/dataset.tsv'
+
+_folder_movielens_20m = str(data_path / 'movielens_20m')
+_path_movielens_20m = _folder_movielens_20m + '/dataset.tsv'
 
 
 def generate_param_combinations(key_list, values, base=None):
@@ -148,29 +151,29 @@ params_pre_filtering = {
 params_pre_filtering_fail = {
     'invalid_global_threshold': generate_param_combinations(
         ['threshold'],
-        {'threshold': [[3], -3, 'invalid', None]},
+        {'threshold': [[3], -3, 'invalid']},
         params_pre_filtering['global_threshold']
     ),
     'invalid_user_k_core': generate_param_combinations(
         ['core'],
-        {'core': [-5, 'abc', None]},
+        {'core': [[3], -5, 'abc']},
         params_pre_filtering['user_k_core']
     ),
     'invalid_item_k_core': generate_param_combinations(
         ['core'],
-        {'core': [-5, 2.5, None]},
+        {'core': [[3], -5, 2.5]},
         params_pre_filtering['item_k_core']
     ),
     'invalid_iterative_k_core': generate_param_combinations(
         ['core'],
-        {'core': [-5, 'x', None]},
+        {'core': [[3], -5, 'x']},
         params_pre_filtering['iterative_k_core']
     ),
     'invalid_n_rounds_combinations': generate_param_combinations(
         [('core', 'rounds')],
         {
-            'core': [2, -5, 'x', None],
-            'rounds': [2, -5, 'y', None]
+            'core': [2, [3], -5, 'x'],
+            'rounds': [2, [3], -5, 'y']
         },
         params_pre_filtering['n_rounds_k_core']
     ),
@@ -186,9 +189,9 @@ params_pre_filtering_fail = {
 
 params_splitting = {
     'dataset_path': str(test_path / 'splitting_strategies/dataset.tsv'),
-    #'dataset_path': _path_movielens_10m,
+    #'dataset_path': _path_movielens_20m,
     'save_folder': str(test_path / 'splitting_strategies/splitting'),
-    'temporal_hold_out': [
+    'temporal_holdout': [
         {
             'test_ratio': 0.1,
         },
@@ -196,13 +199,13 @@ params_splitting = {
             'leave_n_out': 3
         },
         # movielens_1m
-        #{
+        # {
         #    'leave_n_out': 17
-        #},
-        # movielens_10m
-        #{
+        # },
+        # movielens_10m, movielens_20m
+        # {
         #    'leave_n_out': 15
-        #}
+        # }
     ],
     'random_subsampling': [
         {
@@ -213,11 +216,11 @@ params_splitting = {
             'folds': 3,
             'leave_n_out': 2
         },
-        # movielens_1m / movielens_10m
-        #{
+        # movielens_1m, movielens_10m, movielens_20m
+        # {
         #    'folds': 10,
         #    'leave_n_out': 17
-        #}
+        # }
     ],
     'random_cross_validation': [
         {
@@ -233,18 +236,22 @@ params_splitting = {
             'min_over': 1
         },
         # movielens_1m
-        #{
+        # {
         #    'timestamp': 974687965
-        #},
+        # },
         # movielens_10m
-        #{
+        # {
         #    'timestamp': 1079842786
-        #},
+        # },
+        # movielens_20m
+        # {
+        #     'timestamp': 1139534337
+        # },
     ]
 }
 
 params_splitting_fail = {
-    'invalid_temporal_hold_out': generate_param_combinations(
+    'invalid_temporal_holdout': generate_param_combinations(
         ['test_ratio', 'leave_n_out'],
         {
             'test_ratio': [0.0, [3], -3, 'x', None],
@@ -261,12 +268,12 @@ params_splitting_fail = {
     ),
     'invalid_random_cross_validation': generate_param_combinations(
         ['folds'],
-        {'folds': [31, 2.5, -3, 'fold', None]}
+        {'folds': [31, 2.5, -3, 'fold']}
     ),
     'invalid_fixed_timestamp': generate_param_combinations(
         ['timestamp', ('min_below', 'min_over')],
         {
-            'timestamp': [50, 2.5, -3, 'time', None],
+            'timestamp': [50, [3], -3, 'time'],
             'min_below': [1, 100, 2.5, -3, 'below'],
             'min_over': [1, 100, 2.5, -3, 'over']
         }

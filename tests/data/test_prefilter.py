@@ -4,6 +4,8 @@ from tests.params import params_pre_filtering as p
 from tests.params import params_pre_filtering_fail as p_fail
 from tests.utils import *
 
+strategy_enum = getattr(importlib.import_module('elliot.utils.enums'), 'PreFilteringStrategy')
+
 
 def custom_read_dataset(path):
     path = p['dataset_path'] if 'dataset_path' in p.keys() else path
@@ -23,7 +25,7 @@ class TestPreFilter:
     @pytest.mark.parametrize('params', p['global_threshold'])
     def test_global_threshold(self, params):
         config = {
-            'strategy': 'global_threshold',
+            'strategy': strategy_enum.GLOBAL_TH.value,
             'threshold': params['threshold']
         }
 
@@ -37,8 +39,7 @@ class TestPreFilter:
     @pytest.mark.parametrize('params', p['global_threshold'])
     def test_global_average(self, params):
         config = {
-            'strategy': 'global_threshold',
-            'threshold': 'average'
+            'strategy': strategy_enum.GLOBAL_TH.value
         }
 
         df = custom_read_dataset(params['dataset_path'])
@@ -49,7 +50,7 @@ class TestPreFilter:
     @pytest.mark.parametrize('params', p['user_average'])
     def test_user_average(self, params):
         config = {
-            'strategy': 'user_average',
+            'strategy': strategy_enum.USER_AVG.value,
         }
 
         df = custom_read_dataset(params['dataset_path'])
@@ -63,7 +64,7 @@ class TestPreFilter:
     @pytest.mark.parametrize('params', p['user_k_core'])
     def test_user_k_core(self, params):
         config = {
-            'strategy': 'user_k_core',
+            'strategy': strategy_enum.USER_K_CORE.value,
             'core': params['core']
         }
 
@@ -77,7 +78,7 @@ class TestPreFilter:
     @pytest.mark.parametrize('params', p['item_k_core'])
     def test_item_k_core(self, params):
         config = {
-            'strategy': 'item_k_core',
+            'strategy': strategy_enum.ITEM_K_CORE.value,
             'core': params['core']
         }
 
@@ -91,7 +92,7 @@ class TestPreFilter:
     @pytest.mark.parametrize('params', p['iterative_k_core'])
     def test_iterative_k_core(self, params):
         config = {
-            'strategy': 'iterative_k_core',
+            'strategy': strategy_enum.ITER_K_CORE.value,
             'core': params['core']
         }
 
@@ -106,7 +107,7 @@ class TestPreFilter:
     @pytest.mark.parametrize('params', p['n_rounds_k_core'])
     def test_n_rounds_k_core(self, params):
         config = {
-            'strategy': 'n_rounds_k_core',
+            'strategy': strategy_enum.N_ROUNDS_K_CORE.value,
             'core': params['core'],
             'rounds': params['rounds']
         }
@@ -122,7 +123,7 @@ class TestPreFilter:
     @pytest.mark.parametrize('params', p['cold_users'])
     def test_retain_cold_users(self, params):
         config = {
-            'strategy': 'cold_users',
+            'strategy': strategy_enum.COLD_USERS.value,
             'threshold': params['threshold']
         }
 
@@ -145,8 +146,8 @@ class TestPreFilterFailures:
     @time_single_test
     def test_invalid_or_missing_global_threshold(self, params):
         config = {
-            'strategy': 'global_threshold',
-            **({'threshold': params['threshold']} if params['threshold'] is not None else {})
+            'strategy': strategy_enum.GLOBAL_TH.value,
+            **({'threshold': params['threshold']})
         }
 
         self._assert_invalid_config(config, params['dataset_path'])
@@ -154,7 +155,7 @@ class TestPreFilterFailures:
     @pytest.mark.parametrize('params', p['user_average'])
     def test_user_average_with_extra_param(self, params):
         config = {
-            'strategy': 'user_average',
+            'strategy': strategy_enum.USER_AVG.value,
             'threshold': None
         }
 
@@ -164,7 +165,7 @@ class TestPreFilterFailures:
     @time_single_test
     def test_invalid_or_missing_user_k_core(self, params):
         config = {
-            'strategy': 'user_k_core',
+            'strategy': strategy_enum.USER_K_CORE.value,
             **({'core': params['core']} if params['core'] is not None else {})
         }
 
@@ -174,7 +175,7 @@ class TestPreFilterFailures:
     @time_single_test
     def test_invalid_or_missing_item_k_core(self, params):
         config = {
-            'strategy': 'item_k_core',
+            'strategy': strategy_enum.ITEM_K_CORE.value,
             **({'core': params['core']} if params['core'] is not None else {})
         }
 
@@ -184,7 +185,7 @@ class TestPreFilterFailures:
     @time_single_test
     def test_invalid_or_missing_iterative_k_core(self, params):
         config = {
-            'strategy': 'iterative_k_core',
+            'strategy': strategy_enum.ITER_K_CORE.value,
             **({'core': params['core']} if params['core'] is not None else {})
         }
 
@@ -197,7 +198,7 @@ class TestPreFilterFailures:
             pytest.skip("Test requires at least one invalid parameter to be meaningful.")
 
         config = {
-            'strategy': 'n_rounds_k_core',
+            'strategy': strategy_enum.N_ROUNDS_K_CORE.value,
             **({'core': params['core']} if params['core'] is not None else {}),
             **({'rounds': params['rounds']} if params['rounds'] is not None else {})
         }
@@ -208,7 +209,7 @@ class TestPreFilterFailures:
     @time_single_test
     def test_invalid_or_missing_cold_users_threshold(self, params):
         config = {
-            'strategy': 'cold_users',
+            'strategy': strategy_enum.COLD_USERS.value,
             **({'threshold': params['threshold']} if params['threshold'] is not None else {})
         }
 

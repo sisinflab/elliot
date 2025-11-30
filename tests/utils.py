@@ -1,8 +1,9 @@
 import functools
 import time
-import pandas as pd
 from pathlib import Path
 from types import SimpleNamespace
+
+from elliot.utils.read import read_tabular
 
 test_path = Path(__file__).parent / 'data'
 data_path = Path(__file__).parent.parent / 'data'
@@ -21,13 +22,20 @@ def time_single_test(func):
     return wrapper
 
 
-def read_dataset(dataset_path, cols=None):
-    default_cols = ['userId', 'itemId', 'rating', 'timestamp']
-    df_preview = pd.read_csv(dataset_path, sep='\t', nrows=1, header=None)
+def read_dataset(dataset_path, custom_cols=None, custom_dtypes=None, header=False):
+    cols = ['userId', 'itemId', 'rating', 'timestamp']
+    datatypes = ['str', 'str', 'float', 'float']
 
-    column_names = cols if (df_preview.shape[1] < 4 and cols is not None) else default_cols
+    selected_cols = custom_cols if custom_cols is not None else cols
+    selected_dtypes = custom_dtypes if custom_dtypes is not None else datatypes
 
-    df = pd.read_csv(dataset_path, sep='\t', names=column_names, header=None)
+    df = read_tabular(
+        dataset_path,
+        cols=selected_cols,
+        datatypes=selected_dtypes,
+        sep='\t',
+        header=header
+    )
     df_clean = df.dropna(axis=1, how='all')
 
     return df_clean

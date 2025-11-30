@@ -4,10 +4,13 @@ from tests.params import params_splitting as p
 from tests.params import params_splitting_fail as p_fail
 from tests.utils import *
 
+strategy_enum = getattr(importlib.import_module('elliot.utils.enums'), 'SplittingStrategy')
+
 
 def custom_read_dataset():
     cols = ['userId', 'timestamp']
-    df = read_dataset(p['dataset_path'], cols=cols)
+    dtypes = ['str', 'float']
+    df = read_dataset(p['dataset_path'], custom_cols=cols, custom_dtypes=dtypes)
     return df
 
 def apply_splitter(config, df=None):
@@ -20,12 +23,12 @@ def apply_splitter(config, df=None):
 
 class TestSplitter:
 
-    @pytest.mark.parametrize('params', p['temporal_hold_out'])
+    @pytest.mark.parametrize('params', p['temporal_holdout'])
     @time_single_test
     def test_temporal_holdout(self, params):
         config = {
             'test_splitting': {
-                'strategy': 'temporal_hold_out',
+                'strategy': strategy_enum.TEMP_HOLDOUT.value,
                 **{k: v for k, v in params.items() if k in ('test_ratio', 'leave_n_out') and v is not None}
             }
         }
@@ -46,7 +49,7 @@ class TestSplitter:
     def test_random_subsampling(self, params):
         config = {
             'test_splitting': {
-                'strategy': 'random_subsampling',
+                'strategy': strategy_enum.RAND_SUB_SMP.value,
                 'folds': params['folds'],
                 **{k: v for k, v in params.items() if k in ('test_ratio', 'leave_n_out') and v is not None}
             }
@@ -64,7 +67,7 @@ class TestSplitter:
     def test_random_cross_validation(self, params):
         config = {
             'test_splitting': {
-                'strategy': 'random_cross_validation',
+                'strategy': strategy_enum.RAND_CV.value,
                 'folds': params['folds']
             }
         }
@@ -82,8 +85,8 @@ class TestSplitter:
     def test_fixed_timestamp(self, params):
         config = {
             'test_splitting': {
-                'strategy': 'fixed_timestamp',
-                'timestamp': params['timestamp'] if 'timestamp' in params else 'best',
+                'strategy': strategy_enum.FIXED_TS.value,
+                **({'timestamp': params['timestamp']} if 'timestamp' in params else {}),
                 **{k: v for k, v in params.items() if k in ('min_below', 'min_over') and v is not None}
             }
         }
@@ -105,7 +108,7 @@ class TestSplitter:
             'save_on_disk': True,
             'save_folder': p['save_folder'],
             'test_splitting': {
-                'strategy': 'fixed_timestamp',
+                'strategy': strategy_enum.FIXED_TS.value,
                 'timestamp': 8
             }
         }
@@ -116,11 +119,11 @@ class TestSplitter:
     def test_train_validation_test_split(self):
         config = {
             'test_splitting': {
-                'strategy': 'random_cross_validation',
+                'strategy': strategy_enum.RAND_CV.value,
                 'folds': 3
             },
             'validation_splitting': {
-                'strategy': 'temporal_hold_out',
+                'strategy': strategy_enum.TEMP_HOLDOUT.value,
                 'test_ratio': 0.1
             }
         }
@@ -142,12 +145,12 @@ class TestSplitterFailures:
             apply_splitter(config)
         assert isinstance(exc_info.value, (AttributeError, TypeError, ValueError))
 
-    @pytest.mark.parametrize('params', p_fail['invalid_temporal_hold_out'])
+    @pytest.mark.parametrize('params', p_fail['invalid_temporal_holdout'])
     @time_single_test
     def test_invalid_or_missing_temporal_holdout(self, params):
         config = {
             'test_splitting': {
-                'strategy': 'temporal_hold_out',
+                'strategy': strategy_enum.TEMP_HOLDOUT.value,
                 **{k: v for k, v in params.items() if k in ('test_ratio', 'leave_n_out') and v is not None}
             }
         }
@@ -162,7 +165,7 @@ class TestSplitterFailures:
 
         config = {
             'test_splitting': {
-                'strategy': 'random_subsampling',
+                'strategy': strategy_enum.RAND_SUB_SMP.value,
                 'folds': params['folds'],
                 **{k: v for k, v in params.items() if k in ('test_ratio', 'leave_n_out') and v is not None}
             }
@@ -174,7 +177,7 @@ class TestSplitterFailures:
     def test_invalid_or_missing_random_cross_validation(self, params):
         config = {
             'test_splitting': {
-                'strategy': 'random_cross_validation',
+                'strategy': strategy_enum.RAND_CV.value,
                 **({'folds': params['folds']} if params['folds'] is not None else {})
             }
         }
@@ -189,13 +192,12 @@ class TestSplitterFailures:
 
         timestamp_config = (
             {'timestamp': params['timestamp']} if params.get('timestamp') is not None
-            else {'timestamp': 'best'} if 'timestamp' not in params
             else {}
         )
 
         config = {
             'test_splitting': {
-                'strategy': 'fixed_timestamp',
+                'strategy': strategy_enum.FIXED_TS.value,
                 **timestamp_config,
                 **{k: v for k, v in params.items() if k in ('min_below', 'min_over') and v is not None}
             }
@@ -219,7 +221,7 @@ class TestSplitterFailures:
         config = {
             'save_on_disk': True,
             'test_splitting': {
-                'strategy': 'fixed_timestamp',
+                'strategy': strategy_enum.FIXED_TS.value,
                 'timestamp': 8
             }
         }
