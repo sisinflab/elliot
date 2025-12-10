@@ -8,9 +8,9 @@ __author__ = 'Felice Antonio Merra, Vito Walter Anelli, Claudio Pomo'
 __email__ = 'felice.merra@poliba.it, vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
 import numpy as np
+import torch
 from tqdm import tqdm
 
-from elliot.dataset.samplers import FakeSampler
 from elliot.recommender.base_recommender import Recommender
 from elliot.recommender.init import normal_init
 
@@ -47,10 +47,9 @@ class NonNegMF(Recommender):
     lambda_weights: float = 0.1
 
     def __init__(self, data, params, seed, logger):
-        self.sampler = FakeSampler()
         super().__init__(data, params, seed, logger)
 
-        self._i_train = self._data.i_train_dict
+        self._i_train = self._data.get_train_dict(private=True)
         self._global_mean = np.mean(self._data.sp_i_train_ratings)
 
         # Embeddings
@@ -86,10 +85,10 @@ class NonNegMF(Recommender):
 
             # compute current estimation and error
             est = (
-                self._global_mean
-                + self._user_bias[u]
-                + self._item_bias[items]
-                + np.dot(self._user_factors[u], self._item_factors[items].T)
+                self._global_mean +
+                self._user_bias[u] +
+                self._item_bias[items] +
+                np.dot(self._user_factors[u], self._item_factors[items].T)
             )
             err = r_ui - est
 
@@ -128,10 +127,45 @@ class NonNegMF(Recommender):
 
         return 0
 
-    def predict(self, start, stop):
-        return (
+    def predict_full(self, user_indices):
+        user_indices = user_indices.numpy()
+
+        # Retrieve embeddings
+        u_embeddings_batch = self._user_factors[user_indices]
+        i_embeddings_all = self._item_factors
+        u_bias_batch = self._user_bias[user_indices]
+        i_bias_all = self._item_bias
+
+        # Compute predictions
+        predictions = (
+            u_embeddings_batch @ i_embeddings_all.T +
+            u_bias_batch[:, None] +
+            i_bias_all[None, :] +
             self._global_mean
-            + self._user_bias[start:stop, None]
-            + self._item_bias[None, :]
-            + self._user_factors[start:stop] @ self._item_factors.T
         )
+
+        predictions = torch.from_numpy(predictions)
+        return predictions
+
+    def predict_sampled(self, user_indices, item_indices):
+        user_indices = user_indices.numpy()
+        item_indices = item_indices.clamp(min=0).numpy()
+
+        # Retrieve embeddings
+        u_embeddings_batch = self._user_factors[user_indices]
+        i_embeddings_candidate = self._item_factors[item_indices]
+        u_bias_batch = self._user_bias[user_indices]
+        i_bias_candidate = self._item_bias[item_indices]
+
+        # Compute predictions
+        predictions = (
+            np.einsum(
+                "bi,bji->bj", u_embeddings_batch, i_embeddings_candidate
+            ) +
+            u_bias_batch[:, None] +
+            i_bias_candidate +
+            self._global_mean
+        )
+
+        predictions = torch.from_numpy(predictions)
+        return predictions

@@ -1,10 +1,11 @@
-from abc import abstractmethod
+import torch
 
 from elliot.recommender.base_recommender import TraditionalRecommender
 from elliot.recommender.knn.similarity import Similarity
 
 
 class KNN(TraditionalRecommender):
+    # Model hyperparameters
     neighborhood: int
     similarity: str
     implicit: bool
@@ -30,12 +31,9 @@ class KNN(TraditionalRecommender):
     def initialize(self):
         self.similarity_matrix = self._backend.compute_similarity()
 
-    @abstractmethod
-    def predict(self, start, stop):
-        raise NotImplementedError()
-
 
 class ItemKNN(KNN):
+    # Model hyperparameters
     neighborhood: int = 40
     similarity: str = "cosine"
     implicit: bool = False
@@ -46,12 +44,22 @@ class ItemKNN(KNN):
     def __init__(self, data, params, seed, logger):
         super().__init__(data, params, seed, logger, transpose=True)
 
-    def predict(self, start, stop):
-        predictions = self._URM[start:stop] @ self.similarity_matrix.T
+    def predict_full(self, user_indices):
+        predictions = self._URM[user_indices.numpy()] @ self.similarity_matrix
+
+        predictions = torch.from_numpy(predictions.toarray())
+        return predictions
+
+    def predict_sampled(self, user_indices, item_indices):
+        predictions = self._URM[user_indices.numpy()] @ self.similarity_matrix
+
+        predictions = torch.from_numpy(predictions.toarray())
+        predictions = predictions.gather(1, item_indices.clamp(min=0))
         return predictions
 
 
 class UserKNN(KNN):
+    # Model hyperparameters
     neighborhood: int = 40
     similarity: str = "cosine"
     implicit: bool = False
@@ -62,6 +70,15 @@ class UserKNN(KNN):
     def __init__(self, data, params, seed, logger):
         super().__init__(data, params, seed, logger, transpose=False)
 
-    def predict(self, start, stop):
-        predictions = self.similarity_matrix[start:stop] @ self._URM
+    def predict_full(self, user_indices):
+        predictions = self.similarity_matrix[user_indices.numpy()] @ self._URM
+
+        predictions = torch.from_numpy(predictions.toarray())
+        return predictions
+
+    def predict_sampled(self, user_indices, item_indices):
+        predictions = self.similarity_matrix[user_indices.numpy()] @ self._URM
+
+        predictions = torch.from_numpy(predictions.toarray())
+        predictions = predictions.gather(1, item_indices.clamp(min=0))
         return predictions

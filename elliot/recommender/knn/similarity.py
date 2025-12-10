@@ -1,9 +1,8 @@
 import numpy as np
 import similaripy as sim
+from scipy.sparse import csr_matrix
 from tqdm import tqdm
 from sklearn.metrics.pairwise import chi2_kernel, pairwise_distances_chunked
-
-from elliot.utils import sparse
 
 
 class Similarity(object):
@@ -121,8 +120,8 @@ class Similarity(object):
             t.set_description("Done")
             t.refresh()
 
-        return sparse.create_sparse_matrix(
-            data=(data, cols_indices, row_indptr),
+        return csr_matrix(
+            (data, cols_indices, row_indptr),
             shape=(self.dim, self.dim),
             dtype=np.float32
         )

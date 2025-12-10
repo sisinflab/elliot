@@ -47,7 +47,6 @@ class MF(GeneralRecommender):
     lambda_weights: float = 0.1
 
     def __init__(self, data, params, seed, logger):
-        self.sampler = PWPosNegSampler(data.i_train_dict)
         super(MF, self).__init__(data, params, seed, logger)
 
         # Embeddings
@@ -63,6 +62,10 @@ class MF(GeneralRecommender):
 
         # Move to device
         self.to(self._device)
+
+    def get_training_dataloader(self):
+        dataloader = self._data.training_dataloader(PWPosNegSampler, self._seed)
+        return dataloader
 
     def forward(self, user, item):
         u = self.user_mf_embedding(user)
@@ -80,9 +83,7 @@ class MF(GeneralRecommender):
 
         return loss
 
-    def predict(self, start, stop):
-        user_indices = torch.arange(start, stop)
-
+    def predict_full(self, user_indices):
         # Retrieve embeddings
         user_e_all = self.user_mf_embedding.weight
         item_e_all = self.item_mf_embedding.weight
@@ -90,5 +91,19 @@ class MF(GeneralRecommender):
         # Select only the embeddings in the current batch
         u_embeddings_batch = user_e_all[user_indices]
 
+        # Compute predictions
         predictions = torch.matmul(u_embeddings_batch, item_e_all.T)
+
+        return predictions.to(self._device)
+
+    def predict_sampled(self, user_indices, item_indices):
+        # Retrieve embeddings
+        u_embeddings_batch = self.user_mf_embedding(user_indices)
+        i_embeddings_candidate = self.item_mf_embedding(item_indices.clamp(min=0))
+
+        # Compute predictions
+        predictions = torch.einsum(
+            "bi,bji->bj", u_embeddings_batch, i_embeddings_candidate
+        )
+
         return predictions.to(self._device)

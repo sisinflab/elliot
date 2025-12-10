@@ -32,7 +32,7 @@ class BPRMFBatch(GeneralRecommender):
     .. code:: yaml
 
       models:
-        BPRMF:
+        BPRMFBatch:
           meta:
             save_recs: True
           epochs: 10
@@ -48,7 +48,6 @@ class BPRMFBatch(GeneralRecommender):
     lambda_weights: float = 0.1
 
     def __init__(self, data, params, seed, logger):
-        self.sampler = BPRMFSampler(data.i_train_dict, seed)
         super(BPRMFBatch, self).__init__(data, params, seed, logger)
 
         # Embeddings
@@ -65,6 +64,10 @@ class BPRMFBatch(GeneralRecommender):
         # Move to device
         self.to(self._device)
 
+    def get_training_dataloader(self):
+        dataloader = self._data.training_dataloader(BPRMFSampler, self._seed)
+        return dataloader
+
     def forward(self, user, item):
         user_e = torch.squeeze(self.Gu(user))
         item_e = torch.squeeze(self.Gi(item))
@@ -80,23 +83,34 @@ class BPRMFBatch(GeneralRecommender):
 
         # Calculate BPR loss
         reg = 0.5 * (self.Gu.weight[user].pow(2).sum() +
-                     self.Gu.weight[pos].pow(2).sum() +
-                     self.Gu.weight[neg].pow(2).sum()) / float(user.shape[0])
+                     self.Gi.weight[pos].pow(2).sum() +
+                     self.Gi.weight[neg].pow(2).sum()) / float(user.shape[0])
         loss = -torch.mean(self.log_sigmoid(xu_pos - xu_neg)) + self.lambda_weights * reg
 
         return loss
 
-    def predict(self, start, stop):
-        user_indices = torch.arange(start, stop)
-
+    def predict_full(self, user_indices):
         # Retrieve embeddings
-        user_e_all = self.Gu.weight
-        item_e_all = self.Gi.weight
+        u_embeddings_all = self.Gu.weight
+        i_embeddings_all = self.Gi.weight
 
         # Select only the embeddings in the current batch
-        u_embedding_batch = user_e_all[user_indices]
+        u_embedding_batch = u_embeddings_all[user_indices]
 
-        predictions = torch.matmul(u_embedding_batch, item_e_all.T)
+        # Compute predictions
+        predictions = torch.matmul(u_embedding_batch, i_embeddings_all.T)
+
+        return predictions.to(self._device)
+
+    def predict_sampled(self, user_indices, item_indices):
+        u_embeddings_batch = self.Gu(user_indices)
+        i_embeddings_candidate = self.Gi(item_indices.clamp(min=0))
+
+        # Compute predictions
+        predictions = torch.einsum(
+            "bi,bji->bj", u_embeddings_batch, i_embeddings_candidate
+        )
+
         return predictions.to(self._device)
 
     # def end_training(self, dataset_name):

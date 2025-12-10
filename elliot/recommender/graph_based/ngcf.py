@@ -7,6 +7,7 @@ __version__ = '0.3.0'
 __author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malitesta@poliba.it'
 
+from typing import Tuple
 import torch
 import torch_geometric
 from torch import nn
@@ -56,7 +57,7 @@ class NGCF(GraphBasedRecommender):
     # Model hyperparameters
     factors: int = 64
     n_layers: int = 1
-    weight_size: tuple[int] = (64,)
+    weight_size: Tuple[int, ...] = (64,)
     node_dropout: float = 0.0
     message_dropout: float = 0.5
     normalize: bool = True
@@ -64,7 +65,6 @@ class NGCF(GraphBasedRecommender):
     lambda_weights: float = 0.01
 
     def __init__(self, data, params, seed, logger):
-        self.sampler = CustomSampler(data.i_train_dict)
         super(NGCF, self).__init__(data, params, seed, logger)
 
         # Initialize the hidden dimensions
@@ -101,6 +101,10 @@ class NGCF(GraphBasedRecommender):
 
         # Move to device
         self.to(self._device)
+
+    def get_training_dataloader(self):
+        dataloader = self._data.training_dataloader(CustomSampler, self._seed)
+        return dataloader
 
     def forward(self):
         ego_embeddings = self.get_ego_embeddings(self.Gu, self.Gi)
@@ -154,15 +158,30 @@ class NGCF(GraphBasedRecommender):
 
         return loss
 
-    def predict(self, start, stop):
-        user_indices = torch.arange(start, stop)
+    def predict_full(self, user_indices):
         user_e_all, item_e_all = self.forward()
 
         # Select only the embeddings in the current batch
         u_embeddings_batch = user_e_all[user_indices]
 
-        # Compute all item scores for the current user batch
+        # Compute predictions
         predictions = torch.matmul(u_embeddings_batch, item_e_all.T)
+
+        return predictions.to(self._device)
+
+    def predict_sampled(self, user_indices, item_indices):
+        user_e_all, item_e_all = self.forward()
+
+        # Select only the embeddings in the current batch
+        # and the candidate items
+        u_embeddings_batch = user_e_all[user_indices]
+        i_embeddings_candidate = item_e_all[item_indices.clamp(min=0)]
+
+        # Compute predictions
+        predictions = torch.einsum(
+            "bi,bji->bj", u_embeddings_batch, i_embeddings_candidate
+        )
+
         return predictions.to(self._device)
 
     def get_adj_mat(self):

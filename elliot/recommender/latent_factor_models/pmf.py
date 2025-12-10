@@ -53,7 +53,6 @@ class PMF(GeneralRecommender):
     gaussian_variance: float = 0.1
 
     def __init__(self, data, params, seed, logger):
-        self.sampler = PWPosNegSampler(data.i_train_dict)
         super(PMF, self).__init__(data, params, seed, logger)
 
         # Embeddings
@@ -74,6 +73,10 @@ class PMF(GeneralRecommender):
         # Move to device
         self.to(self._device)
 
+    def get_training_dataloader(self):
+        dataloader = self._data.training_dataloader(PWPosNegSampler, self._seed)
+        return dataloader
+
     def forward(self, user, item):
         user_mf_e = self.user_mf_embedding(user)
         item_mf_e = self.item_mf_embedding(item)
@@ -92,9 +95,7 @@ class PMF(GeneralRecommender):
 
         return loss
 
-    def predict(self, start, stop):
-        user_indices = torch.arange(start, stop)
-
+    def predict_full(self, user_indices):
         # Retrieve embeddings
         user_e_all = self.user_mf_embedding.weight
         item_e_all = self.item_mf_embedding.weight
@@ -104,4 +105,18 @@ class PMF(GeneralRecommender):
 
         predictions = torch.matmul(u_embeddings_batch, item_e_all.T)
         predictions = self.sigmoid(predictions)
+
+        return predictions.to(self._device)
+
+    def predict_sampled(self, user_indices, item_indices):
+        # Retrieve embeddings
+        u_embeddings_batch = self.user_mf_embedding(user_indices)
+        i_embeddings_candidate = self.item_mf_embedding(item_indices.clamp(min=0))
+
+        # Compute predictions
+        predictions = torch.einsum(
+            "bi,bji->bj", u_embeddings_batch, i_embeddings_candidate
+        )
+        predictions = self.sigmoid(predictions)
+
         return predictions.to(self._device)

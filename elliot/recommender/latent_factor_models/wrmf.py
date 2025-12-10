@@ -8,9 +8,9 @@ __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
 import numpy as np
+import torch
 from tqdm import tqdm
 
-from elliot.dataset.samplers import FakeSampler
 from elliot.recommender.base_recommender import Recommender
 from elliot.recommender.init import normal_init
 
@@ -47,7 +47,6 @@ class WRMF(Recommender):
     alpha: float = 1.0
 
     def __init__(self, data, params, seed, logger):
-        self.sampler = FakeSampler()
         super().__init__(data, params, seed, logger)
 
         self.C = self.alpha * self._data.sp_i_train
@@ -102,5 +101,15 @@ class WRMF(Recommender):
 
         return 0
 
-    def predict(self, start, stop):
-        return self.X[start:stop] @ self.Y.T
+    def predict_full(self, user_indices):
+        predictions = self.X[user_indices.numpy()] @ self.Y.T
+
+        predictions = torch.from_numpy(predictions)
+        return predictions
+
+    def predict_sampled(self, user_indices, item_indices):
+        predictions = self.X[user_indices.numpy()] @ self.Y.T
+
+        predictions = torch.from_numpy(predictions)
+        predictions = predictions.gather(1, item_indices.clamp(min=0))
+        return predictions

@@ -7,8 +7,8 @@ __version__ = '0.3.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
-from abc import abstractmethod
 import numpy as np
+import torch
 
 from elliot.dataset.samplers import MFSampler, MFSamplerRendle
 from elliot.recommender.base_recommender import Recommender
@@ -54,7 +54,6 @@ class AbstractMF2020(Recommender):
     m: int
 
     def __init__(self, data, params, seed, logger):
-        self.sampler = MFSamplerRendle(data.i_train_dict, data.sp_i_train, seed)
         super().__init__(data, params, seed, logger)
 
         # Embeddings
@@ -67,7 +66,6 @@ class AbstractMF2020(Recommender):
         self._global_bias = 0
 
         self.transactions = data.transactions * (self.m + 1)
-        self.sampler.m = self.m
 
         # Init embedding weights
         self.modules = [self._user_factors, self._item_factors, self._user_bias, self._item_bias]
@@ -76,17 +74,50 @@ class AbstractMF2020(Recommender):
 
         self.params_to_save = ['_global_bias', '_user_bias', '_item_bias', '_user_factor', '_item_factor']
 
-    @abstractmethod
-    def train_step(self, batch, *args):
-        raise NotImplementedError()
-
-    def predict(self, start, stop):
-        return (
-            self._global_bias
-            + self._user_bias[start:stop, None]
-            + self._item_bias[None, :]
-            + self._user_factors[start:stop] @ self._item_factors.T
+    def get_training_dataloader(self):
+        dataloader = self._data.training_dataloader(
+            MFSamplerRendle, self._seed, sparse_matrix=self._data.sp_i_train, m=self.m
         )
+        return dataloader
+
+    def predict_full(self, user_indices):
+        user_indices = user_indices.numpy()
+
+        u_embeddings_batch = self._user_factors[user_indices]
+        i_embeddings_all = self._item_factors
+        u_bias_batch = self._user_bias[user_indices]
+        i_bias_all = self._item_bias
+
+        predictions = (
+            u_embeddings_batch @ i_embeddings_all.T +
+            u_bias_batch[:, None] +
+            i_bias_all[None, :] +
+            self._global_bias
+        )
+
+        predictions = torch.from_numpy(predictions)
+        return predictions
+
+    def predict_sampled(self, user_indices, item_indices):
+        user_indices = user_indices.numpy()
+        item_indices = item_indices.clamp(min=0).numpy()
+
+        u_embeddings_batch = self._user_factors[user_indices]
+        i_embeddings_candidate = self._item_factors[item_indices]
+        u_bias_batch = self._user_bias[user_indices]
+        i_bias_candidate = self._item_bias[item_indices]
+
+        predictions = (
+            np.einsum(
+                "bi,bji->bj", u_embeddings_batch, i_embeddings_candidate
+            ) +
+            u_bias_batch[:, None] +
+            i_bias_candidate +
+            self._global_bias
+        )
+
+        predictions = torch.from_numpy(predictions)
+        return predictions
 
 
 class MF2020(AbstractMF2020):
@@ -100,6 +131,7 @@ class MF2020(AbstractMF2020):
         super().__init__(data, params, seed, logger)
 
     def train_step(self, batch, *args):
+        batch = [x.numpy() for x in batch]
         sum_of_loss = 0
         lr = self.learning_rate
         reg = self.lambda_weights
@@ -150,7 +182,7 @@ class MF2020Batch(AbstractMF2020):
         super().__init__(data, params, seed, logger)
 
     def train_step(self, batch, *args):
-        u_idx, i_idx, rating = batch
+        u_idx, i_idx, rating = tuple(x.numpy() for x in batch)
         lr = self.learning_rate
         reg = self.lambda_weights
 
@@ -177,36 +209,3 @@ class MF2020Batch(AbstractMF2020):
         self._global_bias += lr * (np.sum(grad) - reg * gb_)
 
         return np.sum(this_loss)
-
-    # def update_factors(self, user: int, item: int, rating: float):
-    #     uf_ = self._user_factors[user]
-    #     if_ = self._item_factors[item]
-    #     ub_ = self._user_bias[user]
-    #     ib_ = self._item_bias[item]
-    #     gb_ = self._global_bias
-    #     lr = self._lr
-    #     reg = self._reg
-    #
-    #
-    #     prediction = gb_ + ub_ + ib_ + np.dot(uf_,if_)
-    #     # prediction = gb_ + ub_ + ib_ + uf_ @ if_
-    #
-    #     if prediction > 0:
-    #         one_plus_exp_minus_pred = 1.0 + np.exp(-prediction)
-    #         sigmoid = 1.0 / one_plus_exp_minus_pred
-    #         this_loss = (np.log(one_plus_exp_minus_pred) +
-    #                      (1.0 - rating) * prediction)
-    #     else:
-    #         exp_pred = np.exp(prediction)
-    #         sigmoid = exp_pred / (1.0 + exp_pred)
-    #         this_loss = -rating * prediction + np.log(1.0 + exp_pred)
-    #
-    #     grad = rating - sigmoid
-    #
-    #     self._user_factors[user] += lr * (grad * if_ - reg * uf_)
-    #     self._item_factors[item] += lr * (grad * uf_ - reg * if_)
-    #     self._user_bias[user] += lr * (grad - reg * ub_)
-    #     self._item_bias[item] += lr * (grad - reg * ib_)
-    #     self._global_bias += lr * (grad - reg * gb_)
-    #
-    #     return this_loss

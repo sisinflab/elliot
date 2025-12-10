@@ -50,7 +50,6 @@ class LogisticMF(GeneralRecommender):
     alpha: float = 0.5
 
     def __init__(self, data, params, seed, logger):
-        self.sampler = PWPosNegSampler(data.i_train_dict)
         super(LogisticMF, self).__init__(data, params, seed, logger)
 
         # Embeddings
@@ -63,7 +62,6 @@ class LogisticMF(GeneralRecommender):
         # NOTE: Removed Adagrad optimizer due to its poor performance
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
 
-        self.sampler.events = self._data.transactions * 2
         self.transactions = self._data.transactions * 2
 
         # Init embedding weights
@@ -72,6 +70,12 @@ class LogisticMF(GeneralRecommender):
 
         # Move to device
         self.to(self._device)
+
+    def get_training_dataloader(self):
+        dataloader = self._data.training_dataloader(
+            PWPosNegSampler, self._seed, transactions=self.transactions
+        )
+        return dataloader
 
     def forward(self, user, item):
         user_e = self.Gu(user)
@@ -99,9 +103,7 @@ class LogisticMF(GeneralRecommender):
 
         return loss, inputs
 
-    def predict(self, start, stop):
-        user_indices = torch.arange(start, stop)
-
+    def predict_full(self, user_indices):
         # Retrieve embeddings
         user_e_all = self.Gu.weight
         item_e_all = self.Gi.weight
@@ -112,5 +114,29 @@ class LogisticMF(GeneralRecommender):
         u_embeddings_batch = user_e_all[user_indices]
         u_bias_batch = user_b_all[user_indices]
 
-        predictions = torch.matmul(u_embeddings_batch, item_e_all.T) + u_bias_batch + item_b_all.T
+        # Compute predictions
+        predictions = (
+            torch.matmul(u_embeddings_batch, item_e_all.T) +
+            u_bias_batch +
+            item_b_all.T
+        )
+
+        return predictions.to(self._device)
+
+    def predict_sampled(self, user_indices, item_indices):
+        # Retrieve embeddings
+        u_embeddings_batch = self.Gu(user_indices)
+        i_embeddings_candidate = self.Gi(item_indices.clamp(min=0))
+        u_bias_batch = self.Bu(user_indices)
+        i_bias_candidate = self.Bi(item_indices.clamp(min=0))
+
+        # Compute predictions
+        predictions = (
+            torch.einsum(
+                "bi,bji->bj", u_embeddings_batch, i_embeddings_candidate
+            ) +
+            u_bias_batch +
+            i_bias_candidate.squeeze(-1)
+        )
+
         return predictions.to(self._device)

@@ -23,7 +23,6 @@ class SVDpp(GeneralRecommender):
     lambda_bias: float = 0.001
 
     def __init__(self, data, params, seed, logger):
-        self.sampler = CustomPWSparseSampler(data.i_train_dict, data.sp_i_train)
         super(SVDpp, self).__init__(data, params, seed, logger)
 
         # Embeddings
@@ -47,19 +46,17 @@ class SVDpp(GeneralRecommender):
         # Move to device
         self.to(self._device)
 
+    def get_training_dataloader(self):
+        dataloader = self._data.training_dataloader(CustomPWSparseSampler, self._seed)
+        return dataloader
+
     def forward(self, user, item):
         u = self.user_mf_embedding(user)
         i = self.item_mf_embedding(item)
         ub = self.user_bias_embedding(user)
         ib = self.item_bias_embedding(item)
 
-        offsets, indices, _ = self._sp_i_train[user].csr()
-        puyj = nn.functional.embedding_bag(
-            input=indices,
-            weight=self.item_y_embedding.weight,
-            offsets=offsets[:-1],
-            mode='mean'
-        )
+        puyj = self._compute_user_representation(user)
 
         output = torch.mul((puyj + u), i).sum(dim=-1) + ub.squeeze() + ib.squeeze() + self.bias_
         return output
@@ -84,9 +81,7 @@ class SVDpp(GeneralRecommender):
 
         return loss
 
-    def predict(self, start, stop):
-        user_indices = torch.arange(start, stop)
-
+    def predict_full(self, user_indices):
         # Retrieve embeddings
         user_e_all = self.user_mf_embedding.weight
         item_e_all = self.item_mf_embedding.weight
@@ -97,14 +92,44 @@ class SVDpp(GeneralRecommender):
         u_embeddings_batch = user_e_all[user_indices]
         u_bias_batch = user_b_all[user_indices]
 
-        offsets, indices, _ = self._sp_i_train[user_indices].csr()
+        # Compute predictions
+        puyj = self._compute_user_representation(user_indices)
+
+        predictions = torch.matmul(
+            (puyj + u_embeddings_batch), item_e_all.T
+        ) + u_bias_batch + item_b_all.T + self.bias_
+
+        return predictions.to(self._device)
+
+    def predict_sampled(self, user_indices, item_indices):
+        # Retrieve embeddings
+        u_embeddings_batch = self.user_mf_embedding(user_indices)
+        i_embeddings_candidate = self.item_mf_embedding(item_indices.clamp(min=0))
+        u_bias_batch = self.user_bias_embedding(user_indices)
+        i_bias_candidate = self.item_bias_embedding(item_indices.clamp(min=0))
+
+        # Compute predictions
+        puyj = self._compute_user_representation(user_indices)
+
+        predictions = (
+            torch.einsum(
+                "bi,bji->bj", (puyj + u_embeddings_batch), i_embeddings_candidate
+            ) +
+            u_bias_batch +
+            i_bias_candidate.squeeze(-1)
+        )
+
+        return predictions.to(self._device)
+
+    def _compute_user_representation(self, users):
+        item_y_all = self.item_y_embedding.weight
+        offsets, indices, _ = self._data.sp_i_train_tensor[users].csr()
+
         puyj = nn.functional.embedding_bag(
             input=indices,
-            weight=self.item_y_embedding.weight,
+            weight=item_y_all,
             offsets=offsets[:-1],
             mode='mean'
         )
-        output = torch.matmul(
-            (puyj + u_embeddings_batch), item_e_all.T
-        ) + u_bias_batch + item_b_all.T + self.bias_
-        return output
+
+        return puyj

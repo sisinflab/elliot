@@ -7,6 +7,7 @@ __version__ = '0.3.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo, Daniele Malitesta'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
+from typing import Tuple
 import torch
 from torch import nn
 
@@ -54,17 +55,16 @@ class NeuMF(GeneralRecommender):
     # Model hyperparameters
     embed_mf_size: int = 10
     embed_mlp_size: int = 10
-    mlp_hidden_size: tuple = (64, 32)
+    mlp_hidden_size: Tuple[int, ...] = (64, 32)
     dropout: float = 0.0
     is_mf_train: bool = True
     is_mlp_train: bool = True
     learning_rate: float = 1e-5
     lambda_weights: float = 0.1
-    batch_eval: int = 256
     m: int = 0
+    batch_eval_items: int = 256
 
     def __init__(self, data, params, seed, logger):
-        self.sampler = NeuMFSampler(data.i_train_dict)
         super(NeuMF, self).__init__(data, params, seed, logger)
 
         # MF embeddings
@@ -93,15 +93,15 @@ class NeuMF(GeneralRecommender):
         self.loss = nn.BCEWithLogitsLoss()
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
 
-        self.transactions = self._data.transactions * (self.m + 1)
-        self.sampler.m = self.m
-        self.sampler.events = self.transactions
-
         # Init embedding weights
         self.apply(normal_init, mean=0.0, std=0.01)
 
         # Move to device
         self.to(self._device)
+
+    def get_training_dataloader(self):
+        dataloader = self._data.training_dataloader(NeuMFSampler, self._seed, m=self.m)
+        return dataloader
 
     def forward(self, user, item):
         user_mf_e = self.user_mf_embedding(user)
@@ -134,13 +134,12 @@ class NeuMF(GeneralRecommender):
 
         return loss
 
-    def predict(self, start, stop):
-        user_indices = torch.arange(start, stop)
+    def predict_full(self, user_indices):
         batch_size = len(user_indices)
         preds = []
 
-        for s in range(0, self._num_items, self.batch_eval):
-            e = min(s + self.batch_eval, self._num_items)
+        for s in range(0, self._num_items, self.batch_eval_items):
+            e = min(s + self.batch_eval_items, self._num_items)
             items_block = torch.arange(s, e)
 
             # Expand user_indices and items_block to create all user-item pairs
@@ -156,4 +155,21 @@ class NeuMF(GeneralRecommender):
             preds.append(preds_block.view(batch_size, e - s))
 
         predictions = torch.cat(preds, dim=1)
+
+        return predictions.to(self._device)
+
+    def predict_sampled(self, user_indices, item_indices):
+        batch_size, pad_seq = item_indices.size()
+
+        # Prepare user and item indices for forward pass
+        users_expanded = user_indices.unsqueeze(1).expand(-1, pad_seq).reshape(-1)
+        items_expanded = item_indices.clamp(min=0).reshape(-1)
+
+        # Compute predictions using the forward pass
+        predictions_flat = self.forward(users_expanded, items_expanded)
+        predictions = predictions_flat.view(batch_size, pad_seq)
+
+        # Apply sigmoid to get scores between 0 and 1
+        predictions = self.sigmoid(predictions)
+
         return predictions.to(self._device)
