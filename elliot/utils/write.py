@@ -7,8 +7,41 @@ __version__ = '0.3.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
-import numpy as np
 import pickle
+import os
+import numpy as np
+import pandas as pd
+
+from elliot.utils.folder import create_folder
+
+
+def save_tabular_df(
+    df: pd.DataFrame,
+    folder_path: str,
+    filename: str,
+    sep: str = "\t"
+):
+    """Save a DataFrame in tabular format to the specified path.
+
+    Args:
+        df (pd.Dataframe): Dataframe to save.
+        folder_path (str): Destination folder.
+        filename (str): Name of the destination file (e.g., 'val.tsv').
+        sep (str): Separator to use, default is `\\t`.
+    """
+    # Create the folder if it does not exist
+    create_folder(folder_path, exist_ok=True)
+
+    # Build the full file path
+    file_path = os.path.abspath(os.path.join(folder_path, filename))
+
+    # Save as tabular data
+    df.to_csv(
+        file_path,
+        sep=sep,
+        index=False,
+        header=False
+    )
 
 
 def save_obj(obj, name):

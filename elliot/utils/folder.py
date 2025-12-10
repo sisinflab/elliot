@@ -49,7 +49,16 @@ def build_log_folder(path_log_folder):
 
 
 def create_folder_by_index(path, index):
-    if os.path.exists(os.path.abspath(os.sep.join([path, index]))):
-        shutil.rmtree(os.path.abspath(os.sep.join([path, index])))
-    os.makedirs(os.path.abspath(os.sep.join([path, index])))
-    return os.path.abspath(os.sep.join([path, index]))
+    complete_path = os.path.abspath(os.sep.join([path, index]))
+    return create_folder(complete_path)
+
+
+def create_folder(path, exist_ok=False):
+    if os.path.exists(path):
+        if not exist_ok:
+            shutil.rmtree(path, ignore_errors=True)
+            os.makedirs(path, exist_ok=True)
+    else:
+        os.makedirs(path, exist_ok=True)
+
+    return os.path.abspath(path)

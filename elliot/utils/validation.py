@@ -8,27 +8,15 @@ from elliot.utils.enums import PreFilteringStrategy, SplittingStrategy, Negative
 
 
 class BaseValidator(BaseModel):
-    """Base validator with utility to assign validated values to another object."""
+    """Base validator with utility to get the validated params dict."""
 
-    def assign_to_original(self, obj: object, *args) -> dict:
-        """Copy validated fields to the target object.
-
-        Args:
-            obj (object): Object receiving the validated values.
+    def get_validated_params(self, *args) -> dict:
+        """Return all the validated fields.
 
         Returns:
             dict: The validated params dict.
         """
-
-        # Get validated values
-        validated_data = self.model_dump()
-
-        # Assign validated values to their relative attributes
-        # in the provided object
-        for field, value in validated_data.items():
-            setattr(obj, field, value)
-
-        return validated_data
+        return self.model_dump()
 
 
 # PreFilter validation
@@ -193,7 +181,7 @@ class TrainerValidator(BaseValidator):
     """
 
     restore: bool = Field(default=False)
-    validation_metric: Union[str, List] = Field(default=None)
+    validation_metric: Union[str, list] = Field(default=None)
     save_weights: bool = Field(default=False)
     save_recs: bool = Field(default=False)
     verbose: bool = Field(default=True)
@@ -201,26 +189,23 @@ class TrainerValidator(BaseValidator):
     optimize_internal_loss: bool = Field(default=False)
     epochs: int = Field(default=1, ge=1)
     batch_size: int = Field(default=None, ge=1)
+    eval_batch_size: int = Field(default=None, ge=1)
     seed: int = Field(default=42)
 
-    def assign_to_original(self, obj: object, meta: bool = False, *args):
-        """Copy validated fields to the target object.
+    def get_validated_params(self, meta: bool = False, *args):
+        """Return a subset of the validated fields.
 
         Args:
-            obj (object): Object receiving the validated values.
             meta (bool): If True assign metadata fields, otherwise training fields.
         """
 
-        out_of_meta = ['epochs', 'batch_size', 'seed']
+        out_of_meta = ['epochs', 'batch_size', 'eval_batch_size', 'seed']
 
-        # Pick the right fields to set in the recommender object
+        # Pick the right fields to retrieve
         included = set(out_of_meta) if not meta else set(self.model_fields.keys()) - set(out_of_meta)
         validated_data = self.model_dump(include=included)
 
-        # Assign validated values to their relative attributes
-        # in the recommender object
-        for field, value in validated_data.items():
-            setattr(obj, field, value)
+        return validated_data
 
 
 # Recommender validation

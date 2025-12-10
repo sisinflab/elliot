@@ -3,12 +3,11 @@ from types import SimpleNamespace
 import pandas as pd
 import numpy as np
 import math
-import shutil
-import os
 
 from elliot.utils.enums import SplittingStrategy
 from elliot.utils.validation import SplittingGeneralValidator, SplittingValidator, check_range
-from elliot.utils.folder import create_folder_by_index
+from elliot.utils.folder import create_folder_by_index, create_folder
+from elliot.utils.write import save_tabular_df
 
 
 class Splitter:
@@ -24,12 +23,6 @@ class Splitter:
             'userId' and 'timestamp' columns.
         splitting_ns (SimpleNamespace): Namespace object containing configuration
             for the desired splitting strategy.
-
-        random_seed (int): Seed for reproducibility of random-based strategies.
-        save_on_disk (bool): Indicates whether the generated splits should be saved to disk.
-        save_folder (str | None): Directory path to store the splits if saving is enabled.
-        param_ranges (dict): Stores dynamically computed min/max ranges for
-            configurable attributes based on the input dataset.
 
     Supported splitting strategies:
 
@@ -79,10 +72,35 @@ class Splitter:
         self.data = data
         self.splitting_ns = splitting_ns
 
-        general_validator = SplittingGeneralValidator(**vars(splitting_ns))
-        general_validator.assign_to_original(self)
+        # Set general parameters
+        self.set_params()
 
         np.random.seed(random_seed)
+
+    def set_params(self, scope: str = "general"):
+        """Validate and set object parameters according to the selected validation scope.
+
+        Args:
+            scope (str): Determines which validator to use.
+                Accepted values are: `general`, `test`, and `val`. Default is `general`.
+
+        Raises:
+            ValueError: If the provided scope is not recognized.
+        """
+        validator = None
+
+        match scope:
+            case "general":
+                validator = SplittingGeneralValidator(**vars(self.splitting_ns))
+            case "test":
+                validator = SplittingValidator(**vars(self.splitting_ns.test_splitting))
+            case "val":
+                validator = SplittingValidator(**vars(self.splitting_ns.validation_splitting))
+            case _:
+                raise ValueError(f"Unrecognized scope {scope}")
+
+        for name, val in validator.get_validated_params().items():
+            setattr(self, name, val)
 
     def process_splitting(
         self
@@ -93,14 +111,15 @@ class Splitter:
             List[Tuple[Union[pd.DataFrame, List[Tuple[pd.DataFrame, pd.DataFrame]]], pd.DataFrame]]:
                 A list of (train, test) or ((train, val), test) tuples.
         """
+        # Set test splitting parameters
+        self.set_params(scope="test")
 
-        validator = SplittingValidator(**vars(self.splitting_ns.test_splitting))
-        validator.assign_to_original(self)
         tuple_list = self.handle_hierarchy(self.data)
 
         if hasattr(self.splitting_ns, 'validation_splitting'):
-            cfg = SplittingValidator(**vars(self.splitting_ns.validation_splitting))
-            cfg.assign_to_original(self)
+            # Set validation splitting parameters
+            self.set_params(scope="val")
+
             tuple_list = [
                 (self.handle_hierarchy(train), test)
                 for train, test in tuple_list
@@ -110,9 +129,6 @@ class Splitter:
             print("\nRealized a Train/Test splitting strategy\n")
 
         if self.save_on_disk:
-            if os.path.exists(self.save_folder):
-                shutil.rmtree(self.save_folder, ignore_errors=True)
-            os.makedirs(self.save_folder)
             self.store_splitting(tuple_list)
 
         return tuple_list
@@ -127,16 +143,36 @@ class Splitter:
             tuple_list (List[Tuple[Union[pd.DataFrame, List[Tuple[pd.DataFrame, pd.DataFrame]]], pd.DataFrame]]):
                 A list of split tuples to be saved on disk.
         """
+        # Create the splitting save folder
+        create_folder(self.save_folder)
+
         for i, (train_val, test) in enumerate(tuple_list):
+            # Create folder for current test fold
             actual_test_folder = create_folder_by_index(self.save_folder, str(i))
-            test.to_csv(os.path.abspath(os.sep.join([actual_test_folder, "test.tsv"])), sep='\t', index=False, header=False)
+
+            # Save current test set
+            save_tabular_df(
+                df=test, folder_path=actual_test_folder, filename="test.tsv", sep="\t"
+            )
+
             if isinstance(train_val, list):
+                # Process each validation fold in the current test fold...
                 for j, (train, val) in enumerate(train_val):
+                    # Create folder for current validation fold
                     actual_val_folder = create_folder_by_index(actual_test_folder, str(j))
-                    val.to_csv(os.path.abspath(os.sep.join([actual_val_folder, "val.tsv"])), sep='\t', index=False, header=False)
-                    train.to_csv(os.path.abspath(os.sep.join([actual_val_folder, "train.tsv"])), sep='\t', index=False, header=False)
+
+                    # Save current training and validation sets
+                    save_tabular_df(
+                        df=val, folder_path=actual_val_folder, filename="val.tsv", sep="\t"
+                    )
+                    save_tabular_df(
+                        df=train, folder_path=actual_val_folder, filename="train.tsv", sep="\t"
+                    )
             else:
-                train_val.to_csv(os.path.abspath(os.sep.join([actual_test_folder, "train.tsv"])), sep='\t', index=False, header=False)
+                # ...or simply save current training set
+                save_tabular_df(
+                    df=train_val, folder_path=actual_test_folder, filename="train.tsv", sep="\t"
+                )
 
     def handle_hierarchy(
         self,
