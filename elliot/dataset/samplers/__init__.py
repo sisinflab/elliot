@@ -12,4 +12,3 @@ from .custom_sampler import CustomSampler
 from .mf_samplers import BPRMFSampler, MFSampler, MFSamplerRendle
 from .neumf_samplers import NeuMFSampler, CustomNeuMFSampler
 from .pointwise_pos_neg_sampler import PWPosNegSampler
-from .base_sampler import FakeSampler

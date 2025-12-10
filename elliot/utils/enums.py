@@ -23,3 +23,7 @@ class NegativeSamplingStrategy(Enum):
     FIXED = 'fixed'
 
 
+class ModelType(Enum):
+    BASE = 1
+    TRADITIONAL = 2
+    GENERAL = 3

@@ -11,10 +11,10 @@ import random
 import numpy as np
 import itertools
 
-from elliot.dataset.samplers.base_sampler import TraditionalSampler
+from elliot.dataset.samplers.base_sampler import AbstractSampler
 
 
-class Sampler(TraditionalSampler):
+class Sampler(AbstractSampler):
     def __init__(self, data, seed=42):
         super().__init__(data.i_train_dict, seed)
         self._sp_i_features = data.sp_i_features

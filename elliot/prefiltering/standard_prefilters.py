@@ -56,6 +56,17 @@ class PreFilter:
         self.pre_filtering_ns = pre_filtering_ns
         self._mask = None
 
+    def set_params(self, ns: SimpleNamespace):
+        """Validate and set object parameters according to the provided namespace.
+
+        Args:
+            ns (SimpleNamespace): Single pre-filtering strategy namespace.
+        """
+        validator = PreFilteringValidator(**vars(ns))
+
+        for name, val in validator.get_validated_params().items():
+            setattr(self, name, val)
+
     def filter(self) -> pd.DataFrame:
         """
         Apply all configured pre-filtering strategies in sequence to the dataset.
@@ -82,8 +93,7 @@ class PreFilter:
             ValueError: If the strategy is invalid.
         """
 
-        validator = PreFilteringValidator(**vars(ns))
-        validator.assign_to_original(self)
+        self.set_params(ns)
 
         filtered_data = None
 

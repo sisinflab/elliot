@@ -10,12 +10,12 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 import numpy as np
 from tqdm import tqdm
 
-from elliot.dataset.samplers.base_sampler import TraditionalSampler
+from elliot.dataset.samplers.base_sampler import AbstractSampler
 
 
-class BPRMFSampler(TraditionalSampler):
-    def __init__(self, indexed_ratings, seed=42):
-        super().__init__(seed, indexed_ratings)
+class BPRMFSampler(AbstractSampler):
+    def __init__(self, **params):
+        super().__init__(**params)
 
         self._freq_users = np.zeros(self._nusers, dtype=np.int64)
         self._freq_items = np.zeros(self._nitems, dtype=np.int64)
@@ -58,7 +58,7 @@ class BPRMFSampler(TraditionalSampler):
                     self._freq_items[j] += 1
                     break
 
-        return users[:, None], pos_items[:, None], neg_items[:, None]
+        return users, pos_items, neg_items
         # u = self._r_int(self._nusers)
         # self._freq_users[u] += 1
         # ui = self._ui_dict[u]
@@ -108,16 +108,16 @@ class BPRMFSampler(TraditionalSampler):
             yield bui[:, None], bii[:, None], bij[:, None]"""
 
 
-class MFSampler(TraditionalSampler):
-    def __init__(self, indexed_ratings, sparse_matrix, seed=42):
-        super().__init__(seed, indexed_ratings)
+class MFSampler(AbstractSampler):
+    def __init__(self, sparse_matrix, m, **params):
+        super().__init__(**params)
 
         ratings = sparse_matrix.nonzero()
         self.rating_users = ratings[0]
         self.rating_items = ratings[1]
 
         self._users, self.idx_start, self.count = np.unique(self.rating_users, return_counts=True, return_index=True)
-        self.m = 0
+        self.m = m
         self.num_neg = lambda n: self.m
 
     def _sample(self, **kwargs):
@@ -189,8 +189,8 @@ class MFSampler(TraditionalSampler):
 
 
 class MFSamplerRendle(MFSampler):
-    def __init__(self, indexed_ratings, sparse_matrix, seed=42):
-        super().__init__(indexed_ratings, sparse_matrix, seed)
+    def __init__(self, sparse_matrix, m, **params):
+        super().__init__(sparse_matrix, m, **params)
         self.num_neg = lambda n: self.m * n
 
 # class Sampler(TraditionalSampler):

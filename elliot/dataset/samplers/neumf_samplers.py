@@ -9,15 +9,14 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
 import numpy as np
 import random
-
 from tqdm import tqdm
 
-from elliot.dataset.samplers.base_sampler import TraditionalSampler, PipelineSampler
+from elliot.dataset.samplers.base_sampler import AbstractSampler
 
 
-class NeuMFSampler(TraditionalSampler):
-    def __init__(self, indexed_ratings, seed=42):
-        super().__init__(seed, indexed_ratings)
+class NeuMFSampler(AbstractSampler):
+    def __init__(self, m, **params):
+        super().__init__(**params)
         """np.random.seed(42)
         random.seed(42)
         self._indexed_ratings = indexed_ratings
@@ -27,7 +26,8 @@ class NeuMFSampler(TraditionalSampler):
         self._nitems = len(self._items)
         self._ui_dict = {u: list(set(indexed_ratings[u])) for u in indexed_ratings}
         self._lui_dict = {u: len(v) for u, v in self._ui_dict.items()}"""
-        self.m = 0
+        self.m = m
+        self.events = self.events * (self.m + 1)
 
     def _sample(self, **kwargs):
         r_int = self._r_int
@@ -61,9 +61,9 @@ class NeuMFSampler(TraditionalSampler):
     #        yield u, i, b
 
 
-class CustomNeuMFSampler(PipelineSampler):
-    def __init__(self, indexed_ratings, seed=42):
-        super().__init__(seed, indexed_ratings)
+class CustomNeuMFSampler(AbstractSampler):
+    def __init__(self, m, **params):
+        super().__init__(**params)
         #np.random.seed(random_seed)
         #random.seed(random_seed)
         """elf._indexed_ratings = indexed_ratings
@@ -73,7 +73,8 @@ class CustomNeuMFSampler(PipelineSampler):
         self._nitems = len(self._items)
         self._ui_dict = {u: list(set(indexed_ratings[u])) for u in indexed_ratings}
         self._lui_dict = {u: len(v) for u, v in self._ui_dict.items()}"""
-        self.m = 0
+        self.m = m
+        self.events = self.events * (self.m + 1)
         self._pos = self._pos_generator(self._ui_dict)
 
     @staticmethod

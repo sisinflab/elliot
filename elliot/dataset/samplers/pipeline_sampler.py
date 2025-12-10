@@ -13,10 +13,10 @@ from PIL import Image
 import numpy as np
 import random
 
-from elliot.dataset.samplers.base_sampler import PipelineSampler
+from elliot.dataset.samplers.base_sampler import AbstractSampler
 
 
-class Sampler(PipelineSampler):
+class Sampler(AbstractSampler):
     def __init__(self, indexed_ratings, item_indices, images_path, output_image_size, seed=42):
         super().__init__(indexed_ratings, seed)
         """np.random.seed(42)

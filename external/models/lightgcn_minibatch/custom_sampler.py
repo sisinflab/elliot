@@ -13,10 +13,10 @@ from itertools import chain
 import torch
 from torch_sparse import SparseTensor
 
-from elliot.dataset.samplers.base_sampler import TraditionalSampler
+from elliot.dataset.samplers.base_sampler import AbstractSampler
 
 
-class Sampler(TraditionalSampler):
+class Sampler(AbstractSampler):
     def __init__(self, indexed_ratings, iu_dict, all_user_item, n_layers, seed=42):
         super().__init__(seed, indexed_ratings)
         """np.random.seed(seed)

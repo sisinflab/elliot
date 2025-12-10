@@ -1,5 +1,6 @@
 import pickle
 import random
+from types import SimpleNamespace
 
 import numpy as np
 import torch
@@ -7,9 +8,7 @@ import torch
 from torch import nn, Tensor
 from torch_sparse import SparseTensor
 from abc import ABC, abstractmethod
-from functools import cached_property
 
-from elliot.dataset.samplers.base_sampler import FakeSampler
 from elliot.recommender.init import zeros_init
 from elliot.recommender.utils import ModelType, device
 from elliot.utils.validation import build_recommender_validator
@@ -35,8 +34,6 @@ class AbstractRecommender(ABC):
 
         if hasattr(self, '_loader') or hasattr(self, '_loaders'):
             self.set_side_info()
-        if hasattr(self, 'sampler'):
-            self.sampler.events = data.transactions
 
     @property
     def name(self):
@@ -55,6 +52,33 @@ class AbstractRecommender(ABC):
         return name
 
     @abstractmethod
+    def set_seed(self, seed: int):
+        raise NotImplementedError()
+
+    def set_params(self, params: SimpleNamespace):
+        self.logger.info("Loading parameters")
+
+        RecommenderValidator = build_recommender_validator(self.__class__)
+        validator = RecommenderValidator(**vars(params))
+
+        for name, val in validator.get_validated_params().items():
+            setattr(self, name, val)
+            self.logger.info(f"Parameter {name} set to {val}")
+            self.params_list.append(name)
+
+        self.params_to_save = self.params_list.copy()
+
+    def set_side_info(self, loader=None, mod=None):
+        name = f"_side{('_' + mod) if mod else ''}"
+        loader_name = loader if loader else self._loader
+        loader_obj = getattr(self._data.side_information, loader_name)
+        setattr(self, name, loader_obj)
+
+    def get_training_dataloader(self):
+        for _ in range(1):
+            yield None
+
+    @abstractmethod
     def train_step(self, batch, *args):
         raise NotImplementedError()
 
@@ -65,29 +89,6 @@ class AbstractRecommender(ABC):
     @abstractmethod
     def predict_sampled(self, user_indices, item_indices):
         raise NotImplementedError()
-
-    @abstractmethod
-    def set_seed(self, seed: int):
-        raise NotImplementedError()
-
-    def set_params(self, params):
-        self.logger.info("Loading parameters")
-
-        RecommenderValidator = build_recommender_validator(self.__class__)
-        validator = RecommenderValidator(**vars(params))
-        validated_params = validator.assign_to_original(self)
-
-        for k, v in validated_params.items():
-            self.logger.info(f"Parameter {k} set to {v}")
-            self.params_list.append(k)
-
-        self.params_to_save = self.params_list.copy()
-
-    def set_side_info(self, loader=None, mod=None):
-        name = f"_side{('_' + mod) if mod else ''}"
-        loader_name = loader if loader else self._loader
-        loader_obj = getattr(self._data.side_information, loader_name)
-        setattr(self, name, loader_obj)
 
     @abstractmethod
     def save_weights(self, path):
@@ -139,7 +140,6 @@ class TraditionalRecommender(Recommender):
 
     def __init__(self, data, params, seed, logger):
         super().__init__(data, params, seed, logger)
-        self.sampler = FakeSampler()
         self.similarity_matrix = None
         self._train = data.sp_i_train_ratings
         self._implicit_train = data.sp_i_train
@@ -180,13 +180,6 @@ class GeneralRecommender(nn.Module, AbstractRecommender):
                 zeros_init(m)
             else:
                 init_func(m, **kwargs)
-
-    @cached_property
-    def _sp_i_train(self):
-        coo = self._data.sp_i_train.tocoo()
-        row = torch.tensor(coo.row, dtype=torch.long)
-        col = torch.tensor(coo.col, dtype=torch.long)
-        return SparseTensor(row=row, col=col, sparse_sizes=coo.shape)
 
     def save_weights(self, file_path):
         torch.save({

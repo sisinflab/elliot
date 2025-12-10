@@ -1,65 +1,77 @@
 import inspect
 import random
 import time
-import torch
 import numpy as np
 from abc import ABC, abstractmethod
 
-from torch.utils.data import TensorDataset, Dataset, DataLoader
+from elliot.dataset import DataSet
 
 
 class AbstractSampler(ABC):
-    def __init__(self, seed, indexed_ratings):
+    def __init__(
+        self,
+        train_dict,
+        transactions,
+        users,
+        items,
+        seed,
+        **kwargs
+    ):
         np.random.seed(seed)
         random.seed(seed)
         self._r_int = np.random.randint
         self._r_choice = np.random.choice
         self._r_perm = np.random.permutation
-        self.batch_size = 1
-        self.events = 0
-        if indexed_ratings is not None:
-            self._indexed_ratings = indexed_ratings
-            self._users = list(self._indexed_ratings.keys())
-            self._nusers = len(self._users)
-            self._items = list({k for a in self._indexed_ratings.values() for k in a.keys()})
-            self._nitems = len(self._items)
-            self._ui_dict = {u: list(set(indexed_ratings[u])) for u in indexed_ratings}
-            self._lui_dict = {u: len(v) for u, v in self._ui_dict.items()}
+
+        self.events = transactions
+
+        self._users = users
+        self._nusers = len(users)
+        self._items = items
+        self._nitems = len(items)
+
+        self._indexed_ratings = train_dict
+        self._ui_dict = {u: list(set(self._indexed_ratings[u])) for u in self._indexed_ratings}
+        self._lui_dict = {u: len(v) for u, v in self._ui_dict.items()}
 
     def initialize(self):
-        pass
+        start = time.time()
+        samples = self._sample()
+        end = time.time()
+        print(f"Sampling has taken {end - start:.4f} seconds.")
+        return samples
 
     @abstractmethod
     def _sample(self, **kwargs):
         raise NotImplementedError()
 
-    def step_eval(self, *args):
-        pass
+    # def step_eval(self, *args):
+    #     pass
 
     def _sample_eval(self, *args):
         pass
 
 
-class TraditionalSampler(AbstractSampler):
-    def __init__(self, seed, indexed_ratings=None):
-        super().__init__(seed, indexed_ratings)
-        self._cached_dataloaders = {}
-
-    def initialize(self):
-        cache_key = self.__class__.__name__
-        if cache_key in self._cached_dataloaders:
-            return self._cached_dataloaders[cache_key]
-
-        start = time.time()
-        samples = self._sample()
-        end = time.time()
-        print(f"Sampling has taken {end - start}.4f seconds.")
-        arrays = tuple(map(np.array, samples))
-
-        dataloader = SimpleDataLoader(arrays, batch_size=self.batch_size, shuffle=True)
-        self._cached_dataloaders[cache_key] = dataloader
-
-        return dataloader
+# class TraditionalSampler(AbstractSampler):
+#     def __init__(self, seed, indexed_ratings=None):
+#         super().__init__(seed, indexed_ratings)
+#         self._cached_dataloaders = {}
+#
+#     def initialize(self):
+#         cache_key = self.__class__.__name__
+#         if cache_key in self._cached_dataloaders:
+#             return self._cached_dataloaders[cache_key]
+#
+#         start = time.time()
+#         samples = self._sample()
+#         end = time.time()
+#         print(f"Sampling has taken {end - start:.4f} seconds.")
+#         arrays = tuple(map(np.array, samples))
+#
+#         dataloader = SimpleDataLoader(arrays, batch_size=self.batch_size, shuffle=True)
+#         self._cached_dataloaders[cache_key] = dataloader
+#
+#         return dataloader
 
     # def prepare_output(self, *args):
     #     return args
@@ -75,15 +87,15 @@ class TraditionalSampler(AbstractSampler):
     #         #     res = map(np.array, zip(*[self._sample(idx=i) for i in range(batch_start, batch_stop)]))
     #         yield tuple(self.prepare_output(*sample_out)) #tuple(r[:, None] for r in res)
 
-    @abstractmethod
-    def _sample(self, **kwargs):
-        raise NotImplementedError()
+    # @abstractmethod
+    # def _sample(self, **kwargs):
+    #     raise NotImplementedError()
+    #
 
-
-class PipelineSampler(AbstractSampler):
-    def __init__(self, seed, indexed_ratings=None):
-        super().__init__(seed, indexed_ratings)
-        self._cached_dataloaders = {}
+# class PipelineSampler(AbstractSampler):
+#     def __init__(self, seed, indexed_ratings=None):
+#         super().__init__(seed, indexed_ratings)
+#         self._cached_dataloaders = {}
 
     # def _wrap_dataset(self, sample_fn):
     #     sampler = self
@@ -105,23 +117,23 @@ class PipelineSampler(AbstractSampler):
     #                 return tuple(torch.tensor(f) for f in sampler.read_features(*res))
     #
     #         return WrappedDataset()
-
-    def initialize(self):
-        cache_key = self.__class__.__name__
-        if cache_key in self._cached_dataloaders:
-            return self._cached_dataloaders[cache_key]
-
-        start = time.time()
-        samples = self._sample()
-        end = time.time()
-        print(f"Sampling has taken {end - start}.4f seconds.")
-        tensors = tuple(torch.tensor(x) for x in samples)
-
-        dataset = TensorDataset(*tensors)
-        dataloader = DataLoader(dataset, batch_size=self.batch_size, shuffle=True)
-        self._cached_dataloaders[cache_key] = dataloader
-
-        return dataloader
+    #
+    # def initialize(self):
+    #     cache_key = self.__class__.__name__
+    #     if cache_key in self._cached_dataloaders:
+    #         return self._cached_dataloaders[cache_key]
+    #
+    #     start = time.time()
+    #     samples = self._sample()
+    #     end = time.time()
+    #     print(f"Sampling has taken {end - start:.4f} seconds.")
+    #     tensors = tuple(torch.tensor(x) for x in samples)
+    #
+    #     dataset = TensorDataset(*tensors)
+    #     dataloader = DataLoader(dataset, batch_size=self.batch_size, shuffle=True)
+    #     self._cached_dataloaders[cache_key] = dataloader
+    #
+    #     return dataloader
 
     # def step_eval(self):
     #     self.read_features = self.read_eval_features
@@ -134,38 +146,23 @@ class PipelineSampler(AbstractSampler):
     # def read_eval_features(self, *args):
     #     return args
 
-    @abstractmethod
-    def _sample(self, **kwargs):
-        raise NotImplementedError()
+    # @abstractmethod
+    # def _sample(self, **kwargs):
+    #     raise NotImplementedError()
 
-
-class FakeSampler(AbstractSampler):
-    def __init__(self):
-        super().__init__(42, None)
-
-    def step(self, *args):
-        i = 0
-        while i == 0:
-            i = 1
-            yield True
-
-    def _sample(self, **kwargs):
-        return True
-
-
-class SimpleDataLoader:
-    def __init__(self, arrays, batch_size, shuffle=True):
-        self.arrays = arrays
-        self.batch_size = batch_size
-        self.shuffle = shuffle
-        self.events = len(self.arrays[0])
-
-    def __iter__(self):
-        indices = list(range(self.events))
-        if self.shuffle:
-            np.random.shuffle(indices)
-
-        for batch_start in range(0, self.events, self.batch_size):
-            batch_stop = min(batch_start + self.batch_size, self.events)
-            batch_idx = indices[batch_start:batch_stop]
-            yield tuple(a[batch_idx] for a in self.arrays)
+# class SimpleDataLoader:
+#     def __init__(self, arrays, batch_size, shuffle=True):
+#         self.arrays = arrays
+#         self.batch_size = batch_size
+#         self.shuffle = shuffle
+#         self.events = len(self.arrays[0])
+#
+#     def __iter__(self):
+#         indices = list(range(self.events))
+#         if self.shuffle:
+#             np.random.shuffle(indices)
+#
+#         for batch_start in range(0, self.events, self.batch_size):
+#             batch_stop = min(batch_start + self.batch_size, self.events)
+#             batch_idx = indices[batch_start:batch_stop]
+#             yield tuple(a[batch_idx] for a in self.arrays)

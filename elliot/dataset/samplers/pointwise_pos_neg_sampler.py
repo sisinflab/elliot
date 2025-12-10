@@ -11,12 +11,12 @@ import random
 import numpy as np
 from tqdm import tqdm
 
-from elliot.dataset.samplers.base_sampler import TraditionalSampler
+from elliot.dataset.samplers.base_sampler import AbstractSampler
 
 
-class PWPosNegSampler(TraditionalSampler):
-    def __init__(self, indexed_ratings, seed=42):
-        super().__init__(seed, indexed_ratings)
+class PWPosNegSampler(AbstractSampler):
+    def __init__(self, **params):
+        super().__init__(**params)
         """np.random.seed(42)
         random.seed(42)
         self._indexed_ratings = indexed_ratings

@@ -13,10 +13,10 @@ import os
 import numpy as np
 import random
 
-from elliot.dataset.samplers.base_sampler import PipelineSampler
+from elliot.dataset.samplers.base_sampler import AbstractSampler
 
 
-class Sampler(PipelineSampler):
+class Sampler(AbstractSampler):
     def __init__(self, indexed_ratings, item_indices, cnn_features_path, seed=42):
         super().__init__(indexed_ratings, seed)
         """np.random.seed(42)

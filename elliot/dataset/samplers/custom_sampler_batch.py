@@ -10,12 +10,12 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 import numpy as np
 import random
 
-from elliot.dataset.samplers.base_sampler import TraditionalSampler
+from elliot.dataset.samplers.base_sampler import AbstractSampler
 
 
-class Sampler(TraditionalSampler):
+class Sampler(AbstractSampler):
     def __init__(self, indexed_ratings, seed=42):
-        super().__init__(indexed_ratings, seed)
+        super().__init__(seed, indexed_ratings)
         """np.random.seed(seed)
         random.seed(seed)
         self._indexed_ratings = indexed_ratings
@@ -38,8 +38,8 @@ class Sampler(TraditionalSampler):
         for u in users:
             ui = self._ui_dict[u]
             lui = self._lui_dict[u]
-            if lui ==self._nitems:
-                self._sample(bsize)
+            if lui == self._nitems:
+                return self._sample(bsize)
             i = ui[self._r_int(lui)]
 
             j = self._r_int(self._nitems)

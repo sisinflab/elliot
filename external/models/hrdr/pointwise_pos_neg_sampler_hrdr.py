@@ -10,10 +10,10 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malite
 import random
 import numpy as np
 
-from elliot.dataset.samplers.base_sampler import TraditionalSampler
+from elliot.dataset.samplers.base_sampler import AbstractSampler
 
 
-class Sampler(TraditionalSampler):
+class Sampler(AbstractSampler):
     def __init__(self, ui_dict, iu_dict, public_users, public_items, users_tokens, items_tokens, seed=42):
         super().__init__(seed)
         #np.random.seed(42)

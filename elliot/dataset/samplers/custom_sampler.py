@@ -10,12 +10,12 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 import numpy as np
 from tqdm import tqdm
 
-from elliot.dataset.samplers.base_sampler import TraditionalSampler
+from elliot.dataset.samplers.base_sampler import AbstractSampler
 
 
-class CustomSampler(TraditionalSampler):
-    def __init__(self, indexed_ratings, seed=42):
-        super().__init__(seed, indexed_ratings)
+class CustomSampler(AbstractSampler):
+    def __init__(self, **params):
+        super().__init__(**params)
         #np.random.seed(seed)
         #self._indexed_ratings = indexed_ratings
         #self._users = list(self._indexed_ratings.keys())
