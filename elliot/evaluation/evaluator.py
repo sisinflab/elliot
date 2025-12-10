@@ -60,7 +60,7 @@ class Evaluator(object):
         #                                       for m in data.config.evaluation.simple_metrics]+[m["metric"].lower()
         #                                                                                        for m in self._complex_metrics]:
         #     raise Exception("Validation metric must be in list of general metrics")
-        self._test = data.get_test()
+        self._test = data.get_test_dict()
 
         self._pop = popularity_utils.Popularity(self._data)
 
@@ -69,8 +69,8 @@ class Evaluator(object):
                                                    num_items=self._data.num_items,
                                                    data = self._data,
                                                    additional_metrics=self._complex_metrics)
-        if data.get_validation():
-            self._val = data.get_validation()
+        if data.get_val_dict():
+            self._val = data.get_val_dict()
             self._val_evaluation_objects = SimpleNamespace(relevance=relevance.Relevance(self._val, self._rel_threshold),
                                                            pop=self._pop,
                                                            num_items=self._data.num_items,

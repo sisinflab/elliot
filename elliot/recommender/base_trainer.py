@@ -1,3 +1,4 @@
+from typing import Union
 import inspect
 import random
 import logging as pylog
@@ -10,16 +11,30 @@ import scipy.sparse as sp
 from abc import ABC, abstractmethod
 from tqdm import tqdm
 from types import SimpleNamespace
+from torch.utils.data import DataLoader
 
-from elliot.dataset.samplers.base_sampler import FakeSampler
 from elliot.evaluation.evaluator import Evaluator
 from elliot.recommender.early_stopping import EarlyStopping
+
+from elliot.utils.validation import TrainerValidator
 from elliot.utils.folder import build_model_folder
 from elliot.utils.write import store_recommendation
 from elliot.utils import logging
 
 
 class AbstractTrainer(ABC):
+    restore: bool = False
+    validation_metric: Union[str, list] = None
+    save_weights: bool = False
+    save_recs: bool = False
+    verbose: bool = True
+    validation_rate: int = 1
+    optimize_internal_loss: bool = False
+    epochs: int = 1
+    batch_size: int = None
+    eval_batch_size: int = None
+    seed: int = 42
+
     def __init__(self, data, config, params, model_class, *args, **kwargs):
         """
         This class represents a recommender model. You can load a pretrained model
@@ -34,53 +49,58 @@ class AbstractTrainer(ABC):
         self._params = params
 
         if hasattr(data.config, "negative_sampling"):
-            self._mask_func = self._negative_sampling_eval
+            self.get_recs = self.get_recs_neg_eval
         else:
-            self._mask_func = self._full_rank_eval
+            self.get_recs = self.get_recs_full_eval
 
-        # Base params
-        self._restore = getattr(self._params.meta, "restore", False)
+        # Validate and assign meta parameters
+        self.set_params(meta=True)
 
+        # Validation metric
         _cutoff_k = getattr(data.config.evaluation, "cutoffs", [data.config.top_k])
         _cutoff_k = _cutoff_k if isinstance(_cutoff_k, list) else [_cutoff_k]
         _first_metric = data.config.evaluation.simple_metrics[0] if data.config.evaluation.simple_metrics else ""
         _default_validation_k = _cutoff_k[0]
-        self._validation_metric = getattr(self._params.meta, "validation_metric",
-                                          _first_metric + "@" + str(_default_validation_k)).split("@")
-        if self._validation_metric[0].lower() not in [m.lower()
+
+        if self.validation_metric is None:
+            self.validation_metric = _first_metric + "@" + str(_default_validation_k)
+
+        validation_metric = self.validation_metric.split("@")
+
+        if validation_metric[0].lower() not in [m.lower()
                                                       for m in data.config.evaluation.simple_metrics]:
             raise Exception("Validation metric must be in the list of simple metrics")
 
-        self._validation_k = int(self._validation_metric[1]) if len(self._validation_metric) > 1 else _cutoff_k[0]
+        self._validation_k = int(validation_metric[1]) if len(validation_metric) > 1 else _cutoff_k[0]
+
         if self._validation_k not in _cutoff_k:
             raise Exception("Validation cutoff must be in general cutoff values")
 
-        self._validation_metric = self._validation_metric[0]
-        self._save_weights = getattr(self._params.meta, "save_weights", False)
-        self._save_recs = getattr(self._params.meta, "save_recs", False)
-        self._verbose = getattr(self._params.meta, "verbose", True)
-        self._validation_rate = getattr(self._params.meta, "validation_rate", 1)
-        self._optimize_internal_loss = getattr(self._params.meta, "optimize_internal_loss", False)
-        self._epochs = int(getattr(self._params, "epochs", 1))
-        self._seed = getattr(self._params, "seed", 42)
+        self.validation_metric = validation_metric[0]
+
+        # Early stopping
         self._early_stopping = EarlyStopping(SimpleNamespace(**getattr(self._params, "early_stopping", {})),
-                                             self._validation_metric, self._validation_k, _cutoff_k,
+                                             self.validation_metric, self._validation_k, _cutoff_k,
                                              data.config.evaluation.simple_metrics)
-        self._iteration = 0
-        if self._epochs < self._validation_rate:
-            raise Exception(f"The first validation epoch ({self._validation_rate}) "
-                            f"is later than the overall number of epochs ({self._epochs}).")
 
-        self._batch_size = (
-            self._params.batch_size if getattr(self._params, "batch_size", 0) > 0
-            else self._data.batch_size
-        )
-        self._data.batch_size = self._batch_size
+        # Validate and assign other parameters
+        self.set_params()
 
-        np.random.seed(self._seed)
-        random.seed(self._seed)
-        #self._nprandom = np.random
-        #self._random = random
+        if self.epochs < self.validation_rate:
+            raise Exception(f"The first validation epoch ({self.validation_rate}) "
+                            f"is later than the overall number of epochs ({self.epochs}).")
+
+        if self.batch_size is None:
+            self.batch_size = self._data.batch_size
+        else:
+            self._data.batch_size = self.batch_size
+
+        if self.eval_batch_size is None:
+            self.eval_batch_size = self.batch_size
+
+        # Set seed
+        np.random.seed(self.seed)
+        random.seed(self.seed)
 
         # Logger
         package_name = inspect.getmodule(model_class).__package__
@@ -88,16 +108,9 @@ class AbstractTrainer(ABC):
         self.logger = logging.get_logger_model(rec_name, pylog.CRITICAL if self._config.config_test else pylog.DEBUG)
 
         # Model
-        self._model = model_class(data, params, self._seed, self.logger)
+        self._model = model_class(data, params, self.seed, self.logger)
 
-        # Sampler
-        self._sampler = self._model.sampler
-        self._sampler.batch_size = self._batch_size
-        if isinstance(self._sampler, FakeSampler):
-            self._verbose = False
-        # self._sampler.events = data.transactions
-
-        # Other params
+        # Further parameters
         self._num_items = self._data.num_items
         self._num_users = self._data.num_users
 
@@ -117,15 +130,27 @@ class AbstractTrainer(ABC):
             os.sep.join([self._config.path_output_rec_weight, self.name, f"best-weights-{self.name}"])
         )
 
+    def set_params(self, meta: bool = False):
+        """Validate and set object parameters.
+
+        Args:
+            meta (bool): If True assign metadata fields, otherwise training fields.
+        """
+        param_ns = self._params if not meta else self._params.meta
+        validator = TrainerValidator(**vars(param_ns))
+        for name, val in validator.get_validated_params(meta=meta).items():
+            setattr(self, name, val)
+
     @property
     def name(self):
         return self._model.name + f"_{self.get_base_params_shortcut()}" + self._model.name_param
 
     def get_base_params_shortcut(self):
         return "_".join([str(k) + "=" + str(v).replace(".", "$") for k, v in
-                         dict({"seed": self._seed,
-                               "epochs": self._epochs,
-                               "batch_size": self._batch_size}).items()
+                         dict({"seed": self.seed,
+                               "epochs": self.epochs,
+                               "batch_size": self.batch_size,
+                               "eval_batch_size": self.eval_batch_size}).items()
                          ])
 
     # def get_model_params_shortcut(self):
@@ -135,28 +160,27 @@ class AbstractTrainer(ABC):
     #          for p in self._model.params_list]
     #     )
 
-    @abstractmethod
-    def _train_epoch(self, it, dataloader, *args):
-        pass
-
     def train(self):
-        if self._restore:
+        if self.restore:
             return self.restore_weights()
 
         print(f"Transactions: {self._data.transactions}")
-        train_dataloader = self._sampler.initialize()
+        training_dataloader = self._model.get_training_dataloader()
 
-        for it in self.iterate(self._epochs):
+        if not isinstance(training_dataloader, DataLoader):
+            self.verbose = False
+
+        for it in self.iterate(self.epochs):
             print(f"\n********** Iteration: {it + 1}")
             start = time.perf_counter()
-            loss = self._train_epoch(it, train_dataloader)
+            loss = self._train_epoch(it, training_dataloader)
             end = time.perf_counter()
             print(f"Duration: {end - start}")
-            if not (it + 1) % self._validation_rate:
+            if not (it + 1) % self.validation_rate:
                 self.evaluate(it, loss / (it + 1))
 
     def evaluate(self, it=0, loss=0):
-        recs = self.get_recommendations(self.evaluator.get_needed_recommendations())
+        recs = self.get_recs(self.evaluator.get_needed_recommendations())
         result_dict = self.evaluator.eval(recs)
 
         self._losses.append(loss)
@@ -164,11 +188,11 @@ class AbstractTrainer(ABC):
         self._results.append(result_dict)
 
         # if it is not None:
-        self.logger.info(f'Epoch {(it + 1)}/{self._epochs} loss {loss / (it + 1):.5f}')
+        self.logger.info(f'Epoch {(it + 1)}/{self.epochs} loss {loss / (it + 1):.5f}')
         # else:
         #    self.logger.info(f'Finished')
 
-        if self._save_recs:
+        if self.save_recs:
             self.logger.info(f"Writing recommendations at: {self._config.path_output_rec_result}")
             # if it is not None:
             store_recommendation(recs[1], os.path.abspath(
@@ -181,41 +205,89 @@ class AbstractTrainer(ABC):
             # if it is not None:
             self._params.best_iteration = it + 1
             self.logger.info("******************************************")
-            self.best_metric_value = self._results[-1][self._validation_k]["val_results"][self._validation_metric]
-            if self._save_weights:
+            self.best_metric_value = self._results[-1][self._validation_k]["val_results"][self.validation_metric]
+            if self.save_weights:
                 if hasattr(self, "_model"):
                     self._model.save_weights(self._saving_filepath)
                 else:
                     self.logger.warning("Saving weights FAILED. No model to save.")
 
-    @abstractmethod
-    def get_recommendations(self, k, *args):
-        pass
+    def get_recs_full_eval(self, k: int = 100, *args):
+        preds_test, preds_val = {}, {}
+        dataloader = self._data.full_eval_dataloader(self.eval_batch_size)
 
-    def process_protocol(self, k, masks, predictions, start, stop):
-        val_mask, test_mask = masks
-        test_recs = self.get_single_recommendation(k, test_mask, predictions, start, stop)
-        val_recs = self.get_single_recommendation(k, val_mask, predictions, start, stop) if val_mask else test_recs
-        return val_recs, test_recs
+        iter_data = tqdm(
+            dataloader,
+            desc="Full eval",
+            total=len(dataloader),
+            leave=False
+        )
 
-    def get_single_recommendation(self, k, mask, predictions, start, stop):
-        v, i = self._get_top_k(self._mask_func(mask, predictions), k)
-        mapped_items = np.array(self._data.private_items)[i]
-        mat = [[*zip(item, val)] for item, val in zip(mapped_items, v)]
-        proc_batch = dict(zip(self._data.private_users[start:stop], mat))
+        for users in iter_data:
+            train_batch = self._data.sp_i_train_ratings[users.tolist()]
+
+            recs = self._compute_batch_recs(k=k, user_indices=users, train_batch=train_batch)
+
+            preds_test.update(recs)
+            preds_val.update(recs)
+
+        return preds_val, preds_test
+
+    def get_recs_neg_eval(self, k: int = 100, *args):
+        preds_test, preds_val = {}, {}
+        dataloader = self._data.neg_eval_dataloader(self.eval_batch_size)
+
+        iter_data = tqdm(
+            dataloader,
+            desc="Neg eval",
+            total=len(dataloader),
+            leave=False
+        )
+
+        for users, val_items, test_items in iter_data:
+            # Test
+            recs_test = self._compute_batch_recs(k=k, user_indices=users, item_indices=test_items)
+
+            # Validation
+            if val_items is not None:
+                recs_val = self._compute_batch_recs(k=k, user_indices=users, item_indices=val_items)
+            else:
+                recs_val = recs_test
+
+            preds_test.update(recs_test)
+            preds_val.update(recs_val)
+
+        return preds_val, preds_test
+
+    def _compute_batch_recs(self, k, user_indices, item_indices=None, train_batch=None):
+        """Common logic for computing top-k recommendations."""
+        if item_indices is not None:
+            preds = self._model.predict_sampled(user_indices, item_indices)
+            mask = item_indices == -1
+        else:
+            preds = self._model.predict_full(user_indices)
+            mask = train_batch.nonzero()
+
+        v, i = self._get_top_k(preds, k, mask, item_indices)
+        recs_dict = self._get_recs_dict(v, i, user_indices)
+
+        return recs_dict
+
+    def _get_recs_dict(self, values, item_indices, user_indices):
+        pr_users, pr_items = self._data.get_inverse_mappings()
+        mapped_items = np.array(pr_items)[item_indices]
+        mat = [[*zip(item, val)] for item, val in zip(mapped_items, values)]
+        proc_batch = dict(zip([pr_users[u_i] for u_i in user_indices], mat))
         return proc_batch
 
-    @abstractmethod
-    def _full_rank_eval(self, mask, preds):
-        raise NotImplementedError()
+    def _get_top_k(self, users_recs, k, mask, item_indices=None):
+        users_recs[mask] = -torch.inf
+        v, i = torch.topk(users_recs, k=k, sorted=True)
 
-    @abstractmethod
-    def _negative_sampling_eval(self, mask, preds):
-        raise NotImplementedError()
+        if item_indices is not None:
+            i = item_indices.gather(1, i)
 
-    @abstractmethod
-    def _get_top_k(self, users_recs, k):
-        raise NotImplementedError()
+        return v.numpy(), i.numpy()
 
     def restore_weights(self):
         try:
@@ -227,10 +299,10 @@ class AbstractTrainer(ABC):
             raise Exception(f"Error in model restoring operation! {ex}")
 
     def get_loss(self):
-        if self._optimize_internal_loss:
+        if self.optimize_internal_loss:
             return min(self._losses)
         else:
-            return -max([r[self._validation_k]["val_results"][self._validation_metric] for r in self._results])
+            return -max([r[self._validation_k]["val_results"][self.validation_metric] for r in self._results])
 
     def get_params(self):
         return self._params.__dict__
@@ -239,11 +311,11 @@ class AbstractTrainer(ABC):
         return self._results[self.get_best_arg()]
 
     def get_best_arg(self):
-        if self._optimize_internal_loss:
+        if self.optimize_internal_loss:
             val_results = np.argmin(self._losses)
         else:
             val_results = np.argmax(
-                [r[self._validation_k]["val_results"][self._validation_metric] for r in self._results])
+                [r[self._validation_k]["val_results"][self.validation_metric] for r in self._results])
         return val_results
 
     def iterate(self, epochs):
@@ -253,6 +325,10 @@ class AbstractTrainer(ABC):
                 break
             else:
                 yield iteration
+
+    @abstractmethod
+    def _train_epoch(self, it, dataloader, *args):
+        raise NotImplementedError()
 
     #@staticmethod
     #def _batch_remove(original_str: str, char_list):
@@ -269,9 +345,9 @@ class Trainer(AbstractTrainer):
         loss = 0
         steps = 0
         iter_ = tqdm(
-            total=int(self._model.transactions // self._batch_size),
+            total=int(self._model.transactions // self.batch_size),
             desc="Training",
-            disable=not self._verbose
+            disable=not self.verbose
         )
         with iter_ as t:
             for batch in dataloader:
@@ -281,50 +357,11 @@ class Trainer(AbstractTrainer):
                 t.update()
         return loss
 
-    def get_recommendations(self, k: int = 100, *args):
-        predictions_top_k_test = {}
-        predictions_top_k_val = {}
-
-        iter_data = tqdm(
-            self._data,
-            desc="Processing batches",
-            total=len(self._data),
-            leave=False
-        )
-
-        for (start, stop), masks in iter_data:
-            predictions = self._model.predict(start, stop)
-            recs_val, recs_test = self.process_protocol(k, masks, predictions, start, stop)
-            predictions_top_k_val.update(recs_val)
-            predictions_top_k_test.update(recs_test)
-
-        return predictions_top_k_val, predictions_top_k_test
-
-    def _full_rank_eval(self, mask, preds):
-        if isinstance(preds, sp.csr_matrix):
-            preds = preds.toarray()
-        preds[mask.nonzero()] = -np.inf
-        return preds
-
-    def _negative_sampling_eval(self, mask, preds):
-        if isinstance(preds, sp.csr_matrix):
-            preds = preds.multiply(mask).toarray()
-        else:
-            preds = np.multiply(preds, mask.toarray())
-        return preds
-
-    def _get_top_k(self, users_recs, k):
-        index_ordered = np.argpartition(users_recs, -k, axis=1)[:, -k:]
-        value_ordered = np.take_along_axis(users_recs, index_ordered, axis=1)
-        local_top_k = np.take_along_axis(index_ordered, value_ordered.argsort(axis=1)[:, ::-1], axis=1)
-        value_sorted = np.take_along_axis(users_recs, local_top_k, axis=1)
-        return value_sorted, local_top_k
-
 
 class TraditionalTrainer(Trainer):
     def __init__(self, data, config, params, model_class):
         super().__init__(data, config, params, model_class)
-        self._epochs = 1
+        self.epochs = 1
 
     def _train_epoch(self, *args):
         self._model.initialize()
@@ -335,21 +372,20 @@ class GeneralTrainer(AbstractTrainer):
     def __init__(self, data, config, params, model_class):
         super().__init__(data, config, params, model_class)
         self.optimizer = self._model.optimizer
-        torch.manual_seed(self._seed)
+        torch.manual_seed(self.seed)
 
     def _train_epoch(self, it, dataloader, *args):
         self._model.train()
         total_loss, steps = 0, 0
         iter_ = tqdm(
-            total=int(self._model.transactions // self._batch_size),
+            total=int(self._model.transactions // self.batch_size),
             desc="Training",
-            disable=not self._verbose
+            disable=not self.verbose
         )
         with iter_ as t:
             for batch in dataloader:
                 steps += 1
                 self.optimizer.zero_grad()
-                batch = tuple(self._to_tensor(b) for b in batch)
                 res = self._model.train_step(batch, steps, *args)
                 loss, inputs = res if isinstance(res, tuple) else (res, None)
                 loss.backward(inputs=inputs)
@@ -363,40 +399,3 @@ class GeneralTrainer(AbstractTrainer):
     def evaluate(self, it=0, loss=0):
         self._model.eval()
         super().evaluate(it, loss)
-
-    def get_recommendations(self, k: int = 100, *args):
-        predictions_top_k_test = {}
-        predictions_top_k_val = {}
-
-        iter_data = tqdm(
-            self._data,
-            desc="Processing batches",
-            total=len(self._data),
-            leave=False
-        )
-
-        for (start, stop), masks in iter_data:
-            predictions = self._model.predict(start, stop)
-            recs_val, recs_test = self.process_protocol(k, masks, predictions, start, stop)
-            predictions_top_k_val.update(recs_val)
-            predictions_top_k_test.update(recs_test)
-
-        return predictions_top_k_val, predictions_top_k_test
-
-    def _full_rank_eval(self, mask, preds):
-        preds[mask.nonzero()] = -np.inf
-        return preds
-
-    def _negative_sampling_eval(self, mask, preds):
-        preds = preds * torch.tensor(mask.toarray())
-        return preds
-
-    def _get_top_k(self, users_recs, k):
-        v, i = torch.topk(users_recs, k=k, sorted=True)
-        return v.numpy(), i.numpy()
-
-    def _to_tensor(self, b):
-        if isinstance(b, torch.Tensor):
-            return b
-        else:
-            return torch.tensor(b, dtype=torch.int64)
