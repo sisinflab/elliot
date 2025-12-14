@@ -111,6 +111,9 @@ In the following, a sample configuration file is shown to demonstrate how a samp
 from elliot.run import run_experiment
 
 run_experiment("configuration/file/path")
+
+# Hydra-driven overrides can tweak values without editing the file
+run_experiment("configuration/file/path", config_overrides=["experiment.top_k=20"])
 ```
 
 The following file is a simple configuration for an experimental setup. It contains all the instructions to get 
