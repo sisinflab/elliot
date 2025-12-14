@@ -57,9 +57,9 @@ class RecMixin(object):
             self._results.append(result_dict)
 
             if it is not None:
-                self.logger.info(f'Epoch {(it + 1)}/{self._epochs} loss {loss/(it + 1):.5f}')
+                self.logger.debug(f'Epoch {(it + 1)}/{self._epochs} loss {loss/(it + 1):.5f}')
             else:
-                self.logger.info(f'Finished')
+                self.logger.info("Completed evaluation run")
 
             if self._save_recs:
                 self.logger.info(f"Writing recommendations at: {self._config.path_output_rec_result}")
@@ -73,8 +73,12 @@ class RecMixin(object):
             if (len(self._results) - 1) == self.get_best_arg():
                 if it is not None:
                     self._params.best_iteration = it + 1
-                self.logger.info("******************************************")
-                self.best_metric_value = self._results[-1][self._validation_k]["val_results"][self._validation_metric]
+                best_val = self._results[-1][self._validation_k]["val_results"][self._validation_metric]
+                self.best_metric_value = best_val
+                self.logger.info(
+                    "Recorded best validation result",
+                    extra={"context": {"metric": self._validation_metric, "value": best_val, "iteration": (it + 1) if it is not None else None}}
+                )
                 if self._save_weights:
                     if hasattr(self, "_model"):
                         self._model.save_weights(self._saving_filepath)
@@ -128,7 +132,10 @@ class RecMixin(object):
     def restore_weights(self):
         try:
             self._model.load_weights(self._saving_filepath)
-            print(f"Model correctly Restored")
+            self.logger.info(
+                "Model restored from disk",
+                extra={"context": {"path": self._saving_filepath}}
+            )
             self.evaluate()
             return True
 
@@ -175,6 +182,3 @@ class RecMixin(object):
                 break
             else:
                 yield iteration
-
-
-

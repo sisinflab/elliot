@@ -12,6 +12,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow import keras
 from elliot.dataset.samplers import pointwise_pos_neg_sampler as pws
+from elliot.utils import logging as elog
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
@@ -201,6 +202,7 @@ class IRGAN_model(keras.Model):
         self._d_epochs = d_epochs
         self._batch_size = batch_size
         self._sample_lambda = sample_lambda
+        self.logger = elog.get_logger(self.__class__.__name__)
 
         self.initializer = tf.random_uniform_initializer(minval=-0.05, maxval=0.05, seed=1234)
 
@@ -235,7 +237,10 @@ class IRGAN_model(keras.Model):
 
     def train_step(self):
         for d_epoch in range(self._d_epochs):
-            print(f'\n***** Train D - Epoch{d_epoch + 1}/{self._d_epochs}')
+            self.logger.info(
+                "Training discriminator epoch",
+                extra={"context": {"epoch": d_epoch + 1, "total": self._d_epochs}}
+            )
             dis_loss, step = 0, 0
             for batch in self._discriminator.sampler.step(self._discriminator.data.transactions, self._batch_size):
                 dis_loss += self._discriminator.train_step(batch)
@@ -243,7 +248,10 @@ class IRGAN_model(keras.Model):
             dis_loss /= step
 
         for g_epoch in range(self._g_epochs):
-            print(f'***** Train G - Epoch{g_epoch + 1}/{self._g_epochs}')
+            self.logger.info(
+                "Training generator epoch",
+                extra={"context": {"epoch": g_epoch + 1, "total": self._g_epochs}}
+            )
             gan_loss = 0
             for user in range(self._num_users):
                 # print(f'***** Train G - Epoch{g_epoch+1}/{self._g_epochs} - User {user+1}/{self._num_users}')
@@ -293,13 +301,19 @@ class IRGAN_model(keras.Model):
         for g_epoch in range(self._g_pretrain_epochs):
             for batch in self._generator.sampler.step(self._generator.data.transactions, self._batch_size):
                 self._generator.train_step(batch)
-            print(f'***** Pre Train G - Epoch {g_epoch + 1}/{self._g_pretrain_epochs}')
+            self.logger.info(
+                "Pretraining generator epoch",
+                extra={"context": {"epoch": g_epoch + 1, "total": self._g_pretrain_epochs}}
+            )
 
     def pre_train_discriminator(self):
         for d_epoch in range(self._d_pretrain_epochs):
             for batch in self._discriminator.sampler.step(self._discriminator.data.transactions, self._batch_size):
                 self._discriminator.train_step(batch)
-            print(f'***** Pre Train D - Epoch {d_epoch + 1}/{self._d_pretrain_epochs}\n')
+            self.logger.info(
+                "Pretraining discriminator epoch",
+                extra={"context": {"epoch": d_epoch + 1, "total": self._d_pretrain_epochs}}
+            )
 
     def get_config(self):
         raise NotImplementedError

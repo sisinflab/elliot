@@ -8,5 +8,6 @@ __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
 from . import folder
+from . import hydra_config
 from . import read
 from . import write

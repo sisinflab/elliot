@@ -170,10 +170,16 @@ class KaHFM(RecMixin, BaseRecommenderModel):
         if self._restore:
             return self.restore_weights()
 
-        print(f"Transactions: {self._data.transactions}")
+        self.logger.info(
+            "Loaded training dataset",
+            extra={"context": {"transactions": self._data.transactions}}
+        )
 
         for it in self.iterate(self._epochs):
-            print(f"\n********** Iteration: {it + 1}")
+            self.logger.debug(
+                "Starting iteration",
+                extra={"context": {"iteration": it + 1, "epochs": self._epochs}}
+            )
             loss = 0
             steps = 0
             with tqdm(total=int(self._data.transactions // self._batch_size), disable=not self._verbose) as t:
@@ -211,4 +217,3 @@ class KaHFM(RecMixin, BaseRecommenderModel):
     #     # update item j factors
     #     d_j = (-user_factors * z - self._negative_item_regularization * item_factors_j)
     #     self._model.set_item_factors(j, item_factors_j + (self._learning_rate * d_j))
-

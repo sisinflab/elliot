@@ -100,9 +100,15 @@ class AttributeUserKNN(RecMixin, BaseRecommenderModel):
         start = time.time()
         self._model.initialize()
         end = time.time()
-        print(f"The similarity computation has taken: {end - start}")
+        self.logger.info(
+            "Similarity computation completed",
+            extra={"context": {"duration_sec": end - start}}
+        )
 
-        print(f"Transactions: {self._data.transactions}")
+        self.logger.info(
+            "Dataset summary",
+            extra={"context": {"transactions": self._data.transactions}}
+        )
 
 
         self.evaluate()

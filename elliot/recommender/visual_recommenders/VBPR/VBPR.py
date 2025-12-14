@@ -124,7 +124,6 @@ class VBPR(RecMixin, BaseRecommenderModel):
 
                 if steps == self._data.transactions // self._batch_size:
                     end_epoch = time.time()
-                    print('\r')
                     self.logger.info(f"Epoch Time: {end_epoch - start_epoch}")
                     t.reset()
                     self.evaluate(it, loss.numpy() / steps)
@@ -149,5 +148,4 @@ class VBPR(RecMixin, BaseRecommenderModel):
             predictions_top_k_val.update(recs_val)
             predictions_top_k_test.update(recs_test)
         return predictions_top_k_val, predictions_top_k_test
-
 

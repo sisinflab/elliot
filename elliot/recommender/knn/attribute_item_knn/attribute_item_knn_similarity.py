@@ -4,6 +4,7 @@ import numpy as np
 from scipy import sparse
 from sklearn.metrics.pairwise import cosine_similarity, euclidean_distances, haversine_distances, chi2_kernel, manhattan_distances
 from sklearn.metrics import pairwise_distances
+from elliot.utils import logging as elog
 
 
 
@@ -32,6 +33,7 @@ class Similarity(object):
         self._public_users = self._data.public_users
         self._private_items = self._data.private_items
         self._public_items = self._data.public_items
+        self.logger = elog.get_logger(self.__class__.__name__)
 
     def initialize(self):
         """
@@ -40,8 +42,10 @@ class Similarity(object):
 
         supported_similarities = ["cosine", "dot", ]
         supported_dissimilarities = ["euclidean", "manhattan", "haversine",  "chi2", 'cityblock', 'l1', 'l2', 'braycurtis', 'canberra', 'chebyshev', 'correlation', 'dice', 'hamming', 'jaccard', 'kulsinski', 'mahalanobis', 'minkowski', 'rogerstanimoto', 'russellrao', 'seuclidean', 'sokalmichener', 'sokalsneath', 'sqeuclidean', 'yule']
-        print(f"\nSupported Similarities: {supported_similarities}")
-        print(f"Supported Distances/Dissimilarities: {supported_dissimilarities}\n")
+        self.logger.info(
+            "Supported similarities and distances",
+            extra={"context": {"similarities": supported_similarities, "dissimilarities": supported_dissimilarities}}
+        )
 
         # self._item_ratings = {}
         # for u, user_items in self._ratings.items():

@@ -15,6 +15,9 @@ explicit structure can generate a rigorous experiment.
 
     run_experiment("configuration/file/path")
 
+    # Hydra-driven overrides let you tweak values without editing the YAML
+    run_experiment("configuration/file/path", config_overrides=["experiment.top_k=20"])
+
 The following file is a simple configuration for an experimental setup.
 It contains all the instructions to get the MovieLens-1M catalog from a
 specific path and perform a train test split in a random sample way with

@@ -8,6 +8,7 @@ from elliot.utils.enums import SplittingStrategy
 from elliot.utils.validation import SplittingGeneralValidator, SplittingValidator, check_range
 from elliot.utils.folder import create_folder_by_index, create_folder
 from elliot.utils.write import save_tabular_df
+from elliot.utils import logging as elog
 
 
 class Splitter:
@@ -71,6 +72,7 @@ class Splitter:
     def __init__(self, data: pd.DataFrame, splitting_ns: SimpleNamespace, random_seed: int = 42):
         self.data = data
         self.splitting_ns = splitting_ns
+        self.logger = elog.get_logger(self.__class__.__name__, seed=random_seed)
 
         # Set general parameters
         self.set_params()
@@ -124,9 +126,15 @@ class Splitter:
                 (self.handle_hierarchy(train), test)
                 for train, test in tuple_list
             ]
-            print("\nRealized a Train/Validation Test splitting strategy\n")
+            self.logger.info(
+                "Completed data split",
+                extra={"context": {"strategy": "train_val_test", "folds": len(tuple_list)}}
+            )
         else:
-            print("\nRealized a Train/Test splitting strategy\n")
+            self.logger.info(
+                "Completed data split",
+                extra={"context": {"strategy": "train_test", "folds": len(tuple_list)}}
+            )
 
         if self.save_on_disk:
             self.store_splitting(tuple_list)
@@ -338,7 +346,10 @@ class Splitter:
         max_indices = np.where(counter_array == max_votes)[0]
         best_ts = all_timestamps[max_indices[-1]]
 
-        print(f"Best Timestamp: {best_ts}")
+        self.logger.info(
+            "Selected best timestamp",
+            extra={"context": {"best_timestamp": float(best_ts), "min_below": min_below, "min_over": min_over}}
+        )
         return self.splitting_passed_timestamp(d, best_ts)
 
     def splitting_k_folds(

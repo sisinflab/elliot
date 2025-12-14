@@ -97,9 +97,15 @@ class AttributeItemKNN(RecMixin, BaseRecommenderModel):
         start = time.time()
         self._model.initialize()
         end = time.time()
-        print(f"The similarity computation has taken: {end - start}")
+        self.logger.info(
+            "Similarity computation completed",
+            extra={"context": {"duration_sec": end - start}}
+        )
 
-        print(f"Transactions: {self._data.transactions}")
+        self.logger.info(
+            "Dataset summary",
+            extra={"context": {"transactions": self._data.transactions}}
+        )
 
         self.evaluate()
 
@@ -117,4 +123,3 @@ class AttributeItemKNN(RecMixin, BaseRecommenderModel):
         #             pickle.dump(self._model.get_model_state(), f)
         #     if self._save_recs:
         #         store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}.tsv")
-

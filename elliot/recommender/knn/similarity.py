@@ -1,8 +1,10 @@
+import logging as pylog
 import numpy as np
 import similaripy as sim
 from scipy.sparse import csr_matrix
 from tqdm import tqdm
 from sklearn.metrics.pairwise import chi2_kernel, pairwise_distances_chunked
+from elliot.utils import logging as elog
 
 
 class Similarity(object):
@@ -40,11 +42,17 @@ class Similarity(object):
         self.dim = train_data.shape[0]
         self.num_neighbors = num_neighbors if num_neighbors > -1 else self.dim
         self._neighborhood = num_neighbors is not None
+        self.logger = elog.get_logger(self.__class__.__name__)
 
     def compute_similarity(self):
         """Compute similarity or distance-based similarity matrix."""
-        print(f"\nSupported Similarities: {self.SUPPORTED_SIMILARITIES}")
-        print(f"Supported Distances/Dissimilarities: {self.SUPPORTED_DISSIMILARITIES}\n")
+        self.logger.info(
+            "Supported similarities and distances",
+            extra={"context": {
+                "similarities": sorted(self.SUPPORTED_SIMILARITIES),
+                "dissimilarities": sorted(self.SUPPORTED_DISSIMILARITIES)
+            }}
+        )
 
         if self.similarity not in (self.SUPPORTED_SIMILARITIES | self.SUPPORTED_DISSIMILARITIES):
             raise ValueError(

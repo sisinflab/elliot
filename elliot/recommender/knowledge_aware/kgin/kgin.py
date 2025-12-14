@@ -56,7 +56,7 @@ class KGIN(RecMixin, BaseRecommenderModel):
         self.public_entities = {**self._data.public_items, **self._side.public_objects}  # questo lo devi prendere da loader di kgin
         self.private_entities = {**self._data.private_items, **self._side.private_objects}
 # srotolatore *iterabile = generato degli elementi , **iter = elementi dell'iterabile, ** = dict chiave-valore
-        print("Building the graph")
+        self.logger.info("Building knowledge graph")
         rd = defaultdict(list)
         rd[0] = list(zip(*self._data.sp_i_train.nonzero())) # we create the "dummy" relation "interacts with"
 
@@ -64,7 +64,7 @@ class KGIN(RecMixin, BaseRecommenderModel):
             ckg_graph.add_edge(self.public_entities[h_id], self.public_entities[t_id], key=self._side.public_relations[r_id])
             rd[self._side.public_relations[r_id]].append([self.public_entities[h_id], self.public_entities[t_id]])
 
-        print("Building adjacency matrix")
+        self.logger.info("Building adjacency matrix")
 
         def _bi_norm_lap(adj):
             # D^{-1/2}AD^{-1/2}
@@ -90,7 +90,7 @@ class KGIN(RecMixin, BaseRecommenderModel):
             return norm_adj.tocoo()
 
         adj_mat_list = []
-        print("Begin to build sparse relation matrix ...")
+        self.logger.info("Building sparse relation matrices")
         for r_id in tqdm(rd.keys()):
             np_mat = np.array(rd[r_id])
             if r_id == 0:

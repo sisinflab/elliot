@@ -13,6 +13,7 @@ from PIL import Image
 
 import numpy as np
 import random
+from elliot.utils import logging as elog
 
 
 class Sampler:
@@ -31,6 +32,7 @@ class Sampler:
         self._images_path = images_path
         self._output_image_size = output_image_size
         self._epochs = epochs
+        self.logger = elog.get_logger(self.__class__.__name__)
 
     def read_features_triple(self, user, pos, neg):
         # load positive and negative item images
@@ -40,12 +42,18 @@ class Sampler:
         try:
             im_pos.load()
         except ValueError:
-            print(f'Image at path {pos}.jpg was not loaded correctly!')
+            self.logger.warning(
+                "Positive image failed to load",
+                extra={"context": {"path": f"{pos}.jpg"}}
+            )
 
         try:
             im_neg.load()
         except ValueError:
-            print(f'Image at path {neg}.jpg was not loaded correctly!')
+            self.logger.warning(
+                "Negative image failed to load",
+                extra={"context": {"path": f"{neg}.jpg"}}
+            )
 
         if im_pos.mode != 'RGB':
             im_pos = im_pos.convert(mode='RGB')
@@ -121,7 +129,10 @@ class Sampler:
         try:
             im.load()
         except ValueError:
-            print(f'Image at path {item}.jpg was not loaded correctly!')
+            self.logger.warning(
+                "Image failed to load",
+                extra={"context": {"path": f"{item}.jpg"}}
+            )
 
         if im.mode != 'RGB':
             im = im.convert(mode='RGB')

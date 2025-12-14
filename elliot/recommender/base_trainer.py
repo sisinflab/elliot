@@ -164,18 +164,27 @@ class AbstractTrainer(ABC):
         if self.restore:
             return self.restore_weights()
 
-        print(f"Transactions: {self._data.transactions}")
+        self.logger.info(
+            "Loaded training dataset",
+            extra={"context": {"transactions": self._data.transactions}}
+        )
         training_dataloader = self._model.get_training_dataloader()
 
         if not isinstance(training_dataloader, DataLoader):
             self.verbose = False
 
         for it in self.iterate(self.epochs):
-            print(f"\n********** Iteration: {it + 1}")
+            self.logger.debug(
+                "Starting iteration",
+                extra={"context": {"iteration": it + 1, "epochs": self.epochs}}
+            )
             start = time.perf_counter()
             loss = self._train_epoch(it, training_dataloader)
             end = time.perf_counter()
-            print(f"Duration: {end - start}")
+            self.logger.debug(
+                "Completed iteration",
+                extra={"context": {"iteration": it + 1, "duration_sec": end - start}}
+            )
             if not (it + 1) % self.validation_rate:
                 self.evaluate(it, loss / (it + 1))
 
@@ -188,7 +197,7 @@ class AbstractTrainer(ABC):
         self._results.append(result_dict)
 
         # if it is not None:
-        self.logger.info(f'Epoch {(it + 1)}/{self.epochs} loss {loss / (it + 1):.5f}')
+        self.logger.debug(f'Epoch {(it + 1)}/{self.epochs} loss {loss / (it + 1):.5f}')
         # else:
         #    self.logger.info(f'Finished')
 
@@ -204,8 +213,12 @@ class AbstractTrainer(ABC):
         if (len(self._results) - 1) == self.get_best_arg():
             # if it is not None:
             self._params.best_iteration = it + 1
-            self.logger.info("******************************************")
-            self.best_metric_value = self._results[-1][self._validation_k]["val_results"][self.validation_metric]
+            best_val = self._results[-1][self._validation_k]["val_results"][self.validation_metric]
+            self.best_metric_value = best_val
+            self.logger.info(
+                "Recorded best validation result",
+                extra={"context": {"metric": self.validation_metric, "value": best_val, "iteration": it + 1}}
+            )
             if self.save_weights:
                 if hasattr(self, "_model"):
                     self._model.save_weights(self._saving_filepath)
@@ -292,7 +305,10 @@ class AbstractTrainer(ABC):
     def restore_weights(self):
         try:
             self._model.load_weights(self._saving_filepath)
-            print(f"Model correctly Restored")
+            self.logger.info(
+                "Model restored from disk",
+                extra={"context": {"path": self._saving_filepath}}
+            )
             self.evaluate()
             return True
         except Exception as ex:

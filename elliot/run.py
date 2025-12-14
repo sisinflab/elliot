@@ -10,6 +10,7 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 import importlib
 import sys
 from os import path
+from typing import List, Optional
 
 import numpy as np
 from hyperopt import Trials, fmin
@@ -35,8 +36,10 @@ print(u'''
          \\///////////////   \\/////////   \\/////////   \\///      \\/////          \\/////    
          ''')
 
-def run_experiment(config_path: str = ''):
-    builder = NameSpaceBuilder(config_path, here, path.abspath(path.dirname(config_path)))
+def run_experiment(config_path: str = '', config_overrides: Optional[List[str]] = None):
+    builder = NameSpaceBuilder(
+        config_path, here, path.abspath(path.dirname(config_path)), config_overrides=config_overrides
+    )
     base = builder.base
     config_test(builder, base)
     logging_project.init(base.base_namespace.path_logger_config, base.base_namespace.path_log_folder)

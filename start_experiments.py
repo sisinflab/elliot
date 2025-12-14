@@ -5,4 +5,4 @@ parser = argparse.ArgumentParser(description="Run sample main.")
 parser.add_argument('--config', type=str, default='split')
 args = parser.parse_args()
 
-run_experiment(f"config_files/{args.config}.yml")
+run_experiment(f"config_files/{args.config}.yaml")

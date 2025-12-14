@@ -5,6 +5,7 @@ import pandas as pd
 
 from elliot.utils.enums import PreFilteringStrategy
 from elliot.utils.validation import PreFilteringValidator
+from elliot.utils import logging as elog
 
 
 class PreFilter:
@@ -55,6 +56,7 @@ class PreFilter:
         self.data = data
         self.pre_filtering_ns = pre_filtering_ns
         self._mask = None
+        self.logger = elog.get_logger(self.__class__.__name__)
 
     def set_params(self, ns: SimpleNamespace):
         """Validate and set object parameters according to the provided namespace.
@@ -132,10 +134,10 @@ class PreFilter:
         """
         threshold = data["rating"].mean()
         self._mask = data['rating'] >= threshold
-        print("\nPre-filtering with Global Average")
-        print(f"The rating average is {round(threshold, 1)}")
-        print(f"The transactions above threshold are {self._mask.sum()}")
-        print(f"The transactions below threshold are {(~self._mask).sum()}")
+        self.logger.info(
+            "Applied global-average prefilter",
+            extra={"context": {"threshold": round(threshold, 1), "above": int(self._mask.sum()), "below": int((~self._mask).sum())}}
+        )
 
     def filter_ratings_by_threshold(self, data: pd.DataFrame, threshold: float):
         """Filter out ratings below a fixed threshold.
@@ -145,10 +147,10 @@ class PreFilter:
             threshold (float): The rating threshold.
         """
         self._mask = data['rating'] >= threshold
-        print("\nPre-filtering with fixed threshold")
-        print(f"The rating threshold is {round(threshold, 1)}")
-        print(f"The transactions above threshold are {self._mask.sum()}")
-        print(f"The transactions below threshold are {(~self._mask).sum()}\n")
+        self.logger.info(
+            "Applied threshold prefilter",
+            extra={"context": {"threshold": round(threshold, 1), "above": int(self._mask.sum()), "below": int((~self._mask).sum())}}
+        )
 
     def filter_ratings_by_user_average(self, data: pd.DataFrame):
         """Filter out ratings that fall below each user's average rating.
@@ -157,9 +159,10 @@ class PreFilter:
             data (pd.DataFrame): The input dataset.
         """
         self._mask = data['rating'] >= data.groupby('userId')['rating'].transform('mean')
-        print("\nPre-filtering with user average")
-        print(f"The transactions above threshold are {self._mask.sum()}")
-        print(f"The transactions below threshold are {(~self._mask).sum()}\n")
+        self.logger.info(
+            "Applied user-average prefilter",
+            extra={"context": {"above": int(self._mask.sum()), "below": int((~self._mask).sum())}}
+        )
 
     def filter_user_k_core(self, data: pd.DataFrame, threshold: int):
         """Retain only users with at least `threshold` interactions.
@@ -171,11 +174,16 @@ class PreFilter:
         user_counts = data["userId"].value_counts()
         valid_users = user_counts[user_counts >= threshold].index
         self._mask = data["userId"].isin(valid_users)
-        print(f"\nPre-filtering with user {threshold}-core")
-        print(f"The transactions before filtering are {len(data)}")
-        print(f"The users before filtering are {data['userId'].nunique()}")
-        print(f"The transactions after filtering are {self._mask.sum()}")
-        print(f"The users after filtering are {data[self._mask]['userId'].nunique()}")
+        self.logger.info(
+            "Applied user k-core prefilter",
+            extra={"context": {
+                "core": threshold,
+                "transactions_before": int(len(data)),
+                "users_before": int(data['userId'].nunique()),
+                "transactions_after": int(self._mask.sum()),
+                "users_after": int(data[self._mask]['userId'].nunique())
+            }}
+        )
 
     def filter_item_k_core(self, data: pd.DataFrame, threshold: int):
         """Retain only items with at least `threshold` interactions.
@@ -187,11 +195,16 @@ class PreFilter:
         item_counts = data["itemId"].value_counts()
         valid_items = item_counts[item_counts >= threshold].index
         self._mask = data["itemId"].isin(valid_items)
-        print(f"\nPre-filtering with item {threshold}-core")
-        print(f"The transactions before filtering are {len(data)}")
-        print(f"The items before filtering are {data['itemId'].nunique()}")
-        print(f"The transactions after filtering are {self._mask.sum()}")
-        print(f"The items after filtering are {data[self._mask]['itemId'].nunique()}")
+        self.logger.info(
+            "Applied item k-core prefilter",
+            extra={"context": {
+                "core": threshold,
+                "transactions_before": int(len(data)),
+                "items_before": int(data['itemId'].nunique()),
+                "transactions_after": int(self._mask.sum()),
+                "items_after": int(data[self._mask]['itemId'].nunique())
+            }}
+        )
 
     def filter_iterative_k_core(self, data: pd.DataFrame, threshold: int) -> pd.DataFrame:
         """Apply iterative k-core filtering by alternating between user and item filtering
@@ -205,15 +218,20 @@ class PreFilter:
             pd.DataFrame: The filtered dataset.
         """
         original_length = -1
-        print("\n**************************************")
-        print(f"Iterative {threshold}-core")
+        self.logger.info(
+            "Starting iterative k-core prefilter",
+            extra={"context": {"core": threshold}}
+        )
         while original_length != len(data):
             original_length = len(data)
             self.filter_user_k_core(data, threshold)
             data = data[self._mask]
             self.filter_item_k_core(data, threshold)
             data = data[self._mask]
-        print("**************************************\n")
+        self.logger.info(
+            "Completed iterative k-core prefilter",
+            extra={"context": {"core": threshold, "remaining": int(len(data))}}
+        )
 
         return data
 
@@ -228,15 +246,23 @@ class PreFilter:
         Returns:
             pd.DataFrame: The filtered dataset.
         """
-        print("\n**************************************")
-        print(f"{n_rounds} rounds of user/item {threshold}-core")
+        self.logger.info(
+            "Starting fixed-round k-core prefilter",
+            extra={"context": {"core": threshold, "rounds": n_rounds}}
+        )
         for i in range(n_rounds):
-            print(f"Iteration:\t{i}")
+            self.logger.info(
+                "Running k-core prefilter iteration",
+                extra={"context": {"round": i, "core": threshold}}
+            )
             self.filter_user_k_core(data, threshold)
             data = data[self._mask]
             self.filter_item_k_core(data, threshold)
             data = data[self._mask]
-        print("**************************************\n")
+        self.logger.info(
+            "Completed fixed-round k-core prefilter",
+            extra={"context": {"core": threshold, "rounds": n_rounds, "remaining": int(len(data))}}
+        )
 
         return data
 
@@ -250,11 +276,16 @@ class PreFilter:
         user_counts = data["userId"].value_counts()
         cold_users = user_counts[user_counts <= threshold].index
         self._mask = data["userId"].isin(cold_users)
-        print(f"\nPre-filtering retaining cold users with {threshold} or less ratings")
-        print(f"The transactions before filtering are {len(data)}")
-        print(f"The users before filtering are {data['userId'].nunique()}")
-        print(f"The transactions after filtering are {self._mask.sum()}")
-        print(f"The users after filtering are {data[self._mask]['userId'].nunique()}")
+        self.logger.info(
+            "Applied cold-user retention prefilter",
+            extra={"context": {
+                "threshold": threshold,
+                "transactions_before": int(len(data)),
+                "users_before": int(data['userId'].nunique()),
+                "transactions_after": int(self._mask.sum()),
+                "users_after": int(data[self._mask]['userId'].nunique())
+            }}
+        )
 
     def _apply_mask_and_check(
         self,

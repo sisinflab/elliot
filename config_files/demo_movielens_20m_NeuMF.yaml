@@ -16,10 +16,10 @@ experiment:
   gpu: -1
   models:
     NeuMF:
-      embed_mf_size: 10
-      embed_mlp_size: 10
+      embed_mf_size: 30
+      embed_mlp_size: 30
       mlp_hidden_sizes: (64,32)
-      dropout: 0.0
+      dropout: 0.2
       is_mf_train: True
       is_mlp_train: True
       learning_rate: 0.00001
@@ -27,4 +27,4 @@ experiment:
       m: 0
       epochs: 1
       batch_size: 2048
-      batch_eval_items: 128
+      batch_eval_items: 1048

@@ -31,10 +31,10 @@ class ProxyRecommender(RecMixin, BaseRecommenderModel):
         return self._name
 
     def train(self):
-        print("Reading recommendations")
+        self.logger.info("Loading recommendations")
         self._recommendations = self.read_recommendations(self._path)
 
-        print("Evaluating recommendations")
+        self.logger.info("Evaluating recommendations")
         self.evaluate()
 
     def get_recommendations(self, top_k):
@@ -73,6 +73,4 @@ class ProxyRecommender(RecMixin, BaseRecommenderModel):
         for name, group in user_groups:
             recs[name] = sorted(data.loc[group.index][['itemId', 'prediction']].apply(tuple, axis=1).to_list(), key=lambda x: x[1], reverse=True)
         return recs
-
-
 

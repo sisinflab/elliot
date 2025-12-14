@@ -13,6 +13,7 @@ import numpy as np
 import sys
 import scipy.sparse as sp
 from sklearn.linear_model import ElasticNet
+from elliot.utils import logging as elog
 
 
 class SlimModel(object):
@@ -26,6 +27,7 @@ class SlimModel(object):
         self._alpha = alpha
         self._epochs = epochs
         self._neighborhood = neighborhood
+        self.logger = elog.get_logger(self.__class__.__name__)
 
         self.md = ElasticNet(alpha=self._alpha,
                              l1_ratio=self._l1_ratio,
@@ -93,15 +95,15 @@ class SlimModel(object):
 
             if verbose and (time.time() - start_time_printBatch > 300 or (
                     currentItem + 1) % 1000 == 0 or currentItem == self._num_items - 1):
-                print('{}: Processed {} ( {:.2f}% ) in {:.2f} minutes. Items per second: {:.0f}'.format(
-                    'SLIMElasticNetRecommender',
-                    currentItem + 1,
-                    100.0 * float(currentItem + 1) / self._num_items,
-                    (time.time() - start_time) / 60,
-                    float(currentItem) / (time.time() - start_time)))
-
-                sys.stdout.flush()
-                sys.stderr.flush()
+                self.logger.debug(
+                    "Reporting SLIM training progress",
+                    extra={"context": {
+                        "processed": currentItem + 1,
+                        "percent": round(100.0 * float(currentItem + 1) / self._num_items, 2),
+                        "minutes": (time.time() - start_time) / 60,
+                        "items_per_sec": float(currentItem) / max(time.time() - start_time, 1e-9)
+                    }}
+                )
 
                 start_time_printBatch = time.time()
 

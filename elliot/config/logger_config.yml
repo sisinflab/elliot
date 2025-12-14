@@ -1,98 +1,10 @@
-version: 1
-objects:
-  queue:
-    class: queue.Queue
-    maxsize: 10000
-formatters:
-  simple:
-    format: '%(time_filter)-15s: %(levelname)-.1s %(message)s'
-    datefmt: '%Y-%m-%d %H:%M:%S'
-filters:
-  time_filter:
-    (): elliot.utils.logging.TimeFilter
-handlers:
-  console:
-    class: logging.StreamHandler
-    level: FATAL
-    formatter: simple
-    stream: ext://sys.stdout
-    filters: [time_filter]
-  file:
-    class: logging.FileHandler
-    level: FATAL
-    filename: !CUSTOM ${log_path_exp}
-    formatter: simple
-    filters: [time_filter]
-  queue_listener:
-    class: elliot.utils.logger_util.QueueListenerHandler
-    handlers:
-      - cfg://handlers.console
-      - cfg://handlers.file
-    queue: cfg://objects.queue
-loggers:
-  'recommender':
-    level: FATAL
-    handlers:
-      - queue_listener
-    propagate: false
-  'DataSet':
-    level: FATAL
-    handlers:
-      - queue_listener
-  'KnowledgeChainsLoader':
-    level: FATAL
-    handlers:
-      - queue_listener
-  'KnowledgeChainsDataObject':
-    level: FATAL
-    handlers:
-      - queue_listener
-  'VisualLoader':
-    level: FATAL
-    handlers:
-      - queue_listener
-  'VisualDataObject':
-    level: FATAL
-    handlers:
-      - queue_listener
-  'DataSetLoader':
-    level: FATAL
-    handlers:
-      - queue_listener
-  'Evaluator':
-    level: FATAL
-    handlers:
-      - queue_listener
-  'namespace':
-    level: FATAL
-    handlers:
-      - queue_listener
-  'ModelCoordinator':
-    level: FATAL
-    handlers:
-      - queue_listener
-  'prefiltering':
-    level: FATAL
-    handlers:
-      - queue_listener
-  'splitter':
-    level: FATAL
-    handlers:
-      - queue_listener
-  'result_handler':
-    level: FATAL
-    handlers:
-      - queue_listener
-  'EarlyStopping':
-    level: FATAL
-    handlers:
-      - queue_listener
-  __main__:
-    level: FATAL
-    handlers:
-      - queue_listener
-    propagate: false
-root:
-  level: FATAL
-  handlers:
-    - console
+# Structured logging defaults for Elliot.
+# Levels can be overridden to be more/less chatty depending on the run.
+app_name: elliot
+console_level: DEBUG
+file_level: DEBUG
+max_bytes: 5000000
+backup_count: 5
+json_file_logs: true
+include_location: true
+color_console: true

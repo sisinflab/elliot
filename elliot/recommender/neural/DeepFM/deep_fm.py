@@ -129,18 +129,24 @@ class DeepFM(RecMixin, BaseRecommenderModel):
         try:
             with open(self._saving_filepath, "rb") as f:
                 self._model.set_model_state(pickle.load(f))
-            print(f"Model correctly Restored")
+            self.logger.info(
+                "Model restored from disk",
+                extra={"context": {"path": self._saving_filepath}}
+            )
 
             recs = self.get_recommendations(self.evaluator.get_needed_recommendations())
             result_dict = self.evaluator.eval(recs)
             self._results.append(result_dict)
 
-            print("******************************************")
+            self.logger.info("Evaluation completed after restore")
             if self._save_recs:
                 store_recommendation(recs, self._config.path_output_rec_result + f"{self.name}.tsv")
             return True
 
         except Exception as ex:
-            print(f"Error in model restoring operation! {ex}")
+            self.logger.error(
+                "Error in model restoring operation",
+                extra={"context": {"error": str(ex)}}
+            )
 
         return False
