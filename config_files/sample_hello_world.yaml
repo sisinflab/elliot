@@ -1,0 +1,19 @@
+experiment:
+  dataset: movielens_1m
+  data_config:
+    strategy: dataset
+    dataset_path: ../data/movielens_1m/dataset.tsv
+  splitting:
+    test_splitting:
+        strategy: random_subsampling
+        test_ratio: 0.2
+  top_k: 10
+  evaluation:
+    simple_metrics: [nDCG]
+#  gpu: -1
+  models:
+    ItemKNN:
+      meta:
+        save_recs: True
+      neighbors: 50
+      similarity: cosine

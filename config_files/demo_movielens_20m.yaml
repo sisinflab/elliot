@@ -1,0 +1,77 @@
+experiment:
+  dataset: movielens_20m
+  data_config:
+    strategy: dataset
+    header: True
+    dataset_path: ../data/movielens_20m/dataset.tsv
+  splitting:
+#    save_on_disk: True
+#    save_folder: ../data/movielens_20m/splitting
+    test_splitting:
+      strategy: temporal_holdout
+      test_ratio: 0.2
+  top_k: 100
+  evaluation:
+    simple_metrics: [ nDCG, HR ]
+  gpu: -1
+  models:
+    ItemKNN:
+      neighborhood: 50
+      similarity: euclidean
+      implicit: False
+      batch_size: 4096
+    UserKNN:
+      neighborhood: 50
+      similarity: euclidean
+      implicit: False
+      batch_size: 4096
+    RP3beta:
+      neighborhood: 50
+      alpha: 1.0
+      beta: 0.6
+      normalize_similarity: False
+    EASER:
+      l2_norm: 1000
+    BPRMF:
+      factors: 10
+      learning_rate: 0.05
+      lambda_user: 0.0
+      lambda_bias: 0.0025
+      lambda_pos_i: 0.0025
+      lambda_neg_i: 0.00025
+      epochs: 1
+      batch_size: 2048
+      eval_batch_size: 512
+    BPRMFBatch:
+      factors: 10
+      learning_rate: 0.001
+      lambda_weights: 0.1
+      epochs: 1
+      batch_size: 2048
+    MF2020Batch:
+      factors: 10
+      learning_rate: 0.05
+      lambda_weights: 0.1
+      m: 0
+      epochs: 1
+      batch_size: 2048
+    SVDpp:
+      factors: 10
+      learning_rate: 0.001
+      lambda_weights: 0.1
+      lambda_bias: 0.001
+      epochs: 1
+      batch_size: 2048
+    NeuMF:
+      embed_mf_size: 10
+      embed_mlp_size: 10
+      mlp_hidden_sizes: (64,32)
+      dropout: 0.0
+      is_mf_train: True
+      is_mlp_train: True
+      learning_rate: 0.00001
+      lambda_weights: 0.1
+      m: 0
+      epochs: 1
+      batch_size: 2048
+      batch_eval_items: 128

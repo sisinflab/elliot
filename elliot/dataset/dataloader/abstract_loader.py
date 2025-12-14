@@ -1,4 +1,5 @@
 import copy
+import logging
 import sys
 from packaging import version
 from abc import ABC, abstractmethod
@@ -24,8 +25,11 @@ class AbstractLoader(ABC):
         raise NotImplementedError
 
     if version.parse(sys.version.split()[0]) < version.parse("3.8"):
-        _version_warning = "WARNING: Your Python version is lower than 3.8. Consequently, Custom class objects created in Side Information Namespace will be created swallowly!!!!"
-        print(_version_warning, file=sys.stderr)
+        _version_warning = (
+            "WARNING: Your Python version is lower than 3.8. Consequently, "
+            "Custom class objects created in Side Information Namespace will be created shallowly."
+        )
+        logging.getLogger(__name__).warning(_version_warning)
 
         def __deepcopy__(self, memo = {}):
             self.logger.warning(self._version_warning)
@@ -38,4 +42,3 @@ class AbstractLoader(ABC):
                 else:
                     newself.__dict__[attribute_name] = attribute_value
             return newself
-

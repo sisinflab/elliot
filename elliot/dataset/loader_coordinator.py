@@ -8,6 +8,11 @@ import pandas as pd
 from types import SimpleNamespace
 
 from elliot.dataset.dataloader.abstract_loader import AbstractLoader
+from elliot.dataset.dataloader.side_info_registry import (
+    AlignmentMode,
+    Materialization,
+    side_info_registry,
+)
 from elliot.utils import logging
 from elliot.splitter.base_splitter import Splitter
 from elliot.prefiltering.standard_prefilters import PreFilter
@@ -76,6 +81,10 @@ class DataSetLoader:
         self.dataframe = None
         self.tuple_list = None
         self.side_information = None
+
+        # Default to aligning side information with the observed training set when present
+        if getattr(self.config.data_config, "side_information", None) and not hasattr(self.config, "align_side_with_train"):
+            setattr(self.config, "align_side_with_train", True)
 
         self._load_data()
 
@@ -228,7 +237,12 @@ class DataSetLoader:
             dataloader_class = getattr(module, side.dataloader)
             if not issubclass(dataloader_class, AbstractLoader):
                 raise Exception("Custom Loaders must inherit from AbstractLoader")
+            desc = side_info_registry.get(side.dataloader)
             side_obj = dataloader_class(users, items, side, self.logger)
+            materialization = getattr(side, "materialization", None) or (desc.materialization if desc else None)
+            alignment = getattr(side, "alignment", None) or (desc.alignment if desc else AlignmentMode.DROP)
+            setattr(side_obj, "_alignment_mode", alignment)
+            setattr(side_obj, "_materialization", materialization)
             side_info_objs.append(side_obj)
 
         self._side_info_objs = side_info_objs
@@ -252,6 +266,7 @@ class DataSetLoader:
         """
         self._intersect_users_items()
         self._clean()
+        self._maybe_materialize_cache()
 
         del self._items, self._users, self._side_info_objs
 
@@ -269,24 +284,35 @@ class DataSetLoader:
 
     def _intersect_users_items(self):
         """
-        Repeatedly intersects users/items with those available in side information.
+        Align users/items with side information based on alignment mode:
+        - DROP: intersect with side info (current behavior)
+        - PAD: keep full train set; side loaders can pad/UNK internally
+        - IMPUTE: keep full train set; side loaders should impute defaults
         """
         users, items = self._users, self._items
-        users_items = [side_obj.get_mapped() for side_obj in self._side_info_objs]
+        user_aligned = users.copy()
+        item_aligned = items.copy()
 
-        while True:
-            new_users, new_items = users.copy(), items.copy()
-            for us_, is_ in users_items:
-                new_users &= us_
-                new_items &= is_
-            if len(new_users) == len(users) and len(new_items) == len(items):
-                break
-            users = new_users
-            items = new_items
-            for side_obj in self._side_info_objs:
-                side_obj.filter(users, items)
+        for side_obj in self._side_info_objs:
+            mode = getattr(side_obj, "_alignment_mode", AlignmentMode.DROP)
+            s_users, s_items = side_obj.get_mapped()
+            if mode == AlignmentMode.DROP:
+                user_aligned &= s_users
+                item_aligned &= s_items
+            elif mode in (AlignmentMode.PAD, AlignmentMode.IMPUTE):
+                # Keep full set; loaders handle padding/imputing internally
+                pass
+            else:
+                user_aligned &= s_users
+                item_aligned &= s_items
 
-        self._users, self._items = users, items
+        # Apply filtering for DROP sources
+        for side_obj in self._side_info_objs:
+            mode = getattr(side_obj, "_alignment_mode", AlignmentMode.DROP)
+            if mode == AlignmentMode.DROP:
+                side_obj.filter(user_aligned, item_aligned)
+
+        self._users, self._items = user_aligned, item_aligned
 
     def _clean(self):
         """
@@ -309,6 +335,27 @@ class DataSetLoader:
             self.dataframe = new_dataframe
         else:
             self.dataframe = clean(self.dataframe)
+
+    def _maybe_materialize_cache(self):
+        """
+        Hook for large side-information sources: allow loaders to expose a
+        preferred materialization strategy (lazy/memory/mmap). For now, we
+        log intent; specific loaders can honor _materialization internally.
+        """
+        for side_obj in getattr(self, "_side_info_objs", []):
+            mat = getattr(side_obj, "_materialization", None)
+            if not mat:
+                continue
+            self.logger.debug(
+                "Side-info materialization hint",
+                extra={
+                    "context": {
+                        "source": side_obj.__class__.__name__,
+                        "materialization": mat,
+                        "alignment": getattr(side_obj, "_alignment_mode", None),
+                    }
+                },
+            )
 
     def _clean_single_dataframe(self, df):
         """

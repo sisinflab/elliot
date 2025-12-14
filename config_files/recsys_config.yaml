@@ -1,0 +1,133 @@
+experiment:
+  dataset: ncf_ml1m
+  data_config:
+    strategy: fixed
+    train_path: ../data/{0}/ml-1m.train.rating
+    test_path: ../data/{0}/ml-1m.test.rating
+  binarize: True
+  negative_sampling:
+    strategy: fixed
+    files: [ "/home/ironman/PycharmProjects/Elliot/data/ncf_ml1m/ml-1m.test.negative" ]
+  top_k: 10
+  evaluation:
+    cutoffs: 10
+    simple_metrics: [nDCG, Recall, HR, Precision, MAP, MRR]
+  gpu: 0
+  external_models_path: ../external/models/__init__.py
+  models:
+#    Random:
+#      meta:
+#        save_recs: True
+#    external.MostPop:
+#      meta:
+#        verbose: True
+#        save_recs: True
+#    external.RendleMF: # from original paper
+#      meta:
+#        hyper_max_evals: 1
+#        hyper_opt_alg: tpe
+#        validation_rate: 1
+#        verbose: True
+#        save_recs: True
+        # optimize_internal_loss: True
+#      epochs: 256 # 256 original paper but 50 comes from NeuMF paper
+#      factors: 192
+#      lr: 0.002
+#      reg: 0.005
+#      m: 8
+#      random_seed: 42
+#    external.iALS: #from TOIS
+#      meta:
+#        hyper_max_evals: 20
+#        hyper_opt_alg: tpe
+#        verbose: True
+#        save_recs: True
+#        validation_rate: 20
+#      epochs: [uniform, 1, 500]
+#      scaling: [linear, log]
+#      factors: [uniform, 1, 200]
+#      alpha: [uniform, 10e-3, 50]
+#      epsilon: [uniform, 10e-3, 10]
+#      reg: [uniform, 10e-3, 10e-2]
+#    external.NeuMF: #from the original paper + Rendle
+#      meta:
+#        hyper_max_evals: 1
+#        hyper_opt_alg: tpe
+#        verbose: True
+#        save_recs: True
+#        validation_rate: 1
+#        optimize_internal_loss: True
+#      mf_factors:  64
+#      dropout: 0
+#      is_mf_train: True
+#      is_mlp_train: True
+#      batch_size: 256
+#      epochs: 100
+#      lr: 0.001
+#      m: 4
+#    ItemKNN: #from TOIS
+#      meta:
+#        save_recs: True
+#        verbose: True
+#        hyper_max_evals: 20
+#        hyper_opt_alg: tpe
+#      neighbors: [uniform, 5, 1000]
+#      similarity: [cosine, jaccard, dice, mahalanobis, euclidean]
+#    UserKNN: #from TOIS
+#      meta:
+#        hyper_max_evals: 20
+#        hyper_opt_alg: tpe
+#        save_recs: True
+#        verbose: True
+#      neighbors: [ uniform, 5, 1000 ]
+#      similarity: [cosine, jaccard, dice, mahalanobis, euclidean]
+#    MultiVAE: # from original paper
+#      meta:
+#        hyper_max_evals: 20
+#        hyper_opt_alg: tpe
+#        save_recs: True
+#        verbose: True
+#        # optimize_internal_loss: True
+#      lr: [loguniform, -11.512925464970229, 0] # exploration taken from TOIS
+#      epochs: 200
+#      batch_size: [ 128, 256, 512 ]
+#      intermediate_dim: 600
+#      latent_dim: 200
+#      dropout_pkeep: 0.5
+#      reg_lambda: [loguniform, -11.512925464970229, 0] # exploration taken from TOIS
+#    Slim: #from TOIS
+#      meta:
+#        hyper_max_evals: 1
+#        hyper_opt_alg: tpe
+#        verbose: True
+#        save_recs: True
+#      l1_ratio: 0.0000119
+#      alpha: 0.0788
+#      neighborhood: 544
+#    external.iALS:
+#      meta:
+#        verbose: True
+#        save_recs: True
+#      factors: 46
+#      alpha: 50
+#      epsilon: 10
+#      reg: 0.00001
+#      scaling: log
+#      epochs: 20
+    external.EASER:
+      meta:
+        verbose: True
+        save_recs: True
+        hyper_max_evals: 1
+        hyper_opt_alg: tpe
+      l2_norm: 1320
+    external.RP3beta: #from TOIS
+      meta:
+        hyper_max_evals: 1
+        hyper_opt_alg: tpe
+        verbose: True
+        save_recs: True
+      neighborhood: 546
+      alpha: 1.0807
+      beta: 0.7029
+      normalize_similarity: True

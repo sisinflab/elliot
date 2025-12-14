@@ -12,6 +12,16 @@ class ItemAttributes(AbstractLoader):
         self.items = items
         self.map_ = self.load_attribute_file(self.attribute_file)
         self.items = self.items & set(self.map_.keys())
+        self.logger.debug(
+            "Loaded item attributes",
+            extra={
+                "context": {
+                    "source": "ItemAttributes",
+                    "items_with_features": len(self.items),
+                    "unique_features": len(set(f for feats in self.map_.values() for f in feats)),
+                }
+            },
+        )
 
     def get_mapped(self):
         return self.users, self.items

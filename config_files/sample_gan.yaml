@@ -1,0 +1,53 @@
+experiment:
+  dataset: movielens_100k
+  data_config:
+    strategy: dataset
+    dataset_path: ../data/movielens_100k/dataset.tsv
+  splitting:
+    test_splitting:
+        strategy: random_subsampling
+        test_ratio: 0.2
+  top_k: 10
+  evaluation:
+    simple_metrics: [HR, RMSE, ItemCoverage, PopREO, PopRSP]
+  gpu: 0
+  models:
+    IRGAN:
+      meta:
+        hyper_opt_alg: grid
+        validation_rate: 5
+        verbose: True
+        save_weights: False
+        save_recs: False
+        validation_metric: HR
+      epochs: 10
+      batch_size: 128
+      factors: [50, 100]
+      lr: [0.00001, 0.0001]
+      l_w: 0.000001
+      l_b: 0
+      l_gan: 0.0001
+      predict_model: generator # You can chose also 'discriminator'
+      g_epochs: 2 # For each model epoch there are g_epochs generator epochs
+      d_epochs: 1 # For each model epoch there are d_epochs generator epochs
+      g_pretrain_epochs: [0, 2] # The epochs to pre-train the generator
+      d_pretrain_epochs: [0, 2] # The epochs to pre-train the discriminator
+      sample_lambda: [0.2, 0.5]
+    CFGAN:
+      meta:
+        save_weights: False
+        save_recs: False
+        hyper_max_evals: 5
+        hyper_opt_alg: tpe
+        validation_metric: HR
+      epochs: 2
+      batch_size: 32
+      factors: [50, 100]
+      lr: [0.001, 0.1]
+      l_w: [0.00001, 0.01]
+      l_b: 0.001
+      l_gan: 0.001
+      g_epochs: [1, 5]
+      d_epochs: 1
+      s_zr: [0.001, 0.1]
+      s_pm: [0.001, 0.1]

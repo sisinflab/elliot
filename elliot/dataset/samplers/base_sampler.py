@@ -5,6 +5,7 @@ import numpy as np
 from abc import ABC, abstractmethod
 
 from elliot.dataset import DataSet
+from elliot.utils import logging as elog
 
 
 class AbstractSampler(ABC):
@@ -15,6 +16,7 @@ class AbstractSampler(ABC):
         users,
         items,
         seed,
+        logger=None,
         **kwargs
     ):
         np.random.seed(seed)
@@ -33,12 +35,16 @@ class AbstractSampler(ABC):
         self._indexed_ratings = train_dict
         self._ui_dict = {u: list(set(self._indexed_ratings[u])) for u in self._indexed_ratings}
         self._lui_dict = {u: len(v) for u, v in self._ui_dict.items()}
+        self.logger = logger or elog.get_logger(self.__class__.__name__, seed=seed)
 
     def initialize(self):
         start = time.time()
         samples = self._sample()
         end = time.time()
-        print(f"Sampling has taken {end - start:.4f} seconds.")
+        self.logger.debug(
+            "Completed sampling",
+            extra={"context": {"duration_sec": round(end - start, 4), "events": getattr(self, "events", None)}}
+        )
         return samples
 
     @abstractmethod

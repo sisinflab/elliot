@@ -1,0 +1,22 @@
+experiment:
+  dataset: movielens_20m
+  data_config:
+    strategy: dataset
+    header: True
+    dataset_path: ../data/movielens_20m/dataset.tsv
+  splitting:
+#    save_on_disk: True
+#    save_folder: ../data/movielens_20m/splitting
+    test_splitting:
+      strategy: temporal_holdout
+      test_ratio: 0.2
+  top_k: 100
+  evaluation:
+    simple_metrics: [ nDCG, HR ]
+  gpu: -1
+  models:
+    RP3beta:
+      neighborhood: 50
+      alpha: 1.0
+      beta: 0.6
+      normalize_similarity: False

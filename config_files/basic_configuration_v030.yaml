@@ -1,0 +1,56 @@
+experiment:
+  version: 0.3.1
+  dataset: cat_dbpedia_movielens_1m_v030.yml
+  data_config:
+    strategy: dataset
+    dataset_path: ../data/cat_dbpedia_movielens_1m_v030/dataset.tsv
+    side_information:
+      - dataloader: ChainedKG
+        map: ../data/cat_dbpedia_movielens_1m_v030/map.tsv
+        features: ../data/cat_dbpedia_movielens_1m_v030/features.tsv
+        properties: ../data/cat_dbpedia_movielens_1m_v030/properties.conf
+#  prefiltering:
+#    strategy: user_average # Not applied in the paper experiments
+  splitting:
+    save_on_disk: True
+    save_folder: ../data/cat_dbpedia_movielens_1m/splitting/
+    test_splitting:
+        strategy: temporal_hold_out
+        test_ratio: 0.2
+    validation_splitting:
+        strategy: temporal_hold_out
+        test_ratio: 0.2
+  top_k: 50
+  evaluation:
+    cutoffs: [10, 5]
+    simple_metrics: [nDCG,Precision,ItemCoverage,EPC,Gini]
+    relevance_threshold: 1
+  gpu: 1
+  external_models_path: ../external/models/__init__.py
+  models:
+    Random:
+      meta:
+        verbose: True
+        save_recs: True
+      seed: 42
+    external.MostPop:
+      meta:
+        verbose: True
+        save_recs: True
+        validation_metric: nDCG@10
+    ItemKNN:
+      meta:
+        verbose: True
+        save_recs: True
+        validation_metric: nDCG@10
+      neighbors: [50, 70, 100]
+      similarity: [cosine, euclidean]
+      implementation: standard
+    AttributeItemKNN:
+      meta:
+        verbose: True
+        save_recs: True
+        validation_metric: nDCG@10
+      loader: ChainedKG
+      neighbors: [50, 70, 100]
+      similarity: [braycurtis, manhattan]

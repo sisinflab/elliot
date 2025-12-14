@@ -208,6 +208,14 @@ class DataSet:
             (data, (rows, cols)), dtype=float, shape=(self.num_users, self.num_items)
         )
 
+        if self.side_information:
+            self._annotate_side_information()
+            self._log_side_information()
+            self.fuser = FeatureFuser(self.side_information)
+        else:
+            self.side_information = None
+            self.fuser = None
+
     def _handle_val_test_sets(self, data_tuple):
         if len(data_tuple) == 2:
             self._val_dict = None
@@ -477,3 +485,40 @@ class DataSet:
             name = side_ns.__name__
             setattr(ns, name, side_ns)
         return ns
+
+    def _annotate_side_information(self):
+        """
+        Attach useful mappings to side-information namespaces so CB/Hybrid models
+        can consume them without re-building public/private mappings.
+        """
+        for _, side_ns in self.side_information.__dict__.items():
+            mapped_users, mapped_items = side_ns.object.get_mapped()
+            setattr(side_ns, "user_mapping", self._u_map)
+            setattr(side_ns, "item_mapping", self._i_map)
+            setattr(side_ns, "mapped_users", {u: self._u_map[u] for u in mapped_users if u in self._u_map})
+            setattr(side_ns, "mapped_items", {i: self._i_map[i] for i in mapped_items if i in self._i_map})
+            setattr(side_ns, "num_users", self.num_users)
+            setattr(side_ns, "num_items", self.num_items)
+            # Alignment strategy and materialization hints from loader
+            setattr(side_ns, "alignment_mode", getattr(side_ns.object, "_alignment_mode", None))
+            setattr(side_ns, "materialization", getattr(side_ns.object, "_materialization", None))
+
+    def _log_side_information(self):
+        for name, side_ns in self.side_information.__dict__.items():
+            mapped_users, mapped_items = side_ns.object.get_mapped()
+            missing_users = len(set(self._train_dict.keys()) - set(mapped_users))
+            missing_items = len(set(self._i_map.keys()) - set(mapped_items))
+            self.logger.info(
+                "Side information aligned",
+                extra={
+                    "context": {
+                        "source": name,
+                        "users_in_side": len(mapped_users),
+                        "items_in_side": len(mapped_items),
+                        "missing_users_vs_train": missing_users,
+                        "missing_items_vs_train": missing_items,
+                        "alignment_mode": getattr(side_ns, "alignment_mode", None),
+                        "materialization": getattr(side_ns, "materialization", None),
+                    }
+                },
+            )

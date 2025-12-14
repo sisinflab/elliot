@@ -47,7 +47,10 @@ class TextualAttributeSequence(AbstractLoader):
             if os.path.isfile(self.textual_feature_pretrain_path):
                 raw_word2vec = open(self.textual_feature_pretrain_path, 'r')
             else:
-                print("Path (word2vec) is wrong!")
+                self.logger.error(
+                    "Invalid word2vec path",
+                    extra={"context": {"path": self.textual_feature_pretrain_path}}
+                )
                 sys.exit()
 
             word2vec_dic = {}
@@ -59,7 +62,10 @@ class TextualAttributeSequence(AbstractLoader):
                 _word = tmp[0]
                 _vec = np.array(tmp[1:], dtype=float)
                 if _vec.shape[0] != emb_dim:
-                    print("Mismatch the dimension of pre-trained word vector with word embedding dimension!")
+                    self.logger.error(
+                        "Word2Vec dimension mismatch",
+                        extra={"context": {"expected_dim": emb_dim, "word": _word}}
+                    )
                     sys.exit()
                 word2vec_dic[_word] = _vec
                 mean = mean + _vec
@@ -76,7 +82,10 @@ class TextualAttributeSequence(AbstractLoader):
                 else:
                     W[i + 1] = np.random.normal(mean, 0.1, size=emb_dim)
 
-            print("%d words exist in the given pretrained model" % count)
+            self.logger.info(
+                "Loaded pretrained word vectors",
+                extra={"context": {"words_found": int(count), "vocab_size": len(vocab)}}
+            )
 
             return W
         pass
