@@ -468,7 +468,7 @@ Print evaluation results as triples
 """""""""""""""""""""""""""""""""""""""
 It is common in the Recommender Systems community to generate the evaluation tables with the format: [method,metric,value].
 
-This choice easily lets use custom pivot tables on the data, and thus enabling several complex analysis.
+This choice easily lets us use custom pivot tables on the data, thus enabling several complex analyses.
 To obtain additional evaluation summaries in this format, insert the following field:
 
 .. code:: yaml
