@@ -24,7 +24,7 @@ from torch_sparse import SparseTensor
 
 from elliot.negative_sampling import NegativeSampler
 from elliot.utils import logging
-
+from elliot.dataset.fusion.fuser import FeatureFuser
 
 class NegEvalDataset(Dataset):
     def __init__(self, dataset_obj):

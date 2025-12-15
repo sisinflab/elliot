@@ -15,16 +15,10 @@ experiment:
     simple_metrics: [ nDCG, HR ]
   gpu: -1
   models:
-    NeuMF:
-      embed_mf_size: 10
-      embed_mlp_size: 10
-      mlp_hidden_sizes: (64,32)
-      dropout: 0.2
-      is_mf_train: True
-      is_mlp_train: True
-      learning_rate: 0.00001
-      lambda_weights: 0.1
-      m: 0
+    LightGCN:
+      lr: 0.001
       epochs: 1
-      batch_size: 2048
-      batch_eval_items: 128
+      factors: 10
+      batch_size: 4096
+      l_w: 1e-6
+      n_layers: 2
