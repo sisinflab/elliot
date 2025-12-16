@@ -1,6 +1,12 @@
 from enum import Enum
 
 
+class DataLoadingStrategy(Enum):
+    FIXED = "fixed"
+    HIERARCHY = "hierarchy"
+    DATASET = "dataset"
+
+
 class PreFilteringStrategy(Enum):
     GLOBAL_TH = 'global_threshold'
     USER_AVG = 'user_average'

@@ -1,11 +1,9 @@
+from typing import List, Optional
+from types import SimpleNamespace
 import os
 import importlib
-import typing as t
-import warnings
-
 import numpy as np
 import pandas as pd
-from types import SimpleNamespace
 
 from elliot.dataset.dataloader.abstract_loader import AbstractLoader
 from elliot.dataset.dataloader.side_info_registry import (
@@ -17,31 +15,28 @@ from elliot.utils import logging
 from elliot.splitter.base_splitter import Splitter
 from elliot.prefiltering.standard_prefilters import PreFilter
 from elliot.dataset.dataset import DataSet
+from elliot.utils.enums import DataLoadingStrategy
 from elliot.utils.read import read_tabular
+from elliot.utils.validation import DataLoadingConfig
 
 
 class DataSetLoader:
-    """
-    The DataSetLoader class is responsible for loading and preparing datasets for training, validation, and testing.
+    """The DataSetLoader class is responsible for loading and preparing datasets for training, validation, and testing.
 
-    It supports multiple loading strategies (`"fixed"`, `"hierarchy"`, `"dataset"`) and integrates optional
-    pre-filtering and side information loading. The final output is a list of `DataSet` objects, ready to be
-    consumed by the recommendation pipeline.
+    It supports multiple loading strategies and integrates optional pre-filtering and side information loading.
+    The final output is a list of `DataSet` objects, ready to be consumed by the recommendation pipeline.
 
-    Attributes:
-        config (SimpleNamespace): Configuration namespace object defining data paths, splitting strategy, filters, etc.
-        args (tuple): Additional positional arguments.
-        kwargs (dict): Additional keyword arguments.
-        column_names (list): Default column names used for reading interaction files.
-        logger (Logger): Logger instance for the class.
-        tuple_list (list): Contains train-validation-test splits depending on the strategy.
-        dataframe (pd.DataFrame): DataFrame with interactions (only for `"dataset"` strategy).
-        side_information (SimpleNamespace): Loaded side information, if specified.
+    Args:
+        config_ns (SimpleNamespace): Configuration namespace object defining data paths, splitting strategy,
+            filters, etc.
+        *args (tuple): Additional positional arguments.
+        **kwargs (dict): Additional keyword arguments.
 
     Supported Loading Strategies:
-        - fixed: Loads train/test/(optional) validation sets from files.
-        - hierarchy: Loads multiple folds from a nested directory structure.
-        - dataset: Loads a single dataset and later applies pre-filtering and splitting.
+
+    - `fixed`: Load train/test/(optional) validation sets from files.
+    - `hierarchy`: Load multiple folds from a nested directory structure.
+    - `dataset`: Load a single dataset and later applies pre-filtering and splitting.
 
     To configure the data loading, include the appropriate
     settings in the configuration file using the pattern shown below.
@@ -50,6 +45,7 @@ class DataSetLoader:
 
       data_config:
         strategy: dataset|fixed|hierarchy
+        header: True|False
         dataset_path: this/is/the/path.tsv
         root_folder: this/is/the/path
         train_path: this/is/the/path.tsv
@@ -65,36 +61,33 @@ class DataSetLoader:
             folder_map_features: this/is/the/path/folder
     """
 
-    def __init__(self, config, *args, **kwargs):
-        """
-        Initializes the DataSetLoader object.
+    strategy: DataLoadingStrategy
+    dataset_path: Optional[str] = None
+    root_folder: Optional[str] = None
+    train_path: Optional[str] = None
+    validation_path: Optional[str] = None
+    test_path: Optional[str] = None
+    header: bool = False
+    binarize: bool = False
+    side_information: Optional[SimpleNamespace] = None
+    seed: int = 42
 
-        Args:
-            config (SimpleNamespace): Configuration namespace object.
-            *args: Additional positional arguments.
-            **kwargs: Additional keyword arguments.
-        """
+    def __init__(self, config_ns: SimpleNamespace, *args, **kwargs):
         self.logger = logging.get_logger(self.__class__.__name__)
         self.args = args
         self.kwargs = kwargs
-        self.config = config
+        self.config_ns = config_ns
+        self.dataset_loading_ns = config_ns.data_config
         self.dataframe = None
         self.tuple_list = None
-        self.side_information = None
+
+        self.set_params()
 
         # Default to aligning side information with the observed training set when present
-        if getattr(self.config.data_config, "side_information", None) and not hasattr(self.config, "align_side_with_train"):
-            setattr(self.config, "align_side_with_train", True)
+        if getattr(self.dataset_loading_ns, "side_information", None) and not hasattr(self.config_ns, "align_side_with_train"):
+            setattr(self.config_ns, "align_side_with_train", True)
 
-        self._load_data()
-
-    def _load_data(self):
-        """
-        Fully loads and preprocesses the dataset.
-
-        Executes loading of ratings, optional side information, and dataset preprocessing.
-        """
-        if self.config.config_test:
+        if self.config_ns.config_test:
             return
 
         self._load_ratings()
@@ -104,47 +97,47 @@ class DataSetLoader:
         if isinstance(self.tuple_list[0][1], list):
             self.logger.warning("You are using a splitting strategy with folds. "
                                 "Paired TTest and Wilcoxon Test are not available!")
-            self.config.evaluation.paired_ttest = False
-            self.config.evaluation.wilcoxon_test = False
+            self.config_ns.evaluation.paired_ttest = False
+            self.config_ns.evaluation.wilcoxon_test = False
+
+    def set_params(self):
+        """Validate and set object parameters."""
+        config = DataLoadingConfig(**vars(self.dataset_loading_ns))
+
+        for name, val in config.get_validated_params().items():
+            setattr(self, name, val)
+
+        self.binarize = self.config_ns.binarize
 
     def _load_ratings(self):
-        """
-        Loads user-item interaction data according to the selected strategy.
+        """Load user-item interaction data according to the selected strategy."""
+        match self.strategy:
 
-        Raises:
-            Exception: If an unsupported strategy is specified.
-        """
-        if self.config.data_config.strategy == "fixed":
-            path_train_data = self.config.data_config.train_path
-            path_val_data = getattr(self.config.data_config, "validation_path", None)
-            path_test_data = self.config.data_config.test_path
+            case DataLoadingStrategy.FIXED:
+                train_df = self._read_from_tsv(self.train_path)
+                self.logger.info(f"{self.train_path} - Loaded")
 
-            train_df = self._read_from_tsv(path_train_data)
-            test_df = self._read_from_tsv(path_test_data)
+                test_df = self._read_from_tsv(self.test_path)
+                self.logger.info(f"{self.test_path} - Loaded")
 
-            self.logger.info(f"{path_train_data} - Loaded")
+                if self.validation_path is not None:
+                    val_df = self._read_from_tsv(self.validation_path)
+                    self.logger.info(f"{self.validation_path} - Loaded")
 
-            if path_val_data:
-                val_df = self._read_from_tsv(path_val_data)
-                self.dataframe = [([(train_df, val_df)], test_df)]
-            else:
-                self.dataframe = [(train_df, test_df)]
+                    self.dataframe = [([(train_df, val_df)], test_df)]
+                else:
+                    self.dataframe = [(train_df, test_df)]
 
-        elif self.config.data_config.strategy == "hierarchy":
-            self.dataframe = self._read_splitting(self.config.data_config.root_folder)
+            case DataLoadingStrategy.HIERARCHY:
+                self.dataframe = self._read_splitting(self.root_folder)
+                self.logger.info(f"{self.root_folder} - Loaded splitting")
 
-        elif self.config.data_config.strategy == "dataset":
-            path_dataset = self.config.data_config.dataset_path
+            case DataLoadingStrategy.DATASET:
+                self.dataframe = self._read_from_tsv(self.dataset_path)
+                self.logger.info(f"{self.dataset_path} - Loaded")
 
-            self.dataframe = self._read_from_tsv(path_dataset)
-            # self.logger.info(('{0} - Loaded'.format(path_dataset)))
-
-        else:
-            raise Exception("Strategy option not recognized")
-
-    def _read_from_tsv(self, file_path):
-        """
-        Loads a TSV file and optionally processes the timestamp or binarizes ratings.
+    def _read_from_tsv(self, file_path: str) -> pd.DataFrame:
+        """Load a TSV file, process the timestamp and optionally binarize ratings.
 
         Args:
             file_path (str): Path to the TSV file containing interactions.
@@ -156,27 +149,21 @@ class DataSetLoader:
         cols = ['userId', 'itemId', 'rating', 'timestamp']
         dtypes = ['str', 'str', 'float', 'float']
 
-        if hasattr(self.config.data_config, 'header'):
-            header: bool = self.config.data_config.header
-        else:
-            header: bool = False
-
         df = read_tabular(
             file_path,
             cols=cols,
             datatypes=dtypes,
             sep='\t',
-            header=header
+            header=self.header
         )
 
-        if self.config.binarize == True or 'rating' not in cols:
+        if self.binarize == True or 'rating' not in cols:
             df["rating"] = 1.0
 
         return df
 
-    def _read_splitting(self, folder_path):
-        """
-        Reads train/val/test splits organized in a hierarchical folder structure.
+    def _read_splitting(self, folder_path: str) -> list:
+        """Read train/val/test splits organized in a hierarchical folder structure.
 
         Args:
             folder_path (str): Root folder path containing the splits.
@@ -203,8 +190,7 @@ class DataSetLoader:
         return tuple_list
 
     def _load_side_information(self):
-        """
-        Loads side information (e.g., user/item features) using custom dataloaders defined in config.
+        """Load side information (e.g., user/item features) using custom dataloaders defined in config.
 
         Raises:
             TypeError: If a provided loader does not inherit from AbstractLoader.
@@ -231,12 +217,12 @@ class DataSetLoader:
         self._items = items
 
         side_info_objs = []
-        sides = self.config.data_config.side_information
+        sides = self.dataset_loading_ns.side_information
         for side in sides:
             module = importlib.import_module("elliot.dataset.dataloader.loaders")
             dataloader_class = getattr(module, side.dataloader)
             if not issubclass(dataloader_class, AbstractLoader):
-                raise Exception("Custom Loaders must inherit from AbstractLoader")
+                raise TypeError("Custom Loaders must inherit from AbstractLoader")
             desc = side_info_registry.get(side.dataloader)
             side_obj = dataloader_class(users, items, side, self.logger)
             materialization = getattr(side, "materialization", None) or (desc.materialization if desc else None)
@@ -249,9 +235,7 @@ class DataSetLoader:
         self._build_side_info_namespace()
 
     def _build_side_info_namespace(self):
-        """
-        Builds a unified namespace from all loaded side information objects.
-        """
+        """Build a unified namespace from all loaded side information objects."""
         ns = SimpleNamespace()
         for side_obj in self._side_info_objs:
             side_ns = side_obj.create_namespace()
@@ -260,9 +244,8 @@ class DataSetLoader:
         self.side_information = ns
 
     def _preprocess_data(self):
-        """
-        Applies user/item filtering based on side information, and basic cleanup.
-        Performs optional pre-filtering, and dataset splitting, only if the `"dataset"` strategy is used.
+        """Apply user/item filtering based on side information, and basic cleanup.
+        Perform optional pre-filtering, and dataset splitting, only if the "dataset" strategy is used.
         """
         self._intersect_users_items()
         self._clean()
@@ -270,21 +253,20 @@ class DataSetLoader:
 
         del self._items, self._users, self._side_info_objs
 
-        if self.config.data_config.strategy != 'dataset':
+        if self.strategy != DataLoadingStrategy.DATASET:
             self.tuple_list = self.dataframe
             return
 
-        if hasattr(self.config, 'prefiltering'):
-            prefilter = PreFilter(self.dataframe, self.config.prefiltering)
+        if hasattr(self.config_ns, 'prefiltering'):
+            prefilter = PreFilter(self.dataframe, self.config_ns.prefiltering)
             self.dataframe = prefilter.filter()
 
         self.logger.info("There will be the splitting")
-        splitter = Splitter(self.dataframe, self.config.splitting, self.config.random_seed)
+        splitter = Splitter(self.dataframe, self.config_ns.splitting, self.seed)
         self.tuple_list = splitter.process_splitting()
 
     def _intersect_users_items(self):
-        """
-        Align users/items with side information based on alignment mode:
+        """Align users/items with side information based on alignment mode:
         - DROP: intersect with side info (current behavior)
         - PAD: keep full train set; side loaders can pad/UNK internally
         - IMPUTE: keep full train set; side loaders should impute defaults
@@ -315,12 +297,7 @@ class DataSetLoader:
         self._users, self._items = user_aligned, item_aligned
 
     def _clean(self):
-        """
-        Cleans all loaded DataFrames by filtering users/items and removing duplicates.
-
-        Returns:
-            Union[list, pd.DataFrame]: Cleaned dataset(s).
-        """
+        """Clean all loaded DataFrames by filtering users/items and removing duplicates."""
         def clean(df): return self._clean_single_dataframe(df)
 
         if isinstance(self.dataframe, list):
@@ -337,8 +314,7 @@ class DataSetLoader:
             self.dataframe = clean(self.dataframe)
 
     def _maybe_materialize_cache(self):
-        """
-        Hook for large side-information sources: allow loaders to expose a
+        """Hook for large side-information sources: allow loaders to expose a
         preferred materialization strategy (lazy/memory/mmap). For now, we
         log intent; specific loaders can honor _materialization internally.
         """
@@ -357,9 +333,8 @@ class DataSetLoader:
                 },
             )
 
-    def _clean_single_dataframe(self, df):
-        """
-        Filters a single DataFrame based on valid users/items and applies basic cleanup,
+    def _clean_single_dataframe(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Filter a single DataFrame based on valid users/items and applies basic cleanup,
         i.e., handles missing values in the 'timestamp' column (if present), and removes duplicates.
 
         Args:
@@ -379,7 +354,7 @@ class DataSetLoader:
         df.drop_duplicates(keep='first', inplace=True)
         return df
 
-    def generate_dataobjects(self) -> t.List[object]:
+    def generate_dataobjects(self) -> List[object]:
         data_list = []
         for p1, (train_val, test) in enumerate(self.tuple_list):
             # testset level
@@ -388,19 +363,19 @@ class DataSetLoader:
                 val_list = []
                 for p2, (train, val) in enumerate(train_val):
                     self.logger.info(f"Test Fold {p1} - Validation Fold {p2}")
-                    single_dataobject = DataSet(self.config, (train, val, test), self.side_information, self.args,
+                    single_dataobject = DataSet(self.config_ns, (train, val, test), self.side_information, self.args,
                                                 self.kwargs)
                     val_list.append(single_dataobject)
                 data_list.append(val_list)
             else:
                 self.logger.info(f"Test Fold {p1}")
-                single_dataobject = DataSet(self.config, (train_val, test), self.side_information, self.args,
+                single_dataobject = DataSet(self.config_ns, (train_val, test), self.side_information, self.args,
                                             self.kwargs)
                 data_list.append([single_dataobject])
         return data_list
 
-    def generate_dataobjects_mock(self) -> t.List[object]:
-        np.random.seed(self.config.random_seed)
+    def generate_dataobjects_mock(self) -> List[object]:
+        np.random.seed(self.seed)
         _column_names = ['userId', 'itemId', 'rating']
         training_set = np.hstack(
             (np.random.randint(0, 5 * 20, size=(5 * 20, 2)), np.random.randint(0, 2, size=(5 * 20, 1))))
@@ -409,6 +384,6 @@ class DataSetLoader:
 
         training_set = pd.DataFrame(np.array(training_set), columns=_column_names)
         test_set = pd.DataFrame(np.array(test_set), columns=_column_names)
-        data_list = [[DataSet(self.config, (training_set, test_set), self.args, self.kwargs)]]
+        data_list = [[DataSet(self.config_ns, (training_set, test_set), self.args, self.kwargs)]]
 
         return data_list

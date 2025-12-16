@@ -1,14 +1,16 @@
-from typing import get_origin, Any, Union, List, Optional
+from typing import get_origin, Any, Union, Optional
+from types import SimpleNamespace
 import ast
-from pydantic import BaseModel, Field, model_validator, create_model, GetCoreSchemaHandler
+from pydantic import BaseModel, Field, model_validator, create_model, GetCoreSchemaHandler, ConfigDict
 from pydantic.v1.main import ModelMetaclass
 from pydantic_core import core_schema
 
-from elliot.utils.enums import PreFilteringStrategy, SplittingStrategy, NegativeSamplingStrategy
+from elliot.utils.enums import PreFilteringStrategy, SplittingStrategy, NegativeSamplingStrategy, DataLoadingStrategy
 
 
 class BaseValidator(BaseModel):
     """Base validator with utility to get the validated params dict."""
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     def get_validated_params(self, *args) -> dict:
         """Return all the validated fields.
@@ -19,6 +21,60 @@ class BaseValidator(BaseModel):
         return self.model_dump()
 
 
+# DataSetLoader configuration
+
+class DataLoadingConfig(BaseValidator):
+    """Dataset loading configuration.
+
+    Attributes:
+        strategy (DataLoadingStrategy): Loading strategy to use.
+        dataset_path (Optional[str]): Path to the full dataset.
+        root_folder (Optional[str]): Root directory containing dataset files.
+        train_path (Optional[str]): Path to the training dataset.
+        validation_path (Optional[str]): Path to the validation dataset.
+        test_path (Optional[str]): Path to the test dataset.
+        header (bool): Whether the dataset(s) include(s) a header row; default is False.
+        binarize (bool): Whether to binarize the dataset; default is False.
+        seed (int): Random seed; default is 42.
+    """
+
+    strategy: DataLoadingStrategy
+    dataset_path: Optional[str] = Field(default=None)
+    root_folder: Optional[str] = Field(default=None)
+    train_path: Optional[str] = Field(default=None)
+    validation_path: Optional[str] = Field(default=None)
+    test_path: Optional[str] = Field(default=None)
+    header: bool = Field(default=False)
+    binarize: bool = Field(default=False)
+    seed: int = Field(default=42)
+
+    @model_validator(mode="after")
+    def validate_strategy_fields(self) -> "DataLoadingConfig":
+        """Validate conditional requirements based on the chosen loading strategy.
+
+        Returns:
+            DataSetLoadingConfig: The object itself.
+        """
+        match self.strategy:
+
+            case DataLoadingStrategy.FIXED:
+                if self.train_path is None or self.test_path is None:
+                    raise AttributeError(f"Both `train_path` and `test_path` must be provided "
+                                         f"with `{self.strategy.value}` strategy.")
+
+            case DataLoadingStrategy.HIERARCHY:
+                if self.root_folder is None:
+                    raise AttributeError(f"Attribute `root_folder` must be provided "
+                                         f"with `{self.strategy.value}` strategy.")
+
+            case DataLoadingStrategy.DATASET:
+                if self.dataset_path is None:
+                    raise AttributeError(f"Attribute `dataset_path` must be provided "
+                                         f"with `{self.strategy.value}` strategy.")
+
+        return self
+
+
 # PreFilter validation
 
 class PreFilteringValidator(BaseValidator):
@@ -26,7 +82,7 @@ class PreFilteringValidator(BaseValidator):
 
     Attributes:
         strategy (PreFilteringStrategy): Pre-filtering strategy to use.
-        threshold (Optional[Union[float, int]]): Threshold value for filtering; must be >= 0.
+        threshold (Optional[Union[float, int]]): Threshold value for filtering; min is 0.
         core (int): Core parameter for the strategy; default is 5.
         rounds (int): Number of rounds to perform; default is 2.
     """
@@ -44,7 +100,8 @@ class PreFilteringValidator(BaseValidator):
             PreFilteringValidator: The object itself.
         """
         if self.strategy == PreFilteringStrategy.COLD_USERS and self.threshold is None:
-            raise ValueError(f"Attribute `threshold` must be provided with `{self.strategy.value}` strategy.")
+            raise AttributeError(f"Attribute `threshold` must be provided "
+                                 f"with `{self.strategy.value}` strategy.")
 
         return self
 
@@ -54,7 +111,7 @@ class PreFilteringValidator(BaseValidator):
 class SplittingGeneralValidator(BaseValidator):
     """Splitting general validator.
 
-    Attributes
+    Attributes:
         save_on_disk (bool): Whether to save split data to disk; default is False.
         save_folder (Optional[str]): Folder path to save splits if `save_on_disk` is True.
     """
@@ -70,7 +127,7 @@ class SplittingGeneralValidator(BaseValidator):
             SplittingGeneralValidator: The object itself.
         """
         if self.save_on_disk and self.save_folder is None:
-            raise ValueError("Attribute `save_folder` must be provided if `save_on_disk` is set to True.")
+            raise AttributeError("Attribute `save_folder` must be provided if `save_on_disk` is set to True.")
 
         return self
 
@@ -81,11 +138,11 @@ class SplittingValidator(BaseValidator):
     Attributes:
         strategy (SplittingStrategy): Splitting strategy to apply.
         timestamp (Optional[float]): Optional timestamp for splitting.
-        min_below (int): Minimum number of items below threshold; default 1.
-        min_over (int): Minimum number of items over threshold; default 1.
-        test_ratio (Optional[float]): Fraction of data for testing; must be between 0.1 and 0.9.
-        leave_n_out (Optional[int]): Number of items to leave out for test; default None.
-        folds (int): Number of folds for cross-validation; default 5, min 1, max 20.
+        min_below (int): Minimum number of items below threshold; default is 1.
+        min_over (int): Minimum number of items over threshold; default is 1.
+        test_ratio (Optional[float]): Fraction of data for testing; min is 0.1, max is 0.9.
+        leave_n_out (Optional[int]): Number of items to leave out for test.
+        folds (int): Number of folds for cross-validation; default is 5, min is 1, max is 20.
     """
 
     strategy: SplittingStrategy = Field()
@@ -110,13 +167,13 @@ class SplittingValidator(BaseValidator):
 
             case SplittingStrategy.TEMP_HOLDOUT:
                 if self.test_ratio is None and self.leave_n_out is None:
-                    raise ValueError(f"At least one among `test_ratio` and `leave_n_out` must be set "
-                                     f"with `{self.strategy.value}` strategy.")
+                    raise AttributeError(f"At least one among `test_ratio` and `leave_n_out` must be provided "
+                                         f"with `{self.strategy.value}` strategy.")
 
             case SplittingStrategy.RAND_SUB_SMP:
                 if self.test_ratio is None and self.leave_n_out is None:
-                    raise ValueError(f"At least one among `test_ratio` and `leave_n_out` must be set "
-                                     f"with `{self.strategy.value}` strategy.")
+                    raise AttributeError(f"At least one among `test_ratio` and `leave_n_out` must be provided "
+                                         f"with `{self.strategy.value}` strategy.")
 
             case SplittingStrategy.RAND_CV:
                 min_val = 2
@@ -134,8 +191,8 @@ class NegativeSamplingValidator(BaseValidator):
 
     Attributes:
         strategy (NegativeSamplingStrategy): Negative sampling strategy to use.
-        num_negatives (int): Number of negative samples; default 99.
-        save_on_disk (bool): Whether to save sampling results to disk; default False.
+        num_negatives (int): Number of negative samples; default is 99, min is 1.
+        save_on_disk (bool): Whether to save sampling results to disk; default is False.
         file_path (Optional[str]): File path for saving negative samples.
         test_file_path (Optional[str]): File path for test negative samples; required for FIXED strategy.
         val_file_path (Optional[str]): File path for validation negative samples.
@@ -156,8 +213,8 @@ class NegativeSamplingValidator(BaseValidator):
             NegativeSamplingValidator: The object itself.
         """
         if self.strategy == NegativeSamplingStrategy.FIXED and self.test_file_path is None:
-            raise ValueError(f"Attribute `test_file_path` must be provided "
-                             f"with `{self.strategy.value}` strategy.")
+            raise AttributeError(f"Attribute `test_file_path` must be provided "
+                                 f"with `{self.strategy.value}` strategy.")
 
         return self
 
@@ -168,16 +225,17 @@ class TrainerValidator(BaseValidator):
     """Training validator.
 
     Attributes:
-        restore (bool): Restore a previous training state.
+        restore (bool): Whether to restore a previous training state; default is False.
         validation_metric (Union[str, list]): Validation metric(s) to compute.
-        save_weights (bool): Save model weights after training.
-        save_recs (bool): Save generated recommendations.
-        verbose (bool): Enable verbose logging.
-        validation_rate (int): Frequency (in epochs) of validation runs.
-        optimize_internal_loss (bool): Optimize internal loss instead of main objective.
-        epochs (int): Number of training epochs.
-        batch_size (int): Training batch size.
-        seed (int): Random seed.
+        save_weights (bool): Whether to save model weights after training; default is False.
+        save_recs (bool): Whether to save generated recommendations; default is False.
+        verbose (bool): Whether to enable verbose logging; default is True.
+        validation_rate (int): Frequency (in epochs) of validation runs; default is 1, min is 1.
+        optimize_internal_loss (bool): Whether to optimize internal loss instead of main objective; default is False.
+        epochs (int): Number of training epochs; default is 1, min is 1.
+        batch_size (int): Training batch size; min is 1.
+        eval_batch_size(int): Evaluation batch size; min is 1.
+        seed (int): Random seed; default is 42.
     """
 
     restore: bool = Field(default=False)

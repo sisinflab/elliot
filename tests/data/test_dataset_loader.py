@@ -5,6 +5,8 @@ from tests.params import params_dataset_loader as p
 from tests.params import params_dataset_loader_fail as p_fail
 from tests.utils import *
 
+strategy_enum = getattr(importlib.import_module('elliot.utils.enums'), 'DataLoadingStrategy')
+
 
 def dataloader(config_dict):
     def wrap_data_config(data_config):
@@ -29,7 +31,7 @@ class TestDataSetLoader:
         val = True if 'val_shape' in params.keys() else False
 
         config = {
-            'strategy': 'fixed',
+            'strategy': strategy_enum.FIXED.value,
             'train_path': params['folder_path'] + '/train.tsv',
             'test_path': params['folder_path'] + '/test.tsv',
             **({'validation_path': params['folder_path'] + '/val.tsv'} if val else {})
@@ -52,7 +54,7 @@ class TestDataSetLoader:
     @pytest.mark.parametrize('params', p['hierarchy_strategy'])
     def test_hierarchy_strategy(self, params):
         config = {
-            'strategy': 'hierarchy',
+            'strategy': strategy_enum.HIERARCHY.value,
             'root_folder': params['root_folder']
         }
 
@@ -76,7 +78,7 @@ class TestDataSetLoader:
     def test_dataset_strategy(self, params):
         dataset_path = params['dataset_folder'] + '/dataset.tsv'
         config = {
-            'strategy': 'dataset',
+            'strategy': strategy_enum.DATASET.value,
             'dataset_path': dataset_path
         }
 
@@ -103,7 +105,7 @@ class TestDataSetLoader:
     def test_filter_nan(self, params):
         dataset_path = params['dataset_folder'] + '/dataset.tsv'
         config = {
-            'strategy': 'dataset',
+            'strategy': strategy_enum.DATASET.value,
             'dataset_path': dataset_path
         }
 
@@ -129,7 +131,7 @@ class TestDataSetLoaderFailures:
         val = True if 'val_shape' in params.keys() else False
 
         config = {
-            'strategy': 'fixed',
+            'strategy': strategy_enum.FIXED.value,
             'test_path': params['folder_path'] + '/test.tsv',
             **({'validation_path': params['folder_path'] + '/val.tsv'} if val else {})
         }
@@ -142,7 +144,7 @@ class TestDataSetLoaderFailures:
         val = True if 'val_shape' in params.keys() else False
 
         config = {
-            'strategy': 'fixed',
+            'strategy': strategy_enum.FIXED.value,
             'train_path': params['folder_path'] + '/train.tsv',
             'test_path': params['folder_path'] + '/test.tsv',
             **({'validation_path': params['folder_path'] + '/val.tsv'} if val else {})
@@ -154,7 +156,7 @@ class TestDataSetLoaderFailures:
     @pytest.mark.parametrize('params', p_fail['hierarchy_strategy_missing_root_folder'])
     def test_hierarchy_strategy_missing_root_folder(self, params):
         config = {
-            'strategy': 'hierarchy',
+            'strategy': strategy_enum.HIERARCHY.value,
             'root_folder': params['root_folder']
         }
 
@@ -164,7 +166,7 @@ class TestDataSetLoaderFailures:
     @pytest.mark.parametrize('params', p_fail['dataset_strategy_missing_dataset'])
     def test_dataset_strategy_missing_dataset(self, params):
         config = {
-            'strategy': 'dataset',
+            'strategy': strategy_enum.DATASET.value,
             'dataset_path': params['dataset_path']
         }
 
@@ -184,7 +186,7 @@ class TestDataSetLoaderFailures:
         )
 
         config = {
-            'strategy': 'dataset',
+            'strategy': strategy_enum.DATASET.value,
             'dataset_path': dataset_path
         }
 
