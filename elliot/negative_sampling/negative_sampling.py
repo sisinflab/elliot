@@ -10,7 +10,7 @@ from tqdm import tqdm
 
 from elliot.utils.enums import NegativeSamplingStrategy
 from elliot.utils.sparse import zero_intervals
-from elliot.utils.validation import NegativeSamplingValidator
+from elliot.utils.config import NegativeSamplingConfig
 
 
 class NegativeSampler:
@@ -87,9 +87,9 @@ class NegativeSampler:
 
     def set_params(self):
         """Validate and set object parameters."""
-        validator = NegativeSamplingValidator(**vars(self.namespace))
+        config = NegativeSamplingConfig(**vars(self.namespace))
 
-        for name, val in validator.get_validated_params().items():
+        for name, val in config.get_validated_params().items():
             setattr(self, name, val)
 
     def sample(self) -> Tuple[Optional[list], list]:

@@ -11,7 +11,7 @@ from abc import ABC, abstractmethod
 
 from elliot.recommender.init import zeros_init
 from elliot.recommender.utils import ModelType, device
-from elliot.utils.validation import build_recommender_validator
+from elliot.utils.config import build_recommender_config
 
 
 class AbstractRecommender(ABC):
@@ -58,8 +58,8 @@ class AbstractRecommender(ABC):
     def set_params(self, params: SimpleNamespace):
         self.logger.info("Loading parameters")
 
-        RecommenderValidator = build_recommender_validator(self.__class__)
-        validator = RecommenderValidator(**vars(params))
+        RecommenderConfig = build_recommender_config(self.__class__)
+        validator = RecommenderConfig(**vars(params))
 
         for name, val in validator.get_validated_params().items():
             setattr(self, name, val)

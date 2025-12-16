@@ -5,7 +5,7 @@ import numpy as np
 import math
 
 from elliot.utils.enums import SplittingStrategy
-from elliot.utils.validation import SplittingGeneralValidator, SplittingValidator, check_range
+from elliot.utils.config import SplittingGeneralConfig, SplittingConfig, check_range
 from elliot.utils.folder import create_folder_by_index, create_folder
 from elliot.utils.write import save_tabular_df
 from elliot.utils import logging as elog
@@ -19,7 +19,7 @@ class Splitter:
     This class is designed to work with user-item interaction data in a recommender systems context,
     where splitting must often respect user-level chronology.
 
-    Attributes:
+    Args:
         data (pd.DataFrame): The dataset to be split, typically containing at least
             'userId' and 'timestamp' columns.
         splitting_ns (SimpleNamespace): Namespace object containing configuration
@@ -89,19 +89,19 @@ class Splitter:
         Raises:
             ValueError: If the provided scope is not recognized.
         """
-        validator = None
+        config = None
 
         match scope:
             case "general":
-                validator = SplittingGeneralValidator(**vars(self.splitting_ns))
+                config = SplittingGeneralConfig(**vars(self.splitting_ns))
             case "test":
-                validator = SplittingValidator(**vars(self.splitting_ns.test_splitting))
+                config = SplittingConfig(**vars(self.splitting_ns.test_splitting))
             case "val":
-                validator = SplittingValidator(**vars(self.splitting_ns.validation_splitting))
+                config = SplittingConfig(**vars(self.splitting_ns.validation_splitting))
             case _:
                 raise ValueError(f"Unrecognized scope {scope}")
 
-        for name, val in validator.get_validated_params().items():
+        for name, val in config.get_validated_params().items():
             setattr(self, name, val)
 
     def process_splitting(

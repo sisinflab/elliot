@@ -4,7 +4,7 @@ import warnings
 import pandas as pd
 
 from elliot.utils.enums import PreFilteringStrategy
-from elliot.utils.validation import PreFilteringValidator
+from elliot.utils.config import PreFilteringConfig
 from elliot.utils import logging as elog
 
 
@@ -14,7 +14,7 @@ class PreFilter:
     This class allows filtering interactions based on different strategies, such as global thresholds,
     user/item k-core filtering, user-specific rating averages, and cold user retention.
 
-    Attributes:
+    Args:
         data (pd.DataFrame): The input dataset, typically containing 'userId', 'itemId', and 'rating' columns.
         pre_filtering_ns (List[SimpleNamespace]): A list of configurations specifying filtering strategies.
 
@@ -64,9 +64,9 @@ class PreFilter:
         Args:
             ns (SimpleNamespace): Single pre-filtering strategy namespace.
         """
-        validator = PreFilteringValidator(**vars(ns))
+        config = PreFilteringConfig(**vars(ns))
 
-        for name, val in validator.get_validated_params().items():
+        for name, val in config.get_validated_params().items():
             setattr(self, name, val)
 
     def filter(self) -> pd.DataFrame:

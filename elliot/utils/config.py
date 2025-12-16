@@ -8,8 +8,8 @@ from pydantic_core import core_schema
 from elliot.utils.enums import PreFilteringStrategy, SplittingStrategy, NegativeSamplingStrategy, DataLoadingStrategy
 
 
-class BaseValidator(BaseModel):
-    """Base validator with utility to get the validated params dict."""
+class BaseConfig(BaseModel):
+    """Base configuration with utility to get the validated params dict."""
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     def get_validated_params(self, *args) -> dict:
@@ -23,7 +23,7 @@ class BaseValidator(BaseModel):
 
 # DataSetLoader configuration
 
-class DataLoadingConfig(BaseValidator):
+class DataLoadingConfig(BaseConfig):
     """Dataset loading configuration.
 
     Attributes:
@@ -53,7 +53,7 @@ class DataLoadingConfig(BaseValidator):
         """Validate conditional requirements based on the chosen loading strategy.
 
         Returns:
-            DataSetLoadingConfig: The object itself.
+            DataSetLoadingConfig: The configuration object itself.
         """
         match self.strategy:
 
@@ -77,8 +77,8 @@ class DataLoadingConfig(BaseValidator):
 
 # PreFilter validation
 
-class PreFilteringValidator(BaseValidator):
-    """Pre-filtering validator.
+class PreFilteringConfig(BaseConfig):
+    """Pre-filtering configuration.
 
     Attributes:
         strategy (PreFilteringStrategy): Pre-filtering strategy to use.
@@ -93,11 +93,11 @@ class PreFilteringValidator(BaseValidator):
     rounds: int = Field(default=2, ge=0)
 
     @model_validator(mode="after")
-    def validate_strategy_fields(self) -> "PreFilteringValidator":
+    def validate_strategy_fields(self) -> "PreFilteringConfig":
         """Ensure required fields are set for the selected pre-filtering strategy.
 
         Returns:
-            PreFilteringValidator: The object itself.
+            PreFilteringConfig: The configuration object itself.
         """
         if self.strategy == PreFilteringStrategy.COLD_USERS and self.threshold is None:
             raise AttributeError(f"Attribute `threshold` must be provided "
@@ -108,7 +108,7 @@ class PreFilteringValidator(BaseValidator):
 
 # Splitter validation
 
-class SplittingGeneralValidator(BaseValidator):
+class SplittingGeneralConfig(BaseConfig):
     """Splitting general validator.
 
     Attributes:
@@ -120,11 +120,11 @@ class SplittingGeneralValidator(BaseValidator):
     save_folder: Optional[str] = Field(default=None)
 
     @model_validator(mode="after")
-    def validate_general_fields(self) -> "SplittingGeneralValidator":
+    def validate_general_fields(self) -> "SplittingGeneralConfig":
         """Ensure required fields are set if saving splits to disk.
 
         Returns:
-            SplittingGeneralValidator: The object itself.
+            SplittingGeneralConfig: The object itself.
         """
         if self.save_on_disk and self.save_folder is None:
             raise AttributeError("Attribute `save_folder` must be provided if `save_on_disk` is set to True.")
@@ -132,8 +132,8 @@ class SplittingGeneralValidator(BaseValidator):
         return self
 
 
-class SplittingValidator(BaseValidator):
-    """Splitting validator.
+class SplittingConfig(BaseConfig):
+    """Splitting configuration.
 
     Attributes:
         strategy (SplittingStrategy): Splitting strategy to apply.
@@ -154,11 +154,11 @@ class SplittingValidator(BaseValidator):
     folds: int = Field(default=5, ge=1, le=20)
 
     @model_validator(mode="after")
-    def validate_strategy_fields(self) -> "SplittingValidator":
+    def validate_strategy_fields(self) -> "SplittingConfig":
         """Validate conditional requirements based on the chosen splitting strategy.
 
         Returns:
-            SplittingValidator: The object itself.
+            SplittingConfig: The configuration object itself.
         """
         match self.strategy:
 
@@ -186,8 +186,8 @@ class SplittingValidator(BaseValidator):
 
 # NegativeSampler validation
 
-class NegativeSamplingValidator(BaseValidator):
-    """Negative sampling validator.
+class NegativeSamplingConfig(BaseConfig):
+    """Negative sampling configuration.
 
     Attributes:
         strategy (NegativeSamplingStrategy): Negative sampling strategy to use.
@@ -206,11 +206,11 @@ class NegativeSamplingValidator(BaseValidator):
     val_file_path: Optional[str] = Field(default=None)
 
     @model_validator(mode="after")
-    def validate_strategy_fields(self) -> "NegativeSamplingValidator":
+    def validate_strategy_fields(self) -> "NegativeSamplingConfig":
         """Ensure required fields are set for the selected negative sampling strategy.
 
         Returns:
-            NegativeSamplingValidator: The object itself.
+            NegativeSamplingConfig: The configuration object itself.
         """
         if self.strategy == NegativeSamplingStrategy.FIXED and self.test_file_path is None:
             raise AttributeError(f"Attribute `test_file_path` must be provided "
@@ -221,8 +221,8 @@ class NegativeSamplingValidator(BaseValidator):
 
 # Trainer validation
 
-class TrainerValidator(BaseValidator):
-    """Training validator.
+class TrainerConfig(BaseConfig):
+    """Training configuration.
 
     Attributes:
         restore (bool): Whether to restore a previous training state; default is False.
@@ -302,8 +302,8 @@ class TupleFromString:
         return tuple(value)
 
 
-def build_recommender_validator(cls: object) -> ModelMetaclass:
-    """Create a dynamic Pydantic validator for a recommender class.
+def build_recommender_config(cls: object) -> ModelMetaclass:
+    """Create a dynamic Pydantic configuration for a recommender class.
 
     Tuple fields are automatically converted using TupleFromString.
 
@@ -319,7 +319,7 @@ def build_recommender_validator(cls: object) -> ModelMetaclass:
     # Build recommender validator dynamically
     dynamic_validator = create_model(
         f"{cls.__name__}Validator",
-        __base__=BaseValidator,
+        __base__=BaseConfig,
         **fields
     )
 

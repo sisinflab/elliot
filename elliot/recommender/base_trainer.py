@@ -16,7 +16,7 @@ from torch.utils.data import DataLoader
 from elliot.evaluation.evaluator import Evaluator
 from elliot.recommender.early_stopping import EarlyStopping
 
-from elliot.utils.validation import TrainerValidator
+from elliot.utils.config import TrainerConfig
 from elliot.utils.folder import build_model_folder
 from elliot.utils.write import store_recommendation
 from elliot.utils import logging
@@ -137,8 +137,8 @@ class AbstractTrainer(ABC):
             meta (bool): If True assign metadata fields, otherwise training fields.
         """
         param_ns = self._params if not meta else self._params.meta
-        validator = TrainerValidator(**vars(param_ns))
-        for name, val in validator.get_validated_params(meta=meta).items():
+        config = TrainerConfig(**vars(param_ns))
+        for name, val in config.get_validated_params(meta=meta).items():
             setattr(self, name, val)
 
     @property

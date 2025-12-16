@@ -17,7 +17,7 @@ from elliot.prefiltering.standard_prefilters import PreFilter
 from elliot.dataset.dataset import DataSet
 from elliot.utils.enums import DataLoadingStrategy
 from elliot.utils.read import read_tabular
-from elliot.utils.validation import DataLoadingConfig
+from elliot.utils.config import DataLoadingConfig
 
 
 class DataSetLoader:
