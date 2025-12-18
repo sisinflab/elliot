@@ -16,9 +16,9 @@ experiment:
   gpu: -1
   models:
     LightGCN:
-      lr: 0.001
+      learning_rate: 0.001
       epochs: 1
       factors: 10
       batch_size: 4096
-      l_w: 1e-6
+      lambda_weights: 1e-6
       n_layers: 2
