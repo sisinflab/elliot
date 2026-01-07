@@ -11,7 +11,7 @@ from typing import Tuple
 import torch
 from torch import nn
 
-from elliot.dataset.samplers import NeuMFSampler
+from elliot.dataset.samplers import MFPointWisePosNegSampler
 from elliot.recommender.init import normal_init
 from elliot.recommender.base_recommender import GeneralRecommender
 from elliot.recommender.layers import MLP
@@ -100,7 +100,7 @@ class NeuMF(GeneralRecommender):
         self.to(self._device)
 
     def get_training_dataloader(self):
-        dataloader = self._data.training_dataloader(NeuMFSampler, self._seed, m=self.m)
+        dataloader = self._data.training_dataloader(MFPointWisePosNegSampler, self._seed, m=self.m)
         return dataloader
 
     def forward(self, user, item):

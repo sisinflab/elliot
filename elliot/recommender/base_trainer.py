@@ -48,11 +48,6 @@ class AbstractTrainer(ABC):
         self._config = config
         self._params = params
 
-        if hasattr(data.config, "negative_sampling"):
-            self.get_recs = self.get_recs_neg_eval
-        else:
-            self.get_recs = self.get_recs_full_eval
-
         # Validate and assign meta parameters
         self.set_params(meta=True)
 
@@ -225,34 +220,13 @@ class AbstractTrainer(ABC):
                 else:
                     self.logger.warning("Saving weights FAILED. No model to save.")
 
-    def get_recs_full_eval(self, k: int = 100, *args):
+    def get_recs(self, k: int = 100):
         preds_test, preds_val = {}, {}
-        dataloader = self._data.full_eval_dataloader(self.eval_batch_size)
+        dataloader = self._data.eval_dataloader(self.eval_batch_size)
 
         iter_data = tqdm(
             dataloader,
-            desc="Full eval",
-            total=len(dataloader),
-            leave=False
-        )
-
-        for users in iter_data:
-            train_batch = self._data.sp_i_train_ratings[users.tolist()]
-
-            recs = self._compute_batch_recs(k=k, user_indices=users, train_batch=train_batch)
-
-            preds_test.update(recs)
-            preds_val.update(recs)
-
-        return preds_val, preds_test
-
-    def get_recs_neg_eval(self, k: int = 100, *args):
-        preds_test, preds_val = {}, {}
-        dataloader = self._data.neg_eval_dataloader(self.eval_batch_size)
-
-        iter_data = tqdm(
-            dataloader,
-            desc="Neg eval",
+            desc="Collecting",
             total=len(dataloader),
             leave=False
         )
@@ -272,14 +246,15 @@ class AbstractTrainer(ABC):
 
         return preds_val, preds_test
 
-    def _compute_batch_recs(self, k, user_indices, item_indices=None, train_batch=None):
+    def _compute_batch_recs(self, k, user_indices, item_indices=None):
         """Common logic for computing top-k recommendations."""
         if item_indices is not None:
             preds = self._model.predict_sampled(user_indices, item_indices)
             mask = item_indices == -1
         else:
             preds = self._model.predict_full(user_indices)
-            mask = train_batch.nonzero()
+            eval_batch = self._data.sp_i_train_ratings[user_indices.tolist()]
+            mask = eval_batch.nonzero()
 
         v, i = self._get_top_k(preds, k, mask, item_indices)
         recs_dict = self._get_recs_dict(v, i, user_indices)

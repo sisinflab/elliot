@@ -12,7 +12,7 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 import torch
 from torch import nn
 
-from elliot.dataset.samplers import PWPosNegSampler
+from elliot.dataset.samplers import PointWisePosNegSampler
 from elliot.recommender.base_recommender import GeneralRecommender
 from elliot.recommender.init import xavier_normal_init
 from elliot.recommender.layers import GaussianNoise
@@ -74,7 +74,7 @@ class PMF(GeneralRecommender):
         self.to(self._device)
 
     def get_training_dataloader(self):
-        dataloader = self._data.training_dataloader(PWPosNegSampler, self._seed)
+        dataloader = self._data.training_dataloader(PointWisePosNegSampler, self._seed)
         return dataloader
 
     def forward(self, user, item):

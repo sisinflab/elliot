@@ -10,7 +10,7 @@ __email__ = 'felice.merra@poliba.it, vitowalter.anelli@poliba.it, claudio.pomo@p
 import numpy as np
 from tqdm import tqdm
 
-from elliot.dataset.samplers import pointwise_pos_neg_sampler as pws
+from elliot.dataset.samplers import PointWisePosNegSampler
 from elliot.recommender import BaseRecommenderModel
 from elliot.recommender.base_recommender_model import init_charger
 from elliot.recommender.gan.IRGAN.irgan_model import IRGAN_model
@@ -88,7 +88,7 @@ class IRGAN(RecMixin, BaseRecommenderModel):
 
         self._ratings = self._data.train_dict
 
-        self._sampler = pws.Sampler(self._data.i_train_dict)
+        self._sampler = PointWisePosNegSampler(self._data.i_train_dict)
 
         self._model = IRGAN_model(self._predict_model,
                                   self._data,

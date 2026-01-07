@@ -29,6 +29,11 @@ class NegativeSamplingStrategy(Enum):
     FIXED = 'fixed'
 
 
+class SamplerType(Enum):
+    TRADITIONAL = 1
+    PIPELINE = 2
+
+
 class ModelType(Enum):
     BASE = 1
     TRADITIONAL = 2

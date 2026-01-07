@@ -13,7 +13,7 @@ from tqdm import tqdm
 import networkx as nx
 from collections import defaultdict
 
-from elliot.dataset.samplers import custom_sampler as cs
+from elliot.dataset.samplers import pairwise as cs
 from elliot.recommender import BaseRecommenderModel
 from elliot.recommender.base_recommender_model import init_charger
 from elliot.recommender.knowledge_aware.kgin.kgin_model import KGINModel

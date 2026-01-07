@@ -13,7 +13,7 @@ import numpy as np
 from tqdm import tqdm
 from ast import literal_eval as make_tuple
 
-from elliot.dataset.samplers import custom_sampler as cs
+from elliot.dataset.samplers import pairwise as cs
 from elliot.utils.write import store_recommendation
 
 from elliot.recommender import BaseRecommenderModel

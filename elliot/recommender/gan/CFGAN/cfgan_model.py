@@ -11,7 +11,7 @@ import os
 import numpy as np
 import tensorflow as tf
 from tensorflow import keras
-from elliot.dataset.samplers import pointwise_pos_neg_sampler as pws
+from elliot.dataset.samplers import PointWisePosNegSampler
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
@@ -38,7 +38,7 @@ class Generator(keras.Model):
 
         self.initializer = tf.initializers.GlorotUniform()
 
-        self.sampler = pws.Sampler(self.data.i_train_dict)
+        self.sampler = PointWisePosNegSampler(self.data.i_train_dict)
 
         # Discriminator Model Parameters
         self.B = tf.Variable(tf.zeros(shape=[self._num_items]), name='B_gen', dtype=tf.float32)

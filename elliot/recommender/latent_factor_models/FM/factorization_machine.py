@@ -14,7 +14,7 @@ import pickle
 import numpy as np
 from tqdm import tqdm
 
-from elliot.dataset.samplers import pointwise_pos_neg_ratings_sampler as pws
+from elliot.dataset.samplers import PointWisePosNegRatingsSampler
 from elliot.recommender.base_recommender_model import BaseRecommenderModel
 from elliot.recommender.latent_factor_models.FM.factorization_machine_model import FactorizationMachineModel
 from elliot.recommender.recommender_utils_mixin import RecMixin
@@ -77,7 +77,7 @@ class FM(RecMixin, BaseRecommenderModel):
 
         self._field_dims = [self._num_users, self._num_items, self._nfeatures]
 
-        self._sampler = pws.Sampler(self._data.i_train_dict, self._data.sp_i_train_ratings)
+        self._sampler = PointWisePosNegRatingsSampler(self._data.i_train_dict, self._data.sp_i_train_ratings)
 
         self._model = FactorizationMachineModel(self._num_users,
                                                 self._num_items,

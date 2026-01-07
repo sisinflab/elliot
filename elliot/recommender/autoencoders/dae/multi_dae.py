@@ -12,7 +12,7 @@ import random
 import numpy as np
 from tqdm import tqdm
 
-from elliot.dataset.samplers import sparse_sampler as sp
+from elliot.dataset.samplers import custom as sp
 from elliot.recommender import BaseRecommenderModel
 from elliot.recommender.autoencoders.dae.multi_dae_model import DenoisingAutoEncoder
 from elliot.recommender.recommender_utils_mixin import RecMixin

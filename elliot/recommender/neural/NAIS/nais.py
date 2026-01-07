@@ -12,7 +12,7 @@ __paper__ = 'FISM: Factored Item Similarity Models for Top-N Recommender Systems
 import numpy as np
 from tqdm import tqdm
 
-from elliot.dataset.samplers import pointwise_pos_neg_ratio_ratings_sampler as pws
+from elliot.dataset.samplers import PointWisePosNegRatioRatingsSampler
 from elliot.recommender import BaseRecommenderModel
 from elliot.recommender.base_recommender_model import init_charger
 from elliot.recommender.neural.NAIS.nais_model import NAIS_model
@@ -83,7 +83,7 @@ class NAIS(RecMixin, BaseRecommenderModel):
 
         self._ratings = self._data.train_dict
 
-        self._sampler = pws.Sampler(self._data.i_train_dict, self._data.sp_i_train_ratings, self._neg_ratio)
+        self._sampler = PointWisePosNegRatioRatingsSampler(self._data.i_train_dict, self._data.sp_i_train_ratings, self._neg_ratio)
 
         self._model = NAIS_model(self._data,
                                  self._algorithm,

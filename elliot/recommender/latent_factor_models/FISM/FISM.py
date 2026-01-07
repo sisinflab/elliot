@@ -12,7 +12,7 @@ import numpy as np
 from tqdm import tqdm
 import pickle
 
-from elliot.dataset.samplers import pointwise_pos_neg_ratio_ratings_sampler as pws
+from elliot.dataset.samplers import PointWisePosNegRatioRatingsSampler
 from elliot.utils.write import store_recommendation
 
 from elliot.recommender import BaseRecommenderModel
@@ -84,7 +84,7 @@ class FISM(RecMixin, BaseRecommenderModel):
 
         self._ratings = self._data.train_dict
 
-        self._sampler = pws.Sampler(self._data.i_train_dict, self._data.sp_i_train_ratings, self._neg_ratio)
+        self._sampler = PointWisePosNegRatioRatingsSampler(self._data.i_train_dict, self._data.sp_i_train_ratings, self._neg_ratio)
 
         self._model = FISM_model(self._data,
                                  self._factors,

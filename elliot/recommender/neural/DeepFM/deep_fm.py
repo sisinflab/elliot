@@ -15,7 +15,7 @@ from ast import literal_eval as make_tuple
 import numpy as np
 from tqdm import tqdm
 
-from elliot.dataset.samplers import pointwise_pos_neg_sampler as pws
+from elliot.dataset.samplers import PointWisePosNegSampler
 from elliot.recommender.base_recommender_model import BaseRecommenderModel
 from elliot.recommender.base_recommender_model import init_charger
 from elliot.recommender.neural.DeepFM.deep_fm_model import DeepFMModel
@@ -73,7 +73,7 @@ class DeepFM(RecMixin, BaseRecommenderModel):
         self._sp_i_train = self._data.sp_i_train
         self._i_items_set = list(range(self._num_items))
 
-        self._sampler = pws.Sampler(self._data.i_train_dict)
+        self._sampler = PointWisePosNegSampler(self._data.i_train_dict)
 
         self._model = DeepFMModel(self._num_users,
                                   self._num_items,

@@ -14,7 +14,7 @@ import pickle
 import numpy as np
 from tqdm import tqdm
 
-from elliot.dataset.samplers import pointwise_pos_neg_sampler as pws
+from elliot.dataset.samplers import pointwise as pws
 from elliot.recommender.base_recommender_model import BaseRecommenderModel
 from elliot.recommender.latent_factor_models.FFM.field_aware_factorization_machine_model import FieldAwareFactorizationMachineModel
 from elliot.recommender.recommender_utils_mixin import RecMixin

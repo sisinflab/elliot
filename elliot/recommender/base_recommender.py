@@ -20,8 +20,7 @@ class AbstractRecommender(ABC):
     def __init__(self, data, params, seed, logger):
         self._data = data
         self._seed = seed
-        self._users = data.users
-        self._items = data.items
+        self._users, self._items = data.get_users_items()
         self._num_items = self._data.num_items
         self._num_users = self._data.num_users
         self.transactions = data.transactions
@@ -104,16 +103,16 @@ class Recommender(AbstractRecommender):
 
     def __init__(self, data, params, seed, logger):
         super().__init__(data, params, seed, logger)
-        self._modules = []
-        self._bias = []
+        self.modules = []
+        self.bias = []
 
     def set_seed(self, seed: int):
         random.seed(seed)
         np.random.seed(seed)
 
     def apply(self, init_func, **kwargs):
-        for m in self._modules:
-            if any(m is x for x in self._bias):
+        for m in self.modules:
+            if any(m is x for x in self.bias):
                 zeros_init(m)
             else:
                 init_func(m, **kwargs)
@@ -158,7 +157,7 @@ class GeneralRecommender(nn.Module, AbstractRecommender):
     def __init__(self, data, params, seed, logger):
         AbstractRecommender.__init__(self, data, params, seed, logger)
         super(GeneralRecommender, self).__init__()
-        self._bias = []
+        self.bias = []
         self._device = device
 
     def set_seed(self, seed: int):
@@ -176,7 +175,7 @@ class GeneralRecommender(nn.Module, AbstractRecommender):
 
     def apply(self, init_func, **kwargs):
         for m in self.modules():
-            if any(m is x for x in self._bias):
+            if any(m is x for x in self.bias):
                 zeros_init(m)
             else:
                 init_func(m, **kwargs)

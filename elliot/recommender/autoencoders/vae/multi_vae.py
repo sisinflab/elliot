@@ -9,7 +9,7 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
 from tqdm import tqdm
 
-from elliot.dataset.samplers import sparse_sampler as sp
+from elliot.dataset.samplers import custom as sp
 from elliot.recommender import BaseRecommenderModel
 from elliot.recommender.autoencoders.vae.multi_vae_model import VariationalAutoEncoder
 from elliot.recommender.base_recommender_model import init_charger

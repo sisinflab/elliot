@@ -11,7 +11,7 @@ import os
 import numpy as np
 import tensorflow as tf
 from tensorflow import keras
-from elliot.dataset.samplers import pointwise_pos_neg_sampler as pws
+from elliot.dataset.samplers import PointWisePosNegSampler
 from elliot.utils import logging as elog
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
@@ -41,7 +41,7 @@ class Generator(keras.Model):
 
         self.initializer = tf.random_uniform_initializer(minval=-0.05, maxval=0.05, seed=1234)
 
-        self.sampler = pws.Sampler(self.data.i_train_dict)
+        self.sampler = PointWisePosNegSampler(self.data.i_train_dict)
 
         # Generator
         self.Bi = tf.Variable(tf.zeros(self._num_items), name='Bi_gen', dtype=tf.float32)

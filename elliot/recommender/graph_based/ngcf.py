@@ -13,7 +13,7 @@ import torch_geometric
 from torch import nn
 from torch_sparse import SparseTensor
 
-from elliot.dataset.samplers import CustomSampler
+from elliot.dataset.samplers import PairWiseSampler
 from elliot.recommender.base_recommender import GraphBasedRecommender
 from elliot.recommender.init import xavier_normal_init
 from elliot.recommender.layers import SparseDropout, NGCFLayer
@@ -103,7 +103,7 @@ class NGCF(GraphBasedRecommender):
         self.to(self._device)
 
     def get_training_dataloader(self):
-        dataloader = self._data.training_dataloader(CustomSampler, self._seed)
+        dataloader = self._data.training_dataloader(PairWiseSampler, self._seed)
         return dataloader
 
     def forward(self):

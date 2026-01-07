@@ -11,7 +11,7 @@ import json
 import torch
 from torch import nn
 
-from elliot.dataset.samplers import BPRMFSampler
+from elliot.dataset.samplers import PairWiseSampler
 from elliot.recommender.base_recommender import GeneralRecommender
 from elliot.recommender.init import xavier_uniform_init
 
@@ -65,7 +65,7 @@ class BPRMFBatch(GeneralRecommender):
         self.to(self._device)
 
     def get_training_dataloader(self):
-        dataloader = self._data.training_dataloader(BPRMFSampler, self._seed)
+        dataloader = self._data.training_dataloader(PairWiseSampler, self._seed)
         return dataloader
 
     def forward(self, user, item):

@@ -11,7 +11,7 @@ from tqdm import tqdm
 import numpy as np
 import gc
 
-from elliot.dataset.samplers import sparse_sampler as ss
+from elliot.dataset.samplers import custom as ss
 from elliot.evaluation.evaluator import Evaluator
 from elliot.recommender import BaseRecommenderModel
 from elliot.recommender.base_recommender_model import init_charger

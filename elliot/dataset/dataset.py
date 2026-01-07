@@ -22,9 +22,11 @@ from torch.utils.data import TensorDataset, Dataset, DataLoader
 from torch.nn.utils.rnn import pad_sequence
 from torch_sparse import SparseTensor
 
+from elliot.dataset.samplers.base_sampler import build_dataset
 from elliot.negative_sampling import NegativeSampler
 from elliot.utils import logging
 from elliot.dataset.fusion.fuser import FeatureFuser
+
 
 class NegEvalDataset(Dataset):
     def __init__(self, dataset_obj):
@@ -36,7 +38,7 @@ class NegEvalDataset(Dataset):
         self.test_items = test
 
         sampler = NegativeSampler(
-            namespace=dataset_obj.config.negative_sampling,
+            neg_sampling_ns=dataset_obj.config.negative_sampling,
             mappings=dataset_obj.get_mappings(),
             inv_mappings=dataset_obj.get_inverse_mappings(),
             pos_items=self.pos_items,
@@ -81,18 +83,8 @@ class NegEvalDataset(Dataset):
             val_neg_items = self.val_neg_items[idx]
         return idx, val_neg_items, test_neg_items
 
-
-class NegEvalDataLoader(DataLoader):
-    def __init__(self, neg_eval_dataset, batch_size):
-        super().__init__(
-            neg_eval_dataset,
-            batch_size=batch_size,
-            shuffle=False,
-            collate_fn=self._collate_fn
-        )
-
     @staticmethod
-    def _collate_fn(batch):
+    def collate_fn(batch):
         user_indices, val_negatives, test_negatives = zip(*batch)
 
         # User indices will be a list of ints, so we convert it
@@ -127,19 +119,9 @@ class FullEvalDataset(Dataset):
     def __getitem__(self, idx):
         return idx
 
-
-class FullEvalDataloader(DataLoader):
-    def __init__(self, full_eval_dataset, batch_size):
-        super().__init__(
-            full_eval_dataset,
-            batch_size=batch_size,
-            shuffle=False,
-            collate_fn=self._collate_fn
-        )
-
     @staticmethod
-    def _collate_fn(batch):
-        return torch.tensor(batch)
+    def collate_fn(batch):
+        return torch.tensor(batch), None, None
 
 
 class DataSet:
@@ -167,13 +149,13 @@ class DataSet:
         self._handle_val_test_sets(data_tuple)
 
         if hasattr(self.config, "negative_sampling"):
-            self.neg_eval_dataset = NegEvalDataset(self)
-            self.full_eval_dataset = None
+            self._eval_dataset = NegEvalDataset(self)
+            self._eval_cache_key = 'neg'
         else:
-            self.neg_eval_dataset = None
-            self.full_eval_dataset = FullEvalDataset(self)
+            self._eval_dataset = FullEvalDataset(self)
+            self._eval_cache_key = 'full'
 
-        self._cached_samplers = {}
+        self._cached_dataloaders = {}
 
     def _handle_train_set(self, side_information_data, data_tuple):
         self._train_dict = self._dataframe_to_dict(data_tuple[0])
@@ -183,9 +165,9 @@ class DataSet:
         else:
             self.side_information = side_information_data
 
-        self.users, self.items = self._get_users_and_items()
-        self.num_users = len(self.users)
-        self.num_items = len(self.items)
+        self._users, self._items = self._get_users_and_items()
+        self.num_users = len(self._users)
+        self.num_items = len(self._items)
 
         self.transactions = sum(len(v) for v in self._train_dict.values())
 
@@ -198,8 +180,11 @@ class DataSet:
             f"Sparsity:\t{sparsity}"
         )
 
-        self._u_map = {user: k for k, user in enumerate(self.users)}
-        self._i_map = {item: k for k, item in enumerate(self.items)}
+        self._i_users = list(range(self.num_users))
+        self._i_items = list(range(self.num_items))
+
+        self._u_map = {user: k for k, user in zip(self._i_users, self._users)}
+        self._i_map = {item: k for k, item in zip(self._i_items, self._items)}
 
         self._i_train_dict = self._build_mapped_dict(self._train_dict)
 
@@ -221,26 +206,28 @@ class DataSet:
             self._val_dict = None
             self._test_dict = self._dataframe_to_dict(data_tuple[1])
         else:
-            self._val_dict = self._dataframe_to_dict(data_tuple[1])
+            self._val_dict = self._dataframe_to_dict(data_tuple[1], val=True)
             self._test_dict = self._dataframe_to_dict(data_tuple[2])
 
         self._i_val_dict = self._build_mapped_dict(self._val_dict)
         self._i_test_dict = self._build_mapped_dict(self._test_dict)
 
-    def _dataframe_to_dict(self, data, skip_cold_users_items=True):
+    def _dataframe_to_dict(self, data, val=False, skip_cold_users_items=True):
         """Conversion to Dictionary"""
         ratings_dict = defaultdict(dict)
         users, items, ratings = data["userId"], data["itemId"], data["rating"]
 
+        u_map = getattr(self, "_u_map", None)
+        i_map = getattr(self, "_i_map", None)
+
+        text = 'training' if u_map is None else ('validation' if val else 'test')
+
         iter_df = tqdm(
             zip(users, items, ratings),
             total=len(users),
-            desc=f"Building ratings dict",
+            desc=f"Building ratings dict for {text}",
             leave=False
         )
-
-        u_map = getattr(self, "_u_map", None)
-        i_map = getattr(self, "_i_map", None)
 
         for user, item, rating in iter_df:
             if skip_cold_users_items:
@@ -302,40 +289,52 @@ class DataSet:
         return users, items, ratings
 
     def training_dataloader(self, sampler_cls, seed=42, **kwargs):
-        cache_key = sampler_cls.__name__
-        if cache_key in self._cached_samplers:
-            return self._cached_samplers[cache_key]
-
         if kwargs.get('transactions') is not None:
             transactions = kwargs.pop('transactions')
         else:
             transactions = self.transactions
 
-        sampler = sampler_cls(
-            users=self.users,
-            items=self.items,
-            train_dict=self.get_train_dict(private=True),
-            transactions=transactions,
-            seed=seed,
-            **kwargs
-        )
-        samples = sampler.initialize()
-        tensors = tuple(torch.tensor(x, dtype=torch.long) for x in samples)
+        cache_key = sampler_cls.__name__
+        if (cache_key not in self._cached_dataloaders or
+            len(self._cached_dataloaders[cache_key]) != transactions):
 
-        dataset = TensorDataset(*tensors)
-        dataloader = DataLoader(dataset, batch_size=self.batch_size, shuffle=True)
+            users, items = self.get_users_items(private=True)
 
-        self._cached_samplers[cache_key] = dataloader
+            sampler = sampler_cls(
+                train_dict=self.get_train_dict(private=True),
+                transactions=transactions,
+                users=users,
+                items=items,
+                n_users=self.num_users,
+                n_items=self.num_items,
+                seed=seed,
+                **kwargs
+            )
 
-        return dataloader
+            dataset = build_dataset(sampler)
 
-    def neg_eval_dataloader(self, batch_size):
-        dataloader = NegEvalDataLoader(self.neg_eval_dataset, batch_size)
-        return dataloader
+            self._cached_dataloaders[cache_key] = DataLoader(
+                dataset,
+                batch_size=self.batch_size,
+                collate_fn=getattr(sampler, 'collate_fn', None),
+                shuffle=True
+            )
 
-    def full_eval_dataloader(self, batch_size):
-        dataloader = FullEvalDataloader(self.full_eval_dataset, batch_size)
-        return dataloader
+        return self._cached_dataloaders[cache_key]
+
+    def eval_dataloader(self, batch_size):
+        dataset = self._eval_dataset
+        cache_key = self._eval_cache_key
+
+        if cache_key not in self._cached_dataloaders:
+            self._cached_dataloaders[cache_key] = DataLoader(
+                dataset,
+                batch_size=batch_size,
+                collate_fn=dataset.collate_fn,
+                shuffle=False
+            )
+
+        return self._cached_dataloaders[cache_key]
 
     @cached_property
     def sp_i_train(self):
@@ -352,7 +351,10 @@ class DataSet:
         return self._u_map, self._i_map
 
     def get_inverse_mappings(self):
-        return self.users, self.items
+        return self._users, self._items
+
+    def get_users_items(self, private=False):
+        return (self._users, self._items) if not private else (self._i_users, self._i_items)
 
     def get_train_dict(self, private=False):
         return self._train_dict if not private else self._i_train_dict
@@ -404,7 +406,7 @@ class DataSet:
         row, col = self.sp_i_train.nonzero()
         edge_index = np.array([row, col])
         iu_dict = {i: edge_index[0, iu].tolist() for i, iu in
-                   enumerate(list((edge_index[1] == i).nonzero()[0] for i in self.items))}
+                   enumerate(list((edge_index[1] == i).nonzero()[0] for i in self._items))}
         return iu_dict
 
     """def _build_sparse(self, dict, users, items):

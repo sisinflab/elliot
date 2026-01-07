@@ -10,7 +10,7 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 import numpy as np
 import torch
 
-from elliot.dataset.samplers import MFSampler, MFSamplerRendle
+from elliot.dataset.samplers import MFPointWisePosNegSampler
 from elliot.recommender.base_recommender import Recommender
 from elliot.recommender.init import normal_init
 
@@ -75,9 +75,7 @@ class AbstractMF2020(Recommender):
         self.params_to_save = ['_global_bias', '_user_bias', '_item_bias', '_user_factor', '_item_factor']
 
     def get_training_dataloader(self):
-        dataloader = self._data.training_dataloader(
-            MFSamplerRendle, self._seed, sparse_matrix=self._data.sp_i_train, m=self.m
-        )
+        dataloader = self._data.training_dataloader(MFPointWisePosNegSampler, self._seed, m=self.m)
         return dataloader
 
     def predict_full(self, user_indices):
@@ -146,15 +144,8 @@ class MF2020(AbstractMF2020):
 
             prediction = gb_ + ub_ + ib_ + np.dot(uf_, if_)
 
-            if prediction > 0:
-                one_plus_exp_minus_pred = 1.0 + np.exp(-prediction)
-                sigmoid = 1.0 / one_plus_exp_minus_pred
-                this_loss = (np.log(one_plus_exp_minus_pred) +
-                             (1.0 - rating) * prediction)
-            else:
-                exp_pred = np.exp(prediction)
-                sigmoid = exp_pred / (1.0 + exp_pred)
-                this_loss = -rating * prediction + np.log(1.0 + exp_pred)
+            sigmoid = 1 / (1 + np.exp(-prediction))
+            this_loss = np.logaddexp(0, prediction) - rating * prediction
 
             grad = rating - sigmoid
 
@@ -166,6 +157,7 @@ class MF2020(AbstractMF2020):
             self._user_bias[user] += lr * (grad - reg * ub_)
             self._item_bias[item] += lr * (grad - reg * ib_)
             self._global_bias += lr * (grad - reg * gb_)
+
             sum_of_loss += this_loss
 
         return sum_of_loss
@@ -194,11 +186,8 @@ class MF2020Batch(AbstractMF2020):
 
         prediction = gb_ + ub_ + ib_ + (uf_ * if_).sum(axis=-1)
 
-        exp_pred = np.where(prediction > 0, 1.0 + np.exp(-prediction), np.exp(prediction))
-        sigmoid = np.where(prediction > 0, 1.0 / exp_pred, exp_pred / (1.0 + exp_pred))
-
-        this_loss = np.where(prediction > 0, np.log(exp_pred) + (1 - rating) * prediction,
-                             -rating * prediction + np.log(1.0 + exp_pred))
+        sigmoid = 1 / (1 + np.exp(-prediction))
+        this_loss = np.logaddexp(0, prediction) - rating * prediction
 
         grad = rating - sigmoid
 

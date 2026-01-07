@@ -5,7 +5,7 @@ import typing as t
 from tqdm import tqdm
 
 
-from elliot.dataset.samplers import custom_sampler as cs
+from elliot.dataset.samplers import pairwise as cs
 from elliot.recommender.base_recommender_model import BaseRecommenderModel
 from elliot.recommender.recommender_utils_mixin import RecMixin
 from elliot.utils.write import store_recommendation

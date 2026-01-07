@@ -10,7 +10,7 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 import torch
 from torch import nn
 
-from elliot.dataset.samplers import CustomPWSparseSampler
+from elliot.dataset.samplers import CustomPointWiseSparseSampler
 from elliot.recommender.base_recommender import GeneralRecommender
 from elliot.recommender.init import xavier_uniform_init
 
@@ -47,7 +47,7 @@ class SVDpp(GeneralRecommender):
         self.to(self._device)
 
     def get_training_dataloader(self):
-        dataloader = self._data.training_dataloader(CustomPWSparseSampler, self._seed)
+        dataloader = self._data.training_dataloader(CustomPointWiseSparseSampler, self._seed)
         return dataloader
 
     def forward(self, user, item):

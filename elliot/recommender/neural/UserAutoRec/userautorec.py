@@ -10,7 +10,7 @@ __email__ = 'felice.merra@poliba.it, vitowalter.anelli@poliba.it, claudio.pomo@p
 import numpy as np
 from tqdm import tqdm
 
-from elliot.dataset.samplers import sparse_sampler as sp
+from elliot.dataset.samplers import custom as sp
 from elliot.recommender.base_recommender_model import BaseRecommenderModel
 from elliot.recommender.base_recommender_model import init_charger
 from elliot.recommender.neural.UserAutoRec.userautorec_model import UserAutoRecModel

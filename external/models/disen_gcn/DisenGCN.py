@@ -19,7 +19,7 @@ from elliot.recommender import BaseRecommenderModel
 from elliot.recommender.base_recommender_model import init_charger
 from elliot.recommender.recommender_utils_mixin import RecMixin
 from .DisenGCNModel import DisenGCNModel
-from elliot.dataset.samplers import custom_sampler as cs
+from elliot.dataset.samplers import pairwise as cs
 
 
 class DisenGCN(RecMixin, BaseRecommenderModel):

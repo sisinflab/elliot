@@ -10,7 +10,7 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malite
 import numpy as np
 from tqdm import tqdm
 
-from elliot.dataset.samplers import pointwise_pos_neg_sampler as pws
+from elliot.dataset.samplers import PointWisePosNegSampler
 from elliot.recommender.neural.GeneralizedMF.generalized_matrix_factorization_model import GeneralizedMatrixFactorizationModel
 from elliot.recommender.recommender_utils_mixin import RecMixin
 from elliot.utils.write import store_recommendation
@@ -48,7 +48,7 @@ class GMF(RecMixin, BaseRecommenderModel):
     @init_charger
     def __init__(self, data, config, params, *args, **kwargs):
 
-        self._sampler = pws.Sampler(self._data.i_train_dict)
+        self._sampler = PointWisePosNegSampler(self._data.i_train_dict)
 
         self._params_list = [
             ("_learning_rate", "lr", "lr", 0.001, None, None),

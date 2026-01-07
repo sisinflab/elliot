@@ -12,7 +12,7 @@ from ast import literal_eval as make_tuple
 import numpy as np
 from tqdm import tqdm
 
-from elliot.dataset.samplers import custom_sampler as cs
+from elliot.dataset.samplers import pairwise as cs
 from elliot.recommender.base_recommender_model import BaseRecommenderModel
 from elliot.recommender.base_recommender_model import init_charger
 from elliot.recommender.neural.NPR.neural_personalized_ranking_model import NPRModel

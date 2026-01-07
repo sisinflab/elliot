@@ -16,7 +16,7 @@ from tqdm import tqdm
 
 from ast import literal_eval as make_tuple
 
-from elliot.dataset.samplers import pointwise_pos_neg_ratings_sampler as pws
+from elliot.dataset.samplers import PointWisePosNegRatingsSampler
 from elliot.recommender.base_recommender_model import BaseRecommenderModel
 from elliot.recommender.neural.NFM.neural_fm_model import NeuralFactorizationMachineModel
 from elliot.recommender.recommender_utils_mixin import RecMixin
@@ -74,7 +74,7 @@ class NFM(RecMixin, BaseRecommenderModel):
         self._sp_i_train = self._data.sp_i_train
         self._i_items_set = list(range(self._num_items))
 
-        self._sampler = pws.Sampler(self._data.i_train_dict)
+        self._sampler = PointWisePosNegRatingsSampler(self._data.i_train_dict)
 
         self._model = NeuralFactorizationMachineModel(self._num_users,
                                                       self._num_items,

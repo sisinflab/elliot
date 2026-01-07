@@ -11,7 +11,7 @@ from tqdm import tqdm
 import pandas as pd
 import os
 
-from elliot.dataset.samplers import custom_sampler as cs
+from elliot.dataset.samplers import pairwise as cs
 from elliot.recommender import BaseRecommenderModel
 from elliot.recommender.adversarial.AMF.AMF_model import AMF_model
 from elliot.recommender.base_recommender_model import init_charger

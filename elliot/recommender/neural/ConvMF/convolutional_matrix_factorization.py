@@ -12,7 +12,7 @@ from ast import literal_eval as make_tuple
 import numpy as np
 from tqdm import tqdm
 
-from elliot.dataset.samplers import pointwise_pos_neg_sampler as pws
+from elliot.dataset.samplers import PointWisePosNegSampler
 from elliot.recommender.base_recommender_model import BaseRecommenderModel
 from elliot.recommender.base_recommender_model import init_charger
 from elliot.recommender.neural.ConvMF.convolutional_matrix_factorization_model import \
@@ -66,7 +66,7 @@ class ConvMF(RecMixin, BaseRecommenderModel):
             **kwargs:
         """
 
-        self._sampler = pws.Sampler(self._data.i_train_dict)
+        self._sampler = PointWisePosNegSampler(self._data.i_train_dict)
 
         self._params_list = [
             ("_lr", "lr", "lr", 0.001, None, None),

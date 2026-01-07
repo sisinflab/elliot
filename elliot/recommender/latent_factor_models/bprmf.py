@@ -10,7 +10,7 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 import numpy as np
 import torch
 
-from elliot.dataset.samplers import CustomSampler
+from elliot.dataset.samplers import PairWiseSampler
 from elliot.recommender.base_recommender import Recommender
 from elliot.recommender.init import normal_init
 
@@ -44,7 +44,7 @@ class BPRMF(Recommender):
         self.params_to_save = ['_user_bias', '_item_bias', '_user_factors', '_item_factors']
 
     def get_training_dataloader(self):
-        dataloader = self._data.training_dataloader(CustomSampler, self._seed)
+        dataloader = self._data.training_dataloader(PairWiseSampler, self._seed)
         return dataloader
 
     def train_step(self, batch, *args):

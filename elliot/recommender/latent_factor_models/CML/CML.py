@@ -12,7 +12,7 @@ import pickle
 import numpy as np
 from tqdm import tqdm
 
-from elliot.dataset.samplers import custom_sampler as cs
+from elliot.dataset.samplers import pairwise as cs
 from elliot.recommender import BaseRecommenderModel
 from elliot.recommender.latent_factor_models.CML.CML_model import CML_model
 from elliot.recommender.recommender_utils_mixin import RecMixin

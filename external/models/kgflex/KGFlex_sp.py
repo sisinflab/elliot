@@ -6,7 +6,7 @@ import pandas as pd
 from elliot.recommender import BaseRecommenderModel
 from elliot.recommender.base_recommender_model import init_charger
 from elliot.recommender.recommender_utils_mixin import RecMixin
-from elliot.dataset.samplers import custom_sampler as cs
+from elliot.dataset.samplers import pairwise as cs
 
 from .UserFeatureMapper import UserFeatureMapper
 from .KGFlexModel import KGFlexModel

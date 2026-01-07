@@ -12,7 +12,7 @@ import numpy as np
 from ast import literal_eval as make_tuple
 from tqdm import tqdm
 
-from elliot.dataset.samplers import pointwise_pos_neg_ratio_ratings_sampler as pws
+from elliot.dataset.samplers import PointWisePosNegRatioRatingsSampler
 from elliot.recommender.neural.DMF.deep_matrix_factorization_model import DeepMatrixFactorizationModel
 from elliot.recommender.recommender_utils_mixin import RecMixin
 from elliot.utils.write import store_recommendation
@@ -69,7 +69,7 @@ class DMF(RecMixin, BaseRecommenderModel):
         if self._batch_size < 1:
             self._batch_size = self._data.transactions + self._neg_ratio * self._data.transactions
 
-        self._sampler = pws.Sampler(self._data.i_train_dict, self._data.sp_i_train_ratings, self._neg_ratio)
+        self._sampler = PointWisePosNegRatioRatingsSampler(self._data.i_train_dict, self._data.sp_i_train_ratings, self._neg_ratio)
 
         self._ratings = self._data.train_dict
         self._sp_i_train = self._data.sp_i_train
