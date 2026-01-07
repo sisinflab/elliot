@@ -48,13 +48,15 @@ class PureSVD(TraditionalRecommender):
         self.params_to_save = ['user_vec', 'item_vec']
 
     def initialize(self):
-        fake_iter = tqdm(desc="Computing")
+        t = tqdm()
+        t.set_description("Computing")
 
         U, sigma, Vt = randomized_svd(self._data.sp_i_train,
                                       n_components=self.factors,
                                       random_state=self._seed)
         s_Vt = sp.diags(sigma) * Vt
-        fake_iter.set_description("Done")
+
+        t.set_description("Done")
 
         self.user_vec = U
         self.item_vec = s_Vt.T

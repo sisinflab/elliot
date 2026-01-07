@@ -24,17 +24,20 @@ class EASER(TraditionalRecommender):
         super().__init__(data, params, seed, logger)
 
     def initialize(self):
-        fake_iter = tqdm(desc="Setting up")
+        t = tqdm()
+        t.set_description("Setting up")
 
         S = safe_sparse_dot(self._train.T, self._train, dense_output=True)
 
         diagonal_indices = np.diag_indices(S.shape[0])
         S[diagonal_indices] += self.l2_norm
 
-        fake_iter.set_description("Computing")
+        t.set_description("Computing")
+
         P = np.linalg.inv(S)
         similarity_matrix = P / (-np.diag(P))
-        fake_iter.set_description("Done")
+
+        t.set_description("Done")
 
         similarity_matrix[diagonal_indices] = 0.0
 

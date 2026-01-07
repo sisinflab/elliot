@@ -4,7 +4,9 @@ import similaripy as sim
 from scipy.sparse import csr_matrix
 from tqdm import tqdm
 from sklearn.metrics.pairwise import chi2_kernel, pairwise_distances_chunked
+
 from elliot.utils import logging as elog
+from elliot.utils.sparse import center_data
 
 
 class Similarity(object):
@@ -34,14 +36,15 @@ class Similarity(object):
             self.Y = None
 
         self.train_data = train_data
+
         self.similarity = similarity
         self.asym_alpha = asymmetric_alpha
         self.alpha = alpha
         self.beta = beta
 
-        self.dim = train_data.shape[0]
-        self.num_neighbors = num_neighbors if num_neighbors > -1 else self.dim
-        self._neighborhood = num_neighbors is not None
+        self.tot_neighbors = train_data.shape[0]
+        self.num_neighbors = num_neighbors if num_neighbors < self.tot_neighbors else -1
+
         self.logger = elog.get_logger(self.__class__.__name__)
 
     def compute_similarity(self):
@@ -67,22 +70,51 @@ class Similarity(object):
 
     def _compute_direct_similarity(self):
         """Similarities natively supported by Similaripy."""
-        if self.similarity == "cosine":
-            w_mat = sim.cosine(self.X, self.Y, k=self.num_neighbors, format_output='csr')
-        elif self.similarity == "asym":
-            w_mat = sim.asymmetric_cosine(self.X, self.Y, k=self.num_neighbors, alpha=self.asym_alpha, format_output='csr')
-        elif self.similarity == "dot":
-            w_mat = sim.dot_product(self.train_data, k=self.num_neighbors, format_output='csr')
-        elif self.similarity == "jaccard":
-            w_mat = sim.jaccard(self.X, self.Y, k=self.num_neighbors, binary=True, format_output='csr')
-        elif self.similarity == "dice":
-            w_mat = sim.dice(self.X, self.Y, k=self.num_neighbors, binary=True, format_output='csr')
-        elif self.similarity == "tversky":
-            w_mat = sim.tversky(self.X, self.Y, k=self.num_neighbors, alpha=self.alpha,
-                                   beta=self.beta, binary=True, format_output='csr')
-        else:
-            w_mat = sim.rp3beta(self.X, self.Y, k=self.num_neighbors, alpha=self.alpha,
-                                beta=self.beta, binary=True, format_output='csr')
+        k = self.num_neighbors if self.num_neighbors > -1 else self.tot_neighbors
+
+        match self.similarity:
+            case "cosine":
+                w_mat = sim.cosine(
+                    self.X, self.Y, k=k, format_output='csr'
+                )
+
+            case "asym":
+                w_mat = sim.asymmetric_cosine(
+                    self.X, self.Y, k=k, alpha=self.asym_alpha, format_output='csr'
+                )
+
+            case "dot":
+                w_mat = sim.dot_product(
+                    self.train_data, k=k, format_output='csr'
+                )
+
+            case "jaccard":
+                w_mat = sim.jaccard(
+                    self.X, self.Y, k=k, binary=True, format_output='csr'
+                )
+
+            case "dice":
+                w_mat = sim.dice(
+                    self.X, self.Y, k=k, binary=True, format_output='csr'
+                )
+
+            case "tversky":
+                w_mat = sim.tversky(
+                    self.X, self.Y, k=k, alpha=self.alpha, beta=self.beta, binary=True, format_output='csr'
+                )
+
+            case "rp3beta":
+                w_mat = sim.rp3beta(
+                    self.X, self.Y, k=k, alpha=self.alpha, beta=self.beta, binary=True, format_output='csr'
+                )
+
+            # case "spcorrelation":
+            #     centered_X = center_data(self.X, axis=1)
+            #     centered_Y = center_data(self.Y, axis=0) if self.Y is not None else None
+            #     w_mat = sim.cosine(
+            #         centered_X, centered_Y, k=self.num_neighbors, format_output='csr'
+            #     )
+
         return w_mat
 
     def _compute_distance_based_similarity(self):
@@ -100,39 +132,45 @@ class Similarity(object):
 
     def _process_similarity(self, dist_matrix):
         """Compute similarity matrix from distance matrix, keeping top-k neighbors."""
-        if not self._neighborhood:
+        if not self.num_neighbors > -1:
             return dist_matrix
 
         data, cols_indices, row_indptr = [], [], [0]
         k = self.num_neighbors
         processed_rows = 0
 
-        with tqdm(total=None, desc="Computing") as t:
-            for dist_chunk in dist_matrix:
-                chunk = 1 / (1 + dist_chunk)
+        t = tqdm(total=None)
+        t.set_description("Computing")
 
-                idx = np.argpartition(chunk, -k, axis=1)[:, -k:]
-                top_vals = np.take_along_axis(chunk, idx, axis=1)
+        for dist_chunk in dist_matrix:
+            chunk = 1 / (1 + dist_chunk)
 
-                data.extend(top_vals.ravel())
-                cols_indices.extend(idx.ravel())
+            idx = np.argpartition(chunk, -k, axis=1)[:, -k:]
+            top_vals = np.take_along_axis(chunk, idx, axis=1)
 
-                last = row_indptr[-1]
-                new_ptrs = np.arange(last + k, last + k * (chunk.shape[0] + 1), k)
-                row_indptr.extend(new_ptrs.tolist())
+            data.extend(top_vals.ravel())
+            cols_indices.extend(idx.ravel())
 
-                processed_rows += chunk.shape[0]
-                t.update(1)
-                t.set_postfix(rows=processed_rows)
+            last = row_indptr[-1]
+            new_ptrs = np.arange(last + k, last + k * (chunk.shape[0] + 1), k)
+            row_indptr.extend(new_ptrs.tolist())
 
-            t.set_description("Done")
-            t.refresh()
+            processed_rows += chunk.shape[0]
+            t.update(1)
+            t.set_postfix(rows=processed_rows)
 
-        return csr_matrix(
+        t.set_description("Build csr matrix")
+
+        sim_matrix = csr_matrix(
             (data, cols_indices, row_indptr),
-            shape=(self.dim, self.dim),
+            shape=(self.tot_neighbors, self.tot_neighbors),
             dtype=np.float32
         )
+
+        t.set_description("Done")
+        t.refresh()
+
+        return sim_matrix
 
 
 """def chi2_kernel_sparse_chunked(X, Y=None, gamma=1.0, batch_size=512):

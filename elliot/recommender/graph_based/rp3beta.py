@@ -66,43 +66,49 @@ class RP3beta(TraditionalRecommender):
         rows, cols, values = [], [], []
         block_dim = Pui.shape[1] // 50
 
-        with tqdm(total=(Pui.shape[1] // block_dim), desc="Computing") as t:
-            # Process matrix in blocks along rows
-            for start in range(0, Pui.shape[1], block_dim):
-                end = min(start + block_dim, Pui.shape[1])
-                d_t_block = Piu[start:end, :]
+        t = tqdm(total=(Pui.shape[1] // block_dim))
+        t.set_description("Computing")
 
-                # Compute similarity block matrix product
-                similarity_block = (d_t_block @ Pui @ D)#.toarray()
+        # Process matrix in blocks along rows
+        for start in range(0, Pui.shape[1], block_dim):
+            end = min(start + block_dim, Pui.shape[1])
+            d_t_block = Piu[start:end, :]
 
-                # Set to 0 self-similarity entries (diagonal elements)
-                b_rows, b_cols = similarity_block.nonzero()
-                b_mask = b_rows == b_cols
-                similarity_block.data[b_mask] = 0.0
+            # Compute similarity block matrix product
+            similarity_block = (d_t_block @ Pui @ D)#.toarray()
 
-                # Apply sparse top-k row filtering
-                b_rows, b_cols, b_data = self._get_top_k(similarity_block, start)
+            # Set to 0 self-similarity entries (diagonal elements)
+            b_rows, b_cols = similarity_block.nonzero()
+            b_mask = b_rows == b_cols
+            similarity_block.data[b_mask] = 0.0
 
-                # Store computed values
-                rows.append(b_rows)
-                cols.append(b_cols)
-                values.append(b_data)
+            # Apply sparse top-k row filtering
+            b_rows, b_cols, b_data = self._get_top_k(similarity_block, start)
 
-                t.update()
+            # Store computed values
+            rows.append(b_rows)
+            cols.append(b_cols)
+            values.append(b_data)
 
-            rows = np.concatenate(rows)
-            cols = np.concatenate(cols)
-            values = np.concatenate(values)
+            t.update()
 
-            t.set_description("Done")
-            t.refresh()
+        rows = np.concatenate(rows)
+        cols = np.concatenate(cols)
+        values = np.concatenate(values)
+
+        t.set_description("Build csr matrix")
 
         # Create final sparse matrix from accumulated values
-        return csr_matrix(
+        sim_matrix = csr_matrix(
             (values, (rows, cols)),
             shape=(Pui.shape[1], Pui.shape[1]),
             dtype=np.float32
         )
+
+        t.set_description("Done")
+        t.refresh()
+
+        return sim_matrix
 
     def _get_top_k(self, block, start):
         rows_list = []

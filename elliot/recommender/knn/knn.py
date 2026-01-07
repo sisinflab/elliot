@@ -19,14 +19,18 @@ class KNN(TraditionalRecommender):
         self._URM = self._implicit_train if self.implicit else self._train
         train_data = self._URM if not transpose else self._URM.T
 
-        self._backend = Similarity(train_data=train_data,
-                                   similarity=self.similarity,
-                                   num_neighbors=self.neighborhood,
-                                   asymmetric_alpha=self.asymmetric_alpha,
-                                   alpha=self.alpha,
-                                   beta=self.beta)
+        self._backend = Similarity(
+            train_data=train_data,
+            similarity=self.similarity,
+            num_neighbors=self.neighborhood,
+            asymmetric_alpha=self.asymmetric_alpha,
+            alpha=self.alpha,
+            beta=self.beta
+        )
 
-        self.params_to_save = ['similarity', 'num_neighbors', 'implicit']
+        self.neighborhood = self._backend.num_neighbors
+
+        self.params_to_save = ['similarity', 'neighborhood', 'implicit']
 
     def initialize(self):
         self.similarity_matrix = self._backend.compute_similarity()
