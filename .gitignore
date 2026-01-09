@@ -20,13 +20,15 @@ pip-selfcheck.json
 .idea
 # End of https://www.toptal.com/developers/gitignore/api/venv
 
-/results/
+**/results/
 /data/*
 **/splitting/
 /share/
 **/__pycache__/**
 *.log
 /local_sample_main.py
+/tests/configs
+/tests/elliot_root
 
 .Python
 build/

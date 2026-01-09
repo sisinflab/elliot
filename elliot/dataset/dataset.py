@@ -141,12 +141,13 @@ class DataSet:
         self.config = config
         self.args = args
         self.kwargs = kwargs
+        self.interactions = data_tuple
         self.batch_size = 1024
         self.cold_items = set()
         self.cold_users = set()
 
-        self._handle_train_set(side_information_data, data_tuple)
-        self._handle_val_test_sets(data_tuple)
+        self._handle_train_set(side_information_data)
+        self._handle_val_test_sets()
 
         if hasattr(self.config, "negative_sampling"):
             self._eval_dataset = NegEvalDataset(self)
@@ -157,8 +158,8 @@ class DataSet:
 
         self._cached_dataloaders = {}
 
-    def _handle_train_set(self, side_information_data, data_tuple):
-        self._train_dict = self._dataframe_to_dict(data_tuple[0])
+    def _handle_train_set(self, side_information_data):
+        self._train_dict = self._dataframe_to_dict(self.interactions[0])
 
         if self.config.align_side_with_train:
             self.side_information = self._align_with_training(side_information_data)
@@ -201,13 +202,13 @@ class DataSet:
             self.side_information = None
             self.fuser = None
 
-    def _handle_val_test_sets(self, data_tuple):
-        if len(data_tuple) == 2:
+    def _handle_val_test_sets(self):
+        if len(self.interactions) == 2:
             self._val_dict = None
-            self._test_dict = self._dataframe_to_dict(data_tuple[1])
+            self._test_dict = self._dataframe_to_dict(self.interactions[1])
         else:
-            self._val_dict = self._dataframe_to_dict(data_tuple[1], val=True)
-            self._test_dict = self._dataframe_to_dict(data_tuple[2])
+            self._val_dict = self._dataframe_to_dict(self.interactions[1], val=True)
+            self._test_dict = self._dataframe_to_dict(self.interactions[2])
 
         self._i_val_dict = self._build_mapped_dict(self._val_dict)
         self._i_test_dict = self._build_mapped_dict(self._test_dict)

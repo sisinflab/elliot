@@ -24,6 +24,7 @@ class Splitter:
             'userId' and 'timestamp' columns.
         splitting_ns (SimpleNamespace): Namespace object containing configuration
             for the desired splitting strategy.
+        random_seed (int): Random seed, for reproducibility; default is 42.
 
     Supported splitting strategies:
 
@@ -41,7 +42,7 @@ class Splitter:
 
       splitting:
         save_on_disk: True|False
-        save_path: "path"
+        save_folder: path/to/folder
         test_splitting:
           strategy: fixed_timestamp|temporal_hold_out|random_subsampling|random_cross_validation
           timestamp: best|1609786061
@@ -60,7 +61,7 @@ class Splitter:
     """
 
     save_on_disk: bool = False
-    save_folder: Optional[str] = None
+    save_folder: str
     strategy: SplittingStrategy
     timestamp: Optional[float] = None
     min_below: int = 1

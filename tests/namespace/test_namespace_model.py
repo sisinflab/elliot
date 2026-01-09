@@ -1,10 +1,9 @@
-import os
-import importlib
-from pathlib import Path
 import pytest
+import os
 
-path = Path(__file__).resolve().parent
-namespace_model = getattr(importlib.import_module("elliot.namespace"), 'NameSpaceModel')
+from elliot.namespace import NameSpaceModel
+
+from tests.utils import test_path
 
 
 def _sample_config():
@@ -13,7 +12,7 @@ def _sample_config():
             "dataset": "demo",
             "data_config": {
                 "strategy": "dataset",
-                "dataset_path": "../data/{0}/dataset.tsv",
+                "data_path": "../data/{0}",
             },
             "models": {
                 "ItemKNN": {
@@ -27,19 +26,18 @@ def _sample_config():
     }
 
 
-@pytest.mark.parametrize('tmp_path', [path])
-def test_fill_base_resolves_paths_and_defaults(tmp_path):
-    base_elliot = tmp_path / "elliot_root"
-    base_config = tmp_path / "configs"
+def test_fill_base_resolves_paths_and_defaults():
+    base_elliot = test_path / "elliot_root"
+    base_config = test_path / "configs"
     base_elliot.mkdir(exist_ok=True)
     base_config.mkdir(exist_ok=True)
 
-    model = namespace_model(_sample_config(), str(base_elliot), str(base_config))
+    model = NameSpaceModel(_sample_config(), str(base_elliot), str(base_config))
     model.fill_base()
     ns = model.base_namespace
 
-    expected_dataset = os.path.abspath(os.path.join(base_config, "../", "data", "demo", "dataset.tsv"))
-    assert ns.data_config.dataset_path == expected_dataset
+    expected_dataset = os.path.abspath(os.path.join(base_config, "../", "data", "demo"))
+    assert ns.data_config.data_path == expected_dataset
     assert ns.data_config.side_information == []
     assert ns.path_output_rec_result.endswith(os.path.join("results", "demo", "recs"))
     assert ns.path_output_rec_weight.endswith(os.path.join("results", "demo", "weights"))
@@ -49,14 +47,13 @@ def test_fill_base_resolves_paths_and_defaults(tmp_path):
     assert ns.evaluation.simple_metrics == ["nDCG"]
 
 
-@pytest.mark.parametrize('tmp_path', [path])
-def test_fill_model_builds_hyperopt_space(tmp_path):
-    base_elliot = tmp_path / "elliot_root"
-    base_config = tmp_path / "configs"
+def test_fill_model_builds_hyperopt_space():
+    base_elliot = test_path / "elliot_root"
+    base_config = test_path / "configs"
     base_elliot.mkdir(exist_ok=True)
     base_config.mkdir(exist_ok=True)
 
-    model = namespace_model(_sample_config(), str(base_elliot), str(base_config))
+    model = NameSpaceModel(_sample_config(), str(base_elliot), str(base_config))
     entries = list(model.fill_model())
 
     assert len(entries) == 1

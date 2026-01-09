@@ -203,12 +203,18 @@ class NameSpaceModel:
     def _build_splitting(self) -> None:
         exp_cfg = self.context.experiment
         splitting_cfg = exp_cfg.get(_splitting, {})
-        if not splitting_cfg:
-            return
+        # if not splitting_cfg:
+        #     return
 
         dataset_name = exp_cfg[_dataset]
         resolver = self.context.path_resolver
         splitting_cfg.update({k: resolver.resolve_safe(v, dataset_name) for k, v in splitting_cfg.items()})
+        if splitting_cfg.get("save_folder") is None:
+            save_folder = os.path.abspath(
+                os.sep.join([self.context.base_folder_path_config, "..", "data", dataset_name, "splitting"])
+            )
+            splitting_cfg["save_folder"] = save_folder
+
         test_splitting = splitting_cfg.get("test_splitting", {})
         validation_splitting = splitting_cfg.get("validation_splitting", {})
 

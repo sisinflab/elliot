@@ -28,51 +28,17 @@ class DataLoadingConfig(BaseConfig):
 
     Attributes:
         strategy (DataLoadingStrategy): Loading strategy to use.
-        dataset_path (Optional[str]): Path to the full dataset.
-        root_folder (Optional[str]): Root directory containing dataset files.
-        train_path (Optional[str]): Path to the training dataset.
-        validation_path (Optional[str]): Path to the validation dataset.
-        test_path (Optional[str]): Path to the test dataset.
+        data_path (str): Root directory containing dataset files.
         header (bool): Whether the dataset(s) include(s) a header row; default is False.
         binarize (bool): Whether to binarize the dataset; default is False.
         seed (int): Random seed; default is 42.
     """
 
     strategy: DataLoadingStrategy
-    dataset_path: Optional[str] = Field(default=None)
-    root_folder: Optional[str] = Field(default=None)
-    train_path: Optional[str] = Field(default=None)
-    validation_path: Optional[str] = Field(default=None)
-    test_path: Optional[str] = Field(default=None)
+    data_path: str
     header: bool = Field(default=False)
     binarize: bool = Field(default=False)
     seed: int = Field(default=42)
-
-    @model_validator(mode="after")
-    def validate_strategy_fields(self) -> "DataLoadingConfig":
-        """Validate conditional requirements based on the chosen loading strategy.
-
-        Returns:
-            DataSetLoadingConfig: The configuration object itself.
-        """
-        match self.strategy:
-
-            case DataLoadingStrategy.FIXED:
-                if self.train_path is None or self.test_path is None:
-                    raise AttributeError(f"Both `train_path` and `test_path` must be provided "
-                                         f"with `{self.strategy.value}` strategy.")
-
-            case DataLoadingStrategy.HIERARCHY:
-                if self.root_folder is None:
-                    raise AttributeError(f"Attribute `root_folder` must be provided "
-                                         f"with `{self.strategy.value}` strategy.")
-
-            case DataLoadingStrategy.DATASET:
-                if self.dataset_path is None:
-                    raise AttributeError(f"Attribute `dataset_path` must be provided "
-                                         f"with `{self.strategy.value}` strategy.")
-
-        return self
 
 
 # PreFilter validation
@@ -113,23 +79,15 @@ class SplittingGeneralConfig(BaseConfig):
 
     Attributes:
         save_on_disk (bool): Whether to save split data to disk; default is False.
-        save_folder (Optional[str]): Folder path to save splits if `save_on_disk` is True.
+        save_folder (str): Folder path to save splits if `save_on_disk` is True.
+        test_splitting (SimpleNamespace): Namespace for test splitting.
+        validation_splitting (Optional[SimpleNamespace]): Namespace for validation splitting.
     """
 
     save_on_disk: bool = Field(default=False)
-    save_folder: Optional[str] = Field(default=None)
-
-    @model_validator(mode="after")
-    def validate_general_fields(self) -> "SplittingGeneralConfig":
-        """Ensure required fields are set if saving splits to disk.
-
-        Returns:
-            SplittingGeneralConfig: The object itself.
-        """
-        if self.save_on_disk and self.save_folder is None:
-            raise AttributeError("Attribute `save_folder` must be provided if `save_on_disk` is set to True.")
-
-        return self
+    save_folder: str = Field()
+    test_splitting: SimpleNamespace
+    validation_splitting: Optional[SimpleNamespace] = Field(default=None)
 
 
 class SplittingConfig(BaseConfig):

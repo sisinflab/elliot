@@ -29,8 +29,6 @@ class DataSetLoader:
     Args:
         config_ns (SimpleNamespace): Configuration namespace object defining data paths, splitting strategy,
             filters, etc.
-        *args (tuple): Additional positional arguments.
-        **kwargs (dict): Additional keyword arguments.
 
     Supported Loading Strategies:
 
@@ -46,11 +44,7 @@ class DataSetLoader:
       data_config:
         strategy: dataset|fixed|hierarchy
         header: True|False
-        dataset_path: this/is/the/path.tsv
-        root_folder: this/is/the/path
-        train_path: this/is/the/path.tsv
-        validation_path: this/is/the/path.tsv
-        test_path: this/is/the/path.tsv
+        data_path: this/is/the/path
       binarize: True|False
         side_information:
           - dataloader: FeatureLoader1
@@ -62,20 +56,14 @@ class DataSetLoader:
     """
 
     strategy: DataLoadingStrategy
-    dataset_path: Optional[str] = None
-    root_folder: Optional[str] = None
-    train_path: Optional[str] = None
-    validation_path: Optional[str] = None
-    test_path: Optional[str] = None
+    data_path: str
     header: bool = False
     binarize: bool = False
     side_information: Optional[SimpleNamespace] = None
     seed: int = 42
 
-    def __init__(self, config_ns: SimpleNamespace, *args, **kwargs):
+    def __init__(self, config_ns: SimpleNamespace):
         self.logger = logging.get_logger(self.__class__.__name__)
-        self.args = args
-        self.kwargs = kwargs
         self.config_ns = config_ns
         self.dataset_loading_ns = config_ns.data_config
         self.dataframe = None
@@ -94,12 +82,6 @@ class DataSetLoader:
         self._load_side_information()
         self._preprocess_data()
 
-        if isinstance(self.tuple_list[0][1], list):
-            self.logger.warning("You are using a splitting strategy with folds. "
-                                "Paired TTest and Wilcoxon Test are not available!")
-            self.config_ns.evaluation.paired_ttest = False
-            self.config_ns.evaluation.wilcoxon_test = False
-
     def set_params(self):
         """Validate and set object parameters."""
         config = DataLoadingConfig(**vars(self.dataset_loading_ns))
@@ -111,30 +93,35 @@ class DataSetLoader:
 
     def _load_ratings(self):
         """Load user-item interaction data according to the selected strategy."""
+        train_path = os.path.join(self.data_path, "train.tsv")
+        test_path = os.path.join(self.data_path, "test.tsv")
+        val_path = os.path.join(self.data_path, "val.tsv")
+        dataset_path = os.path.join(self.data_path, "dataset.tsv")
+
         match self.strategy:
 
             case DataLoadingStrategy.FIXED:
-                train_df = self._read_from_tsv(self.train_path)
-                self.logger.info(f"{self.train_path} - Loaded")
+                train_df = self._read_from_tsv(train_path)
+                self.logger.info(f"{train_path} - Loaded")
 
-                test_df = self._read_from_tsv(self.test_path)
-                self.logger.info(f"{self.test_path} - Loaded")
+                test_df = self._read_from_tsv(test_path)
+                self.logger.info(f"{test_path} - Loaded")
 
-                if self.validation_path is not None:
-                    val_df = self._read_from_tsv(self.validation_path)
-                    self.logger.info(f"{self.validation_path} - Loaded")
+                try:
+                    val_df = self._read_from_tsv(val_path)
+                    self.logger.info(f"{val_path} - Loaded")
 
                     self.dataframe = [([(train_df, val_df)], test_df)]
-                else:
+                except FileNotFoundError:
                     self.dataframe = [(train_df, test_df)]
 
             case DataLoadingStrategy.HIERARCHY:
-                self.dataframe = self._read_splitting(self.root_folder)
-                self.logger.info(f"{self.root_folder} - Loaded splitting")
+                self.dataframe = self._read_splitting(self.data_path)
+                self.logger.info(f"{self.data_path} - Loaded splitting")
 
             case DataLoadingStrategy.DATASET:
-                self.dataframe = self._read_from_tsv(self.dataset_path)
-                self.logger.info(f"{self.dataset_path} - Loaded")
+                self.dataframe = self._read_from_tsv(dataset_path)
+                self.logger.info(f"{dataset_path} - Loaded")
 
     def _read_from_tsv(self, file_path: str) -> pd.DataFrame:
         """Load a TSV file, process the timestamp and optionally binarize ratings.
@@ -245,7 +232,7 @@ class DataSetLoader:
 
     def _preprocess_data(self):
         """Apply user/item filtering based on side information, and basic cleanup.
-        Perform optional pre-filtering, and dataset splitting, only if the "dataset" strategy is used.
+        Perform optional pre-filtering.
         """
         self._intersect_users_items()
         self._clean()
@@ -253,17 +240,9 @@ class DataSetLoader:
 
         del self._items, self._users, self._side_info_objs
 
-        if self.strategy != DataLoadingStrategy.DATASET:
-            self.tuple_list = self.dataframe
-            return
-
         if hasattr(self.config_ns, 'prefiltering'):
             prefilter = PreFilter(self.dataframe, self.config_ns.prefiltering)
             self.dataframe = prefilter.filter()
-
-        self.logger.info("There will be the splitting")
-        splitter = Splitter(self.dataframe, self.config_ns.splitting, self.seed)
-        self.tuple_list = splitter.process_splitting()
 
     def _intersect_users_items(self):
         """Align users/items with side information based on alignment mode:
@@ -313,26 +292,6 @@ class DataSetLoader:
         else:
             self.dataframe = clean(self.dataframe)
 
-    def _maybe_materialize_cache(self):
-        """Hook for large side-information sources: allow loaders to expose a
-        preferred materialization strategy (lazy/memory/mmap). For now, we
-        log intent; specific loaders can honor _materialization internally.
-        """
-        for side_obj in getattr(self, "_side_info_objs", []):
-            mat = getattr(side_obj, "_materialization", None)
-            if not mat:
-                continue
-            self.logger.debug(
-                "Side-info materialization hint",
-                extra={
-                    "context": {
-                        "source": side_obj.__class__.__name__,
-                        "materialization": mat,
-                        "alignment": getattr(side_obj, "_alignment_mode", None),
-                    }
-                },
-            )
-
     def _clean_single_dataframe(self, df: pd.DataFrame) -> pd.DataFrame:
         """Filter a single DataFrame based on valid users/items and applies basic cleanup,
         i.e., handles missing values in the 'timestamp' column (if present), and removes duplicates.
@@ -354,24 +313,65 @@ class DataSetLoader:
         df.drop_duplicates(keep='first', inplace=True)
         return df
 
-    def generate_dataobjects(self) -> List[object]:
+    def _maybe_materialize_cache(self):
+        """Hook for large side-information sources: allow loaders to expose a
+        preferred materialization strategy (lazy/memory/mmap). For now, we
+        log intent; specific loaders can honor _materialization internally.
+        """
+        for side_obj in getattr(self, "_side_info_objs", []):
+            mat = getattr(side_obj, "_materialization", None)
+            if not mat:
+                continue
+            self.logger.debug(
+                "Side-info materialization hint",
+                extra={
+                    "context": {
+                        "source": side_obj.__class__.__name__,
+                        "materialization": mat,
+                        "alignment": getattr(side_obj, "_alignment_mode", None),
+                    }
+                },
+            )
+
+    def build(self) -> List[object]:
+        if self.strategy != DataLoadingStrategy.DATASET:
+            tuple_list = self.dataframe
+        else:
+            self.logger.info("There will be the splitting")
+            splitter = Splitter(self.dataframe, self.config_ns.splitting, self.seed)
+            tuple_list = splitter.process_splitting()
+
+        if isinstance(tuple_list[0][1], list):
+            self.logger.warning("You are using a splitting strategy with folds. "
+                                "Paired TTest and Wilcoxon Test are not available!")
+            self.config_ns.evaluation.paired_ttest = False
+            self.config_ns.evaluation.wilcoxon_test = False
+
         data_list = []
-        for p1, (train_val, test) in enumerate(self.tuple_list):
-            # testset level
+
+        for p1, (train_val, test) in enumerate(tuple_list):
+            # test level
             if isinstance(train_val, list):
                 # validation level
                 val_list = []
                 for p2, (train, val) in enumerate(train_val):
                     self.logger.info(f"Test Fold {p1} - Validation Fold {p2}")
-                    single_dataobject = DataSet(self.config_ns, (train, val, test), self.side_information, self.args,
-                                                self.kwargs)
-                    val_list.append(single_dataobject)
+                    single_data_object = DataSet(
+                        config=self.config_ns,
+                        data_tuple=(train, val, test),
+                        side_information_data=self.side_information
+                    )
+                    val_list.append(single_data_object)
                 data_list.append(val_list)
             else:
                 self.logger.info(f"Test Fold {p1}")
-                single_dataobject = DataSet(self.config_ns, (train_val, test), self.side_information, self.args,
-                                            self.kwargs)
-                data_list.append([single_dataobject])
+                single_data_object = DataSet(
+                    config=self.config_ns,
+                    data_tuple=(train_val, test),
+                    side_information_data=self.side_information
+                )
+                data_list.append([single_data_object])
+
         return data_list
 
     def generate_dataobjects_mock(self) -> List[object]:

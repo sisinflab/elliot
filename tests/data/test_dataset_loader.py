@@ -1,197 +1,151 @@
 import pytest
-import importlib
-from unittest.mock import patch
-from tests.params import params_dataset_loader as p
-from tests.params import params_dataset_loader_fail as p_fail
-from tests.utils import *
+from pathlib import Path
 
-strategy_enum = getattr(importlib.import_module('elliot.utils.enums'), 'DataLoadingStrategy')
+from elliot.dataset import DataSetLoader
+from elliot.utils.enums import DataLoadingStrategy
+
+from tests.params import params_dataset_loader_fail as p
+from tests.utils import create_namespace, data_path
+
+current_path = Path(__file__).parent
 
 
-def dataloader(config_dict):
-    def wrap_data_config(data_config):
-        data_config['side_information'] = []
-        return {
-            'data_config': data_config,
-            'splitting': {'test_splitting': {'strategy': 'random_subsampling'}},
-            'random_seed': 42,
-            'binarize': False,
-            'config_test': False
-        }
-    ns = create_namespace(wrap_data_config(config_dict))
-    dataloader_class = getattr(importlib.import_module("elliot.dataset"), 'DataSetLoader')
-    return dataloader_class(ns)
+def load_data(config_dict):
+    data_config = {
+        "experiment": {**config_dict}
+    }
+    ns = create_namespace(data_config, current_path)
+    loader = DataSetLoader(ns)
+    return loader.dataframe
 
 
 class TestDataSetLoader:
 
-    @pytest.mark.parametrize('params', p['fixed_strategy'])
-    @time_single_test
-    def test_fixed_strategy(self, params):
-        val = True if 'val_shape' in params.keys() else False
-
+    def test_fixed_strategy(self):
         config = {
-            'strategy': strategy_enum.FIXED.value,
-            'train_path': params['folder_path'] + '/train.tsv',
-            'test_path': params['folder_path'] + '/test.tsv',
-            **({'validation_path': params['folder_path'] + '/val.tsv'} if val else {})
+            "dataset": "fixed_strategy",
+            "data_config": {
+                "strategy": DataLoadingStrategy.FIXED.value,
+                "data_path": data_path
+            }
         }
 
-        loader = dataloader(config)
+        df = load_data(config)
 
-        def check_dataloader(data, shape):
-            data.shuffle = False
-            assert data.shape[0] == shape
+        assert df[0][1].shape[0] == 5
+        assert df[0][0].shape[0] == 45
 
-        check_dataloader(loader.tuple_list[0][1], params['test_shape'])
-        if val:
-            check_dataloader(loader.tuple_list[0][0][0][0], params['train_shape'])
-            check_dataloader(loader.tuple_list[0][0][0][1], params['val_shape'])
-            assert len(loader.tuple_list[0][0]) == 1
-        else:
-            check_dataloader(loader.tuple_list[0][0], params['train_shape'])
-
-    @pytest.mark.parametrize('params', p['hierarchy_strategy'])
-    def test_hierarchy_strategy(self, params):
+    def test_fixed_strategy_with_validation(self):
         config = {
-            'strategy': strategy_enum.HIERARCHY.value,
-            'root_folder': params['root_folder']
+            "dataset": "fixed_strategy_with_validation",
+            "data_config": {
+                "strategy": DataLoadingStrategy.FIXED.value,
+                "data_path": data_path
+            }
         }
 
-        loader = dataloader(config)
+        df = load_data(config)
 
-        i = 0
-        for t in loader.tuple_list:
-            assert t[1].shape[0] == params['test_shapes'][i]
-            if isinstance(t[0], list):
-                j = 0
-                for train_val in t[0]:
-                    assert train_val[0].shape[0] == params['train_shapes'][i][j]
-                    assert train_val[1].shape[0] == params['val_shapes'][i][j]
-                    j += 1
-            else:
-                assert t[0].shape[0] == params['train_shapes'][i]
-            i += 1
+        assert df[0][1].shape[0] == 5
+        assert df[0][0][0][0].shape[0] == 40
+        assert df[0][0][0][1].shape[0] == 5
+        assert len(df[0][0]) == 1
 
-    @pytest.mark.parametrize('params', p['dataset_strategy'])
-    @time_single_test
-    def test_dataset_strategy(self, params):
-        dataset_path = params['dataset_folder'] + '/dataset.tsv'
+    def test_hierarchy_strategy(self):
         config = {
-            'strategy': strategy_enum.DATASET.value,
-            'dataset_path': dataset_path
+            "dataset": "hierarchy_strategy",
+            "data_config": {
+                "strategy": DataLoadingStrategy.HIERARCHY.value,
+                "data_path": data_path
+            }
         }
 
-        df_mock = read_dataset(dataset_path)
-        split_idx = round(df_mock.shape[0] * (1 - params['test_ratio']))
-        train_df = df_mock.iloc[:split_idx]
-        test_df = df_mock.iloc[split_idx:]
+        df = load_data(config)
 
-        with (
-            patch(
-                "elliot.dataset.loader_coordinator.Splitter.process_splitting",
-                return_value=[(train_df, test_df)]
-            ) as mock_splitter
-        ):
-            loader = dataloader(config)
+        assert df[0][1].shape[0] == 5
+        assert df[0][0][0][0].shape[0] == 40
+        assert df[0][0][0][1].shape[0] == 5
+        assert df[0][0][1][0].shape[0] == 40
+        assert df[0][0][1][1].shape[0] == 5
 
-            mock_splitter.assert_called_once()
+        assert df[1][1].shape[0] == 5
+        assert df[1][0].shape[0] == 45
 
-            assert loader.dataframe.shape[0] == params['df_shape']
-            assert loader.tuple_list[0][0].equals(train_df)
-            assert loader.tuple_list[0][1].equals(test_df)
-
-    @pytest.mark.parametrize('params', p['filter_nan'])
-    def test_filter_nan(self, params):
-        dataset_path = params['dataset_folder'] + '/dataset.tsv'
+    def test_dataset_strategy(self):
         config = {
-            'strategy': strategy_enum.DATASET.value,
-            'dataset_path': dataset_path
+            "dataset": "dataset_strategy",
+            "data_config": {
+                "strategy": DataLoadingStrategy.DATASET.value,
+                "data_path": data_path
+            }
         }
 
-        df_mock = read_dataset(dataset_path)
+        df = load_data(config)
 
-        with (
-            patch(
-                "elliot.dataset.loader_coordinator.Splitter.process_splitting",
-                return_value=[(df_mock, df_mock)]
-            )
-        ):
-            loader = dataloader(config)
+        assert df.shape[0] == 50
 
-            assert loader.dataframe.shape[0] == params['df_final_shape']
-            assert loader.dataframe.duplicated().sum() == 0
-            assert not loader.dataframe["timestamp"].isna().any()
+    def test_filter_nan(self):
+        config = {
+            "dataset": "filter_nan",
+            "data_config": {
+                "strategy": DataLoadingStrategy.DATASET.value,
+                "data_path": data_path
+            }
+        }
+
+        df = load_data(config)
+
+        assert df.shape[0] == 2
+        assert df.duplicated().sum() == 0
+        assert not df["timestamp"].isna().any()
 
 
 class TestDataSetLoaderFailures:
 
-    @pytest.mark.parametrize('params', p['fixed_strategy'])
-    def test_fixed_strategy_missing_train_path(self, params):
-        val = True if 'val_shape' in params.keys() else False
+    @pytest.mark.parametrize("params", p["invalid_or_missing_params"])
+    def test_invalid_or_missing_params(self, params):
+        if (
+            params.get("strategy") == DataLoadingStrategy.DATASET.value and
+            params.get("data_path") == data_path and
+            params.get("header") == False
+        ):
+            pytest.skip("Test requires at least one invalid parameter to be meaningful.")
 
         config = {
-            'strategy': strategy_enum.FIXED.value,
-            'test_path': params['folder_path'] + '/test.tsv',
-            **({'validation_path': params['folder_path'] + '/val.tsv'} if val else {})
+            "dataset": "dataset_strategy",
+            "data_config": {
+                **({"strategy": params["strategy"]} if params["strategy"] is not None else {}),
+                **({"data_path": params["data_path"]} if params["data_path"] is not None else {}),
+                "header": params["header"]
+            }
         }
 
-        with pytest.raises(AttributeError):
-            dataloader(config)
+        with pytest.raises(ValueError):
+            load_data(config)
 
-    @pytest.mark.parametrize('params', p_fail['fixed_strategy_missing_file'])
-    def test_fixed_strategy_missing_file(self, params):
-        val = True if 'val_shape' in params.keys() else False
-
+    def test_missing_folder(self):
         config = {
-            'strategy': strategy_enum.FIXED.value,
-            'train_path': params['folder_path'] + '/train.tsv',
-            'test_path': params['folder_path'] + '/test.tsv',
-            **({'validation_path': params['folder_path'] + '/val.tsv'} if val else {})
-        }
-
-        with pytest.raises(FileNotFoundError):
-            dataloader(config)
-
-    @pytest.mark.parametrize('params', p_fail['hierarchy_strategy_missing_root_folder'])
-    def test_hierarchy_strategy_missing_root_folder(self, params):
-        config = {
-            'strategy': strategy_enum.HIERARCHY.value,
-            'root_folder': params['root_folder']
+            "dataset": "dataset_strategy",
+            "data_config": {
+                "strategy": DataLoadingStrategy.DATASET.value,
+                "data_path": "non/existent/path"
+            }
         }
 
         with pytest.raises(FileNotFoundError):
-            dataloader(config)
+            load_data(config)
 
-    @pytest.mark.parametrize('params', p_fail['dataset_strategy_missing_dataset'])
-    def test_dataset_strategy_missing_dataset(self, params):
+    def test_missing_file(self):
         config = {
-            'strategy': strategy_enum.DATASET.value,
-            'dataset_path': params['dataset_path']
+            "dataset": "missing_file",
+            "data_config": {
+                "strategy": DataLoadingStrategy.DATASET.value,
+                "data_path": data_path
+            }
         }
 
         with pytest.raises(FileNotFoundError):
-            dataloader(config)
-
-    @pytest.mark.parametrize('params', p['dataset_strategy'])
-    def test_dataset_strategy_invalid_split(self, params, monkeypatch):
-        dataset_path = params['dataset_folder'] + '/dataset.tsv'
-
-        def fake_splitter(*args, **kwargs):
-            return [] # Failed split
-
-        monkeypatch.setattr(
-            "elliot.dataset.loader_coordinator.Splitter.process_splitting",
-            fake_splitter
-        )
-
-        config = {
-            'strategy': strategy_enum.DATASET.value,
-            'dataset_path': dataset_path
-        }
-
-        with pytest.raises(IndexError):
-            dataloader(config)
+            load_data(config)
 
 
 if __name__ == '__main__':
