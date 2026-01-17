@@ -7,58 +7,74 @@ __version__ = '0.3.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
-import os
+from typing import Generator, Union
+from os import PathLike
 import shutil
+from pathlib import Path
 
 
-def manage_directories(path_output_rec_result, path_output_rec_weight, path_output_rec_performance):
-    if os.path.exists(path_output_rec_result):
-        return
-    os.makedirs(path_output_rec_result)
+def check_dir(
+    path: Union[str, PathLike[str]],
+    replace: bool = False
+) -> str:
+    _path = Path(path)
 
-    if os.path.exists(path_output_rec_weight):
-        return
-    os.makedirs(path_output_rec_weight)
-
-    if os.path.exists(path_output_rec_performance):
-        return
-    os.makedirs(path_output_rec_performance)
-    # if os.path.exists(os.path.dirname(path_output_rec_result)):
-    #     return
-    # os.makedirs(os.path.dirname(path_output_rec_result))
-    #
-    # if os.path.exists(os.path.dirname(path_output_rec_weight)):
-    #     return
-    # os.makedirs(os.path.dirname(path_output_rec_weight))
-    #
-    # if os.path.exists(os.path.dirname(path_output_rec_performance)):
-    #     return
-    # os.makedirs(os.path.dirname(path_output_rec_performance))
-
-
-def build_model_folder(path_output_rec_weight, model):
-    if not os.path.exists(os.path.abspath(os.sep.join([path_output_rec_weight, model]))):
-        os.makedirs(os.path.abspath(os.sep.join([path_output_rec_weight, model])))
-    # if not os.path.exists(os.path.dirname(f'{path_output_rec_weight}{model}/')):
-    #     os.makedirs(os.path.dirname(f'{path_output_rec_weight}{model}/'))
-
-
-def build_log_folder(path_log_folder):
-    if not os.path.exists(os.path.abspath(path_log_folder)):
-        os.makedirs(os.path.abspath(path_log_folder))
-
-
-def create_folder_by_index(path, index):
-    complete_path = os.path.abspath(os.sep.join([path, index]))
-    return create_folder(complete_path)
-
-
-def create_folder(path, exist_ok=False):
-    if os.path.exists(path):
-        if not exist_ok:
-            shutil.rmtree(path, ignore_errors=True)
-            os.makedirs(path, exist_ok=True)
+    if _path.exists():
+        if replace:
+            shutil.rmtree(_path, ignore_errors=True)
+            _path.mkdir(parents=True, exist_ok=True)
     else:
-        os.makedirs(path, exist_ok=True)
+        _path.mkdir(parents=True, exist_ok=True)
 
-    return os.path.abspath(path)
+    return path_absolute(_path)
+
+
+def list_dir(
+    path: Union[str, PathLike[str]]
+) -> Generator[str, None, None]:
+    _dirs = [d for d in Path(path).iterdir()]
+    for d in _dirs:
+        yield str(d)
+
+
+def parent_dir(
+    path: Union[str, PathLike[str]]
+) -> str:
+    return str(Path(path).parent)
+
+
+def is_dir(
+    path: Union[str, PathLike[str]]
+) -> bool:
+    return Path(path).is_dir()
+
+
+def check_path(
+    path: Union[str, PathLike[str]]
+) -> bool:
+    return Path(path).exists()
+
+
+def is_file(
+    path: Union[str, PathLike[str]]
+) -> bool:
+    return Path(path).is_file()
+
+
+def path_joiner(
+    *args: Union[str, PathLike[str]]
+) -> str:
+    return str(Path(*args))
+
+
+def path_absolute(
+    path: Union[str, PathLike[str]]
+) -> str:
+    return str(Path(path).resolve())
+
+
+def path_relative(
+    path: Union[str, PathLike[str]],
+    start: Union[str, PathLike[str]]
+) -> str:
+    return str(Path(path).relative_to(start))

@@ -9,7 +9,6 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
 import importlib
 import sys
-from os import path
 from typing import List, Optional
 
 import numpy as np
@@ -19,9 +18,10 @@ import elliot.hyperoptimization as ho
 from elliot.namespace.namespace_model_builder import NameSpaceBuilder
 from elliot.result_handler.result_handler import ResultHandler, HyperParameterStudy, StatTest
 from elliot.utils import logging as logging_project
+from elliot.utils.folder import parent_dir, path_relative
 
 _rstate = np.random.default_rng(seed=42)
-here = path.abspath(path.dirname(__file__))
+here = parent_dir(__file__)
 
 print(u'''
 
@@ -38,7 +38,7 @@ print(u'''
 
 def run_experiment(config_path: str = '', config_overrides: Optional[List[str]] = None):
     builder = NameSpaceBuilder(
-        config_path, here, path.abspath(path.dirname(config_path)), config_overrides=config_overrides
+        config_path, here, parent_dir(config_path), config_overrides=config_overrides
     )
     base = builder.base
     config_test(builder, base)
@@ -59,7 +59,7 @@ def run_experiment(config_path: str = '', config_overrides: Optional[List[str]] 
     res_handler = ResultHandler(rel_threshold=base.base_namespace.evaluation.relevance_threshold)
     hyper_handler = HyperParameterStudy(rel_threshold=base.base_namespace.evaluation.relevance_threshold)
     dataloader_class = getattr(importlib.import_module("elliot.dataset"), 'DataSetLoader')
-    dataloader = dataloader_class(config_ns=base.base_namespace)
+    dataloader = dataloader_class(config=base.base_namespace)
     data_test_list = dataloader.build()
     all_trials = {}
     for key, model_base in builder.models():
@@ -69,8 +69,10 @@ def run_experiment(config_path: str = '', config_overrides: Optional[List[str]] 
         for test_fold_index, data_test in enumerate(data_test_list):
             logging_project.prepare_logger(key, base.base_namespace.path_log_folder)
             if key.startswith("external."):
-                spec = importlib.util.spec_from_file_location("external",
-                                                              path.relpath(base.base_namespace.external_models_path))
+                spec = importlib.util.spec_from_file_location(
+                    "external",
+                    path_relative(base.base_namespace.external_models_path, here)
+                )
                 external = importlib.util.module_from_spec(spec)
                 external.backend = base.base_namespace.backend
                 sys.modules[spec.name] = external
@@ -148,31 +150,31 @@ def run_experiment(config_path: str = '', config_overrides: Optional[List[str]] 
         all_trials[key] = all_trials[key][min_val]
 
     # res_handler.save_results(output=base.base_namespace.path_output_rec_performance)
-    hyper_handler.save_trials(output=base.base_namespace.path_output_rec_performance)
+    # hyper_handler.save_trials(output=base.base_namespace.path_output_rec_performance)
     # hyper_handler.save_trials_std(output=base.base_namespace.path_output_rec_performance)
     # hyper_handler.save_trials_times(output=base.base_namespace.path_output_rec_performance)
-    res_handler.save_best_results(output=base.base_namespace.path_output_rec_performance)
+    # res_handler.save_best_results(output=base.base_namespace.path_output_rec_performance)
     # res_handler.save_best_times(output=base.base_namespace.path_output_rec_performance)
     # res_handler.save_best_results_std(output=base.base_namespace.path_output_rec_performance)
     # res_handler.save_best_results_mean(output=base.base_namespace.path_output_rec_performance)
-    cutoff_k = getattr(base.base_namespace.evaluation, "cutoffs", [base.base_namespace.top_k])
-    cutoff_k = cutoff_k if isinstance(cutoff_k, list) else [cutoff_k]
-    first_metric = base.base_namespace.evaluation.simple_metrics[
-        0] if base.base_namespace.evaluation.simple_metrics else ""
-    res_handler.save_best_models(output=base.base_namespace.path_output_rec_performance, default_metric=first_metric,
-                                 default_k=cutoff_k)
-    if hasattr(base.base_namespace,
-               "print_results_as_triplets") and base.base_namespace.print_results_as_triplets == True:
-        res_handler.save_best_results_as_triplets(output=base.base_namespace.path_output_rec_performance)
-        # res_handler.save_best_results_std_as_triplets(output=base.base_namespace.path_output_rec_performance)
-        hyper_handler.save_trials_as_triplets(output=base.base_namespace.path_output_rec_performance)
-        # hyper_handler.save_trials_as_triplets_std(output=base.base_namespace.path_output_rec_performance)
-    if hasattr(base.base_namespace.evaluation, "paired_ttest") and base.base_namespace.evaluation.paired_ttest:
-        res_handler.save_best_statistical_results(stat_test=StatTest.PairedTTest,
-                                                  output=base.base_namespace.path_output_rec_performance)
-    if hasattr(base.base_namespace.evaluation, "wilcoxon_test") and base.base_namespace.evaluation.wilcoxon_test:
-        res_handler.save_best_statistical_results(stat_test=StatTest.WilcoxonTest,
-                                                  output=base.base_namespace.path_output_rec_performance)
+    # cutoff_k = getattr(base.base_namespace.evaluation, "cutoffs", [base.base_namespace.top_k])
+    # cutoff_k = cutoff_k if isinstance(cutoff_k, list) else [cutoff_k]
+    # first_metric = base.base_namespace.evaluation.simple_metrics[
+    #     0] if base.base_namespace.evaluation.simple_metrics else ""
+    # res_handler.save_best_models(output=base.base_namespace.path_output_rec_performance, default_metric=first_metric,
+    #                              default_k=cutoff_k)
+    # if hasattr(base.base_namespace,
+    #            "print_results_as_triplets") and base.base_namespace.print_results_as_triplets == True:
+    #     res_handler.save_best_results_as_triplets(output=base.base_namespace.path_output_rec_performance)
+    #     # res_handler.save_best_results_std_as_triplets(output=base.base_namespace.path_output_rec_performance)
+    #     hyper_handler.save_trials_as_triplets(output=base.base_namespace.path_output_rec_performance)
+    #     # hyper_handler.save_trials_as_triplets_std(output=base.base_namespace.path_output_rec_performance)
+    # if hasattr(base.base_namespace.evaluation, "paired_ttest") and base.base_namespace.evaluation.paired_ttest:
+    #     res_handler.save_best_statistical_results(stat_test=StatTest.PairedTTest,
+    #                                               output=base.base_namespace.path_output_rec_performance)
+    # if hasattr(base.base_namespace.evaluation, "wilcoxon_test") and base.base_namespace.evaluation.wilcoxon_test:
+    #     res_handler.save_best_statistical_results(stat_test=StatTest.WilcoxonTest,
+    #                                               output=base.base_namespace.path_output_rec_performance)
 
     logger.info("End experiment")
     # TODO: check before to push only this feature!
@@ -217,9 +219,10 @@ def config_test(builder, base):
             test_trials = []
             for data_test in data_test_list:
                 if key.startswith("external."):
-                    spec = importlib.util.spec_from_file_location("external",
-                                                                  path.relpath(
-                                                                      base.base_namespace.external_models_path))
+                    spec = importlib.util.spec_from_file_location(
+                        "external",
+                        path_relative(base.base_namespace.external_models_path, here)
+                    )
                     external = importlib.util.module_from_spec(spec)
                     sys.modules[spec.name] = external
                     spec.loader.exec_module(external)

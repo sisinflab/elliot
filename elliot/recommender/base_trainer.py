@@ -2,7 +2,6 @@ from typing import Union
 import inspect
 import random
 import logging as pylog
-import os
 import time
 
 import torch
@@ -17,23 +16,16 @@ from elliot.evaluation.evaluator import Evaluator
 from elliot.recommender.early_stopping import EarlyStopping
 
 from elliot.utils.config import TrainerConfig
-from elliot.utils.folder import build_model_folder
-from elliot.utils.write import store_recommendation
+from elliot.utils.read import Reader
+from elliot.utils.write import Writer
 from elliot.utils import logging
+
+reader = Reader()
+writer = Writer()
 
 
 class AbstractTrainer(ABC):
-    restore: bool = False
-    validation_metric: Union[str, list] = None
-    save_weights: bool = False
-    save_recs: bool = False
-    verbose: bool = True
-    validation_rate: int = 1
-    optimize_internal_loss: bool = False
-    epochs: int = 1
-    batch_size: int = None
-    eval_batch_size: int = None
-    seed: int = 42
+    config: TrainerConfig
 
     def __init__(self, data, config, params, model_class, *args, **kwargs):
         """
@@ -45,11 +37,26 @@ class AbstractTrainer(ABC):
             params: dictionary with all parameters
         """
         self._data = data
-        self._config = config
-        self._params = params
+        self.global_config = config
+
+        # _params = params.copy()
+        if hasattr(params, 'meta'):
+            params.meta = vars(params.meta)
+        self.config = TrainerConfig(**vars(params))
+
+        # Logger
+        package_name = inspect.getmodule(model_class).__package__
+        rec_name = f"external.{model_class.__name__}" if "external" in package_name else model_class.__name__
+        self.logger = logging.get_logger_model(
+            rec_name,
+            pylog.CRITICAL if self.global_config.config_test else pylog.DEBUG
+        )
+
+        # Model
+        self.model = model_class(data, params, self.config.seed, self.logger)
 
         # Validate and assign meta parameters
-        self.set_params(meta=True)
+        # self.set_params(meta=True)
 
         # Validation metric
         _cutoff_k = getattr(data.config.evaluation, "cutoffs", [data.config.top_k])
@@ -57,10 +64,11 @@ class AbstractTrainer(ABC):
         _first_metric = data.config.evaluation.simple_metrics[0] if data.config.evaluation.simple_metrics else ""
         _default_validation_k = _cutoff_k[0]
 
-        if self.validation_metric is None:
-            self.validation_metric = _first_metric + "@" + str(_default_validation_k)
+        validation_metric = self.config.meta.validation_metric
+        if validation_metric is None:
+            validation_metric = _first_metric + "@" + str(_default_validation_k)
 
-        validation_metric = self.validation_metric.split("@")
+        validation_metric = validation_metric.split("@")
 
         if validation_metric[0].lower() not in [m.lower()
                                                       for m in data.config.evaluation.simple_metrics]:
@@ -74,40 +82,28 @@ class AbstractTrainer(ABC):
         self.validation_metric = validation_metric[0]
 
         # Early stopping
-        self._early_stopping = EarlyStopping(SimpleNamespace(**getattr(self._params, "early_stopping", {})),
+        self._early_stopping = EarlyStopping(SimpleNamespace(**getattr(params, "early_stopping", {})),
                                              self.validation_metric, self._validation_k, _cutoff_k,
                                              data.config.evaluation.simple_metrics)
 
         # Validate and assign other parameters
-        self.set_params()
+        # self.set_params()
 
-        if self.epochs < self.validation_rate:
-            raise Exception(f"The first validation epoch ({self.validation_rate}) "
-                            f"is later than the overall number of epochs ({self.epochs}).")
+        if self.config.epochs < self.config.meta.validation_rate:
+            raise Exception(f"The first validation epoch ({self.config.meta.validation_rate}) "
+                            f"is later than the overall number of epochs ({self.config.epochs}).")
 
-        if self.batch_size is None:
-            self.batch_size = self._data.batch_size
-        else:
-            self._data.batch_size = self.batch_size
-
-        if self.eval_batch_size is None:
-            self.eval_batch_size = self.batch_size
+        if self.config.eval_batch_size is None:
+            self.config.eval_batch_size = self.config.batch_size
 
         # Set seed
-        np.random.seed(self.seed)
-        random.seed(self.seed)
-
-        # Logger
-        package_name = inspect.getmodule(model_class).__package__
-        rec_name = f"external.{model_class.__name__}" if "external" in package_name else model_class.__name__
-        self.logger = logging.get_logger_model(rec_name, pylog.CRITICAL if self._config.config_test else pylog.DEBUG)
-
-        # Model
-        self._model = model_class(data, params, self.seed, self.logger)
+        np.random.seed(self.config.seed)
+        random.seed(self.config.seed)
 
         # Further parameters
         self._num_items = self._data.num_items
         self._num_users = self._data.num_users
+        self.config.name = self.name
 
         self.best_metric_value = 0
 
@@ -116,14 +112,7 @@ class AbstractTrainer(ABC):
         self._params_list = []
 
         # Evaluator
-        self.evaluator = Evaluator(self._data, self._params)
-
-        # Saving file
-        self._params.name = self.name
-        build_model_folder(self._config.path_output_rec_weight, self.name)
-        self._saving_filepath = os.path.abspath(
-            os.sep.join([self._config.path_output_rec_weight, self.name, f"best-weights-{self.name}"])
-        )
+        self.evaluator = Evaluator(data, params)
 
     def set_params(self, meta: bool = False):
         """Validate and set object parameters.
@@ -138,14 +127,14 @@ class AbstractTrainer(ABC):
 
     @property
     def name(self):
-        return self._model.name + f"_{self.get_base_params_shortcut()}" + self._model.name_param
+        return self.model.name + f"_{self.get_base_params_shortcut()}" + self.model.name_param
 
     def get_base_params_shortcut(self):
         return "_".join([str(k) + "=" + str(v).replace(".", "$") for k, v in
-                         dict({"seed": self.seed,
-                               "epochs": self.epochs,
-                               "batch_size": self.batch_size,
-                               "eval_batch_size": self.eval_batch_size}).items()
+                         dict({"seed": self.config.seed,
+                               "epochs": self.config.epochs,
+                               "batch_size": self.config.batch_size,
+                               "eval_batch_size": self.config.eval_batch_size}).items()
                          ])
 
     # def get_model_params_shortcut(self):
@@ -156,22 +145,22 @@ class AbstractTrainer(ABC):
     #     )
 
     def train(self):
-        if self.restore:
+        if self.config.meta.restore:
             return self.restore_weights()
 
         self.logger.info(
             "Loaded training dataset",
             extra={"context": {"transactions": self._data.transactions}}
         )
-        training_dataloader = self._model.get_training_dataloader()
+        training_dataloader = self.model.get_training_dataloader(self.config.batch_size)
 
         if not isinstance(training_dataloader, DataLoader):
-            self.verbose = False
+            self.config.meta.verbose = False
 
-        for it in self.iterate(self.epochs):
+        for it in self.iterate(self.config.epochs):
             self.logger.debug(
                 "Starting iteration",
-                extra={"context": {"iteration": it + 1, "epochs": self.epochs}}
+                extra={"context": {"iteration": it + 1, "epochs": self.config.epochs}}
             )
             start = time.perf_counter()
             loss = self._train_epoch(it, training_dataloader)
@@ -180,7 +169,7 @@ class AbstractTrainer(ABC):
                 "Completed iteration",
                 extra={"context": {"iteration": it + 1, "duration_sec": end - start}}
             )
-            if not (it + 1) % self.validation_rate:
+            if not (it + 1) % self.config.meta.validation_rate:
                 self.evaluate(it, loss / (it + 1))
 
     def evaluate(self, it=0, loss=0):
@@ -192,37 +181,45 @@ class AbstractTrainer(ABC):
         self._results.append(result_dict)
 
         # if it is not None:
-        self.logger.debug(f'Epoch {(it + 1)}/{self.epochs} loss {loss / (it + 1):.5f}')
+        self.logger.debug(f'Epoch {(it + 1)}/{self.config.epochs} loss {loss / (it + 1):.5f}')
         # else:
         #    self.logger.info(f'Finished')
 
-        if self.save_recs:
-            self.logger.info(f"Writing recommendations at: {self._config.path_output_rec_result}")
+        if self.config.meta.save_recs:
+            self.logger.info(f"Writing recommendations at: {self.global_config.path_output_rec_result}")
             # if it is not None:
-            store_recommendation(recs[1], os.path.abspath(
-                os.sep.join([self._config.path_output_rec_result, f"{self.name}_it={it + 1}.tsv"])))
+            writer.write_recommendation(
+                recommendations=recs[1],
+                save_folder=self.global_config.path_output_rec_result,
+                model_name=self.name,
+                it=it
+            )
             # else:
             #    store_recommendation(recs[1], os.path.abspath(
             #        os.sep.join([self._config.path_output_rec_result, f"{self.name}.tsv"])))
 
         if (len(self._results) - 1) == self.get_best_arg():
             # if it is not None:
-            self._params.best_iteration = it + 1
+            self.config.best_iteration = it + 1
             best_val = self._results[-1][self._validation_k]["val_results"][self.validation_metric]
             self.best_metric_value = best_val
             self.logger.info(
                 "Recorded best validation result",
                 extra={"context": {"metric": self.validation_metric, "value": best_val, "iteration": it + 1}}
             )
-            if self.save_weights:
+            if self.config.meta.save_weights:
                 if hasattr(self, "_model"):
-                    self._model.save_weights(self._saving_filepath)
+                    writer.write_model(
+                        obj=self._model.get_model_state(),
+                        save_folder=self.global_config.path_output_rec_weight,
+                        model_name=self.name
+                    )
                 else:
-                    self.logger.warning("Saving weights FAILED. No model to save.")
+                    self.logger.warning("No model to save")
 
     def get_recs(self, k: int = 100):
         preds_test, preds_val = {}, {}
-        dataloader = self._data.eval_dataloader(self.eval_batch_size)
+        dataloader = self._data.eval_dataloader(self.config.eval_batch_size)
 
         iter_data = tqdm(
             dataloader,
@@ -249,10 +246,10 @@ class AbstractTrainer(ABC):
     def _compute_batch_recs(self, k, user_indices, item_indices=None):
         """Common logic for computing top-k recommendations."""
         if item_indices is not None:
-            preds = self._model.predict_sampled(user_indices, item_indices)
+            preds = self.model.predict_sampled(user_indices, item_indices)
             mask = item_indices == -1
         else:
-            preds = self._model.predict_full(user_indices)
+            preds = self.model.predict_full(user_indices)
             eval_batch = self._data.sp_i_train_ratings[user_indices.tolist()]
             mask = eval_batch.nonzero()
 
@@ -262,6 +259,8 @@ class AbstractTrainer(ABC):
         return recs_dict
 
     def _get_recs_dict(self, values, item_indices, user_indices):
+        if not item_indices.size:
+            return {}
         pr_users, pr_items = self._data.get_inverse_mappings()
         mapped_items = np.array(pr_items)[item_indices]
         mat = [[*zip(item, val)] for item, val in zip(mapped_items, values)]
@@ -270,6 +269,8 @@ class AbstractTrainer(ABC):
 
     def _get_top_k(self, users_recs, k, mask, item_indices=None):
         users_recs[mask] = -torch.inf
+
+        k = min(k, users_recs.shape[1])
         v, i = torch.topk(users_recs, k=k, sorted=True)
 
         if item_indices is not None:
@@ -279,30 +280,30 @@ class AbstractTrainer(ABC):
 
     def restore_weights(self):
         try:
-            self._model.load_weights(self._saving_filepath)
-            self.logger.info(
-                "Model restored from disk",
-                extra={"context": {"path": self._saving_filepath}}
+            weights = reader.read_model(
+                read_folder=self.global_config.path_output_rec_weight,
+                model_name=self.name
             )
+            self.model.set_model_state(weights)
             self.evaluate()
             return True
         except Exception as ex:
             raise Exception(f"Error in model restoring operation! {ex}")
 
     def get_loss(self):
-        if self.optimize_internal_loss:
+        if self.config.meta.optimize_internal_loss:
             return min(self._losses)
         else:
             return -max([r[self._validation_k]["val_results"][self.validation_metric] for r in self._results])
 
     def get_params(self):
-        return self._params.__dict__
+        return self.config.model_dump(exclude={"meta"})
 
     def get_results(self):
         return self._results[self.get_best_arg()]
 
     def get_best_arg(self):
-        if self.optimize_internal_loss:
+        if self.config.meta.optimize_internal_loss:
             val_results = np.argmin(self._losses)
         else:
             val_results = np.argmax(
@@ -336,14 +337,14 @@ class Trainer(AbstractTrainer):
         loss = 0
         steps = 0
         iter_ = tqdm(
-            total=int(self._model.transactions // self.batch_size),
+            total=int(self.model.transactions // self.config.batch_size),
             desc="Training",
-            disable=not self.verbose
+            disable=not self.config.meta.verbose
         )
         with iter_ as t:
             for batch in dataloader:
                 steps += 1
-                loss += self._model.train_step(batch, *args)
+                loss += self.model.train_step(batch, *args)
                 t.set_postfix({'loss': f'{loss / steps:.5f}'})
                 t.update()
         return loss
@@ -355,29 +356,29 @@ class TraditionalTrainer(Trainer):
         self.epochs = 1
 
     def _train_epoch(self, *args):
-        self._model.initialize()
+        self.model.initialize()
         return 0
 
 
 class GeneralTrainer(AbstractTrainer):
     def __init__(self, data, config, params, model_class):
         super().__init__(data, config, params, model_class)
-        self.optimizer = self._model.optimizer
-        torch.manual_seed(self.seed)
+        self.optimizer = self.model.optimizer
+        torch.manual_seed(self.config.seed)
 
     def _train_epoch(self, it, dataloader, *args):
-        self._model.train()
+        self.model.train()
         total_loss, steps = 0, 0
         iter_ = tqdm(
-            total=int(self._model.transactions // self.batch_size),
+            total=int(self.model.transactions // self.config.batch_size),
             desc="Training",
-            disable=not self.verbose
+            disable=not self.config.meta.verbose
         )
         with iter_ as t:
             for batch in dataloader:
                 steps += 1
                 self.optimizer.zero_grad()
-                res = self._model.train_step(batch, steps, *args)
+                res = self.model.train_step(batch, steps, *args)
                 loss, inputs = res if isinstance(res, tuple) else (res, None)
                 loss.backward(inputs=inputs)
                 total_loss += loss.detach().cpu().numpy()
@@ -388,5 +389,5 @@ class GeneralTrainer(AbstractTrainer):
 
     @torch.no_grad()
     def evaluate(self, it=0, loss=0):
-        self._model.eval()
+        self.model.eval()
         super().evaluate(it, loss)

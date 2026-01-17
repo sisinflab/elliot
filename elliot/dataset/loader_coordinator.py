@@ -1,6 +1,5 @@
-from typing import List, Optional
+from typing import List, Union
 from types import SimpleNamespace
-import os
 import importlib
 import numpy as np
 import pandas as pd
@@ -16,8 +15,10 @@ from elliot.splitter.base_splitter import Splitter
 from elliot.prefiltering.standard_prefilters import PreFilter
 from elliot.dataset.dataset import DataSet
 from elliot.utils.enums import DataLoadingStrategy
-from elliot.utils.read import read_tabular
+from elliot.utils.read import Reader
 from elliot.utils.config import DataLoadingConfig
+
+reader = Reader()
 
 
 class DataSetLoader:
@@ -27,7 +28,7 @@ class DataSetLoader:
     The final output is a list of `DataSet` objects, ready to be consumed by the recommendation pipeline.
 
     Args:
-        config_ns (SimpleNamespace): Configuration namespace object defining data paths, splitting strategy,
+        config (SimpleNamespace): Configuration namespace object defining data paths, splitting strategy,
             filters, etc.
 
     Supported Loading Strategies:
@@ -43,8 +44,8 @@ class DataSetLoader:
 
       data_config:
         strategy: dataset|fixed|hierarchy
-        header: True|False
-        data_path: this/is/the/path
+        data_folder: this/is/the/path
+        dataset_path: this/is/the/path
       binarize: True|False
         side_information:
           - dataloader: FeatureLoader1
@@ -55,126 +56,88 @@ class DataSetLoader:
             folder_map_features: this/is/the/path/folder
     """
 
-    strategy: DataLoadingStrategy
-    data_path: str
-    header: bool = False
-    binarize: bool = False
-    side_information: Optional[SimpleNamespace] = None
-    seed: int = 42
+    # TODO: insert separate reader config
+    # TODO: move 'header' and 'columns' attributes to reader config
 
-    def __init__(self, config_ns: SimpleNamespace):
+    config: DataLoadingConfig
+    interactions: Union[list, pd.DataFrame]
+    tuple_list: list
+    side_information: SimpleNamespace
+
+    def __init__(self, config: SimpleNamespace):
         self.logger = logging.get_logger(self.__class__.__name__)
-        self.config_ns = config_ns
-        self.dataset_loading_ns = config_ns.data_config
-        self.dataframe = None
-        self.tuple_list = None
+        reader.logger = self.logger
 
-        self.set_params()
+        self.config = DataLoadingConfig(**vars(config.data_config))
+        self.reader_config = self._get_reader_config()
+        self.global_config = config
 
-        # Default to aligning side information with the observed training set when present
-        if getattr(self.dataset_loading_ns, "side_information", None) and not hasattr(self.config_ns, "align_side_with_train"):
-            setattr(self.config_ns, "align_side_with_train", True)
+        # Default to align side information with the observed training set when present
+        if self.config.side_information is not None and not hasattr(self.global_config, "align_side_with_train"):
+            setattr(self.global_config, "align_side_with_train", True)
 
-        if self.config_ns.config_test:
+        if self.global_config.config_test:
             return
 
         self._load_ratings()
         self._load_side_information()
         self._preprocess_data()
 
-    def set_params(self):
-        """Validate and set object parameters."""
-        config = DataLoadingConfig(**vars(self.dataset_loading_ns))
-
-        for name, val in config.get_validated_params().items():
-            setattr(self, name, val)
-
-        self.binarize = self.config_ns.binarize
+    def _get_reader_config(self):
+        return {
+            "columns": self.config.columns,
+            "datatypes": ["string", "string", "float", "float"],
+            "sep": "\t",
+            "ext": ".tsv",
+            "header": self.config.header,
+            "callback_fn": self._rename_cols_and_binarize
+        }
 
     def _load_ratings(self):
         """Load user-item interaction data according to the selected strategy."""
-        train_path = os.path.join(self.data_path, "train.tsv")
-        test_path = os.path.join(self.data_path, "test.tsv")
-        val_path = os.path.join(self.data_path, "val.tsv")
-        dataset_path = os.path.join(self.data_path, "dataset.tsv")
-
-        match self.strategy:
+        match self.config.strategy:
 
             case DataLoadingStrategy.FIXED:
-                train_df = self._read_from_tsv(train_path)
-                self.logger.info(f"{train_path} - Loaded")
-
-                test_df = self._read_from_tsv(test_path)
-                self.logger.info(f"{test_path} - Loaded")
-
-                try:
-                    val_df = self._read_from_tsv(val_path)
-                    self.logger.info(f"{val_path} - Loaded")
-
-                    self.dataframe = [([(train_df, val_df)], test_df)]
-                except FileNotFoundError:
-                    self.dataframe = [(train_df, test_df)]
+                self.interactions = reader.read_tabular_split(
+                    read_folder=self.config.data_folder,
+                    **self.reader_config
+                )
 
             case DataLoadingStrategy.HIERARCHY:
-                self.dataframe = self._read_splitting(self.data_path)
-                self.logger.info(f"{self.data_path} - Loaded splitting")
+                self.interactions = reader.read_tabular_split(
+                    read_folder=self.config.data_folder,
+                    hierarchical=True,
+                    **self.reader_config
+                )
 
             case DataLoadingStrategy.DATASET:
-                self.dataframe = self._read_from_tsv(dataset_path)
-                self.logger.info(f"{dataset_path} - Loaded")
+                self.interactions = reader.read_tabular(
+                    file_path=self.config.dataset_path,
+                    **self.reader_config
+                )
 
-    def _read_from_tsv(self, file_path: str) -> pd.DataFrame:
-        """Load a TSV file, process the timestamp and optionally binarize ratings.
+        self._clean(self._filter_nan_and_duplicates)
 
-        Args:
-            file_path (str): Path to the TSV file containing interactions.
+    def _rename_cols_and_binarize(self, data):
+        names = ["userId", "itemId", "rating", "timestamp"]
 
-        Returns:
-            pd.DataFrame: The loaded and formatted DataFrame.
-        """
-
-        cols = ['userId', 'itemId', 'rating', 'timestamp']
-        dtypes = ['str', 'str', 'float', 'float']
-
-        df = read_tabular(
-            file_path,
-            cols=cols,
-            datatypes=dtypes,
-            sep='\t',
-            header=self.header
+        col_mapping = (
+            {c: names[i] for i, c in enumerate(self.config.columns) if c in data.columns}
+            if self.config.columns is not None
+            else dict(zip(data.columns, names))
         )
 
-        if self.binarize == True or 'rating' not in cols:
-            df["rating"] = 1.0
+        cols_to_use = list(col_mapping.values())
+        data.rename(columns=col_mapping, inplace=True)
+        data = data[cols_to_use]
 
-        return df
+        if any(c not in data.columns for c in ("userId", "itemId")):
+            raise KeyError("Missing some required columns: 'userId' or 'itemId'.")
 
-    def _read_splitting(self, folder_path: str) -> list:
-        """Read train/val/test splits organized in a hierarchical folder structure.
+        if self.config.binarize == True or "rating" not in data.columns:
+            data["rating"] = 1.0
 
-        Args:
-            folder_path (str): Root folder path containing the splits.
-
-        Returns:
-            list: A nested list of (train, val, test) splits for each fold.
-        """
-        tuple_list = []
-        for dirs in os.listdir(folder_path):
-            for test_dir in dirs:
-                test_ = self._read_from_tsv(os.sep.join([folder_path, test_dir, "test.tsv"]))
-                val_dirs = [os.sep.join([folder_path, test_dir, val_dir]) for val_dir in
-                            os.listdir(os.sep.join([folder_path, test_dir])) if
-                            os.path.isdir(os.sep.join([folder_path, test_dir, val_dir]))]
-                val_list = []
-                for val_dir in val_dirs:
-                    train_ = self._read_from_tsv(os.sep.join([val_dir, "train.tsv"]))
-                    val_ = self._read_from_tsv(os.sep.join([val_dir, "val.tsv"]))
-                    val_list.append((train_, val_))
-                if not val_list:
-                    val_list = self._read_from_tsv(os.sep.join([folder_path, test_dir, "train.tsv"]))
-                tuple_list.append((val_list, test_))
-
-        return tuple_list
+        return data
 
     def _load_side_information(self):
         """Load side information (e.g., user/item features) using custom dataloaders defined in config.
@@ -183,19 +146,19 @@ class DataSetLoader:
             TypeError: If a provided loader does not inherit from AbstractLoader.
         """
         users, items = set(), set()
-        df = self.dataframe
+        df = self.interactions
 
         if isinstance(df, list):
-            train, test = df[0]
+            train_val, test = df[0]
             users |= set(test["userId"].unique())
             items |= set(test["itemId"].unique())
-            if isinstance(train, list):
-                tr, val = train[0]
-                users |= set(tr["userId"].unique()) | set(val["userId"].unique())
-                items |= set(tr["itemId"].unique()) | set(val["itemId"].unique())
-            else:
-                users |= set(train["userId"].unique())
-                items |= set(train["itemId"].unique())
+
+            train, val = train_val[0]
+            users |= set(train["userId"].unique())
+            items |= set(train["itemId"].unique())
+            if val is not None:
+                users |= set(val["userId"].unique())
+                items |= set(val["itemId"].unique())
         else:
             users = set(df["userId"].unique())
             items = set(df["itemId"].unique())
@@ -204,7 +167,7 @@ class DataSetLoader:
         self._items = items
 
         side_info_objs = []
-        sides = self.dataset_loading_ns.side_information
+        sides = self.config.side_information
         for side in sides:
             module = importlib.import_module("elliot.dataset.dataloader.loaders")
             dataloader_class = getattr(module, side.dataloader)
@@ -235,14 +198,14 @@ class DataSetLoader:
         Perform optional pre-filtering.
         """
         self._intersect_users_items()
-        self._clean()
+        self._clean(self._filter_users_and_items)
         self._maybe_materialize_cache()
 
         del self._items, self._users, self._side_info_objs
 
-        if hasattr(self.config_ns, 'prefiltering'):
-            prefilter = PreFilter(self.dataframe, self.config_ns.prefiltering)
-            self.dataframe = prefilter.filter()
+        if hasattr(self.global_config, "prefiltering"):
+            prefilter = PreFilter(self.interactions, self.global_config.prefiltering)
+            self.interactions = prefilter.filter()
 
     def _intersect_users_items(self):
         """Align users/items with side information based on alignment mode:
@@ -275,24 +238,21 @@ class DataSetLoader:
 
         self._users, self._items = user_aligned, item_aligned
 
-    def _clean(self):
+    def _clean(self, clean_fn):
         """Clean all loaded DataFrames by filtering users/items and removing duplicates."""
-        def clean(df): return self._clean_single_dataframe(df)
+        def clean(df): return clean_fn(df) if df is not None else None
 
-        if isinstance(self.dataframe, list):
+        if isinstance(self.interactions, list):
             new_dataframe = []
-            for tr, te in self.dataframe:
+            for tr, te in self.interactions:
                 test = clean(te)
-                if isinstance(tr, list):
-                    train_fold = [(clean(tr_), clean(va)) for tr_, va in tr]
-                else:
-                    train_fold = clean(tr)
+                train_fold = [(clean(tr_), clean(va)) for tr_, va in tr]
                 new_dataframe.append((train_fold, test))
-            self.dataframe = new_dataframe
+            self.interactions = new_dataframe
         else:
-            self.dataframe = clean(self.dataframe)
+            self.interactions = clean(self.interactions)
 
-    def _clean_single_dataframe(self, df: pd.DataFrame) -> pd.DataFrame:
+    def _filter_nan_and_duplicates(self, df: pd.DataFrame) -> pd.DataFrame:
         """Filter a single DataFrame based on valid users/items and applies basic cleanup,
         i.e., handles missing values in the 'timestamp' column (if present), and removes duplicates.
 
@@ -302,15 +262,17 @@ class DataSetLoader:
         Returns:
             pd.DataFrame: Cleaned DataFrame.
         """
-        df = df[df["userId"].isin(self._users) & df["itemId"].isin(self._items)].reset_index(drop=True)
-
-        mean_imputing_feats = ['timestamp']
+        mean_imputing_feats = ["timestamp"]
         for feat in mean_imputing_feats:
             if feat in list(df.columns):
                 df[feat] = df[feat].fillna(df[feat].mean())
 
         df.dropna(inplace=True)
         df.drop_duplicates(keep='first', inplace=True)
+        return df
+
+    def _filter_users_and_items(self, df: pd.DataFrame) -> pd.DataFrame:
+        df = df[df["userId"].isin(self._users) & df["itemId"].isin(self._items)].reset_index(drop=True)
         return df
 
     def _maybe_materialize_cache(self):
@@ -334,49 +296,42 @@ class DataSetLoader:
             )
 
     def build(self) -> List[object]:
-        if self.strategy != DataLoadingStrategy.DATASET:
-            tuple_list = self.dataframe
+        if self.config.strategy != DataLoadingStrategy.DATASET:
+            tuple_list = self.interactions
         else:
             self.logger.info("There will be the splitting")
-            splitter = Splitter(self.dataframe, self.config_ns.splitting, self.seed)
+            splitter = Splitter(self.interactions, self.global_config.splitting, self.config.seed)
             tuple_list = splitter.process_splitting()
 
-        if isinstance(tuple_list[0][1], list):
+        if len(tuple_list) > 1:
             self.logger.warning("You are using a splitting strategy with folds. "
                                 "Paired TTest and Wilcoxon Test are not available!")
-            self.config_ns.evaluation.paired_ttest = False
-            self.config_ns.evaluation.wilcoxon_test = False
+            self.global_config.evaluation.paired_ttest = False
+            self.global_config.evaluation.wilcoxon_test = False
 
         data_list = []
 
         for p1, (train_val, test) in enumerate(tuple_list):
             # test level
-            if isinstance(train_val, list):
+            val_list = []
+            for p2, (train, val) in enumerate(train_val):
                 # validation level
-                val_list = []
-                for p2, (train, val) in enumerate(train_val):
-                    self.logger.info(f"Test Fold {p1} - Validation Fold {p2}")
-                    single_data_object = DataSet(
-                        config=self.config_ns,
-                        data_tuple=(train, val, test),
-                        side_information_data=self.side_information
-                    )
-                    val_list.append(single_data_object)
-                data_list.append(val_list)
-            else:
-                self.logger.info(f"Test Fold {p1}")
+                self.logger.info(
+                    f"Test Fold {p1}{f" - Validation Fold {p2}" if val is not None else ""}"
+                )
                 single_data_object = DataSet(
-                    config=self.config_ns,
-                    data_tuple=(train_val, test),
+                    config=self.global_config,
+                    data_tuple=(train, val, test),
                     side_information_data=self.side_information
                 )
-                data_list.append([single_data_object])
+                val_list.append(single_data_object)
+            data_list.append(val_list)
 
         return data_list
 
     def generate_dataobjects_mock(self) -> List[object]:
-        np.random.seed(self.seed)
-        _column_names = ['userId', 'itemId', 'rating']
+        _column_names = ["userId", "itemId", "rating"]
+        np.random.seed(self.config.seed)
         training_set = np.hstack(
             (np.random.randint(0, 5 * 20, size=(5 * 20, 2)), np.random.randint(0, 2, size=(5 * 20, 1))))
         test_set = np.hstack(
@@ -384,6 +339,6 @@ class DataSetLoader:
 
         training_set = pd.DataFrame(np.array(training_set), columns=_column_names)
         test_set = pd.DataFrame(np.array(test_set), columns=_column_names)
-        data_list = [[DataSet(self.config_ns, (training_set, test_set), self.args, self.kwargs)]]
+        data_list = [[DataSet(self.global_config, (training_set, test_set))]]
 
         return data_list

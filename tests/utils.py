@@ -1,11 +1,12 @@
 import functools
 import time
-from pathlib import Path
 
 from elliot.namespace import NameSpaceModel
+from elliot.utils.folder import parent_dir, path_joiner
 
-test_path = Path(__file__).parent
-data_path = str(test_path / "data" / "{0}")
+test_path = parent_dir(__file__)
+data_folder = path_joiner(test_path, "data", "{0}")
+dataset_path = path_joiner(data_folder, "dataset.tsv")
 
 
 def time_single_test(func):
@@ -22,6 +23,6 @@ def time_single_test(func):
 
 
 def create_namespace(config, source_path):
-    model = NameSpaceModel(config, str(test_path), str(source_path))
-    model.fill_base()
-    return model.base_namespace
+    ns_model = NameSpaceModel(config, str(test_path), str(source_path))
+    ns_model.fill_base()
+    return ns_model

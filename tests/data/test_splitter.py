@@ -1,13 +1,13 @@
 import pytest
-from pathlib import Path
 
 from elliot.dataset import DataSetLoader
 from elliot.utils.enums import SplittingStrategy, DataLoadingStrategy
+from elliot.utils.folder import parent_dir, path_joiner, check_path
 
 from tests.params import params_splitting_fail as p
-from tests.utils import create_namespace, data_path
+from tests.utils import create_namespace, dataset_path
 
-current_path = Path(__file__).parent
+current_path = parent_dir(__file__)
 
 
 def load_and_split_data(config_dict):
@@ -16,14 +16,17 @@ def load_and_split_data(config_dict):
             "dataset": "splitting_strategies",
             "data_config": {
                 "strategy": DataLoadingStrategy.DATASET.value,
-                "data_path": data_path
+                "dataset_path": dataset_path,
+                "header": True,
+                "columns": ["userId", "itemId", "", "timestamp"]
             },
             "splitting": {
                 **config_dict
             }
         }
     }
-    ns = create_namespace(config, current_path)
+    ns_model = create_namespace(config, current_path)
+    ns = ns_model.base_namespace
     loader = DataSetLoader(ns)
     data_list = loader.build()
     return data_list
@@ -42,7 +45,7 @@ class TestSplitter:
         data = load_and_split_data(config)
 
         assert len(data) == 1
-        train, test = data[0][0].interactions
+        train, _, test = data[0][0].inter_dataframe
         assert not train.empty and not test.empty
         assert len(train) + len(test) == 30
 
@@ -57,7 +60,7 @@ class TestSplitter:
         data = load_and_split_data(config)
 
         assert len(data) == 1
-        train, test = data[0][0].interactions
+        train, _, test = data[0][0].inter_dataframe
         assert not train.empty and not test.empty
         assert all(test.groupby('userId').size() <= 3)
 
@@ -73,8 +76,8 @@ class TestSplitter:
         data = load_and_split_data(config)
 
         assert len(data) == 10
-        inter = [d[0].interactions for d in data]
-        for train, test in inter:
+        inter = [d[0].inter_dataframe for d in data]
+        for train, _, test in inter:
             assert not train.empty and not test.empty
             assert len(train) + len(test) == 30
 
@@ -90,8 +93,8 @@ class TestSplitter:
         data = load_and_split_data(config)
 
         assert len(data) == 3
-        inter = [d[0].interactions for d in data]
-        for train, test in inter:
+        inter = [d[0].inter_dataframe for d in data]
+        for train, _, test in inter:
             assert not train.empty and not test.empty
             assert len(train) + len(test) == 30
 
@@ -106,8 +109,8 @@ class TestSplitter:
         data = load_and_split_data(config)
 
         assert len(data) == 10
-        inter = [d[0].interactions for d in data]
-        for train, test in inter:
+        inter = [d[0].inter_dataframe for d in data]
+        for train, _, test in inter:
             assert not train.empty and not test.empty
             assert len(train) + len(test) == 30
 
@@ -122,7 +125,7 @@ class TestSplitter:
         data = load_and_split_data(config)
 
         assert len(data) == 1
-        train, test = data[0][0].interactions
+        train, _, test = data[0][0].inter_dataframe
         assert not train.empty and not test.empty
         assert all(test["timestamp"] >= 7)
         assert all(train["timestamp"] < 7)
@@ -139,7 +142,7 @@ class TestSplitter:
         data = load_and_split_data(config)
 
         assert len(data) == 1
-        train, test = data[0][0].interactions
+        train, _, test = data[0][0].inter_dataframe
         assert not train.empty and not test.empty
         assert train['timestamp'].max() < test['timestamp'].min()
 
@@ -156,8 +159,10 @@ class TestSplitter:
 
         load_and_split_data(config)
 
-        assert (current_path / Path(save_folder) / "0" / "train.tsv").resolve().exists()
-        assert (current_path / Path(save_folder) / "0" / "test.tsv").resolve().exists()
+        train_path = path_joiner(current_path, save_folder, "0", "train.tsv")
+        test_path = path_joiner(current_path, save_folder, "0", "test.tsv")
+        assert check_path(train_path)
+        assert check_path(test_path)
 
     def test_train_validation_test_split(self):
         config = {
@@ -174,7 +179,7 @@ class TestSplitter:
         data = load_and_split_data(config)
 
         assert len(data) == 3
-        inter = [d[0].interactions for d in data]
+        inter = [d[0].inter_dataframe for d in data]
         for train, val, test in inter:
             assert not train.empty
             assert not val.empty
@@ -280,7 +285,7 @@ class TestSplitterFailures:
     def test_invalid_or_missing_strategy(self, params):
         config = {
             "test_splitting": {
-                **params,
+                **({"strategy": params["strategy"]} if params["strategy"] is not None else {}),
                 "test_ratio": 0.1
             }
         }

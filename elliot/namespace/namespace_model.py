@@ -7,20 +7,19 @@ __version__ = '0.3.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
+from typing import Any, Dict, List, Optional
+from types import SimpleNamespace
 import copy
 import os
 import re
+
 from ast import literal_eval
 from collections import OrderedDict
 from functools import reduce
-from os.path import isfile, join
-from types import SimpleNamespace
-from typing import Any, Dict, List, Optional
-
 from hyperopt import hp
 
 import elliot.hyperoptimization as ho
-from elliot.utils.folder import manage_directories
+from elliot.utils.folder import list_dir, is_file, path_joiner, path_absolute
 
 regexp = re.compile(r'[\D][\w-]+\.[\w-]+')
 
@@ -67,12 +66,15 @@ class PathResolver:
         self.base_folder_path_config = base_folder_path_config
 
     def resolve(self, local_path: str, dataset_name: str = "") -> str:
-        if os.path.isabs(local_path):
-            return os.path.abspath(local_path)
+        #if Path(local_path).is_absolute():
+        #    pass
+            # local_path = Path(local_path).absolute()
         if local_path.startswith((".", "..")) or regexp.search(local_path):
-            return os.path.abspath(os.sep.join([self.base_folder_path_config, local_path]))
-        if dataset_name:
-            return local_path.format(dataset_name)
+            local_path = path_absolute(
+                path_joiner(self.base_folder_path_config, local_path)
+            )
+        elif dataset_name:
+            local_path = local_path.format(dataset_name)
         return local_path
 
     def resolve_safe(self, value: Any, dataset_name: str = "") -> Any:
@@ -144,9 +146,9 @@ class NameSpaceModel:
         exp_cfg = self.context.experiment
         dataset_name = exp_cfg[_dataset]
         resolver = self.context.path_resolver
-        default_results_recs = os.sep.join(["..", "results", "{0}", "recs"])
-        default_results_weights = os.sep.join(["..", "results", "{0}", "weights"])
-        default_results_performance = os.sep.join(["..", "results", "{0}", "performance"])
+        default_results_recs = path_joiner("..", "results", "{0}", "recs")
+        default_results_weights = path_joiner("..", "results", "{0}", "weights")
+        default_results_performance = path_joiner("..", "results", "{0}", "performance")
 
         def resolve_output_path(raw_value: Optional[str], default_value: str) -> str:
             candidate = raw_value if raw_value is not None else default_value
@@ -155,7 +157,7 @@ class NameSpaceModel:
                 resolved = resolved.format(dataset_name)
             except Exception:
                 pass
-            return os.path.abspath(resolved)
+            return path_absolute(resolved)
 
         exp_cfg[_recs] = resolve_output_path(exp_cfg.get(_recs), default_results_recs)
         exp_cfg[_weights] = resolve_output_path(exp_cfg.get(_weights), default_results_weights)
@@ -164,7 +166,6 @@ class NameSpaceModel:
         exp_cfg[_dataloader] = exp_cfg.get(_dataloader, "DataSetLoader")
         exp_cfg[_version] = exp_cfg.get(_version, __version__)
 
-        manage_directories(exp_cfg[_recs], exp_cfg[_weights], exp_cfg[_performance])
         self.context.mark_used(_recs, _weights, _performance, _dataloader, _version)
 
     def _build_data_config(self) -> None:
@@ -210,8 +211,8 @@ class NameSpaceModel:
         resolver = self.context.path_resolver
         splitting_cfg.update({k: resolver.resolve_safe(v, dataset_name) for k, v in splitting_cfg.items()})
         if splitting_cfg.get("save_folder") is None:
-            save_folder = os.path.abspath(
-                os.sep.join([self.context.base_folder_path_config, "..", "data", dataset_name, "splitting"])
+            save_folder = path_absolute(
+                path_joiner(self.context.base_folder_path_config, "..", "data", dataset_name, "splitting")
             )
             splitting_cfg["save_folder"] = save_folder
 
@@ -252,11 +253,11 @@ class NameSpaceModel:
         resolver = self.context.path_resolver
         negative_sampling.update({k: resolver.resolve_safe(v, dataset_name) for k, v in negative_sampling.items()})
         negative_sampling = SimpleNamespace(**negative_sampling)
-        if getattr(negative_sampling, 'strategy', '') == 'random':
-            negative_file_path = os.path.abspath(
-                os.sep.join([self.context.base_folder_path_config, "..", "data", dataset_name, "negative.tsv"])
+        if getattr(negative_sampling, "save_folder", None) is None:
+            negative_folder_path = path_absolute(
+                path_joiner(self.context.base_folder_path_config, "..", "data", dataset_name)
             )
-            setattr(negative_sampling, 'file_path', negative_file_path)
+            setattr(negative_sampling, "save_folder", negative_folder_path)
 
         exp_cfg[_negative_sampling] = negative_sampling
         self.context.base_namespace.negative_sampling = negative_sampling
@@ -287,8 +288,8 @@ class NameSpaceModel:
         exp_cfg = self.context.experiment
         resolver = self.context.path_resolver
         if not exp_cfg.get(_logger_config, False):
-            path_logger_config = os.path.abspath(
-                os.sep.join([self.context.base_folder_path_elliot, "config", "logger_config.yml"])
+            path_logger_config = path_absolute(
+                path_joiner(self.context.base_folder_path_elliot, "config", "logger_config.yml")
             )
         else:
             path_logger_config = resolver.resolve_safe(exp_cfg[_logger_config], exp_cfg[_dataset])
@@ -300,7 +301,9 @@ class NameSpaceModel:
         exp_cfg = self.context.experiment
         resolver = self.context.path_resolver
         if not exp_cfg.get(_log_folder, False):
-            path_log_folder = os.path.abspath(os.sep.join([self.context.base_folder_path_elliot, "..", "log"]))
+            path_log_folder = path_absolute(
+                path_joiner(self.context.base_folder_path_elliot, "..", "log")
+            )
         else:
             path_log_folder = resolver.resolve_safe(exp_cfg[_log_folder], exp_cfg[_dataset])
 
@@ -366,10 +369,10 @@ class NameSpaceModel:
             folder_path = getattr(model_name_space, "folder", None)
             if not folder_path:
                 raise Exception("RecommendationFolder meta-model must expose the folder field.")
-            onlyfiles = [f for f in os.listdir(folder_path) if isfile(join(folder_path, f))]
+            onlyfiles = [f for f in list_dir(folder_path) if is_file(path_joiner(folder_path, f))]
             for file_ in onlyfiles:
                 local_model_name_space = copy.copy(model_name_space)
-                local_model_name_space.path = os.path.join(folder_path, file_)
+                local_model_name_space.path = path_joiner(folder_path, file_)
                 yield "ProxyRecommender", local_model_name_space
             return
 

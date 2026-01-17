@@ -1,4 +1,4 @@
-from typing import get_origin, Any, Union, Optional
+from typing import get_origin, List, Any, Union, Optional
 from types import SimpleNamespace
 import ast
 from pydantic import BaseModel, Field, model_validator, create_model, GetCoreSchemaHandler, ConfigDict
@@ -28,20 +28,44 @@ class DataLoadingConfig(BaseConfig):
 
     Attributes:
         strategy (DataLoadingStrategy): Loading strategy to use.
-        data_path (str): Root directory containing dataset files.
-        header (bool): Whether the dataset(s) include(s) a header row; default is False.
+        data_folder (Optional[str]): Folder containing dataset files.
+        dataset_path (Optional[str]): Path to the dataset file.
         binarize (bool): Whether to binarize the dataset; default is False.
         seed (int): Random seed; default is 42.
     """
 
     strategy: DataLoadingStrategy
-    data_path: str
-    header: bool = Field(default=False)
-    binarize: bool = Field(default=False)
-    seed: int = Field(default=42)
+    data_folder: Optional[str] = None
+    dataset_path: Optional[str] = None
+    header: bool = False
+    columns: Optional[List[str]] = None
+    binarize: bool = False
+    seed: int = 42
+    side_information: Optional[List[SimpleNamespace]] = None
+
+    @model_validator(mode="after")
+    def validate_strategy_fields(self) -> "DataLoadingConfig":
+        """Validate conditional requirements based on the chosen loading strategy.
+
+        Returns:
+            DataSetLoadingConfig: The configuration object itself.
+        """
+        match self.strategy:
+
+            case DataLoadingStrategy.FIXED | DataLoadingStrategy.HIERARCHY:
+                if self.data_folder is None:
+                    raise AttributeError(f"Attribute `data_folder` must be provided "
+                                         f"with `{self.strategy.value}` strategy.")
+
+            case DataLoadingStrategy.DATASET:
+                if self.dataset_path is None:
+                    raise AttributeError(f"Attribute `dataset_path` must be provided "
+                                         f"with `{self.strategy.value}` strategy.")
+
+        return self
 
 
-# PreFilter validation
+# PreFilter configuration
 
 class PreFilteringConfig(BaseConfig):
     """Pre-filtering configuration.
@@ -72,25 +96,9 @@ class PreFilteringConfig(BaseConfig):
         return self
 
 
-# Splitter validation
+# Splitter configuration
 
-class SplittingGeneralConfig(BaseConfig):
-    """Splitting general validator.
-
-    Attributes:
-        save_on_disk (bool): Whether to save split data to disk; default is False.
-        save_folder (str): Folder path to save splits if `save_on_disk` is True.
-        test_splitting (SimpleNamespace): Namespace for test splitting.
-        validation_splitting (Optional[SimpleNamespace]): Namespace for validation splitting.
-    """
-
-    save_on_disk: bool = Field(default=False)
-    save_folder: str = Field()
-    test_splitting: SimpleNamespace
-    validation_splitting: Optional[SimpleNamespace] = Field(default=None)
-
-
-class SplittingConfig(BaseConfig):
+class SplittingSingleConfig(BaseConfig):
     """Splitting configuration.
 
     Attributes:
@@ -103,8 +111,8 @@ class SplittingConfig(BaseConfig):
         folds (int): Number of folds for cross-validation; default is 5, min is 1, max is 20.
     """
 
-    strategy: SplittingStrategy = Field()
-    timestamp: Optional[float] = Field(default=None)
+    strategy: SplittingStrategy
+    timestamp: Optional[float] = None
     min_below: int = Field(default=1, ge=1)
     min_over: int = Field(default=1, ge=1)
     test_ratio: Optional[float] = Field(default=None, ge=0.1, le=0.9)
@@ -112,11 +120,11 @@ class SplittingConfig(BaseConfig):
     folds: int = Field(default=5, ge=1, le=20)
 
     @model_validator(mode="after")
-    def validate_strategy_fields(self) -> "SplittingConfig":
+    def validate_strategy_fields(self) -> "SplittingSingleConfig":
         """Validate conditional requirements based on the chosen splitting strategy.
 
         Returns:
-            SplittingConfig: The configuration object itself.
+            SplittingSingleConfig: The configuration object itself.
         """
         match self.strategy:
 
@@ -142,7 +150,23 @@ class SplittingConfig(BaseConfig):
         return self
 
 
-# NegativeSampler validation
+class SplittingConfig(BaseConfig):
+    """Splitting general validator.
+
+    Attributes:
+        save_on_disk (bool): Whether to save split data to disk; default is False.
+        save_folder (str): Folder path to save splits if `save_on_disk` is True.
+        test_splitting (SplittingSingleConfig): Config for test splitting.
+        validation_splitting (Optional[SplittingSingleConfig]): Config for validation splitting.
+    """
+
+    save_on_disk: bool = False
+    save_folder: str
+    test_splitting: SplittingSingleConfig
+    validation_splitting: Optional[SplittingSingleConfig] = None
+
+
+# NegativeSampler configuration
 
 class NegativeSamplingConfig(BaseConfig):
     """Negative sampling configuration.
@@ -151,17 +175,15 @@ class NegativeSamplingConfig(BaseConfig):
         strategy (NegativeSamplingStrategy): Negative sampling strategy to use.
         num_negatives (int): Number of negative samples; default is 99, min is 1.
         save_on_disk (bool): Whether to save sampling results to disk; default is False.
-        file_path (Optional[str]): File path for saving negative samples.
-        test_file_path (Optional[str]): File path for test negative samples; required for FIXED strategy.
-        val_file_path (Optional[str]): File path for validation negative samples.
+        save_folder (Optional[str]): Folder path to save negative samples.
+        read_folder (Optional[str]): Folder containing negative samples files; required for `fixed` strategy.
     """
 
     strategy: NegativeSamplingStrategy
     num_negatives: int = Field(default=99, ge=1)
-    save_on_disk: bool = Field(default=False)
-    file_path: Optional[str] = Field(default=None)
-    test_file_path: Optional[str] = Field(default=None)
-    val_file_path: Optional[str] = Field(default=None)
+    save_on_disk: bool = False
+    save_folder: Optional[str] = None
+    read_folder: Optional[str] = None
 
     @model_validator(mode="after")
     def validate_strategy_fields(self) -> "NegativeSamplingConfig":
@@ -170,17 +192,17 @@ class NegativeSamplingConfig(BaseConfig):
         Returns:
             NegativeSamplingConfig: The configuration object itself.
         """
-        if self.strategy == NegativeSamplingStrategy.FIXED and self.test_file_path is None:
-            raise AttributeError(f"Attribute `test_file_path` must be provided "
+        if self.strategy == NegativeSamplingStrategy.FIXED and self.read_folder is None:
+            raise AttributeError(f"Attribute `read_folder` must be provided "
                                  f"with `{self.strategy.value}` strategy.")
 
         return self
 
 
-# Trainer validation
+# Trainer configuration
 
-class TrainerConfig(BaseConfig):
-    """Training configuration.
+class MetaConfig(BaseConfig):
+    """Meta configuration.
 
     Attributes:
         restore (bool): Whether to restore a previous training state; default is False.
@@ -190,41 +212,38 @@ class TrainerConfig(BaseConfig):
         verbose (bool): Whether to enable verbose logging; default is True.
         validation_rate (int): Frequency (in epochs) of validation runs; default is 1, min is 1.
         optimize_internal_loss (bool): Whether to optimize internal loss instead of main objective; default is False.
+    """
+
+    restore: bool = False
+    validation_metric: Union[str, list] = None
+    save_weights: bool = False
+    save_recs: bool = False
+    verbose: bool = True
+    validation_rate: int = Field(default=1, ge=1)
+    optimize_internal_loss: bool = False
+
+
+class TrainerConfig(BaseConfig):
+    """Training configuration.
+
+    Attributes:
+        meta (MetaConfig): Config for meta parameters.
         epochs (int): Number of training epochs; default is 1, min is 1.
         batch_size (int): Training batch size; min is 1.
         eval_batch_size(int): Evaluation batch size; min is 1.
         seed (int): Random seed; default is 42.
     """
 
-    restore: bool = Field(default=False)
-    validation_metric: Union[str, list] = Field(default=None)
-    save_weights: bool = Field(default=False)
-    save_recs: bool = Field(default=False)
-    verbose: bool = Field(default=True)
-    validation_rate: int = Field(default=1, ge=1)
-    optimize_internal_loss: bool = Field(default=False)
+    meta: MetaConfig = Field(default_factory=MetaConfig)
     epochs: int = Field(default=1, ge=1)
-    batch_size: int = Field(default=None, ge=1)
+    batch_size: int = Field(default=1024, ge=1)
     eval_batch_size: int = Field(default=None, ge=1)
-    seed: int = Field(default=42)
-
-    def get_validated_params(self, meta: bool = False, *args):
-        """Return a subset of the validated fields.
-
-        Args:
-            meta (bool): If True assign metadata fields, otherwise training fields.
-        """
-
-        out_of_meta = ['epochs', 'batch_size', 'eval_batch_size', 'seed']
-
-        # Pick the right fields to retrieve
-        included = set(out_of_meta) if not meta else set(self.model_fields.keys()) - set(out_of_meta)
-        validated_data = self.model_dump(include=included)
-
-        return validated_data
+    seed: int = 42
+    best_iteration: Optional[int] = None
+    name: str = ""
 
 
-# Recommender validation
+# Recommender configuration
 
 class TupleFromString:
     """Custom type converting tuple-like strings into real tuples.

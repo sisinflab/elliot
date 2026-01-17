@@ -2,14 +2,13 @@ import datetime
 import json
 import logging
 from logging.handlers import RotatingFileHandler
-import os
 import sys
 import uuid
 from typing import Any, Dict, Optional
 
 import yaml
 
-from elliot.utils.folder import build_log_folder
+from elliot.utils.folder import check_dir, check_path, path_absolute, path_joiner
 
 DEFAULT_SETTINGS: Dict[str, Any] = {
     "app_name": "elliot",
@@ -77,7 +76,7 @@ def _coerce_level(value: Any, fallback: int) -> int:
 
 def _load_settings(path_config: Optional[str]) -> Dict[str, Any]:
     settings = dict(DEFAULT_SETTINGS)
-    if path_config and os.path.exists(path_config):
+    if path_config and check_path(path_config):
         with open(path_config, "r", encoding="utf-8") as stream:
             loaded = yaml.safe_load(stream) or {}
             if isinstance(loaded, dict):
@@ -282,13 +281,13 @@ def init(path_config: str, folder_log: str, log_level: int = logging.INFO) -> No
     )
 
     STATE.settings = settings
-    STATE.log_dir = os.path.abspath(folder_log)
-    build_log_folder(STATE.log_dir)
+    STATE.log_dir = path_absolute(folder_log)
+    check_dir(STATE.log_dir)
 
     if not STATE.run_id:
         STATE.run_id = settings.get("run_id") or _generate_run_id()
 
-    STATE.log_file = os.path.join(
+    STATE.log_file = path_joiner(
         STATE.log_dir, f"{settings.get('app_name', 'elliot')}-{STATE.run_id}.log"
     )
 
@@ -311,7 +310,7 @@ def prepare_logger(
     name: str, path: str, log_level: int = logging.DEBUG
 ) -> logging.LoggerAdapter:
     _ensure_state()
-    build_log_folder(path)
+    check_dir(path)
 
     logger = logging.getLogger(name)
     logger.setLevel(log_level)
@@ -320,8 +319,8 @@ def prepare_logger(
         if getattr(handler, "_elliot_model_handler", False):
             logger.removeHandler(handler)
 
-    logfilepath = os.path.abspath(
-        os.sep.join([path, f"{name}-{STATE.run_id}.log"])
+    logfilepath = path_absolute(
+        path_joiner(path, f"{name}-{STATE.run_id}.log")
     )
 
     handler = RotatingFileHandler(

@@ -1,7 +1,7 @@
 import pytest
-import os
 
 from elliot.namespace import NameSpaceModel
+from elliot.utils.folder import path_joiner, path_absolute, check_dir
 
 from tests.utils import test_path
 
@@ -12,7 +12,7 @@ def _sample_config():
             "dataset": "demo",
             "data_config": {
                 "strategy": "dataset",
-                "data_path": "../data/{0}",
+                "dataset_path": "../data/{0}/dataset.tsv",
             },
             "models": {
                 "ItemKNN": {
@@ -27,31 +27,31 @@ def _sample_config():
 
 
 def test_fill_base_resolves_paths_and_defaults():
-    base_elliot = test_path / "elliot_root"
-    base_config = test_path / "configs"
-    base_elliot.mkdir(exist_ok=True)
-    base_config.mkdir(exist_ok=True)
+    base_elliot = path_joiner(test_path, "elliot_root")
+    base_config = path_joiner(test_path, "configs")
+    check_dir(base_elliot)
+    check_dir(base_config)
 
     model = NameSpaceModel(_sample_config(), str(base_elliot), str(base_config))
     model.fill_base()
     ns = model.base_namespace
 
-    expected_dataset = os.path.abspath(os.path.join(base_config, "../", "data", "demo"))
-    assert ns.data_config.data_path == expected_dataset
+    expected_dataset = path_joiner(base_config, "../", "data", "demo", "dataset.tsv")
+    assert ns.data_config.dataset_path == path_absolute(expected_dataset)
     assert ns.data_config.side_information == []
-    assert ns.path_output_rec_result.endswith(os.path.join("results", "demo", "recs"))
-    assert ns.path_output_rec_weight.endswith(os.path.join("results", "demo", "weights"))
-    assert ns.path_output_rec_performance.endswith(os.path.join("results", "demo", "performance"))
+    assert ns.path_output_rec_result.endswith(path_joiner("results", "demo", "recs"))
+    assert ns.path_output_rec_weight.endswith(path_joiner("results", "demo", "weights"))
+    assert ns.path_output_rec_performance.endswith(path_joiner("results", "demo", "performance"))
     assert ns.backend == ["tensorflow"]
     assert ns.top_k == 10
     assert ns.evaluation.simple_metrics == ["nDCG"]
 
 
 def test_fill_model_builds_hyperopt_space():
-    base_elliot = test_path / "elliot_root"
-    base_config = test_path / "configs"
-    base_elliot.mkdir(exist_ok=True)
-    base_config.mkdir(exist_ok=True)
+    base_elliot = path_joiner(test_path, "elliot_root")
+    base_config = path_joiner(test_path, "configs")
+    check_dir(base_elliot)
+    check_dir(base_config)
 
     model = NameSpaceModel(_sample_config(), str(base_elliot), str(base_config))
     entries = list(model.fill_model())

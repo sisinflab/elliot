@@ -73,7 +73,7 @@ class AbstractRecommender(ABC):
         loader_obj = getattr(self._data.side_information, loader_name)
         setattr(self, name, loader_obj)
 
-    def get_training_dataloader(self):
+    def get_training_dataloader(self, batch_size):
         for _ in range(1):
             yield None
 
@@ -90,11 +90,11 @@ class AbstractRecommender(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def save_weights(self, path):
+    def get_model_state(self):
         raise NotImplementedError()
 
     @abstractmethod
-    def load_weights(self, path):
+    def set_model_state(self, checkpoint):
         raise NotImplementedError()
 
 
@@ -117,19 +117,11 @@ class Recommender(AbstractRecommender):
             else:
                 init_func(m, **kwargs)
 
-    def save_weights(self, path):
-        with open(path, "wb") as f:
-            pickle.dump(self._get_model_state(), f)
-
-    def load_weights(self, path):
-        with open(path, "rb") as f:
-            self._set_model_state(pickle.load(f))
-
-    def _get_model_state(self):
+    def get_model_state(self):
         return {p[0]: getattr(self, p[0]) for p in self.params_to_save}
 
-    def _set_model_state(self, saving_dict):
-        for k, v in saving_dict:
+    def set_model_state(self, checkpoint):
+        for k, v in checkpoint:
             if k in self.params_to_save:
                 setattr(self, k, v)
 
@@ -180,16 +172,15 @@ class GeneralRecommender(nn.Module, AbstractRecommender):
             else:
                 init_func(m, **kwargs)
 
-    def save_weights(self, file_path):
-        torch.save({
-            'model_state_dict': self.state_dict(),
-            'optimizer_state_dict': self.optimizer.state_dict()
-        }, file_path)
+    def get_model_state(self):
+        return {
+            "model_state_dict": self.state_dict(),
+            "optimizer_state_dict": self.optimizer.state_dict()
+        }
 
-    def load_weights(self, file_path):
-        checkpoint = torch.load(file_path)
-        self.load_state_dict(checkpoint['model_state_dict'])
-        self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+    def set_model_state(self, checkpoint):
+        self.load_state_dict(checkpoint["model_state_dict"])
+        self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
 
 
 class GraphBasedRecommender(GeneralRecommender):

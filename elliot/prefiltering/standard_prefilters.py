@@ -1,4 +1,4 @@
-from typing import List, Optional, Union
+from typing import List, Optional
 from types import SimpleNamespace
 import warnings
 import pandas as pd
@@ -16,7 +16,7 @@ class PreFilter:
 
     Args:
         data (pd.DataFrame): The input dataset, typically containing 'userId', 'itemId', and 'rating' columns.
-        pre_filtering_ns (List[SimpleNamespace]): A list of configurations specifying filtering strategies.
+        config (List[SimpleNamespace]): A list of configurations specifying filtering strategies.
 
     Supported pre-filtering strategies:
 
@@ -47,27 +47,13 @@ class PreFilter:
         Pre-filtering is optional and can be applied regardless of the `data_config.strategy` value.
     """
 
-    strategy: PreFilteringStrategy
-    threshold: Optional[Union[float, int]] = None
-    core: Optional[int] = 5
-    rounds: Optional[int] = 2
+    config: List[PreFilteringConfig]
 
-    def __init__(self, data: pd.DataFrame, pre_filtering_ns: List[SimpleNamespace]):
-        self.data = data
-        self.pre_filtering_ns = pre_filtering_ns
-        self._mask = None
+    def __init__(self, data: pd.DataFrame, config: List[SimpleNamespace]):
         self.logger = elog.get_logger(self.__class__.__name__)
-
-    def set_params(self, ns: SimpleNamespace):
-        """Validate and set object parameters according to the provided namespace.
-
-        Args:
-            ns (SimpleNamespace): Single pre-filtering strategy namespace.
-        """
-        config = PreFilteringConfig(**vars(ns))
-
-        for name, val in config.get_validated_params().items():
-            setattr(self, name, val)
+        self.data = data
+        self.config = [PreFilteringConfig(**vars(ns)) for ns in config]
+        self._mask = None
 
     def filter(self) -> pd.DataFrame:
         """
@@ -77,54 +63,49 @@ class PreFilter:
             pd.DataFrame: The filtered dataset.
         """
         dataframe = self.data
-        for strategy in self.pre_filtering_ns:
-            dataframe = self.single_filter(dataframe, strategy)
+        for cfg in self.config:
+            dataframe = self.single_filter(dataframe, cfg)
         return dataframe
 
-    def single_filter(self, data: pd.DataFrame, ns: SimpleNamespace) -> pd.DataFrame:
+    def single_filter(self, data: pd.DataFrame, cfg: PreFilteringConfig) -> pd.DataFrame:
         """Apply a single pre-filtering strategy to the dataset based on the provided configuration.
 
         Args:
             data (pd.DataFrame): The input dataset to be filtered.
-            ns (SimpleNamespace): A namespace containing the strategy name and any required parameters.
+            cfg (PreFilteringConfig): Object containing the strategy name and any required parameters.
 
         Returns:
             pd.DataFrame: The filtered dataset.
-
-        Raises:
-            ValueError: If the strategy is invalid.
         """
-
-        self.set_params(ns)
 
         filtered_data = None
 
-        match self.strategy:
+        match cfg.strategy:
             case PreFilteringStrategy.GLOBAL_TH:
-                if self.threshold is None:
+                if cfg.threshold is None:
                     self.filter_ratings_by_global_average(data)
                 else:
-                    self.filter_ratings_by_threshold(data, self.threshold)
+                    self.filter_ratings_by_threshold(data, cfg.threshold)
 
             case PreFilteringStrategy.USER_AVG:
                 self.filter_ratings_by_user_average(data)
 
             case PreFilteringStrategy.USER_K_CORE:
-                self.filter_user_k_core(data, self.core)
+                self.filter_user_k_core(data, cfg.core)
 
             case PreFilteringStrategy.ITEM_K_CORE:
-                self.filter_item_k_core(data, self.core)
+                self.filter_item_k_core(data, cfg.core)
 
             case PreFilteringStrategy.ITER_K_CORE:
-                filtered_data = self.filter_iterative_k_core(data, self.core)
+                filtered_data = self.filter_iterative_k_core(data, cfg.core)
 
             case PreFilteringStrategy.N_ROUNDS_K_CORE:
-                filtered_data = self.filter_n_rounds_k_core(data, self.core, self.rounds)
+                filtered_data = self.filter_n_rounds_k_core(data, cfg.core, cfg.rounds)
 
             case PreFilteringStrategy.COLD_USERS:
-                self.filter_retain_cold_users(data, self.threshold)
+                self.filter_retain_cold_users(data, cfg.threshold)
 
-        return self._apply_mask_and_check(data, self.threshold, filtered_data)
+        return self._apply_mask_and_check(cfg, data, filtered_data)
 
     def filter_ratings_by_global_average(self, data: pd.DataFrame):
         """Filter out ratings below the global average rating across the dataset.
@@ -289,32 +270,30 @@ class PreFilter:
 
     def _apply_mask_and_check(
         self,
+        cfg: PreFilteringConfig,
         data: pd.DataFrame,
-        th: Union[int, float],
         filtered_data: Optional[pd.DataFrame] = None
     ) -> pd.DataFrame:
         """Apply a boolean mask to the data and checks whether the resulting filtered dataset
         is sufficiently large to be considered valid. If not, returns the original data.
 
         Args:
+            cfg (PreFilteringConfig): The object containing the current strategy configuration.
             data (pd.DataFrame): The original dataset to be filtered.
-            th (Union[int, float]): The threshold used for filtering (only used for reporting purposes).
             filtered_data (Optional[pd.DataFrame]): Pre-filtered data to use instead of applying
                 the mask. If None, `self._mask` is applied to `data`.
 
         Returns:
             pd.DataFrame: The filtered dataset if the ratio of filtered rows is acceptable;
                 otherwise, the original unfiltered dataset.
-
-        Raises:
-            Warning: Emit a warning if the filtered dataset is too small (less than 60% of
-                original) or empty.
         """
         filtered_data = filtered_data if filtered_data is not None else data[self._mask]
         ratio = len(filtered_data) / len(data)
         if data.empty or ratio < 0.6:
-            warnings.warn(f"Pre-filtering with strategy {self.strategy.value} ignored: "
-                          f"dataset is empty or too reduced using threshold {th}.")
+            self.logger.warning(
+                f"Pre-filtering with strategy {cfg.strategy.value} ignored: "
+                f"dataset is empty or too reduced using threshold {cfg.threshold}."
+            )
             return data
         else:
             return filtered_data

@@ -1,14 +1,15 @@
-from typing import List, Tuple, Optional, Union, Callable
+from typing import List, Tuple, Union, Callable
 from types import SimpleNamespace
 import pandas as pd
 import numpy as np
 import math
 
 from elliot.utils.enums import SplittingStrategy
-from elliot.utils.config import SplittingGeneralConfig, SplittingConfig, check_range
-from elliot.utils.folder import create_folder_by_index, create_folder
-from elliot.utils.write import save_tabular_df
+from elliot.utils.config import SplittingConfig, check_range, SplittingSingleConfig
+from elliot.utils.write import Writer
 from elliot.utils import logging as elog
+
+writer = Writer()
 
 
 class Splitter:
@@ -22,7 +23,7 @@ class Splitter:
     Args:
         data (pd.DataFrame): The dataset to be split, typically containing at least
             'userId' and 'timestamp' columns.
-        splitting_ns (SimpleNamespace): Namespace object containing configuration
+        config (SimpleNamespace): Namespace object containing configuration
             for the desired splitting strategy.
         random_seed (int): Random seed, for reproducibility; default is 42.
 
@@ -60,71 +61,46 @@ class Splitter:
         Splitting is required and will be applied only if `data_config.strategy` is set to 'dataset'.
     """
 
-    save_on_disk: bool = False
-    save_folder: str
-    strategy: SplittingStrategy
-    timestamp: Optional[float] = None
-    min_below: int = 1
-    min_over: int = 1
-    test_ratio: Optional[float] = None
-    leave_n_out: Optional[int] = None
-    folds: int = 5
+    config: SplittingConfig
 
-    def __init__(self, data: pd.DataFrame, splitting_ns: SimpleNamespace, random_seed: int = 42):
-        self.data = data
-        self.splitting_ns = splitting_ns
+    def __init__(self, data: pd.DataFrame, config: SimpleNamespace, random_seed: int = 42):
         self.logger = elog.get_logger(self.__class__.__name__, seed=random_seed)
+        writer.logger = self.logger
 
-        # Set general parameters
-        self.set_params()
+        self.data = data
+
+        # TODO: remove this by completely changing namespace handling (using pydantic)
+        if hasattr(config, "test_splitting"):
+            config.test_splitting = vars(config.test_splitting)
+        if hasattr(config, "validation_splitting"):
+            config.validation_splitting = vars(config.validation_splitting)
+
+        self.config = SplittingConfig(**vars(config))
+        self.writer_config = self._get_writer_config()
 
         np.random.seed(random_seed)
 
-    def set_params(self, scope: str = "general"):
-        """Validate and set object parameters according to the selected validation scope.
-
-        Args:
-            scope (str): Determines which validator to use.
-                Accepted values are: `general`, `test`, and `val`. Default is `general`.
-
-        Raises:
-            ValueError: If the provided scope is not recognized.
-        """
-        config = None
-
-        match scope:
-            case "general":
-                config = SplittingGeneralConfig(**vars(self.splitting_ns))
-            case "test":
-                config = SplittingConfig(**vars(self.splitting_ns.test_splitting))
-            case "val":
-                config = SplittingConfig(**vars(self.splitting_ns.validation_splitting))
-            case _:
-                raise ValueError(f"Unrecognized scope {scope}")
-
-        for name, val in config.get_validated_params().items():
-            setattr(self, name, val)
+    def _get_writer_config(self):
+        return {
+            "sep": "\t",
+            "ext": ".tsv"
+        }
 
     def process_splitting(
         self
-    ) -> List[Tuple[Union[pd.DataFrame, List[Tuple[pd.DataFrame, pd.DataFrame]]], pd.DataFrame]]:
+    ) -> List[Tuple[List[Tuple[pd.DataFrame, pd.DataFrame]], pd.DataFrame]]:
         """Execute the configured splitting strategy (Train/Test or Train/Validation/Test).
 
         Returns:
             List[Tuple[Union[pd.DataFrame, List[Tuple[pd.DataFrame, pd.DataFrame]]], pd.DataFrame]]:
                 A list of (train, test) or ((train, val), test) tuples.
         """
-        # Set test splitting parameters
-        self.set_params(scope="test")
 
-        tuple_list = self.handle_hierarchy(self.data)
+        tuple_list = self.handle_hierarchy(self.data, self.config.test_splitting)
 
-        if hasattr(self.splitting_ns, 'validation_splitting'):
-            # Set validation splitting parameters
-            self.set_params(scope="val")
-
+        if self.config.validation_splitting is not None:
             tuple_list = [
-                (self.handle_hierarchy(train), test)
+                (self.handle_hierarchy(train, self.config.validation_splitting), test)
                 for train, test in tuple_list
             ]
             self.logger.info(
@@ -132,65 +108,31 @@ class Splitter:
                 extra={"context": {"strategy": "train_val_test", "folds": len(tuple_list)}}
             )
         else:
+            tuple_list = [([(train, None)], test) for train, test in tuple_list]
             self.logger.info(
                 "Completed data split",
                 extra={"context": {"strategy": "train_test", "folds": len(tuple_list)}}
             )
 
-        if self.save_on_disk:
-            self.store_splitting(tuple_list)
+        if self.config.save_on_disk:
+            writer.write_split(
+                fold_dataset=tuple_list,
+                save_folder=self.config.save_folder,
+                **self.writer_config
+            )
 
         return tuple_list
 
-    def store_splitting(
-        self,
-        tuple_list: List[Tuple[Union[pd.DataFrame, List[Tuple[pd.DataFrame, pd.DataFrame]]], pd.DataFrame]]
-    ):
-        """Save the generated splits to disk as TSV files if enabled.
-
-        Args:
-            tuple_list (List[Tuple[Union[pd.DataFrame, List[Tuple[pd.DataFrame, pd.DataFrame]]], pd.DataFrame]]):
-                A list of split tuples to be saved on disk.
-        """
-        # Create the splitting save folder
-        create_folder(self.save_folder)
-
-        for i, (train_val, test) in enumerate(tuple_list):
-            # Create folder for current test fold
-            actual_test_folder = create_folder_by_index(self.save_folder, str(i))
-
-            # Save current test set
-            save_tabular_df(
-                df=test, folder_path=actual_test_folder, filename="test.tsv", sep="\t"
-            )
-
-            if isinstance(train_val, list):
-                # Process each validation fold in the current test fold...
-                for j, (train, val) in enumerate(train_val):
-                    # Create folder for current validation fold
-                    actual_val_folder = create_folder_by_index(actual_test_folder, str(j))
-
-                    # Save current training and validation sets
-                    save_tabular_df(
-                        df=val, folder_path=actual_val_folder, filename="val.tsv", sep="\t"
-                    )
-                    save_tabular_df(
-                        df=train, folder_path=actual_val_folder, filename="train.tsv", sep="\t"
-                    )
-            else:
-                # ...or simply save current training set
-                save_tabular_df(
-                    df=train_val, folder_path=actual_test_folder, filename="train.tsv", sep="\t"
-                )
-
     def handle_hierarchy(
         self,
-        data: pd.DataFrame
+        data: pd.DataFrame,
+        cfg: SplittingSingleConfig,
     ) -> List[Tuple[pd.DataFrame, pd.DataFrame]]:
         """Handle the splitting logic based on the selected strategy.
 
         Args:
             data (pd.DataFrame): The dataset to be split.
+            cfg (SplittingSingleConfig): Object containing the configuration for the current splitting.
 
         Returns:
             List[Tuple[pd.DataFrame, pd.DataFrame]]: A list of (train, test) tuples.
@@ -198,49 +140,48 @@ class Splitter:
         data = data.reset_index(drop=True)
         tuple_list = []
 
-        match self.strategy:
-
+        match cfg.strategy:
             case SplittingStrategy.FIXED_TS:
-                if self.timestamp is not None:
-                    self._check_timestamp_range(data, self.timestamp)
-                    tuple_list = self.splitting_passed_timestamp(data, self.timestamp)
+                if cfg.timestamp is not None:
+                    self._check_timestamp_range(data, cfg.timestamp)
+                    tuple_list = self.splitting_passed_timestamp(data, cfg.timestamp)
                 else:
                     tuple_list = self.splitting_best_timestamp(
                         data,
-                        self.min_below,
-                        self.min_over
+                        cfg.min_below,
+                        cfg.min_over
                     )
 
             case SplittingStrategy.TEMP_HOLDOUT:
-                if self.test_ratio is not None:
+                if cfg.test_ratio is not None:
                     tuple_list = self.splitting_temporal_holdout(
                         data,
-                        self.test_ratio
+                        cfg.test_ratio
                     )
                 else:
-                    self._check_leave_n_out_range(data, self.leave_n_out)
+                    self._check_leave_n_out_range(data, cfg.leave_n_out)
                     tuple_list = self.splitting_temporal_leave_n_out(
                         data,
-                        self.leave_n_out
+                        cfg.leave_n_out
                     )
 
             case SplittingStrategy.RAND_SUB_SMP:
-                if self.test_ratio is not None:
+                if cfg.test_ratio is not None:
                     tuple_list = self.splitting_random_subsampling_k_folds(
                         data,
-                        self.folds,
-                        self.test_ratio
+                        cfg.folds,
+                        cfg.test_ratio
                     )
                 else:
-                    self._check_leave_n_out_range(data, self.leave_n_out)
+                    self._check_leave_n_out_range(data, cfg.leave_n_out)
                     tuple_list = self.splitting_random_subsampling_k_folds_leave_n_out(
                         data,
-                        self.folds,
-                        self.leave_n_out
+                        cfg.folds,
+                        cfg.leave_n_out
                     )
 
             case SplittingStrategy.RAND_CV:
-                tuple_list = self.splitting_k_folds(data, self.folds)
+                tuple_list = self.splitting_k_folds(data, cfg.folds)
 
         return tuple_list
 

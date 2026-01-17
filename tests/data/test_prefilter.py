@@ -1,13 +1,13 @@
 import pytest
-from pathlib import Path
 
 from elliot.dataset import DataSetLoader
 from elliot.utils.enums import PreFilteringStrategy, DataLoadingStrategy
+from elliot.utils.folder import parent_dir
 
 from tests.params import params_pre_filtering_fail as p
-from tests.utils import create_namespace, data_path
+from tests.utils import create_namespace, dataset_path
 
-current_path = Path(__file__).parent
+current_path = parent_dir(__file__)
 
 
 def load_and_filter_data(config_dict):
@@ -15,14 +15,16 @@ def load_and_filter_data(config_dict):
         "experiment": {
             "data_config": {
                 "strategy": DataLoadingStrategy.DATASET.value,
-                "data_path": data_path
+                "dataset_path": dataset_path,
+                "header": True
             },
             **config_dict
         }
     }
-    ns = create_namespace(config, current_path)
+    ns_model = create_namespace(config, current_path)
+    ns = ns_model.base_namespace
     loader = DataSetLoader(ns)
-    return loader.dataframe
+    return loader.interactions
 
 
 class TestPreFilter:
@@ -238,6 +240,19 @@ class TestPreFilterFailures:
         }
 
         with pytest.raises((ValueError, AttributeError)):
+            load_and_filter_data(config)
+
+    @pytest.mark.parametrize("params", p["invalid_strategy"])
+    def test_invalid_or_missing_strategy(self, params):
+        config = {
+            "dataset": "filter_retain_cold_users",
+            "prefiltering": {
+                **({"strategy": params["strategy"]} if params["strategy"] is not None else {}),
+                "threshold": 2
+            }
+        }
+
+        with pytest.raises(ValueError):
             load_and_filter_data(config)
 
 

@@ -7,54 +7,167 @@ __version__ = '0.3.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
-import warnings
+from ast import literal_eval
+from collections import defaultdict
+
+import torch
 import pandas as pd
 import configparser
-import pickle
 import numpy as np
 import os
 
-from typing import List
+from typing import List, Tuple, Dict, Any, Callable, Optional
 from types import SimpleNamespace
 
+from elliot.utils.folder import path_joiner, list_dir, is_dir, check_path
+from elliot.utils.logging import get_logger
 
-def read_tabular(
-    file_path: str,
-    cols: List[str],
-    datatypes: List[str],
-    sep: str = '\t',
-    header: bool = False
-) -> pd.DataFrame:
 
-    n_rows, hd = (0, 0) if header else (1, None)
+class Reader:
+    def __init__(self, logger = get_logger("__main__")):
+        self.logger = logger
 
-    try:
-        file_cols = pd.read_csv(file_path, sep=sep, nrows=n_rows).columns.tolist()
-    except pd.errors.EmptyDataError:
-        warnings.warn(
-            "The data file is empty. Returning an empty DataFrame."
+    def read_tabular(
+        self,
+        file_path: str,
+        columns: Optional[List[str]] = None,
+        datatypes: List[str] = [],
+        sep: str = "\t",
+        header: bool = False,
+        callback_fn: Callable = None,
+        **kwargs: Any,
+    ) -> pd.DataFrame:
+
+        try:
+            header_row = 0 if header else None
+            data = pd.read_csv(file_path, sep=sep, header=header_row)
+        except pd.errors.EmptyDataError:
+            self.logger.warning(
+                "The data file is empty. Returning an empty DataFrame."
+            )
+            cols_to_use = columns if columns is not None else []
+            dtype_to_use = {c: d for c, d in zip(cols_to_use, datatypes)}
+            df = pd.DataFrame(columns=cols_to_use).astype(dtype_to_use)
+        else:
+            if not header and columns is not None:
+                data.columns = columns[:len(data.columns)]
+
+            if columns is None:
+                dtype_to_use = {c: d for c, d in zip(list(data.columns), datatypes)}
+                df = data.astype(dtype_to_use)
+            else:
+                cols_to_use = [c for c in columns if c in data.columns]
+                if not cols_to_use:
+                    self.logger.warning(
+                        "None of the desired columns were found. Returning an empty DataFrame."
+                    )
+                    df = pd.DataFrame()
+                else:
+                    dtype_to_use = {
+                        c: datatypes[i]
+                        for i, c in enumerate(columns)
+                        if datatypes and c in data.columns
+                    }
+                    df = data[cols_to_use].astype(dtype_to_use)
+
+        self.logger.info(f"{file_path} - Loaded")
+
+        if callback_fn is not None:
+            df = callback_fn(df)
+
+        return df
+
+    def read_tabular_split(
+        self,
+        read_folder: str,
+        ext: str = ".tsv",
+        hierarchical: bool = False,
+        **kwargs: Any
+    ) -> List[Tuple[List[Tuple[pd.DataFrame, pd.DataFrame]], pd.DataFrame]]:
+
+        tuple_list = []
+
+        if not hierarchical:
+            train_path = path_joiner(read_folder, f"train{ext}")
+            test_path = path_joiner(read_folder, f"test{ext}")
+            val_path = path_joiner(read_folder, f"val{ext}")
+
+            train_df = self.read_tabular(train_path, **kwargs)
+            test_df = self.read_tabular(test_path, **kwargs)
+
+            if check_path(val_path):
+                val_df = self.read_tabular(val_path, **kwargs)
+            else:
+                val_df = None
+
+            tuple_list = [([(train_df, val_df)], test_df)]
+
+        else:
+            test_dirs = [p for p in list_dir(read_folder) if is_dir(p)]
+
+            for test_folder_path in test_dirs:
+                test_path = path_joiner(test_folder_path, f"test{ext}")
+
+                test_df = self.read_tabular(test_path, **kwargs)
+
+                val_dirs = [p for p in list_dir(test_folder_path) if is_dir(p)]
+                val_list = []
+
+                for val_folder_path in val_dirs:
+                    train_path = path_joiner(val_folder_path, f"train{ext}")
+                    val_path = path_joiner(val_folder_path, f"val{ext}")
+
+                    train_df = self.read_tabular(train_path, **kwargs)
+                    val_df = self.read_tabular(val_path, **kwargs)
+
+                    val_list.append((train_df, val_df))
+
+                if not val_list:
+                    train_path = path_joiner(test_folder_path, f"train{ext}")
+
+                    train_df = self.read_tabular(train_path, **kwargs)
+
+                    val_list.append((train_df, None))
+
+                tuple_list.append((val_list, test_df))
+
+        return tuple_list
+
+    def read_negatives(
+        self,
+        read_folder: str,
+        sep: str = "\t",
+        ext: str = ".tsv",
+        scope: str = "test",
+        **kwargs: Any
+    ) -> Dict[str, List[str]]:
+
+        file_path = path_joiner(read_folder, f"{scope}_negative{ext}")
+        neg = {}
+
+        with open(file_path) as file:
+            for line in file:
+                line = line.rstrip("\n").split(sep)
+                user_id = str(literal_eval(line[0])[0])
+                neg[user_id] = [i for i in line[1:]]
+
+        return neg
+
+    def read_model(
+        self,
+        read_folder: str,
+        model_name: str
+    ) -> Any:
+
+        file_path = path_joiner(read_folder, model_name, f"best-weights-{model_name}.pth")
+        model = torch.load(file_path)
+
+        self.logger.info(
+            "Model restored from disk",
+            extra={"context": {"path": file_path}}
         )
-        return pd.DataFrame(columns=cols)
 
-    if len(file_cols) < 2:
-        raise ValueError("Too few columns to read")
-
-    while len(cols) > len(file_cols):
-        cols.pop()
-
-    dtypes = {
-        col: dtype for col, dtype in zip(cols, datatypes)
-    }
-
-    df = pd.read_csv(
-        file_path,
-        sep=sep,
-        header=hd,
-        names=cols,
-        dtype=dtypes,
-    )
-
-    return df
+        return model
 
 
 def read_csv(filename):
@@ -124,15 +237,6 @@ def read_multi_config():
         configs.append(single_config)
     return configs
 
-
-def load_obj(name):
-    """
-    Load the pkl object by name
-    :param name: name of file
-    :return:
-    """
-    with open(name, 'rb') as f:
-        return pickle.load(f)
 
 
 def find_checkpoint(dir, restore_epochs, epochs, rec, best=0):
