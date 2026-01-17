@@ -1,9 +1,5 @@
 from itertools import product
 
-from elliot.utils.enums import DataLoadingStrategy
-
-from tests.utils import data_path
-
 
 def generate_param_combinations(key_list, values, base=None):
     if base is None:
@@ -27,13 +23,17 @@ def generate_param_combinations(key_list, values, base=None):
 # DataSetLoader
 
 params_dataset_loader_fail = {
-    "invalid_or_missing_params": generate_param_combinations(
-        [("strategy", "data_path", "header")],
-        {
-            "strategy": [DataLoadingStrategy.DATASET.value, 'invalid', 3, None],
-            "data_path": [data_path, 3, None],
-            "header": [False, 3]
-        }
+    "invalid_fixed": generate_param_combinations(
+        ["data_folder"],
+        {"data_folder": ["non/existent/path", 3, None]}
+    ),
+    "invalid_dataset": generate_param_combinations(
+        ["dataset_path"],
+        {"dataset_path": ["non/existent/path", [3], None]}
+    ),
+    "invalid_strategy": generate_param_combinations(
+        ["strategy"],
+        {"strategy": ["invalid", 3, None]}
     )
 }
 
@@ -67,6 +67,10 @@ params_pre_filtering_fail = {
     "invalid_cold_users": generate_param_combinations(
         ["threshold"],
         {"threshold": [-5, "invalid", None]}
+    ),
+    "invalid_strategy": generate_param_combinations(
+        ["strategy"],
+        {"strategy": ["invalid", 3, None]}
     )
 }
 
@@ -112,6 +116,24 @@ params_splitting_fail = {
             "min_below": [1, 100, "invalid"],
             "min_over": [1, 100, "invalid"]
         }
+    ),
+    "invalid_strategy": generate_param_combinations(
+        ["strategy"],
+        {"strategy": ["invalid", 3, None]}
+    )
+}
+
+
+# NegativeSampler
+
+params_neg_sampling_fail = {
+    "invalid_neg_random": generate_param_combinations(
+        ["num_negatives"],
+        {"num_negatives": [[3], -5]}
+    ),
+    "invalid_neg_fixed": generate_param_combinations(
+        ["read_folder"],
+        {"read_folder": ["non/existent/path", 3, None]}
     ),
     "invalid_strategy": generate_param_combinations(
         ["strategy"],

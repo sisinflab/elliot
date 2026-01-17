@@ -43,8 +43,8 @@ class BPRMF(Recommender):
 
         self.params_to_save = ['_user_bias', '_item_bias', '_user_factors', '_item_factors']
 
-    def get_training_dataloader(self):
-        dataloader = self._data.training_dataloader(PairWiseSampler, self._seed)
+    def get_training_dataloader(self, batch_size):
+        dataloader = self._data.training_dataloader(PairWiseSampler, batch_size, self._seed)
         return dataloader
 
     def train_step(self, batch, *args):

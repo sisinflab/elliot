@@ -102,8 +102,8 @@ class NGCF(GraphBasedRecommender):
         # Move to device
         self.to(self._device)
 
-    def get_training_dataloader(self):
-        dataloader = self._data.training_dataloader(PairWiseSampler, self._seed)
+    def get_training_dataloader(self, batch_size):
+        dataloader = self._data.training_dataloader(PairWiseSampler, batch_size, self._seed)
         return dataloader
 
     def forward(self):

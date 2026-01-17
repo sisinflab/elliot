@@ -74,8 +74,8 @@ class AbstractMF2020(Recommender):
 
         self.params_to_save = ['_global_bias', '_user_bias', '_item_bias', '_user_factor', '_item_factor']
 
-    def get_training_dataloader(self):
-        dataloader = self._data.training_dataloader(MFPointWisePosNegSampler, self._seed, m=self.m)
+    def get_training_dataloader(self, batch_size):
+        dataloader = self._data.training_dataloader(MFPointWisePosNegSampler, batch_size, self._seed, m=self.m)
         return dataloader
 
     def predict_full(self, user_indices):

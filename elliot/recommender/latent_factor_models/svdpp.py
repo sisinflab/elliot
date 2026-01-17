@@ -46,8 +46,8 @@ class SVDpp(GeneralRecommender):
         # Move to device
         self.to(self._device)
 
-    def get_training_dataloader(self):
-        dataloader = self._data.training_dataloader(CustomPointWiseSparseSampler, self._seed)
+    def get_training_dataloader(self, batch_size):
+        dataloader = self._data.training_dataloader(CustomPointWiseSparseSampler, batch_size, self._seed)
         return dataloader
 
     def forward(self, user, item):

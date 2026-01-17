@@ -7,7 +7,10 @@ __version__ = '0.3.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
+from typing import Tuple
 from types import SimpleNamespace
+
+import pandas as pd
 from scipy.sparse import csr_matrix
 
 import copy
@@ -18,7 +21,7 @@ from functools import cached_property
 from tqdm import tqdm
 
 import torch
-from torch.utils.data import TensorDataset, Dataset, DataLoader
+from torch.utils.data import Dataset, DataLoader
 from torch.nn.utils.rnn import pad_sequence
 from torch_sparse import SparseTensor
 
@@ -29,45 +32,34 @@ from elliot.dataset.fusion.fuser import FeatureFuser
 
 
 class NegEvalDataset(Dataset):
-    def __init__(self, dataset_obj):
-        self.num_users = dataset_obj.num_users
+    def __init__(self, num_users, sampler, val_pos_items, test_pos_items):
+        self.num_users = num_users
 
-        pos, val, test = dataset_obj.get_positive_items()
-        self.pos_items = pos
-        self.val_items = val
-        self.test_items = test
-
-        sampler = NegativeSampler(
-            neg_sampling_ns=dataset_obj.config.negative_sampling,
-            mappings=dataset_obj.get_mappings(),
-            inv_mappings=dataset_obj.get_inverse_mappings(),
-            pos_items=self.pos_items,
-            add_validation_sampling=len(self.val_items) > 0
-        )
         val_neg_items, test_neg_items = sampler.sample()
 
-        self.val_neg_items = self._add_indices(val_neg_items, validation=True)
-        self.test_neg_items = self._add_indices(test_neg_items)
+        self.val_items = self._add_indices(val_neg_items, val_pos_items, validation=True)
+        self.test_items = self._add_indices(test_neg_items, test_pos_items)
 
-    def _add_indices(self, neg, validation=False):
+    def _add_indices(self, neg, pos, validation=False):
         """Add test or validation samples to the sampled negatives."""
-        if neg is None:
+        if not neg:
             return None
 
         total = len(neg)
-        additional_items = self.val_items if validation else self.test_items
         final_items = []
         i = 0
         text = "validation" if validation else "test"
 
         with tqdm(total=total, desc=f"Adding {text} items to sampled negatives", leave=False) as t:
             while i < len(neg):
-                a, b = neg[i], additional_items[i]
+                a = neg[i]
+                b = [pos[i][-1]] if pos[i] and a else []
+
                 final_items.append(torch.tensor(a + b))
 
                 # Manual garbage collection
                 del neg[i]
-                del additional_items[i]
+                del pos[i]
 
                 t.update()
 
@@ -77,11 +69,9 @@ class NegEvalDataset(Dataset):
         return self.num_users
 
     def __getitem__(self, idx):
-        test_neg_items = self.test_neg_items[idx]
-        val_neg_items = None
-        if self.val_neg_items is not None:
-            val_neg_items = self.val_neg_items[idx]
-        return idx, val_neg_items, test_neg_items
+        test_items = self.test_items[idx]
+        val_items = self.val_items[idx] if self.val_items is not None else None
+        return idx, val_items, test_items
 
     @staticmethod
     def collate_fn(batch):
@@ -99,7 +89,7 @@ class NegEvalDataset(Dataset):
         )
         val_neg_padded = None
 
-        if all(v is not None for v in val_negatives):
+        if val_negatives[0] is not None:
             val_neg_padded = pad_sequence(
                 val_negatives,
                 batch_first=True,
@@ -110,8 +100,8 @@ class NegEvalDataset(Dataset):
 
 
 class FullEvalDataset(Dataset):
-    def __init__(self, dataset_obj):
-        self.num_users = dataset_obj.num_users
+    def __init__(self, num_users):
+        self.num_users = num_users
 
     def __len__(self):
         return self.num_users
@@ -128,6 +118,7 @@ class DataSet:
     """
     Load train and test dataset
     """
+    inter_dataframe: Tuple[pd.DataFrame, ...]
 
     def __init__(self, config, data_tuple, side_information_data, *args, **kwargs):
         """
@@ -141,25 +132,19 @@ class DataSet:
         self.config = config
         self.args = args
         self.kwargs = kwargs
-        self.interactions = data_tuple
-        self.batch_size = 1024
+        self.inter_dataframe = data_tuple
         self.cold_items = set()
         self.cold_users = set()
 
         self._handle_train_set(side_information_data)
         self._handle_val_test_sets()
 
-        if hasattr(self.config, "negative_sampling"):
-            self._eval_dataset = NegEvalDataset(self)
-            self._eval_cache_key = 'neg'
-        else:
-            self._eval_dataset = FullEvalDataset(self)
-            self._eval_cache_key = 'full'
-
         self._cached_dataloaders = {}
+        self._eval_cache_key = None
 
     def _handle_train_set(self, side_information_data):
-        self._train_dict = self._dataframe_to_dict(self.interactions[0])
+        train_df, _, _ = self.inter_dataframe
+        self._train_dict = self._dataframe_to_dict(train_df)
 
         if self.config.align_side_with_train:
             self.side_information = self._align_with_training(side_information_data)
@@ -203,15 +188,16 @@ class DataSet:
             self.fuser = None
 
     def _handle_val_test_sets(self):
-        if len(self.interactions) == 2:
-            self._val_dict = None
-            self._test_dict = self._dataframe_to_dict(self.interactions[1])
-        else:
-            self._val_dict = self._dataframe_to_dict(self.interactions[1], val=True)
-            self._test_dict = self._dataframe_to_dict(self.interactions[2])
+        _, val_df, test_df = self.inter_dataframe
 
-        self._i_val_dict = self._build_mapped_dict(self._val_dict)
+        self._test_dict = self._dataframe_to_dict(test_df)
+        self._val_dict = (
+            self._dataframe_to_dict(val_df, val=True)
+            if val_df is not None else None
+        )
+
         self._i_test_dict = self._build_mapped_dict(self._test_dict)
+        self._i_val_dict = self._build_mapped_dict(self._val_dict)
 
     def _dataframe_to_dict(self, data, val=False, skip_cold_users_items=True):
         """Conversion to Dictionary"""
@@ -276,7 +262,7 @@ class DataSet:
         for user_ratings in ratings_dict.values():
             item_set.update(user_ratings.keys())
 
-        items = list(item_set)
+        items = sorted(list(item_set))
 
         return users, items
 
@@ -289,7 +275,7 @@ class DataSet:
                 ratings.append(r)
         return users, items, ratings
 
-    def training_dataloader(self, sampler_cls, seed=42, **kwargs):
+    def training_dataloader(self, sampler_cls, batch_size, seed=42, **kwargs):
         if kwargs.get('transactions') is not None:
             transactions = kwargs.pop('transactions')
         else:
@@ -316,7 +302,7 @@ class DataSet:
 
             self._cached_dataloaders[cache_key] = DataLoader(
                 dataset,
-                batch_size=self.batch_size,
+                batch_size=batch_size,
                 collate_fn=getattr(sampler, 'collate_fn', None),
                 shuffle=True
             )
@@ -324,16 +310,35 @@ class DataSet:
         return self._cached_dataloaders[cache_key]
 
     def eval_dataloader(self, batch_size):
-        dataset = self._eval_dataset
         cache_key = self._eval_cache_key
 
-        if cache_key not in self._cached_dataloaders:
+        if cache_key is None:
+            if hasattr(self.config, "negative_sampling"):
+                train, val, test = self.get_positive_items()
+
+                sampler = NegativeSampler(
+                    config=self.config.negative_sampling,
+                    mappings=self.get_mappings(),
+                    inv_mappings=self.get_inverse_mappings(),
+                    num_users=self.num_users,
+                    num_items=self.num_items,
+                    pos_items=(train, val, test)
+                )
+
+                eval_dataset = NegEvalDataset(self.num_users, sampler, val, test)
+                cache_key = "neg"
+            else:
+                eval_dataset = FullEvalDataset(self.num_users)
+                cache_key = "full"
+
             self._cached_dataloaders[cache_key] = DataLoader(
-                dataset,
+                eval_dataset,
                 batch_size=batch_size,
-                collate_fn=dataset.collate_fn,
+                collate_fn=eval_dataset.collate_fn,
                 shuffle=False
             )
+
+            self._eval_cache_key = cache_key
 
         return self._cached_dataloaders[cache_key]
 
@@ -369,39 +374,33 @@ class DataSet:
     def get_positive_items(self):
         users = sorted(list(self._i_train_dict.keys()))
 
-        pos, val, test = [], [], []
+        train, val, test = [], [], []
 
         # Local cache to speed up computation
-        train = self._i_train_dict
+        train_dict = self._i_train_dict
         test_dict = self._i_test_dict
         val_dict = self._i_val_dict
 
         has_val = val_dict is not None
 
         for u in users:
-            items_train = train.get(u, ())
+            # Train
+            items_train = train_dict.get(u, ())
+            train_set = list(set(items_train))
+            train.append(list(train_set))
+
+            # Test
             items_test = test_dict.get(u, ())
-
-            # Convert to set
-            train_set = set(items_train)
-            test_set = set(items_test)
-
-            # Add test set
+            test_set = list(set(items_test))
             test.append(list(test_set))
 
-            # Positives = train ∪ test (U val if present)
+            # Val
             if has_val:
                 items_val = val_dict.get(u, ())
                 val_set = set(items_val)
                 val.append(list(val_set))
 
-                all_items = train_set | test_set | val_set
-            else:
-                all_items = train_set | test_set
-
-            pos.append(list(all_items))
-
-        return pos, val, test
+        return train, val, test
 
     def build_items_neighbour(self):
         row, col = self.sp_i_train.nonzero()

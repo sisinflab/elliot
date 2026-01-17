@@ -63,8 +63,8 @@ class MF(GeneralRecommender):
         # Move to device
         self.to(self._device)
 
-    def get_training_dataloader(self):
-        dataloader = self._data.training_dataloader(PointWisePosNegSampler, self._seed)
+    def get_training_dataloader(self, batch_size):
+        dataloader = self._data.training_dataloader(PointWisePosNegSampler, batch_size, self._seed)
         return dataloader
 
     def forward(self, user, item):

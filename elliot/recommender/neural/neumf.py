@@ -99,8 +99,8 @@ class NeuMF(GeneralRecommender):
         # Move to device
         self.to(self._device)
 
-    def get_training_dataloader(self):
-        dataloader = self._data.training_dataloader(MFPointWisePosNegSampler, self._seed, m=self.m)
+    def get_training_dataloader(self, batch_size):
+        dataloader = self._data.training_dataloader(MFPointWisePosNegSampler, batch_size, self._seed, m=self.m)
         return dataloader
 
     def forward(self, user, item):

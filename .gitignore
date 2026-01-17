@@ -23,6 +23,7 @@ pip-selfcheck.json
 **/results/
 /data/*
 **/splitting/
+**/negative/
 /share/
 **/__pycache__/**
 *.log
