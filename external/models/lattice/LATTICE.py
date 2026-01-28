@@ -92,7 +92,7 @@ class LATTICE(RecMixin, BaseRecommenderModel):
                              self._data.side_information.__getattribute__(f'''{self._loaders[m_id]}'''))
 
         row, col = data.sp_i_train.nonzero()
-        col = [c + self._num_users for c in col]
+        col += self._num_users # [c + self._num_users for c in col]
         edge_index = np.array([row, col])
         edge_index = torch.tensor(edge_index, dtype=torch.int64)
         self.adj = SparseTensor(row=torch.cat([edge_index[0], edge_index[1]], dim=0),

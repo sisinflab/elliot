@@ -1,6 +1,7 @@
 import ntpath
 import numpy as np
 import pandas as pd
+from tqdm import tqdm
 
 from elliot.recommender.base_recommender_model import BaseRecommenderModel
 from elliot.recommender.recommender_utils_mixin import RecMixin
@@ -50,13 +51,27 @@ class ProxyRecommender(RecMixin, BaseRecommenderModel):
 
     def get_single_recommendation(self, mask, k):
 
-        nonzero = mask.nonzero()
+        # nonzero = mask.nonzero()
+        # zero = np.where(mask==False)
         candidate_items = {}
-        [candidate_items.setdefault(self._data.private_users[user], set()).add(self._data.private_items[item]) for user, item in zip(*nonzero)]
+        setItem = set(range(mask.shape[1]))
+        for user in tqdm(range(mask.shape[0])):
+            itemFalse = set(np.where(mask[user,:]==False)[0].tolist())
+            itemTrue = list(setItem.difference(itemFalse))
+            candidate_items[self._data.private_users[user]] = [self._data.private_items[item] for item in itemTrue]
+            # [candidate_items.setdefault(self._data.private_users[user], list()).add(
+                        # self._data.private_items[item]) for item in itemTrue]
+            # for item in range(mask.shape[1]):
+            #     if item in itemFalse:
+            #         continue
+            #     else:
+            #         candidate_items.setdefault(self._data.private_users[user], set()).add(
+            #             self._data.private_items[item])
+        # [candidate_items.setdefault(self._data.private_users[user], set()).add(self._data.private_items[item]) for user, item in zip(*nonzero)]
         recs = {}
         for u, user_recs in self._recommendations.items():
             user_cleaned_recs = []
-            user_candidate_items = candidate_items[u]
+            user_candidate_items = set(candidate_items[u])
             for p, (item, prediction) in enumerate(user_recs):
                 if p >= k:
                     break
@@ -66,11 +81,15 @@ class ProxyRecommender(RecMixin, BaseRecommenderModel):
         return recs
 
     def read_recommendations(self, path):
-        recs = {}
-        column_names = ["userId", "itemId", "prediction", "timestamp"]
+        recs = dict()
+        column_names = ["userId", "itemId", "prediction"]
         data = pd.read_csv(path, sep="\t", header=None, names=column_names)
+        data = data.sort_values(by='prediction', ascending=False)
         user_groups = data.groupby(['userId'])
-        for name, group in user_groups:
-            recs[name] = sorted(data.loc[group.index][['itemId', 'prediction']].apply(tuple, axis=1).to_list(), key=lambda x: x[1], reverse=True)
+        # user_groups = user_groups.sort_values(by='prediction', ascending=False)
+        # recs = {name: list(group[['itemId', 'prediction']].itertuples(index=False, name=None)) for name, group in tqdm(user_groups)}
+        for name, group in tqdm(user_groups):
+            #df.sort_values(by=['col1'])
+            recs[name] = list(group[['itemId', 'prediction']].itertuples(index=False, name=None))#data.loc[group.index][['itemId', 'prediction']].apply(tuple, axis=1).to_list()
+            # recs[name] = sorted(data.loc[group.index][['itemId', 'prediction']].apply(tuple, axis=1).to_list(), key=lambda x: x[1], reverse=True)
         return recs
-

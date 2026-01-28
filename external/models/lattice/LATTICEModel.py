@@ -9,6 +9,8 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, daniele.malite
 
 from abc import ABC
 
+import similaripy
+from scipy.sparse import csr_matrix
 from torch_geometric.nn import LGConv
 
 import torch
@@ -45,6 +47,7 @@ class LATTICEModel(torch.nn.Module, ABC):
         torch.manual_seed(random_seed)
         torch.cuda.manual_seed(random_seed)
         torch.cuda.manual_seed_all(random_seed)
+        torch.mps.manual_seed(random_seed)
         torch.backends.cudnn.deterministic = True
 
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -116,8 +119,7 @@ class LATTICEModel(torch.nn.Module, ABC):
     @staticmethod
     def build_sim(context):
         context_norm = context.div(torch.norm(context, p=2, dim=-1, keepdim=True))
-        sim = torch.mm(context_norm, context_norm.transpose(1, 0))
-        return sim
+        return torch.mm(context_norm, context_norm.transpose(1, 0))
 
     def build_knn_neighbourhood(self, adj, topk):
         knn_val, knn_ind = torch.topk(adj, topk, dim=-1)
@@ -132,9 +134,9 @@ class LATTICEModel(torch.nn.Module, ABC):
     @staticmethod
     def compute_normalized_laplacian(adj, norm):
         adj = fill_diag(adj, 1.)
-        deg = sum(adj, dim=-1)
+        deg = adj.sum(dim=-1)
         deg_inv_sqrt = deg.pow_(-norm)
-        deg_inv_sqrt.masked_fill_(deg_inv_sqrt == float('inf'), 0.)
+        deg_inv_sqrt = torch.where(deg_inv_sqrt == float('inf'), torch.zeros_like(deg_inv_sqrt), deg_inv_sqrt)
         adj_t = mul(adj, deg_inv_sqrt.view(-1, 1))
         adj_t = mul(adj_t, deg_inv_sqrt.view(1, -1))
         return adj_t

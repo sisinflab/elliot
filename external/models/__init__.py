@@ -46,6 +46,8 @@ for _backend in sys.modules["external"].backend:
         # from .kgcn.KGCN import KGCN
         from .gcn.GCN import GCN
         from .egcfv2.EGCFv2 import EGCFv2
+        from .lattice.LATTICE import LATTICE
+        from .bprmf.BPRMF import BPRMF
         from .vbpr.VBPR import VBPR
         from .grcn.GRCN import GRCN
         from .mgat.MGAT import MGAT

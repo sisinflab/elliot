@@ -62,4 +62,4 @@ docs/source/_templates
 !/data/cat_dbpedia_movielens_1m_v030/features.tsv
 !/data/cat_dbpedia_movielens_1m_v030/map.tsv
 !/data/cat_dbpedia_movielens_1m_v030/properties.conf
-
+.DS_Store

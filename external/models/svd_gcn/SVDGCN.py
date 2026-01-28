@@ -60,23 +60,24 @@ class SVDGCN(RecMixin, BaseRecommenderModel):
         self.rate_matrix.to(self.device)
 
         if self._config.data_config.strategy == 'fixed':
-            path, _ = os.path.split(self._config.data_config.train_path)
-            if not (os.path.exists(path + '/svd_u.npy') or os.path.exists(path + '/svd_i.npy') or os.path.exists(
-                    path + '/svd_value.npy')):
+            path = os.path.split(self._config.data_config.train_path)[0]
+            if not (os.path.exists(path + f'/svd_u_{self._alpha}.npy')
+                    or os.path.exists(path + f'/svd_i_{self._alpha}.npy') or os.path.exists(
+                    path + f'/svd_value_{self._alpha}.npy')):
                 self.logger.info(
                     f"Processing singular values as they haven't been calculated before on this dataset...")
-                U, value, V = self.preprocess(path)
+                U, value, V = self.preprocess(path, data.num_users, data.num_items)
                 self.logger.info(f"Processing end!")
             else:
                 self.logger.info(f"Singular values have already been processed for this dataset!")
-                value = torch.Tensor(np.load(path + r'/svd_value.npy'))
-                U = torch.Tensor(np.load(path + r'/svd_u.npy'))
-                V = torch.Tensor(np.load(path + r'/svd_v.npy'))
+                value = torch.Tensor(np.load(path + f'/svd_value_{self._alpha}.npy'))
+                U = torch.Tensor(np.load(path + f'/svd_u_{self._alpha}.npy'))
+                V = torch.Tensor(np.load(path + f'/svd_v_{self._alpha}.npy'))
         else:
             raise NotImplementedError('The check when strategy is different from fixed has not been implemented yet!')
 
-        self.user_matrix = ((self.rate_matrix.mm(self.rate_matrix.t())) != 0).float()
-        self.item_matrix = ((self.rate_matrix.t().mm(self.rate_matrix)) != 0).float()
+        self.user_matrix = ((self.rate_matrix.mm(self.rate_matrix.t())) != 0).float().to(self.device)
+        self.item_matrix = ((self.rate_matrix.t().mm(self.rate_matrix)) != 0).float().to(self.device)
 
         self._model = SVDGCNModel(
             learning_rate=self._learning_rate,
@@ -98,15 +99,15 @@ class SVDGCN(RecMixin, BaseRecommenderModel):
                + f"_{self.get_base_params_shortcut()}" \
                + f"_{self.get_params_shortcut()}"
 
-    def preprocess(self, dataset):
+    def preprocess(self, dataset, users, items):
         D_u = self.rate_matrix.sum(1) + self._alpha
         D_i = self.rate_matrix.sum(0) + self._alpha
 
-        for i in range(self._num_users):
+        for i in range(users):
             if D_u[i] != 0:
                 D_u[i] = 1 / D_u[i].sqrt()
 
-        for i in range(self._num_items):
+        for i in range(items):
             if D_i[i] != 0:
                 D_i[i] = 1 / D_i[i].sqrt()
 
@@ -118,9 +119,9 @@ class SVDGCN(RecMixin, BaseRecommenderModel):
 
         U, value, V = torch.svd_lowrank(rate_matrix, q=400, niter=30)
 
-        np.save(dataset + r'/svd_u.npy', U.cpu().numpy())
-        np.save(dataset + r'/svd_v.npy', V.cpu().numpy())
-        np.save(dataset + r'/svd_value.npy', value.cpu().numpy())
+        np.save(dataset + f'/svd_u_{self._alpha}.npy', U.cpu().numpy())
+        np.save(dataset + f'/svd_v_{self._alpha}.npy', V.cpu().numpy())
+        np.save(dataset + f'/svd_value_{self._alpha}.npy', value.cpu().numpy())
 
         return U, value, V
 
@@ -132,7 +133,7 @@ class SVDGCN(RecMixin, BaseRecommenderModel):
             loss = 0
             steps = 0
             with tqdm(total=int(self._data.transactions // self._batch_size), disable=not self._verbose) as t:
-                for _, _ in enumerate(range(0, self._data.transactions, self._batch_size)):
+                for _, _ in enumerate(range(0, int(self._data.transactions // self._batch_size))):
                     steps += 1
                     u = np.random.randint(0, self._num_users, self._batch_size)
                     p = torch.multinomial(self.rate_matrix[u], 1, True).squeeze(1)
@@ -146,7 +147,7 @@ class SVDGCN(RecMixin, BaseRecommenderModel):
                     t.set_postfix({'loss': f'{loss / steps:.5f}'})
                     t.update()
 
-            self.evaluate(it, loss / (it + 1))
+            self.evaluate(it, loss / steps)
 
     def get_recommendations(self, k: int = 100):
         predictions_top_k_test = {}
@@ -161,7 +162,7 @@ class SVDGCN(RecMixin, BaseRecommenderModel):
 
     def get_users_rating(self, batch_start, batch_stop):
         final_user = self._model.user_vector[batch_start: batch_stop].mm(self._model.FS)
-        final_item = self._model.item_vector.mm(self._model.FS).to(self.device)
+        final_item = self._model.item_vector.mm(self._model.FS)
         return (final_user.mm(final_item.t())).sigmoid().to(self.device) - (self.rate_matrix[batch_start: batch_stop] * 1000).to(self.device)
 
     def get_single_recommendation(self, mask, k, predictions, offset, offset_stop):
@@ -180,7 +181,7 @@ class SVDGCN(RecMixin, BaseRecommenderModel):
             self._results.append(result_dict)
 
             if it is not None:
-                self.logger.info(f'Epoch {(it + 1)}/{self._epochs} loss {loss / (it + 1):.5f}')
+                self.logger.info(f'Epoch {(it + 1)}/{self._epochs} loss {loss :.5f}')
             else:
                 self.logger.info(f'Finished')
 
