@@ -32,6 +32,8 @@ def xavier_normal_init(module):
         xavier_normal_(module.weight.data)
         if module.bias is not None:
             zeros_(module.bias.data)
+    elif isinstance(module, np.ndarray):
+        module[:] = xavier_init(module.shape, init=np.random.normal)
 
 
 def xavier_uniform_init(module):
@@ -41,3 +43,14 @@ def xavier_uniform_init(module):
         xavier_uniform_(module.weight.data)
         if module.bias is not None:
             zeros_(module.bias.data)
+    elif isinstance(module, np.ndarray):
+        module[:] = xavier_init(module.shape, init=np.random.uniform)
+
+def xavier_init(shape, init=np.random.normal, fan_in=None, fan_out=None, gain=1.0, dtype=np.float32):
+    if fan_in is None or fan_out is None:
+        if len(shape) < 2:
+            raise ValueError("Serve fan_in/fan_out oppure una shape >=2")
+        fan_out = shape[0]
+        fan_in = shape[1]
+    limit = gain * np.sqrt(6.0 / (fan_in + fan_out))
+    return init(-limit, limit, size=shape).astype(dtype)

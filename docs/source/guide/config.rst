@@ -551,9 +551,10 @@ In detail, use:
 
 ``validation_rate`` **int** field: where applicable, define the iteration interval for the validation and test evaluation
 
-``hyper_opt_alg`` **string** field: it defines the hyperparameter tuning strategy
+``hyper_opt_alg`` **string** field: it defines the hyperparameter tuning strategy (e.g., ``grid``, ``tpe``, ``rand``)
 
-``hyper_max_evals`` **int** field: where applicable, it defines the number of samples to consider for hyperparameter evaluation
+``hyper_max_evals`` **int** field: defines the number of samples to consider for hyperparameter evaluation. It is required
+when using Hyperopt distributions; for ``grid`` it can be omitted (full grid) or set to at least the grid size.
 
 To fully understand how to conduct hyperparameter optimization in Elliot, please refer to the corresponding :ref:`section<Hyperparameter Optimization>`.
 

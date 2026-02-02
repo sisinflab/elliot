@@ -117,7 +117,7 @@ class SplittingSingleConfig(BaseConfig):
     min_over: int = Field(default=1, ge=1)
     test_ratio: Optional[float] = Field(default=None, ge=0.1, le=0.9)
     leave_n_out: Optional[int] = Field(default=None, ge=1)
-    folds: int = Field(default=5, ge=1, le=20)
+    folds: int = Field(default=1, ge=1, le=20)
 
     @model_validator(mode="after")
     def validate_strategy_fields(self) -> "SplittingSingleConfig":

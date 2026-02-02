@@ -40,6 +40,7 @@ experiment:
         validation_metric: nDCG@10
     ItemKNN:
       meta:
+        hyper_opt_alg: grid
         verbose: True
         save_recs: True
         validation_metric: nDCG@10
@@ -48,6 +49,7 @@ experiment:
       implementation: standard
     AttributeItemKNN:
       meta:
+        hyper_opt_alg: grid
         verbose: True
         save_recs: True
         validation_metric: nDCG@10

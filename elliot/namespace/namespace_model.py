@@ -380,6 +380,8 @@ class NameSpaceModel:
 
     def _build_hyperopt_space(self, model_config: Dict[str, Any], meta_model: Dict[str, Any]):
         space_list = []
+        uses_distributions = False
+        opt_alg_name = meta_model.get(_hyper_opt_alg, "tpe")
         for k, value in model_config.items():
             if not isinstance(value, list):
                 continue
@@ -396,7 +398,8 @@ class NameSpaceModel:
                 "qlognormal"
             ]
             if isinstance(value[0], str) and value[0] in valid_functions:
-                func_ = getattr(hp, value[0].replace(" ", "").split("(")[0])
+                func_name = value[0].replace(" ", "").split("(")[0]
+                func_ = getattr(hp, func_name)
                 val_string = value[0].replace(" ", "").split("(")[1].split(")")[0] \
                     if len(value[0].replace(" ", "").split("(")) > 1 else None
                 val_items = [literal_eval(val_string) if val_string else None]
@@ -408,6 +411,8 @@ class NameSpaceModel:
                 )
                 val_items = [v for v in val_items if v is not None]
                 space_list.append((k, func_(k, *val_items)))
+                if func_name not in {"choice"}:
+                    uses_distributions = True
             elif all(isinstance(item, str) for item in value):
                 space_list.append((k, hp.choice(k, value)))
             else:
@@ -415,8 +420,24 @@ class NameSpaceModel:
 
         _SPACE = OrderedDict(space_list)
         _estimated_evals = reduce(lambda x, y: x * y, [len(param.pos_args) - 1 for _, param in _SPACE.items()], 1)
-        _max_evals = meta_model.get(_hyper_max_evals, _estimated_evals)
+        _max_evals = meta_model.get(_hyper_max_evals, None)
+        if opt_alg_name == "grid" and uses_distributions:
+            raise Exception(
+                "Grid search supports only discrete choices. "
+                "Please use explicit lists or 'choice' in model/meta configuration."
+            )
+        if _max_evals is None:
+            if uses_distributions:
+                raise Exception(
+                    "hyper_max_evals must be provided when using hyperopt distributions. "
+                    "Please define hyper_max_evals in model/meta configuration."
+                )
+            _max_evals = _estimated_evals
         if _max_evals <= 0:
-            raise Exception("Only pure value lists can be used without hyper_max_evals option. Please define hyper_max_evals in model/meta configuration.")
-        _opt_alg = ho.parse_algorithms(meta_model.get(_hyper_opt_alg, "grid"))
+            raise Exception("hyper_max_evals must be a positive integer in model/meta configuration.")
+        if opt_alg_name == "grid" and _max_evals < _estimated_evals:
+            raise Exception(
+                "hyper_max_evals must be >= the full grid size when using grid search."
+            )
+        _opt_alg = ho.parse_algorithms(opt_alg_name)
         return _SPACE, _max_evals, _opt_alg

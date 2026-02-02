@@ -119,9 +119,9 @@ run_experiment("configuration/file/path", config_overrides=["experiment.top_k=20
 The following file is a simple configuration for an experimental setup. It contains all the instructions to get 
 the MovieLens-1M catalog from a specific path and perform a train test split in a random sample way with a ratio of 20%.
 
-This experiment provides a hyperparameter optimization with a grid search strategy for an Item-KNN model. Indeed, 
-it is seen that the possible values of neighbors are closed in squared brackets. It indicates that two different models 
-equipped with two different neighbors' values will be trained and compared to select the best configuration. Moreover, 
+This experiment provides a hyperparameter optimization with a grid search strategy for an Item-KNN model. Grid search is
+enabled via ``hyper_opt_alg: grid`` and discrete value lists. It indicates that two different models equipped with two
+different neighbors' values will be trained and compared to select the best configuration. Moreover, 
 this configuration obliges Elliot to save the recommendation lists with at most 10 items per user as suggest by top_k property.
 
 In this basic experiment, only a simple metric is considered in the final evaluation study. The candidate metric is nDCG 
@@ -148,6 +148,8 @@ experiment:
     simple_metrics: [nDCG]
   top_k: 10
 ```
+
+Note: when using Hyperopt distributions (e.g., ``loguniform``), set ``hyper_max_evals`` explicitly.
 
 If you want to explore a basic configuration, and an advanced configuration, please refer to:
 

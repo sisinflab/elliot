@@ -24,11 +24,11 @@ specific path and perform a train test split in a random sample way with
 a ratio of 20%.
 
 This experiment provides a hyperparameter optimization with a grid
-search strategy for an Item-KNN model. Indeed, it is seen that the
-possible values of neighbors are closed in squared brackets. It
-indicates that two different models equipped with two different
-neighbors' values will be trained and compared to select the best
-configuration. Moreover, this configuration obliges Elliot to save the
+search strategy for an Item-KNN model. Grid search is enabled via
+``hyper_opt_alg: grid`` and discrete value lists. It indicates that two
+different models equipped with two different neighbors' values will be
+trained and compared to select the best configuration. Moreover, this
+configuration obliges Elliot to save the
 recommendation lists with at most 10 items per user as suggest by top\_k
 property.
 
@@ -75,7 +75,7 @@ The knowledge-aware recommendation model, AttributeItemKNN, is compared against 
 along with a user-implemented model that is external.MostPop.
 
 The configuration makes use of elliot's feature of conducting a grid search-based hyperparameter optimization strategy
-by merely passing a list of possible hyperparameter values, e.g., neighbors: [50, 70, 100].
+by setting ``hyper_opt_alg: grid`` and providing a list of possible hyperparameter values, e.g., neighbors: [50, 70, 100].
 
 The reported models are selected according to nDCG@10.
 

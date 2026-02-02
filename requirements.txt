@@ -8,9 +8,14 @@ pytest>=8.4.1
 PyYAML>=5.4.1
 scikit_learn>=1.7.1
 scipy>=1.16.0
-similaripy>=0.2.2
+similaripy==0.4.0
 tensorflow>=2.19.0
 torch>=2.7.1
 torch_geometric>=2.6.1
-torch_sparse==0.6.18
+-f https://data.pyg.org/whl/torch-2.7.0+cpu.html
+pyg_lib
+torch_scatter
+torch_sparse
+torch_cluster
+torch_spline_conv
 tqdm>=4.58.0

@@ -170,7 +170,7 @@ class AbstractTrainer(ABC):
                 extra={"context": {"iteration": it + 1, "duration_sec": end - start}}
             )
             if not (it + 1) % self.config.meta.validation_rate:
-                self.evaluate(it, loss / (it + 1))
+                self.evaluate(it, loss)
 
     def evaluate(self, it=0, loss=0):
         recs = self.get_recs(self.evaluator.get_needed_recommendations())
@@ -181,7 +181,7 @@ class AbstractTrainer(ABC):
         self._results.append(result_dict)
 
         # if it is not None:
-        self.logger.debug(f'Epoch {(it + 1)}/{self.config.epochs} loss {loss / (it + 1):.5f}')
+        self.logger.debug(f'Epoch {(it + 1)}/{self.config.epochs} loss {loss:.5f}')
         # else:
         #    self.logger.info(f'Finished')
 
@@ -334,7 +334,7 @@ class Trainer(AbstractTrainer):
         super().__init__(data, config, params, model_class)
 
     def _train_epoch(self, it, dataloader, *args):
-        loss = 0
+        total_loss = 0.0
         steps = 0
         iter_ = tqdm(
             total=int(self.model.transactions // self.config.batch_size),
@@ -344,10 +344,15 @@ class Trainer(AbstractTrainer):
         with iter_ as t:
             for batch in dataloader:
                 steps += 1
-                loss += self.model.train_step(batch, *args)
-                t.set_postfix({'loss': f'{loss / steps:.5f}'})
+                batch_loss = self.model.train_step(batch, *args)
+                if hasattr(batch_loss, "item"):
+                    batch_loss = batch_loss.item()
+                elif hasattr(batch_loss, "numpy"):
+                    batch_loss = float(batch_loss)
+                total_loss += batch_loss
+                t.set_postfix({'loss': f'{total_loss / steps:.5f}'})
                 t.update()
-        return loss
+        return (total_loss / steps) if steps else 0.0
 
 
 class TraditionalTrainer(Trainer):
@@ -368,7 +373,7 @@ class GeneralTrainer(AbstractTrainer):
 
     def _train_epoch(self, it, dataloader, *args):
         self.model.train()
-        total_loss, steps = 0, 0
+        total_loss, steps = 0.0, 0
         iter_ = tqdm(
             total=int(self.model.transactions // self.config.batch_size),
             desc="Training",
@@ -381,11 +386,11 @@ class GeneralTrainer(AbstractTrainer):
                 res = self.model.train_step(batch, steps, *args)
                 loss, inputs = res if isinstance(res, tuple) else (res, None)
                 loss.backward(inputs=inputs)
-                total_loss += loss.detach().cpu().numpy()
+                total_loss += loss.detach().cpu().item()
                 self.optimizer.step()
                 t.set_postfix({'loss': f'{total_loss / steps:.5f}'})
                 t.update()
-        return total_loss
+        return (total_loss / steps) if steps else 0.0
 
     @torch.no_grad()
     def evaluate(self, it=0, loss=0):

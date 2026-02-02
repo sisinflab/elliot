@@ -8,19 +8,17 @@ __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
 import importlib
-import sys
 from typing import List, Optional
 
 import numpy as np
-from hyperopt import Trials, fmin
 
 import elliot.hyperoptimization as ho
 from elliot.namespace.namespace_model_builder import NameSpaceBuilder
-from elliot.result_handler.result_handler import ResultHandler, HyperParameterStudy, StatTest
+from elliot.result_handler.result_handler import ResultHandler, StatTest
 from elliot.utils import logging as logging_project
-from elliot.utils.folder import parent_dir, path_relative
+from elliot.utils.folder import parent_dir
+from elliot.utils.model_resolver import resolve_model_class
 
-_rstate = np.random.default_rng(seed=42)
 here = parent_dir(__file__)
 
 print(u'''
@@ -57,7 +55,9 @@ def run_experiment(config_path: str = '', config_overrides: Optional[List[str]] 
     base.base_namespace.evaluation.relevance_threshold = getattr(base.base_namespace.evaluation, "relevance_threshold",
                                                      0)
     res_handler = ResultHandler(rel_threshold=base.base_namespace.evaluation.relevance_threshold)
-    hyper_handler = HyperParameterStudy(rel_threshold=base.base_namespace.evaluation.relevance_threshold)
+    rstate = np.random.default_rng(seed=getattr(base.base_namespace, "random_seed", 42))
+    engine = ho.HyperOptEngine(rstate=rstate)
+    runner = ho.HyperoptRunner(engine)
     dataloader_class = getattr(importlib.import_module("elliot.dataset"), 'DataSetLoader')
     dataloader = dataloader_class(config=base.base_namespace)
     data_test_list = dataloader.build()
@@ -68,59 +68,31 @@ def run_experiment(config_path: str = '', config_overrides: Optional[List[str]] 
         all_trials[key] = []
         for test_fold_index, data_test in enumerate(data_test_list):
             logging_project.prepare_logger(key, base.base_namespace.path_log_folder)
-            if key.startswith("external."):
-                spec = importlib.util.spec_from_file_location(
-                    "external",
-                    path_relative(base.base_namespace.external_models_path, here)
-                )
-                external = importlib.util.module_from_spec(spec)
-                external.backend = base.base_namespace.backend
-                sys.modules[spec.name] = external
-                spec.loader.exec_module(external)
-                model_class = getattr(importlib.import_module("external"), key.split(".", 1)[1])
-            else:
-                model_class = getattr(importlib.import_module("elliot.recommender"), key)
+            model_class = resolve_model_class(key, base.base_namespace, here)
 
-            model_placeholder = ho.ModelCoordinator(data_test, base.base_namespace, model_base, model_class,
-                                                    test_fold_index)
             if isinstance(model_base, tuple):
                 logger.info(f"Tuning begun for {model_class.__name__}\n")
-                trials = Trials()
-                fmin(model_placeholder.objective,
-                     space=model_base[1],
-                     algo=model_base[3],
-                     trials=trials,
-                     verbose=False,
-                     rstate=_rstate,
-                     max_evals=model_base[2])
-
-                # argmin relativo alla combinazione migliore di iperparametri
-                min_val = np.argmin([i["result"]["loss"] for i in trials._trials])
-                ############################################
-                best_model_loss = trials._trials[min_val]["result"]["loss"]
-                best_model_params = trials._trials[min_val]["result"]["params"]
-                best_model_results = trials._trials[min_val]["result"]["test_results"]
-                ############################################
-
-                # aggiunta a lista performance test
-                test_results.append(trials._trials[min_val]["result"])
-                test_trials.append(trials)
-                all_trials[key].append([el["result"] for el in trials._trials])
-                logger.info(f"Tuning ended for {model_class.__name__}")
             else:
                 logger.info(f"Training begun for {model_class.__name__}\n")
-                single = model_placeholder.single()
 
-                ############################################
-                best_model_loss = single["loss"]
-                best_model_params = single["params"]
-                best_model_results = single["test_results"]
-                ############################################
+            outcome = runner.run(data_test, base.base_namespace, model_base, model_class, test_fold_index)
+            best_eval = outcome.best_eval
 
-                # aggiunta a lista performance test
-                test_results.append(single)
-                test_trials.append(single)
-                all_trials[key].append([single])
+            ############################################
+            best_model_loss = best_eval["loss"]
+            best_model_params = best_eval["params"]
+            best_model_results = best_eval["test_results"]
+            ############################################
+
+            # aggiunta a lista performance test
+            test_results.append(best_eval)
+            if outcome.trials is not None:
+                test_trials.append(outcome.trials)
+                all_trials[key].append(outcome.all_trial_results)
+                logger.info(f"Tuning ended for {model_class.__name__}")
+            else:
+                test_trials.append(best_eval)
+                all_trials[key].append(outcome.all_trial_results)
                 logger.info(f"Training ended for {model_class.__name__}")
 
             logger.info(f"Loss:\t{best_model_loss}")
@@ -146,7 +118,7 @@ def run_experiment(config_path: str = '', config_overrides: Optional[List[str]] 
         res_handler.add_oneshot_recommender(**test_results[min_val])
 
         if isinstance(model_base, tuple):
-            hyper_handler.add_trials(test_trials[min_val])
+            res_handler.add_trials(test_trials[min_val])
         all_trials[key] = all_trials[key][min_val]
 
     # res_handler.save_results(output=base.base_namespace.path_output_rec_performance)
@@ -209,7 +181,9 @@ def config_test(builder, base):
         base.base_namespace.evaluation.relevance_threshold = getattr(base.base_namespace.evaluation,
                                                                      "relevance_threshold", 0)
         res_handler = ResultHandler(rel_threshold=base.base_namespace.evaluation.relevance_threshold)
-        hyper_handler = HyperParameterStudy(rel_threshold=base.base_namespace.evaluation.relevance_threshold)
+        rstate = np.random.default_rng(seed=getattr(base.base_namespace, "random_seed", 42))
+        engine = ho.HyperOptEngine(rstate=rstate)
+        runner = ho.HyperoptRunner(engine)
         dataloader_class = getattr(importlib.import_module("elliot.dataset"),
                                    base.base_namespace.data_config.dataloader)
         dataloader = dataloader_class(config=base.base_namespace)
@@ -217,46 +191,24 @@ def config_test(builder, base):
         for key, model_base in builder.models():
             test_results = []
             test_trials = []
-            for data_test in data_test_list:
-                if key.startswith("external."):
-                    spec = importlib.util.spec_from_file_location(
-                        "external",
-                        path_relative(base.base_namespace.external_models_path, here)
-                    )
-                    external = importlib.util.module_from_spec(spec)
-                    sys.modules[spec.name] = external
-                    spec.loader.exec_module(external)
-                    model_class = getattr(importlib.import_module("external"), key.split(".", 1)[1])
-                else:
-                    model_class = getattr(importlib.import_module("elliot.recommender"), key)
+            for test_fold_index, data_test in enumerate(data_test_list):
+                model_class = resolve_model_class(key, base.base_namespace, here)
 
                 model_base_mock = model_base
                 model_base_mock = _reset_verbose_option(model_base_mock)
-                model_placeholder = ho.ModelCoordinator(data_test, base.base_namespace, model_base_mock, model_class)
-                if isinstance(model_base, tuple):
-                    trials = Trials()
-                    fmin(model_placeholder.objective,
-                         space=model_base_mock[1],
-                         algo=model_base_mock[3],
-                         trials=trials,
-                         rstate=_rstate,
-                         max_evals=model_base_mock[2])
 
-                    min_val = np.argmin([i["result"]["loss"] for i in trials._trials])
+                outcome = runner.run(data_test, base.base_namespace, model_base_mock, model_class, test_fold_index)
 
-                    test_results.append(trials._trials[min_val]["result"])
-                    test_trials.append(trials)
-                else:
-                    single = model_placeholder.single()
-
-                    test_results.append(single)
+                test_results.append(outcome.best_eval)
+                if outcome.trials is not None:
+                    test_trials.append(outcome.trials)
 
             min_val = np.argmin([i["loss"] for i in test_results])
 
             res_handler.add_oneshot_recommender(**test_results[min_val])
 
             if isinstance(model_base, tuple):
-                hyper_handler.add_trials(test_trials[min_val])
+                res_handler.add_trials(test_trials[min_val])
         logger.info("End config test without issues")
     base.base_namespace.config_test = False
 

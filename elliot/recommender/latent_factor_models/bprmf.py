@@ -9,10 +9,11 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
 import numpy as np
 import torch
+from scipy.special import expit
 
 from elliot.dataset.samplers import PairWiseSampler
 from elliot.recommender.base_recommender import Recommender
-from elliot.recommender.init import normal_init
+from elliot.recommender.init import normal_init, xavier_uniform_init
 
 
 class BPRMF(Recommender):
@@ -37,9 +38,9 @@ class BPRMF(Recommender):
         self._global_bias = 0
 
         # Init embedding weights
-        self._modules = [self._user_factors, self._item_factors, self._user_bias, self._item_bias]
-        self._bias = [self._user_bias, self._item_bias]
-        self.apply(normal_init)
+        self.modules = [self._user_factors, self._item_factors, self._user_bias, self._item_bias]
+        self.bias = [self._user_bias, self._item_bias]
+        self.apply(xavier_uniform_init)
 
         self.params_to_save = ['_user_bias', '_item_bias', '_user_factors', '_item_factors']
 
@@ -49,6 +50,10 @@ class BPRMF(Recommender):
 
     def train_step(self, batch, *args):
         users, pos_items, neg_items = [b.numpy() for b in batch]
+        if not len(users):
+            return 0.0
+
+        batch_loss = 0.0
 
         for u, i, j in zip(users, pos_items, neg_items):
             # Extract embeddings
@@ -58,15 +63,22 @@ class BPRMF(Recommender):
             b_i = self._item_bias[i]
             b_j = self._item_bias[j]
 
-            # Compute scores difference
-            x_ui = self._user_factors[u] @ self._item_factors[i] + self._item_bias[i]
-            x_uj = self._user_factors[u] @ self._item_factors[j] + self._item_bias[j]
-            x_uij = x_ui - x_uj
+            # Compute scores difference (avoid inf - inf)
+            x_uij = u_factors @ (i_factors - j_factors) + (b_i - b_j)
 
             # BPR loss
-            z = 1 / (1 + np.exp(x_uij))
+            z = expit(-x_uij)
 
             lr = self.learning_rate
+
+            # Accumulate loss (logistic) + regularization
+            batch_loss += np.logaddexp(0, -x_uij)
+            batch_loss += 0.5 * (
+                self.lambda_user * np.sum(u_factors ** 2) +
+                self.lambda_pos_i * np.sum(i_factors ** 2) +
+                self.lambda_neg_i * np.sum(j_factors ** 2) +
+                self.lambda_bias * (b_i ** 2 + b_j ** 2)
+            )
 
             # Bias updates
             self._item_bias[i] += lr * (z - self.lambda_bias * b_i)
@@ -84,7 +96,7 @@ class BPRMF(Recommender):
             delta_j = -u_factors * z - self.lambda_neg_i * j_factors
             self._item_factors[j] += lr * delta_j
 
-        return 0
+        return batch_loss / float(len(users))
 
     def predict_full(self, user_indices):
         user_indices = user_indices.numpy()

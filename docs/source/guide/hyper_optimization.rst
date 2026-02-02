@@ -1,7 +1,7 @@
 Hyperparameter Optimization
 ================================
 
-Elliot provides hyperparameter tuning optimization integrating the functionalities of the **HyperOpt** library and extending it with exhaustive grid search.
+Elliot provides hyperparameter tuning optimization integrating the functionalities of the **HyperOpt** library and supporting exhaustive grid search for discrete choices.
 
 Before continuing, let us recall how to include a recommendation system into an experiment:
 
@@ -29,11 +29,11 @@ Before continuing, let us recall how to include a recommendation system into an 
 As we can observe, the *meta* section contains two fields that are related to hyperparameter optimization: ``hyper_max_evals``, and ``hyper_opt_alg``.
 
 
-``hyper_opt_alg`` is a **string** field that defines the hyperparameter tuning strategy
+``hyper_opt_alg`` is a **string** field that defines the hyperparameter tuning strategy.
 
 ``hyper_opt_alg`` can assume one of the following values: *grid*, *tpe, *atpe*, *rand*, *mix*, and *anneal*.
 
-*grid* corresponds to exhaustive grid search
+*grid* corresponds to exhaustive grid search (discrete choices only)
 
 *tpe* stands for Tree of Parzen Estimators, a type of Bayesian Optimization, see the `paper <https://papers.nips.cc/paper/4443-algorithms-for-hyper-parameter-optimization.pdf>`_
 
@@ -47,7 +47,9 @@ As we can observe, the *meta* section contains two fields that are related to hy
 
 
 
-``hyper_max_evals`` is an **int** field that, where applicable (all strategies but *grid*), defines the number of samples to consider for hyperparameter evaluation
+``hyper_max_evals`` is an **int** field that defines the number of samples to consider for hyperparameter evaluation.
+It is **required** when using Hyperopt distributions (e.g., ``uniform``, ``loguniform``). For *grid*, if omitted, Elliot
+evaluates the full grid; if provided, it must be greater than or equal to the grid size.
 
 
 Once we choose the search strategy, we need to define the search space.
@@ -96,8 +98,8 @@ An example of the syntax to define a search with *loguniform* for the learning r
           reg_b:                0
           gaussian_variance:    0.1
 
-Finally, Elliot provides a shortcut to perform an exhaustive grid search.
-We can avoid inserting ``hyper_opt_alg`` and ``hyper_max_evals`` fields and we directly insert the lists of possible values for the parameters to optimize:
+Finally, to perform an exhaustive grid search, set ``hyper_opt_alg: grid`` and provide discrete value lists for the
+parameters to optimize:
 
 .. code:: yaml
 
@@ -105,6 +107,7 @@ We can avoid inserting ``hyper_opt_alg`` and ``hyper_max_evals`` fields and we d
       models:
         PMF:
           meta:
+            hyper_opt_alg: grid
             validation_rate: 1
             verbose: True
             save_weights: True
@@ -118,4 +121,7 @@ We can avoid inserting ``hyper_opt_alg`` and ``hyper_max_evals`` fields and we d
           reg_b:                0
           gaussian_variance:    0.1
 
-In this case, Elliot recognizes that hyperparameter optimization is needed and automatically performs the grid search.
+In this case, Elliot performs an exhaustive grid search over the discrete combinations.
+
+Note: Hyperopt trials are evaluated on validation metrics. After the search, the best configuration is retrained and
+evaluated on the test split.
