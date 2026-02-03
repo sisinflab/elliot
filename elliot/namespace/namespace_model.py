@@ -10,6 +10,7 @@ __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 from typing import Any, Dict, List, Optional
 from types import SimpleNamespace
 import copy
+import fnmatch
 import os
 import re
 
@@ -111,7 +112,9 @@ class ConfigContext:
 class NameSpaceModel:
     def __init__(self, config: Dict[str, Any], base_folder_path_elliot: str, base_folder_path_config: str):
         self.context = ConfigContext(config, base_folder_path_elliot, base_folder_path_config)
-        os.environ['CUDA_VISIBLE_DEVICES'] = str(self.context.experiment.get(_gpu, -1))
+        gpu_value = self.context.experiment.get(_gpu, None)
+        if gpu_value is not None:
+            os.environ['CUDA_VISIBLE_DEVICES'] = str(gpu_value)
 
     @property
     def base_namespace(self) -> SimpleNamespace:
@@ -273,6 +276,11 @@ class NameSpaceModel:
         paired_ttest = evaluation_cfg.get("paired_ttest", {})
         wilcoxon_test = evaluation_cfg.get("wilcoxon_test", {})
 
+        if evaluation_cfg.get("user_filter_file"):
+            evaluation_cfg["user_filter_file"] = resolver.resolve_safe(
+                evaluation_cfg["user_filter_file"], dataset_name
+            )
+
         for complex_metric in complex_metrics:
             complex_metric.update({k: resolver.resolve_safe(v, dataset_name) for k, v in complex_metric.items()})
 
@@ -369,10 +377,29 @@ class NameSpaceModel:
             folder_path = getattr(model_name_space, "folder", None)
             if not folder_path:
                 raise Exception("RecommendationFolder meta-model must expose the folder field.")
-            onlyfiles = [f for f in list_dir(folder_path) if is_file(path_joiner(folder_path, f))]
-            for file_ in onlyfiles:
+            onlyfiles = [f for f in list_dir(folder_path) if is_file(f)]
+
+            patterns = getattr(model_name_space, "pattern", None)
+            if patterns:
+                patterns = patterns if isinstance(patterns, list) else [patterns]
+                onlyfiles = [f for f in onlyfiles if any(fnmatch.fnmatch(f, p) for p in patterns)]
+
+            extensions = getattr(model_name_space, "extensions", None)
+            if extensions is None:
+                extensions = getattr(model_name_space, "extension", None)
+            if extensions:
+                extensions = extensions if isinstance(extensions, list) else [extensions]
+                normalized = set()
+                for ext in extensions:
+                    ext = ext.lower()
+                    if not ext.startswith("."):
+                        ext = f".{ext}"
+                    normalized.add(ext)
+                onlyfiles = [f for f in onlyfiles if os.path.splitext(f)[1].lower() in normalized]
+
+            for file_ in sorted(onlyfiles):
                 local_model_name_space = copy.copy(model_name_space)
-                local_model_name_space.path = path_joiner(folder_path, file_)
+                local_model_name_space.path = path_joiner(file_)
                 yield "ProxyRecommender", local_model_name_space
             return
 

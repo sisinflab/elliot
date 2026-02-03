@@ -12,6 +12,7 @@ similaripy==0.4.0
 tensorflow>=2.19.0
 torch>=2.7.1
 torch_geometric>=2.6.1
+lightgbm>=4.6.0fg
 -f https://data.pyg.org/whl/torch-2.7.0+cpu.html
 pyg_lib
 torch_scatter

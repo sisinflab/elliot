@@ -29,6 +29,7 @@ import numpy as np
 
 import elliot.dataset.dataset as ds
 from elliot.utils import logging
+from elliot.utils.folder import path_absolute, check_path
 from . import metrics
 from . import popularity_utils
 from . import relevance
@@ -61,20 +62,23 @@ class Evaluator(object):
         #                                                                                        for m in self._complex_metrics]:
         #     raise Exception("Validation metric must be in list of general metrics")
         self._test = data.get_test_dict()
+        self._val = data.get_val_dict() if data.get_val_dict() else None
+        self._eval_users = self._load_eval_users()
+        if self._eval_users is not None:
+            self._apply_user_filter()
 
         self._pop = popularity_utils.Popularity(self._data)
 
         self._evaluation_objects = SimpleNamespace(relevance=relevance.Relevance(self._test, self._rel_threshold),
                                                    pop=self._pop,
                                                    num_items=self._data.num_items,
-                                                   data = self._data,
+                                                   data=self._data,
                                                    additional_metrics=self._complex_metrics)
-        if data.get_val_dict():
-            self._val = data.get_val_dict()
+        if self._val is not None:
             self._val_evaluation_objects = SimpleNamespace(relevance=relevance.Relevance(self._val, self._rel_threshold),
                                                            pop=self._pop,
                                                            num_items=self._data.num_items,
-                                                           data = self._data,
+                                                           data=self._data,
                                                            additional_metrics=self._complex_metrics)
         self._needed_recommendations = self._compute_needed_recommendations()
 
@@ -128,6 +132,125 @@ class Evaluator(object):
                 (self._test if hasattr(self, '_test') else None,
                  self._evaluation_objects if hasattr(self, '_evaluation_objects') else None)
                 ]
+
+    def _load_eval_users(self):
+        eval_cfg = getattr(self._data.config, "evaluation", None)
+        if eval_cfg is None:
+            return None
+        file_path = getattr(eval_cfg, "user_filter_file", None)
+        if not file_path:
+            return None
+
+        file_path = path_absolute(file_path)
+        if not check_path(file_path):
+            raise FileNotFoundError(f"User filter file not found: {file_path}")
+
+        sep = getattr(eval_cfg, "user_filter_sep", None)
+        id_space = str(getattr(eval_cfg, "user_filter_id_space", "public")).strip().lower()
+
+        raw_users = []
+        with open(file_path, "r", encoding="utf-8") as handle:
+            for line in handle:
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                token = line
+                if sep:
+                    token = line.split(sep)[0]
+                elif "\t" in line:
+                    token = line.split("\t")[0]
+                elif "," in line:
+                    token = line.split(",")[0]
+                else:
+                    token = line.split()[0]
+                token = token.strip()
+                if token:
+                    raw_users.append(token)
+
+        if not raw_users:
+            self.logger.warning("User filter file is empty; skipping user filtering.")
+            return None
+
+        if id_space in {"private", "internal"}:
+            users, _ = self._data.get_inverse_mappings()
+            mapped = set()
+            invalid = 0
+            for token in raw_users:
+                try:
+                    idx = int(token)
+                except (TypeError, ValueError):
+                    invalid += 1
+                    continue
+                if 0 <= idx < len(users):
+                    mapped.add(users[idx])
+                else:
+                    invalid += 1
+            if invalid:
+                self.logger.warning(
+                    "Dropped invalid private user ids from filter list",
+                    extra={"context": {"count": invalid}}
+                )
+            return mapped if mapped else None
+
+        target_type = self._infer_user_id_type()
+        casted = set()
+        invalid = 0
+        for token in raw_users:
+            try:
+                casted.add(self._cast_user_id(token, target_type))
+            except (TypeError, ValueError):
+                invalid += 1
+        if invalid:
+            self.logger.warning(
+                "Dropped invalid public user ids from filter list",
+                extra={"context": {"count": invalid}}
+            )
+
+        if not casted:
+            self.logger.warning("No valid users found in user filter file.")
+            return None
+
+        known_users, _ = self._data.get_users_items()
+        known_set = set(known_users) if known_users else None
+        if known_set is not None:
+            filtered = casted & known_set
+            dropped = len(casted) - len(filtered)
+            if dropped:
+                self.logger.warning(
+                    "Dropped unknown users from filter list",
+                    extra={"context": {"count": dropped}}
+                )
+            return filtered if filtered else None
+
+        return casted
+
+    def _apply_user_filter(self):
+        if not self._eval_users:
+            return
+        self._test = {u: items for u, items in self._test.items() if u in self._eval_users}
+        if self._val is not None:
+            self._val = {u: items for u, items in self._val.items() if u in self._eval_users}
+        self.logger.info(
+            "Evaluation user filter applied",
+            extra={"context": {"users": len(self._eval_users)}})
+
+    def _infer_user_id_type(self):
+        if self._test:
+            return type(next(iter(self._test.keys())))
+        if self._val:
+            return type(next(iter(self._val.keys())))
+        users, _ = self._data.get_users_items()
+        if users:
+            return type(users[0])
+        return str
+
+    @staticmethod
+    def _cast_user_id(token, target_type):
+        if target_type in (int, np.int32, np.int64) or np.issubdtype(target_type, np.integer):
+            return int(float(token))
+        if target_type in (float, np.float32, np.float64) or np.issubdtype(target_type, np.floating):
+            return float(token)
+        return str(token)
 
     def _process_test_data(self, recommendations, test_data, eval_objs, val_test):
         if (not test_data) or (not eval_objs):

@@ -10,7 +10,7 @@ from torch_sparse import SparseTensor
 from abc import ABC, abstractmethod
 
 from elliot.recommender.init import zeros_init
-from elliot.recommender.utils import ModelType, device
+from elliot.recommender.utils import ModelType, get_device
 from elliot.utils.config import build_recommender_config
 
 
@@ -150,7 +150,7 @@ class GeneralRecommender(nn.Module, AbstractRecommender):
         AbstractRecommender.__init__(self, data, params, seed, logger)
         super(GeneralRecommender, self).__init__()
         self.bias = []
-        self._device = device
+        self._device = get_device()
 
     def set_seed(self, seed: int):
         """Set random seed for reproducibility.

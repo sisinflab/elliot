@@ -268,6 +268,19 @@ class AbstractTrainer(ABC):
         return proc_batch
 
     def _get_top_k(self, users_recs, k, mask, item_indices=None):
+        device = users_recs.device
+        if item_indices is not None and item_indices.device != device:
+            item_indices = item_indices.to(device)
+        if isinstance(mask, tuple):
+            mask = (
+                torch.as_tensor(mask[0], device=device),
+                torch.as_tensor(mask[1], device=device),
+            )
+        elif isinstance(mask, np.ndarray):
+            mask = torch.as_tensor(mask, device=device)
+        elif isinstance(mask, torch.Tensor) and mask.device != device:
+            mask = mask.to(device)
+
         users_recs[mask] = -torch.inf
 
         k = min(k, users_recs.shape[1])
@@ -276,7 +289,7 @@ class AbstractTrainer(ABC):
         if item_indices is not None:
             i = item_indices.gather(1, i)
 
-        return v.numpy(), i.numpy()
+        return v.detach().cpu().numpy(), i.detach().cpu().numpy()
 
     def restore_weights(self):
         try:

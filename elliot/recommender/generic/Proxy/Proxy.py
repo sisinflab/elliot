@@ -1,95 +1,409 @@
 import ntpath
+import os
+from typing import Iterable, Optional, Tuple, Union
+
 import numpy as np
 import pandas as pd
-from tqdm import tqdm
+import torch
 
-from elliot.recommender.base_recommender_model import BaseRecommenderModel
-from elliot.recommender.recommender_utils_mixin import RecMixin
-from elliot.recommender.base_recommender_model import init_charger
+from elliot.recommender.base_recommender import Recommender
 
 
-class ProxyRecommender(RecMixin, BaseRecommenderModel):
-    @init_charger
-    def __init__(self, data, config, params, *args, **kwargs):
+class ProxyRecommender(Recommender):
+    path: str = ""
+    sep: str = "\t"
+    header: Union[bool, int] = False
+    user_col: Optional[Union[int, str]] = None
+    item_col: Optional[Union[int, str]] = None
+    score_col: Optional[Union[int, str]] = None
+    id_space: str = "public"
+    deduplicate: bool = True
+    filter_seen: bool = True
+    strict: bool = False
+    model_name: Optional[str] = None
+
+    def __init__(self, data, params, seed, logger):
         """
         Create a Proxy recommender to evaluate already generated recommendations.
         :param name: data loader object
         :param path: path to the directory rec. results
         :param args: parameters
         """
-        self._random = np.random
+        super().__init__(data, params, seed, logger)
+        if not self.path:
+            raise ValueError("ProxyRecommender requires 'path' parameter.")
 
-        self._params_list = [
-            ("_name", "name", "name", "", None, None),
-            ("_path", "path", "path", "", None, None)
-        ]
-        self.autoset_params()
-        if not self._name:
-            self._name = ntpath.basename(self._path).rsplit(".",1)[0]
+        self._model_name = self.model_name or ntpath.basename(self.path).rsplit(".", 1)[0]
+        self._public_user_map, self._public_item_map = self._resolve_public_maps()
+        self._private_user_map, self._private_item_map = self._resolve_private_maps()
+        self._user_id_type, self._item_id_type = self._infer_public_id_types()
+        self._train_dict = self._get_dict("train", private=True)
+        self._val_dict = self._get_dict("val", private=True)
+        self._test_dict = self._get_dict("test", private=True)
+
+        self._seen_items = self._build_seen_items(self._train_dict)
+        self._recommendations = self.read_recommendations(self.path)
+        self._rec_scores = {user: dict(recs) for user, recs in self._recommendations.items()}
 
     @property
     def name(self):
-        return self._name
+        return self._model_name
 
-    def train(self):
-        self.logger.info("Loading recommendations")
-        self._recommendations = self.read_recommendations(self._path)
+    @property
+    def name_param(self):
+        return ""
 
-        self.logger.info("Evaluating recommendations")
-        self.evaluate()
+    def get_training_dataloader(self, batch_size):
+        yield None
 
-    def get_recommendations(self, top_k):
-        predictions_top_k_val = {}
-        predictions_top_k_test = {}
+    def train_step(self, batch, *args):
+        return 0.0
 
-        recs_val, recs_test = self.process_protocol(top_k)
+    def predict_full(self, user_indices):
+        num_users = user_indices.shape[0]
+        scores = torch.full((num_users, self._num_items), -torch.inf, dtype=torch.float32)
+        user_list = user_indices.tolist()
 
-        predictions_top_k_val.update(recs_val)
-        predictions_top_k_test.update(recs_test)
+        for row, user in enumerate(user_list):
+            user_recs = self._recommendations.get(user)
+            if not user_recs:
+                continue
+            seen = self._seen_items.get(user) if self.filter_seen else None
+            for item, score in user_recs:
+                if seen and item in seen:
+                    continue
+                scores[row, item] = score
 
-        return predictions_top_k_val, predictions_top_k_test
+        return scores
 
-    def get_single_recommendation(self, mask, k):
+    def predict_sampled(self, user_indices, item_indices):
+        scores = torch.full(item_indices.shape, -torch.inf, dtype=torch.float32)
+        user_list = user_indices.tolist()
+        item_list = item_indices.tolist()
 
-        # nonzero = mask.nonzero()
-        # zero = np.where(mask==False)
-        candidate_items = {}
-        setItem = set(range(mask.shape[1]))
-        for user in tqdm(range(mask.shape[0])):
-            itemFalse = set(np.where(mask[user,:]==False)[0].tolist())
-            itemTrue = list(setItem.difference(itemFalse))
-            candidate_items[self._data.private_users[user]] = [self._data.private_items[item] for item in itemTrue]
-            # [candidate_items.setdefault(self._data.private_users[user], list()).add(
-                        # self._data.private_items[item]) for item in itemTrue]
-            # for item in range(mask.shape[1]):
-            #     if item in itemFalse:
-            #         continue
-            #     else:
-            #         candidate_items.setdefault(self._data.private_users[user], set()).add(
-            #             self._data.private_items[item])
-        # [candidate_items.setdefault(self._data.private_users[user], set()).add(self._data.private_items[item]) for user, item in zip(*nonzero)]
-        recs = {}
-        for u, user_recs in self._recommendations.items():
-            user_cleaned_recs = []
-            user_candidate_items = set(candidate_items[u])
-            for p, (item, prediction) in enumerate(user_recs):
-                if p >= k:
+        for row, user in enumerate(user_list):
+            user_scores = self._rec_scores.get(user, {})
+            if not user_scores:
+                continue
+            seen = self._seen_items.get(user) if self.filter_seen else None
+            for col, item in enumerate(item_list[row]):
+                if item == -1:
+                    continue
+                if seen and item in seen:
+                    continue
+                score = user_scores.get(item)
+                if score is not None:
+                    scores[row, col] = score
+
+        return scores
+
+    def get_model_state(self):
+        return {}
+
+    def set_model_state(self, checkpoint):
+        return
+
+    def read_recommendations(self, path: str, top_k: Optional[int] = None):
+        if not path or not os.path.isfile(path):
+            raise FileNotFoundError(f"Recommendation file not found: {path}")
+
+        header = self._resolve_header(self.header)
+        data = pd.read_csv(path, sep=self.sep, header=header, dtype=str)
+
+        user_col = self._resolve_column(self.user_col, 0)
+        item_col = self._resolve_column(self.item_col, 1)
+        score_col = self._resolve_column(self.score_col, 2)
+
+        user_col = self._normalize_column_ref(data, user_col)
+        item_col = self._normalize_column_ref(data, item_col)
+        score_col = self._normalize_column_ref(data, score_col)
+
+        data, score_col = self._select_columns(data, user_col, item_col, score_col)
+
+        data = data.dropna(subset=["userId", "itemId"]).copy()
+        data["userId"] = data["userId"].str.strip()
+        data["itemId"] = data["itemId"].str.strip()
+        data = data[(data["userId"] != "") & (data["itemId"] != "")]
+
+        data = self._map_ids(data)
+        data = self._normalize_predictions(data)
+
+        if data.empty:
+            self.logger.warning("No recommendations loaded after normalization")
+            return {}
+
+        data = self._map_internal_ids(data)
+
+        if self.deduplicate:
+            before = len(data)
+            data = data.sort_values("prediction", ascending=False, kind="mergesort")
+            data = data.drop_duplicates(subset=["user_idx", "item_idx"], keep="first")
+            dropped = before - len(data)
+            if dropped:
+                self.logger.info(
+                    "Dropped duplicate user-item pairs",
+                    extra={"context": {"count": dropped}}
+                )
+
+        data = data.sort_values(["user_idx", "prediction"], ascending=[True, False], kind="mergesort")
+        if top_k is not None:
+            data = data.groupby("user_idx", sort=False).head(top_k)
+
+        recs = {
+            int(user): list(group[["item_idx", "prediction"]].itertuples(index=False, name=None))
+            for user, group in data.groupby("user_idx", sort=False)
+        }
+        self.logger.info(
+            "Recommendations loaded",
+            extra={"context": {"users": len(recs), "rows": len(data)}}
+        )
+        return recs
+
+    def _resolve_public_maps(self) -> Tuple[dict, dict]:
+        if hasattr(self._data, "public_users") and hasattr(self._data, "public_items"):
+            return self._data.public_users, self._data.public_items
+        if hasattr(self._data, "get_mappings"):
+            return self._data.get_mappings()
+        if hasattr(self._data, "_u_map") and hasattr(self._data, "_i_map"):
+            return self._data._u_map, self._data._i_map
+        return {}, {}
+
+    def _resolve_private_maps(self) -> Tuple[Iterable, Iterable]:
+        if hasattr(self._data, "private_users") and hasattr(self._data, "private_items"):
+            return self._data.private_users, self._data.private_items
+        if hasattr(self._data, "get_inverse_mappings"):
+            return self._data.get_inverse_mappings()
+        if hasattr(self._data, "_users") and hasattr(self._data, "_items"):
+            return self._data._users, self._data._items
+        return [], []
+
+    def _infer_public_id_types(self) -> Tuple[type, type]:
+        user_type = str
+        item_type = str
+        if self._public_user_map:
+            user_type = type(next(iter(self._public_user_map.keys())))
+        elif self._train_dict:
+            user_type = type(next(iter(self._train_dict.keys())))
+
+        if self._public_item_map:
+            item_type = type(next(iter(self._public_item_map.keys())))
+        elif self._train_dict:
+            for items in self._train_dict.values():
+                if items:
+                    if isinstance(items, dict):
+                        item_type = type(next(iter(items.keys())))
+                    else:
+                        item_type = type(next(iter(items)))
                     break
-                if item in user_candidate_items:
-                    user_cleaned_recs.append((item, prediction))
-            recs[u] = user_cleaned_recs
-        return recs
 
-    def read_recommendations(self, path):
-        recs = dict()
-        column_names = ["userId", "itemId", "prediction"]
-        data = pd.read_csv(path, sep="\t", header=None, names=column_names)
-        data = data.sort_values(by='prediction', ascending=False)
-        user_groups = data.groupby(['userId'])
-        # user_groups = user_groups.sort_values(by='prediction', ascending=False)
-        # recs = {name: list(group[['itemId', 'prediction']].itertuples(index=False, name=None)) for name, group in tqdm(user_groups)}
-        for name, group in tqdm(user_groups):
-            #df.sort_values(by=['col1'])
-            recs[name] = list(group[['itemId', 'prediction']].itertuples(index=False, name=None))#data.loc[group.index][['itemId', 'prediction']].apply(tuple, axis=1).to_list()
-            # recs[name] = sorted(data.loc[group.index][['itemId', 'prediction']].apply(tuple, axis=1).to_list(), key=lambda x: x[1], reverse=True)
-        return recs
+        return user_type, item_type
+
+    def _get_dict(self, scope: str, private: bool = False):
+        getter = getattr(self._data, f"get_{scope}_dict", None)
+        if callable(getter):
+            try:
+                return getter(private=private)
+            except TypeError:
+                return getter()
+        return getattr(self._data, f"{scope}_dict", None) or getattr(self._data, f"_{scope}_dict", None)
+
+    def _resolve_header(self, header_value):
+        if isinstance(header_value, bool):
+            return 0 if header_value else None
+        if header_value is None:
+            return None
+        if isinstance(header_value, int):
+            return header_value
+        header_str = str(header_value).strip().lower()
+        if header_str in {"true", "yes", "1"}:
+            return 0
+        if header_str in {"false", "no", "0"}:
+            return None
+        try:
+            return int(header_str)
+        except ValueError:
+            return None
+
+    def _resolve_column(self, col_value, default_idx):
+        if col_value is None:
+            return default_idx
+        if isinstance(col_value, str) and col_value.isdigit():
+            return int(col_value)
+        return col_value
+
+    def _normalize_column_ref(self, data: pd.DataFrame, col_value):
+        if col_value is None:
+            return None
+        if isinstance(col_value, int) and col_value not in data.columns:
+            if 0 <= col_value < data.shape[1]:
+                return data.columns[col_value]
+        return col_value
+
+    def _select_columns(self, data: pd.DataFrame, user_col, item_col, score_col):
+        missing = [col for col in (user_col, item_col) if col not in data.columns]
+        if missing:
+            if self.strict:
+                raise ValueError(f"Missing columns in recommendation file: {missing}")
+            self.logger.warning(
+                "Missing columns, falling back to default indices",
+                extra={"context": {"missing": missing}}
+            )
+            user_col, item_col, score_col = 0, 1, 2
+            user_col = self._normalize_column_ref(data, user_col)
+            item_col = self._normalize_column_ref(data, item_col)
+            score_col = self._normalize_column_ref(data, score_col)
+            missing = [col for col in (user_col, item_col) if col not in data.columns]
+            if missing:
+                raise ValueError(f"Missing required columns in recommendation file: {missing}")
+
+        if score_col not in data.columns:
+            if self.strict:
+                raise ValueError("Missing score column in recommendation file.")
+            score_col = None
+
+        cols = [user_col, item_col] + ([score_col] if score_col is not None else [])
+        data = data[cols].copy()
+        data.columns = ["userId", "itemId"] + (["prediction"] if score_col is not None else [])
+        return data, score_col
+
+    def _map_ids(self, data: pd.DataFrame) -> pd.DataFrame:
+        id_space = str(self.id_space).strip().lower()
+        if id_space in {"private", "internal"}:
+            data = self._map_private_ids(data, "userId", self._private_user_map, "user")
+            data = self._map_private_ids(data, "itemId", self._private_item_map, "item")
+        else:
+            data = self._coerce_public_ids(data, "userId", self._user_id_type, "user")
+            data = self._coerce_public_ids(data, "itemId", self._item_id_type, "item")
+            data = self._filter_unknown_public_ids(data)
+        return data
+
+    def _map_private_ids(self, data: pd.DataFrame, col: str, mapping: Iterable, label: str) -> pd.DataFrame:
+        series = pd.to_numeric(data[col], errors="coerce")
+        mask = series.notna()
+        if mask.sum() < len(data):
+            self.logger.warning(
+                f"Dropping rows with invalid {label} ids",
+                extra={"context": {"count": int(len(data) - mask.sum())}}
+            )
+        data = data.loc[mask].copy()
+        series = series.loc[mask].astype(int)
+
+        if isinstance(mapping, dict):
+            data[col] = series.map(mapping)
+            before = len(data)
+            data = data.dropna(subset=[col])
+            dropped = before - len(data)
+            if dropped:
+                self.logger.warning(
+                    f"Dropping rows with unknown {label} ids",
+                    extra={"context": {"count": dropped}}
+                )
+            return data
+
+        mapping_arr = np.asarray(mapping, dtype=object)
+        valid = (series >= 0) & (series < len(mapping_arr))
+        if valid.sum() < len(series):
+            self.logger.warning(
+                f"Dropping rows with unknown {label} ids",
+                extra={"context": {"count": int(len(series) - valid.sum())}}
+            )
+        data = data.loc[valid].copy()
+        data[col] = mapping_arr[series.loc[valid].to_numpy()]
+        return data
+
+    def _coerce_public_ids(self, data: pd.DataFrame, col: str, target_type: type, label: str) -> pd.DataFrame:
+        if target_type in (int, np.int32, np.int64) or np.issubdtype(target_type, np.integer):
+            series = pd.to_numeric(data[col], errors="coerce")
+            mask = series.notna()
+            if mask.sum() < len(data):
+                self.logger.warning(
+                    f"Dropping rows with invalid {label} ids",
+                    extra={"context": {"count": int(len(data) - mask.sum())}}
+                )
+            data = data.loc[mask].copy()
+            data[col] = series.loc[mask].astype(int)
+            return data
+        if target_type in (float, np.float32, np.float64) or np.issubdtype(target_type, np.floating):
+            series = pd.to_numeric(data[col], errors="coerce")
+            mask = series.notna()
+            if mask.sum() < len(data):
+                self.logger.warning(
+                    f"Dropping rows with invalid {label} ids",
+                    extra={"context": {"count": int(len(data) - mask.sum())}}
+                )
+            data = data.loc[mask].copy()
+            data[col] = series.loc[mask].astype(float)
+            return data
+
+        data[col] = data[col].astype(str)
+        return data
+
+    def _filter_unknown_public_ids(self, data: pd.DataFrame) -> pd.DataFrame:
+        if self._public_user_map:
+            valid_users = data["userId"].isin(self._public_user_map)
+            if valid_users.sum() < len(data):
+                self.logger.warning(
+                    "Dropping rows with unknown users",
+                    extra={"context": {"count": int(len(data) - valid_users.sum())}}
+                )
+            data = data.loc[valid_users].copy()
+        if self._public_item_map:
+            valid_items = data["itemId"].isin(self._public_item_map)
+            if valid_items.sum() < len(data):
+                self.logger.warning(
+                    "Dropping rows with unknown items",
+                    extra={"context": {"count": int(len(data) - valid_items.sum())}}
+                )
+            data = data.loc[valid_items].copy()
+        return data
+
+    def _normalize_predictions(self, data: pd.DataFrame) -> pd.DataFrame:
+        if "prediction" not in data.columns:
+            data["prediction"] = -data.groupby("userId", sort=False).cumcount().astype(float)
+            return data
+
+        series = pd.to_numeric(data["prediction"], errors="coerce")
+        mask = series.notna()
+        if mask.sum() < len(data):
+            self.logger.warning(
+                "Dropping rows with invalid prediction values",
+                extra={"context": {"count": int(len(data) - mask.sum())}}
+            )
+        data = data.loc[mask].copy()
+        data["prediction"] = series.loc[mask].astype(float)
+        return data
+
+    def _map_internal_ids(self, data: pd.DataFrame) -> pd.DataFrame:
+        if self._public_user_map:
+            data["user_idx"] = data["userId"].map(self._public_user_map)
+        else:
+            data["user_idx"] = pd.to_numeric(data["userId"], errors="coerce")
+        if self._public_item_map:
+            data["item_idx"] = data["itemId"].map(self._public_item_map)
+        else:
+            data["item_idx"] = pd.to_numeric(data["itemId"], errors="coerce")
+
+        before = len(data)
+        data = data.dropna(subset=["user_idx", "item_idx"]).copy()
+        dropped = before - len(data)
+        if dropped:
+            self.logger.warning(
+                "Dropping rows with unmapped ids",
+                extra={"context": {"count": dropped}}
+            )
+
+        data["user_idx"] = data["user_idx"].astype(int)
+        data["item_idx"] = data["item_idx"].astype(int)
+        return data
+
+    @staticmethod
+    def _build_seen_items(train_dict: Optional[dict]) -> dict:
+        seen = {}
+        if not train_dict:
+            return seen
+        for user, items in train_dict.items():
+            if isinstance(items, dict):
+                seen[user] = set(items.keys())
+            else:
+                seen[user] = set(items)
+        return seen

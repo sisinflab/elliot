@@ -476,6 +476,25 @@ To obtain additional evaluation summaries in this format, insert the following f
     experiment:
       print_results_as_triplets: True
 
+Save performance outputs
+"""""""""""""""""""""""""""""""""""""""""
+By default, Elliot saves performance tables at the end of the experiment. You can control which artifacts are
+written via the optional ``results`` block:
+
+.. code:: yaml
+
+    experiment:
+      results:
+        save_performance: True         # main test results tables
+        save_performance_triplets: False
+        save_fold_stats: True          # mean/std across folds (if >1 fold)
+        save_fold_stats_triplets: False
+        save_times: True               # training time table
+        save_best_models: True         # JSON with best params
+        save_trials: True              # hyperopt trials for each model
+        trials_formats: ["json", "tsv"]
+        save_statistical: False        # requires paired_ttest/wilcoxon_test in evaluation
+
 Test the config file
 """"""""""""""""""""""""""""
 Since an experiment may take a long time, a possible error in the configuration file in the last model configuration can lead to a severe waste of time.
@@ -502,6 +521,18 @@ Elliot lets the user enable GPU acceleration with Tensorflow. To select the gpu 
 If a negative value is passed, or the field is missing, the computation will take place on the CPU.
 
 Please note that the configuration of tensorflow to work with GPUs is not covered by this guide. Please refer to the Tensorflow documentation for that.
+
+For PyTorch models, the ``gpu`` field is ignored. Use ``device`` (or ``torch_device``) to select the runtime device:
+
+.. code:: yaml
+
+    experiment:
+      device: auto   # auto | cpu | cuda | cuda:0 | mps
+
+``auto`` prefers CUDA when available, then Apple ``mps`` on new Mac machines, otherwise CPU.
+You can also set ``ELLIOT_DEVICE`` as an environment variable to override the config.
+If you run on Apple Silicon and hit unsupported operations, consider setting
+``PYTORCH_ENABLE_MPS_FALLBACK=1`` to enable CPU fallback.
 
 Recommendation Model Configuration
 """""""""""""""""""""""""""""""""""""""""

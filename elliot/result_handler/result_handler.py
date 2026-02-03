@@ -6,8 +6,10 @@ import json
 import os
 from datetime import datetime
 from enum import Enum
+from types import SimpleNamespace
 
 import pandas as pd
+import numpy as np
 
 from elliot.evaluation.statistical_significance import PairedTTest, WilcoxonTest
 
@@ -43,6 +45,31 @@ class ResultHandler:
         if name is None:
             name = results[0]["params"]["name"].split("_")[0]
         self.trials[name] = results
+
+    def _normalize(self, value):
+        if isinstance(value, SimpleNamespace):
+            return {k: self._normalize(v) for k, v in vars(value).items()}
+        if isinstance(value, dict):
+            return {k: self._normalize(v) for k, v in value.items()}
+        if isinstance(value, (list, tuple)):
+            return [self._normalize(v) for v in value]
+        if isinstance(value, np.ndarray):
+            return value.tolist()
+        if isinstance(value, np.generic):
+            return value.item()
+        return value
+
+    def _to_json(self, value):
+        if value is None:
+            return None
+        return json.dumps(self._normalize(value), ensure_ascii=True)
+
+    def _is_new_recommender(self, params):
+        if isinstance(params, SimpleNamespace):
+            return False
+        if isinstance(params, dict):
+            return "meta" not in params
+        return False
 
     def _cutoffs(self, items, key):
         for entry in items:
@@ -96,6 +123,44 @@ class ResultHandler:
             f"rec_training_time_relthreshold_{self.rel_threshold}_{_timestamp()}.tsv",
         )
 
+    def save_trials(self, output="", formats=("json", "tsv")):
+        if not self.trials:
+            return
+        if isinstance(formats, str):
+            formats = [formats]
+        for model_name, trials in self.trials.items():
+            if not trials:
+                continue
+            first_params = trials[0].get("params", {}) if isinstance(trials[0], dict) else {}
+            if isinstance(first_params, SimpleNamespace):
+                first_params = vars(first_params)
+            if not self._is_new_recommender(first_params):
+                continue
+            normalized = [self._normalize(entry) for entry in trials]
+            if "json" in formats:
+                filename = f"trials_{model_name}_relthreshold_{self.rel_threshold}_{_timestamp()}.json"
+                with open(os.path.abspath(os.sep.join([output, filename])), "w", encoding="utf-8") as handle:
+                    json.dump(normalized, handle, indent=2, ensure_ascii=True)
+            if "tsv" in formats:
+                rows = []
+                for idx, entry in enumerate(normalized):
+                    rows.append({
+                        "model": model_name,
+                        "trial": idx,
+                        "loss": entry.get("loss"),
+                        "status": entry.get("status"),
+                        "val_metric": entry.get("val_metric"),
+                        "test_metric": entry.get("test_metric"),
+                        "time": self._to_json(entry.get("time")),
+                        "objective": self._to_json(entry.get("objective")),
+                        "params": self._to_json(entry.get("params")),
+                        "val_results": self._to_json(entry.get("val_results")),
+                        "test_results": self._to_json(entry.get("test_results")),
+                    })
+                info = pd.DataFrame(rows)
+                filename = f"trials_{model_name}_relthreshold_{self.rel_threshold}_{_timestamp()}.tsv"
+                info.to_csv(os.path.abspath(os.sep.join([output, filename])), sep="\t", index=False)
+
     def save_best_models(self, output="../results/", default_metric="nDCG", default_k=10):
         models = [{
             "default_validation_metric": default_metric,
@@ -103,10 +168,21 @@ class ResultHandler:
             "rel_threshold": self.rel_threshold,
         }]
         for rec, entry in self.results.items():
+            params = entry.get("params", {})
+            if isinstance(params, SimpleNamespace):
+                params = vars(params)
+            if not self._is_new_recommender(params):
+                continue
+            meta_obj = None
+            if isinstance(params, dict):
+                meta_obj = params.get("meta")
+            else:
+                meta_obj = getattr(params, "meta", None)
+            meta = self._normalize(meta_obj) if meta_obj is not None else {}
             models.append({
-                "meta": entry["params"]["meta"].__dict__,
+                "meta": meta,
                 "recommender": rec,
-                "configuration": {key: value for key, value in entry["params"].items() if key != "meta"},
+                "configuration": {key: value for key, value in params.items() if key != "meta"},
             })
         with open(os.path.abspath(os.sep.join([output,
                 f"bestmodelparams_cutoff_{default_k}_relthreshold_{self.rel_threshold}_{_timestamp()}.json"])),
@@ -153,4 +229,3 @@ class ResultHandler:
 
     def save_best_results_std_as_triplets(self, output="../results/"):
         self.save_results(output=output, key=_EVAL_STD_RESULTS, triplets=True)
-
