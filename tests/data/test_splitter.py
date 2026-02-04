@@ -1,34 +1,32 @@
 import pytest
 
 from elliot.dataset import DataSetLoader
-from elliot.utils.enums import SplittingStrategy, DataLoadingStrategy
-from elliot.utils.folder import parent_dir, path_joiner, check_path
+from elliot.namespace import build_namespace
+from elliot.utils.folder import path_joiner, check_path, parent_dir
 
 from tests.params import params_splitting_fail as p
-from tests.utils import create_namespace, dataset_path
+from tests.utils import dataset_path
 
-current_path = parent_dir(__file__)
+current_path = path_joiner(__file__)
 
 
 def load_and_split_data(config_dict):
-    config = {
+    config_data = {
         "experiment": {
             "dataset": "splitting_strategies",
             "data_config": {
-                "strategy": DataLoadingStrategy.DATASET.value,
+                "strategy": "dataset",
                 "dataset_path": dataset_path,
-                "header": True,
-                "columns": ["userId", "itemId", "", "timestamp"]
+                "reader": {"header": True}
             },
             "splitting": {
                 **config_dict
             }
         }
     }
-    ns_model = create_namespace(config, current_path)
-    ns = ns_model.base_namespace
-    loader = DataSetLoader(ns)
-    data_list = loader.build()
+    config = build_namespace(config_path=current_path, config_data=config_data)
+    dataset_loader = DataSetLoader(config=config)
+    data_list = dataset_loader.build()
     return data_list
 
 
@@ -37,7 +35,7 @@ class TestSplitter:
     def test_temporal_holdout_test_ratio(self):
         config = {
             "test_splitting": {
-                "strategy": SplittingStrategy.TEMP_HOLDOUT.value,
+                "strategy": "temporal_holdout",
                 "test_ratio": 0.1
             }
         }
@@ -52,7 +50,7 @@ class TestSplitter:
     def test_temporal_holdout_leave_n_out(self):
         config = {
             "test_splitting": {
-                "strategy": SplittingStrategy.TEMP_HOLDOUT.value,
+                "strategy": "temporal_holdout",
                 "leave_n_out": 3
             }
         }
@@ -67,7 +65,7 @@ class TestSplitter:
     def test_random_subsampling_test_ratio(self):
         config = {
             "test_splitting": {
-                "strategy": SplittingStrategy.RAND_SUB_SMP.value,
+                "strategy": "random_subsampling",
                 "folds": 10,
                 "test_ratio": 0.1
             }
@@ -84,7 +82,7 @@ class TestSplitter:
     def test_random_subsampling_leave_n_out(self):
         config = {
             "test_splitting": {
-                "strategy": SplittingStrategy.RAND_SUB_SMP.value,
+                "strategy": "random_subsampling",
                 "folds": 3,
                 "leave_n_out": 2
             }
@@ -101,7 +99,7 @@ class TestSplitter:
     def test_random_cross_validation(self):
         config = {
             "test_splitting": {
-                "strategy": SplittingStrategy.RAND_CV.value,
+                "strategy": "random_cross_validation",
                 "folds": 10,
             }
         }
@@ -117,7 +115,7 @@ class TestSplitter:
     def test_fixed_timestamp(self):
         config = {
             "test_splitting": {
-                "strategy": SplittingStrategy.FIXED_TS.value,
+                "strategy": "fixed_timestamp",
                 "timestamp": 7
             }
         }
@@ -133,7 +131,7 @@ class TestSplitter:
     def test_best_timestamp(self):
         config = {
             "test_splitting": {
-                "strategy": SplittingStrategy.FIXED_TS.value,
+                "strategy": "fixed_timestamp",
                 "min_below": 1,
                 "min_over": 1
             }
@@ -152,26 +150,27 @@ class TestSplitter:
             "save_on_disk": True,
             "save_folder": save_folder,
             "test_splitting": {
-                "strategy": SplittingStrategy.FIXED_TS.value,
+                "strategy": "fixed_timestamp",
                 "timestamp": 8
             }
         }
 
         load_and_split_data(config)
 
-        train_path = path_joiner(current_path, save_folder, "0", "train.tsv")
-        test_path = path_joiner(current_path, save_folder, "0", "test.tsv")
+        current_folder = parent_dir(current_path)
+        train_path = path_joiner(current_folder, save_folder, "0", "train.tsv")
+        test_path = path_joiner(current_folder, save_folder, "0", "test.tsv")
         assert check_path(train_path)
         assert check_path(test_path)
 
     def test_train_validation_test_split(self):
         config = {
             "test_splitting": {
-                "strategy": SplittingStrategy.RAND_CV.value,
+                "strategy": "random_cross_validation",
                 "folds": 3
             },
             "validation_splitting": {
-                "strategy": SplittingStrategy.TEMP_HOLDOUT.value,
+                "strategy": "temporal_holdout",
                 "test_ratio": 0.1
             }
         }
@@ -192,7 +191,7 @@ class TestSplitterFailures:
     def test_invalid_or_missing_params_temporal_holdout_test_ratio(self, params):
         config = {
             "test_splitting": {
-                "strategy": SplittingStrategy.TEMP_HOLDOUT.value,
+                "strategy": "temporal_holdout",
                 **params
             }
         }
@@ -204,7 +203,7 @@ class TestSplitterFailures:
     def test_invalid_or_missing_params_temporal_holdout_leave_n_out(self, params):
         config = {
             "test_splitting": {
-                "strategy": SplittingStrategy.TEMP_HOLDOUT.value,
+                "strategy": "temporal_holdout",
                 **params
             }
         }
@@ -219,7 +218,7 @@ class TestSplitterFailures:
 
         config = {
             "test_splitting": {
-                "strategy": SplittingStrategy.RAND_SUB_SMP.value,
+                "strategy": "random_subsampling",
                 **params
             }
         }
@@ -234,7 +233,7 @@ class TestSplitterFailures:
 
         config = {
             "test_splitting": {
-                "strategy": SplittingStrategy.RAND_SUB_SMP.value,
+                "strategy": "random_subsampling",
                 **params
             }
         }
@@ -246,7 +245,7 @@ class TestSplitterFailures:
     def test_invalid_or_missing_params_random_cross_validation(self, params):
         config = {
             "test_splitting": {
-                "strategy": SplittingStrategy.RAND_CV.value,
+                "strategy": "random_cross_validation",
                 **params
             }
         }
@@ -258,7 +257,7 @@ class TestSplitterFailures:
     def test_invalid_or_missing_params_fixed_timestamp(self, params):
         config = {
             "test_splitting": {
-                "strategy": SplittingStrategy.FIXED_TS.value,
+                "strategy": "fixed_timestamp",
                 **params
             }
         }
@@ -273,7 +272,7 @@ class TestSplitterFailures:
 
         config = {
             "test_splitting": {
-                "strategy": SplittingStrategy.FIXED_TS.value,
+                "strategy": "fixed_timestamp",
                 **params
             }
         }
@@ -304,7 +303,7 @@ class TestSplitterFailures:
             "save_on_disk": True,
             "save_folder": 3,
             "test_splitting": {
-                "strategy": SplittingStrategy.FIXED_TS.value,
+                "strategy": "fixed_timestamp",
                 "timestamp": 8
             }
         }

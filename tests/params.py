@@ -128,12 +128,18 @@ params_splitting_fail = {
 
 params_neg_sampling_fail = {
     "invalid_neg_random": generate_param_combinations(
-        ["num_negatives"],
-        {"num_negatives": [[3], -5]}
+        [("num_negatives", "leave_one_out")],
+        {
+            "num_negatives": [20, [3], -5],
+            "leave_one_out": [True, "invalid"]
+        }
     ),
     "invalid_neg_fixed": generate_param_combinations(
-        ["read_folder"],
-        {"read_folder": ["non/existent/path", 3, None]}
+        [("read_folder", "leave_one_out")],
+        {
+            "read_folder": ["./{0}", "non/existent/path", 3, None],
+            "leave_one_out": [True, "invalid"]
+        }
     ),
     "invalid_strategy": generate_param_combinations(
         ["strategy"],

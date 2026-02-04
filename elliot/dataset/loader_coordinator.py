@@ -4,6 +4,7 @@ import importlib
 import numpy as np
 import pandas as pd
 
+from elliot.namespace import ExperimentConfig, DataConfig
 from elliot.dataset.dataloader.abstract_loader import AbstractLoader
 from elliot.dataset.dataloader.side_info_registry import (
     AlignmentMode,
@@ -16,7 +17,6 @@ from elliot.prefiltering.standard_prefilters import PreFilter
 from elliot.dataset.dataset import DataSet
 from elliot.utils.enums import DataLoadingStrategy
 from elliot.utils.read import Reader
-from elliot.utils.config import DataLoadingConfig
 
 reader = Reader()
 
@@ -28,7 +28,7 @@ class DataSetLoader:
     The final output is a list of `DataSet` objects, ready to be consumed by the recommendation pipeline.
 
     Args:
-        config (SimpleNamespace): Configuration namespace object defining data paths, splitting strategy,
+        config (ExperimentConfig): Configuration namespace object defining data paths, splitting strategy,
             filters, etc.
 
     Supported Loading Strategies:
@@ -56,76 +56,75 @@ class DataSetLoader:
             folder_map_features: this/is/the/path/folder
     """
 
-    # TODO: insert separate reader config
-    # TODO: move 'header' and 'columns' attributes to reader config
-
-    config: DataLoadingConfig
+    data_config: DataConfig
     interactions: Union[list, pd.DataFrame]
     tuple_list: list
     side_information: SimpleNamespace
 
-    def __init__(self, config: SimpleNamespace):
+    def __init__(self, config: ExperimentConfig):
         self.logger = logging.get_logger(self.__class__.__name__)
         reader.logger = self.logger
 
-        self.config = DataLoadingConfig(**vars(config.data_config))
-        self.reader_config = self._get_reader_config()
-        self.global_config = config
+        self.config = config
+        self.data_config = config.data_config
 
         # Default to align side information with the observed training set when present
-        if self.config.side_information is not None and not hasattr(self.global_config, "align_side_with_train"):
-            setattr(self.global_config, "align_side_with_train", True)
+        if self.data_config.side_information:
+            self.config.align_side_with_train = True
 
-        if self.global_config.config_test:
+        if self.config.config_test:
             return
 
         self._load_ratings()
         self._load_side_information()
         self._preprocess_data()
 
-    def _get_reader_config(self):
-        return {
-            "columns": self.config.columns,
-            "datatypes": ["string", "string", "float", "float"],
-            "sep": "\t",
-            "ext": ".tsv",
-            "header": self.config.header,
-            "callback_fn": self._rename_cols_and_binarize
-        }
-
     def _load_ratings(self):
         """Load user-item interaction data according to the selected strategy."""
-        match self.config.strategy:
+        reader_config = self.data_config.reader
+
+        match self.data_config.strategy:
 
             case DataLoadingStrategy.FIXED:
                 self.interactions = reader.read_tabular_split(
-                    read_folder=self.config.data_folder,
-                    **self.reader_config
+                    read_folder=self.data_config.data_folder,
+                    columns=reader_config.column_names(),
+                    datatypes=reader_config.column_dtypes(),
+                    sep=reader_config.sep,
+                    ext=reader_config.ext,
+                    header=reader_config.header,
+                    callback_fn=self._rename_cols_and_binarize
                 )
 
             case DataLoadingStrategy.HIERARCHY:
                 self.interactions = reader.read_tabular_split(
-                    read_folder=self.config.data_folder,
+                    read_folder=self.data_config.data_folder,
                     hierarchical=True,
-                    **self.reader_config
+                    columns=reader_config.column_names(),
+                    datatypes=reader_config.column_dtypes(),
+                    sep=reader_config.sep,
+                    ext=reader_config.ext,
+                    header=reader_config.header,
+                    callback_fn=self._rename_cols_and_binarize
                 )
 
             case DataLoadingStrategy.DATASET:
                 self.interactions = reader.read_tabular(
-                    file_path=self.config.dataset_path,
-                    **self.reader_config
+                    file_path=self.data_config.dataset_path,
+                    columns=reader_config.column_names(),
+                    datatypes=reader_config.column_dtypes(),
+                    sep=reader_config.sep,
+                    header=reader_config.header,
+                    callback_fn=self._rename_cols_and_binarize
                 )
 
         self._clean(self._filter_nan_and_duplicates)
 
     def _rename_cols_and_binarize(self, data):
         names = ["userId", "itemId", "rating", "timestamp"]
+        current_names = self.data_config.reader.column_names()
 
-        col_mapping = (
-            {c: names[i] for i, c in enumerate(self.config.columns) if c in data.columns}
-            if self.config.columns is not None
-            else dict(zip(data.columns, names))
-        )
+        col_mapping = {c: names[i] for i, c in enumerate(current_names) if c in data.columns}
 
         cols_to_use = list(col_mapping.values())
         data.rename(columns=col_mapping, inplace=True)
@@ -167,7 +166,7 @@ class DataSetLoader:
         self._items = items
 
         side_info_objs = []
-        sides = self.config.side_information
+        sides = self.data_config.side_information
         for side in sides:
             module = importlib.import_module("elliot.dataset.dataloader.loaders")
             dataloader_class = getattr(module, side.dataloader)
@@ -203,9 +202,8 @@ class DataSetLoader:
 
         del self._items, self._users, self._side_info_objs
 
-        if hasattr(self.global_config, "prefiltering"):
-            prefilter = PreFilter(self.interactions, self.global_config.prefiltering)
-            self.interactions = prefilter.filter()
+        prefilter = PreFilter(self.interactions, self.config.prefiltering)
+        self.interactions = prefilter.filter()
 
     def _intersect_users_items(self):
         """Align users/items with side information based on alignment mode:
@@ -280,7 +278,7 @@ class DataSetLoader:
         preferred materialization strategy (lazy/memory/mmap). For now, we
         log intent; specific loaders can honor _materialization internally.
         """
-        for side_obj in getattr(self, "_side_info_objs", []):
+        for side_obj in self._side_info_objs:
             mat = getattr(side_obj, "_materialization", None)
             if not mat:
                 continue
@@ -295,19 +293,19 @@ class DataSetLoader:
                 },
             )
 
-    def build(self) -> List[object]:
-        if self.config.strategy != DataLoadingStrategy.DATASET:
+    def build(self) -> List[List[DataSet]]:
+        if self.data_config.strategy != DataLoadingStrategy.DATASET:
             tuple_list = self.interactions
         else:
             self.logger.info("There will be the splitting")
-            splitter = Splitter(self.interactions, self.global_config.splitting, self.config.seed)
+            splitter = Splitter(self.interactions, self.config.splitting, self.config.random_seed)
             tuple_list = splitter.process_splitting()
 
         if len(tuple_list) > 1:
             self.logger.warning("You are using a splitting strategy with folds. "
                                 "Paired TTest and Wilcoxon Test are not available!")
-            self.global_config.evaluation.paired_ttest = False
-            self.global_config.evaluation.wilcoxon_test = False
+            self.config.evaluation.paired_ttest = {}
+            self.config.evaluation.wilcoxon_test = {}
 
         data_list = []
 
@@ -320,7 +318,7 @@ class DataSetLoader:
                     f"Test Fold {p1}{f" - Validation Fold {p2}" if val is not None else ""}"
                 )
                 single_data_object = DataSet(
-                    config=self.global_config,
+                    config=self.config,
                     data_tuple=(train, val, test),
                     side_information_data=self.side_information
                 )
@@ -329,9 +327,9 @@ class DataSetLoader:
 
         return data_list
 
-    def generate_dataobjects_mock(self) -> List[object]:
+    def generate_dataobjects_mock(self) -> List[List[DataSet]]:
         _column_names = ["userId", "itemId", "rating"]
-        np.random.seed(self.config.seed)
+        np.random.seed(self.config.random_seed)
         training_set = np.hstack(
             (np.random.randint(0, 5 * 20, size=(5 * 20, 2)), np.random.randint(0, 2, size=(5 * 20, 1))))
         test_set = np.hstack(
@@ -339,6 +337,6 @@ class DataSetLoader:
 
         training_set = pd.DataFrame(np.array(training_set), columns=_column_names)
         test_set = pd.DataFrame(np.array(test_set), columns=_column_names)
-        data_list = [[DataSet(self.global_config, (training_set, test_set))]]
+        data_list = [[DataSet(self.config, (training_set, test_set))]]
 
         return data_list

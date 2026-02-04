@@ -1,6 +1,4 @@
-import pickle
 import random
-from types import SimpleNamespace
 
 import numpy as np
 import torch
@@ -9,9 +7,10 @@ from torch import nn, Tensor
 from torch_sparse import SparseTensor
 from abc import ABC, abstractmethod
 
+from elliot.namespace import RecommenderConfig
 from elliot.recommender.init import zeros_init
-from elliot.recommender.utils import ModelType, get_device
-from elliot.utils.config import build_recommender_config
+from elliot.utils import get_device
+from elliot.utils.enums import ModelType
 
 
 class AbstractRecommender(ABC):
@@ -21,8 +20,8 @@ class AbstractRecommender(ABC):
         self._data = data
         self._seed = seed
         self._users, self._items = data.get_users_items()
-        self._num_items = self._data.num_items
-        self._num_users = self._data.num_users
+        self._num_items = data.num_items
+        self._num_users = data.num_users
         self.transactions = data.transactions
         self.logger = logger
         self.params_list = []
@@ -54,16 +53,14 @@ class AbstractRecommender(ABC):
     def set_seed(self, seed: int):
         raise NotImplementedError()
 
-    def set_params(self, params: SimpleNamespace):
+    def set_params(self, params: RecommenderConfig):
         self.logger.info("Loading parameters")
 
-        RecommenderConfig = build_recommender_config(self.__class__)
-        validator = RecommenderConfig(**vars(params))
-
-        for name, val in validator.get_validated_params().items():
-            setattr(self, name, val)
-            self.logger.info(f"Parameter {name} set to {val}")
-            self.params_list.append(name)
+        for name, val in params.model_dump().items():
+            if name in self.__class__.__annotations__:
+                setattr(self, name, val)
+                self.logger.info(f"Parameter {name} set to {val}")
+                self.params_list.append(name)
 
         self.params_to_save = self.params_list.copy()
 

@@ -1,32 +1,33 @@
- experiment:
-    dataset: movielens_1m
-    random_seed: 42
-    data_config:
-      strategy: dataset
-      dataset_path: ../data/movielens_1m/dataset.tsv
-    splitting:
-      test_splitting:
-        strategy: random_subsampling
-        test_ratio: 0.2
-      validation_splitting:
-        strategy: random_subsampling
-        test_ratio: 0.2
-    top_k: 10
-    evaluation:
-      cutoffs: [10]
-      simple_metrics: [nDCG, Recall, Precision]
-      relevance_threshold: 3
-    models:
-      BPRMF:
-        meta:
-          hyper_max_evals: 20
-          hyper_opt_alg: tpe
-          validation_metric: nDCG@10
-        epochs: 3
-        batch_size: [128, 256, 512]
-        factors: [8, 16, 32, 64]
-        learning_rate: [loguniform, -10, -2]
-        lambda_bias: [loguniform, -10, -3]
-        lambda_user: [loguniform, -10, -3]
-        lambda_pos_i: [loguniform, -10, -3]
-        lambda_neg_i: [loguniform, -10, -3]
+experiment:
+  dataset: movielens_1m
+  random_seed: 42
+  data_config:
+    strategy: dataset
+    dataset_path: ../data/{0}/dataset.tsv
+  splitting:
+    test_splitting:
+      strategy: random_subsampling
+      test_ratio: 0.2
+    validation_splitting:
+      strategy: random_subsampling
+      test_ratio: 0.2
+  top_k: 10
+  evaluation:
+    cutoffs: [10]
+    simple_metrics: [nDCG, Recall, Precision]
+    relevance_threshold: 3
+  models:
+    BPRMF:
+      meta:
+        hyper_max_evals: 20
+        hyper_opt_alg: tpe
+        validation_metric: nDCG
+        validation_k: 10
+      epochs: 3
+      batch_size: [128, 256, 512]
+      factors: [8, 16, 32, 64]
+      learning_rate: [loguniform, -10, -2]
+      lambda_bias: [loguniform, -10, -3]
+      lambda_user: [loguniform, -10, -3]
+      lambda_pos_i: [loguniform, -10, -3]
+      lambda_neg_i: [loguniform, -10, -3]

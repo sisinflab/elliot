@@ -1,11 +1,10 @@
 from typing import List, Tuple, Union, Callable
-from types import SimpleNamespace
 import pandas as pd
 import numpy as np
 import math
 
+from elliot.namespace import SplittingConfig, SplittingSingleConfig, check_range
 from elliot.utils.enums import SplittingStrategy
-from elliot.utils.config import SplittingConfig, check_range, SplittingSingleConfig
 from elliot.utils.write import Writer
 from elliot.utils import logging as elog
 
@@ -23,7 +22,7 @@ class Splitter:
     Args:
         data (pd.DataFrame): The dataset to be split, typically containing at least
             'userId' and 'timestamp' columns.
-        config (SimpleNamespace): Namespace object containing configuration
+        splitting_config (SplittingConfig): Object containing configuration
             for the desired splitting strategy.
         random_seed (int): Random seed, for reproducibility; default is 42.
 
@@ -61,30 +60,16 @@ class Splitter:
         Splitting is required and will be applied only if `data_config.strategy` is set to 'dataset'.
     """
 
-    config: SplittingConfig
+    splitting_config: SplittingConfig
 
-    def __init__(self, data: pd.DataFrame, config: SimpleNamespace, random_seed: int = 42):
+    def __init__(self, data: pd.DataFrame, splitting_config: SplittingConfig, random_seed: int = 42):
         self.logger = elog.get_logger(self.__class__.__name__, seed=random_seed)
         writer.logger = self.logger
 
         self.data = data
-
-        # TODO: remove this by completely changing namespace handling (using pydantic)
-        if hasattr(config, "test_splitting"):
-            config.test_splitting = vars(config.test_splitting)
-        if hasattr(config, "validation_splitting"):
-            config.validation_splitting = vars(config.validation_splitting)
-
-        self.config = SplittingConfig(**vars(config))
-        self.writer_config = self._get_writer_config()
+        self.splitting_config = splitting_config
 
         np.random.seed(random_seed)
-
-    def _get_writer_config(self):
-        return {
-            "sep": "\t",
-            "ext": ".tsv"
-        }
 
     def process_splitting(
         self
@@ -96,11 +81,11 @@ class Splitter:
                 A list of (train, test) or ((train, val), test) tuples.
         """
 
-        tuple_list = self.handle_hierarchy(self.data, self.config.test_splitting)
+        tuple_list = self.handle_hierarchy(self.data, self.splitting_config.test_splitting)
 
-        if self.config.validation_splitting is not None:
+        if self.splitting_config.validation_splitting is not None:
             tuple_list = [
-                (self.handle_hierarchy(train, self.config.validation_splitting), test)
+                (self.handle_hierarchy(train, self.splitting_config.validation_splitting), test)
                 for train, test in tuple_list
             ]
             self.logger.info(
@@ -114,11 +99,12 @@ class Splitter:
                 extra={"context": {"strategy": "train_test", "folds": len(tuple_list)}}
             )
 
-        if self.config.save_on_disk:
+        if self.splitting_config.save_on_disk:
             writer.write_split(
                 fold_dataset=tuple_list,
-                save_folder=self.config.save_folder,
-                **self.writer_config
+                save_folder=self.splitting_config.save_folder,
+                sep=self.splitting_config.writer.sep,
+                ext=self.splitting_config.writer.ext
             )
 
         return tuple_list

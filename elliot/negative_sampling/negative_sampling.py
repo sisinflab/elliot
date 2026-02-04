@@ -1,19 +1,29 @@
 from typing import Tuple, List
-from types import SimpleNamespace
 
 import bisect
 import random
 import numpy as np
 from tqdm import tqdm
 
+from elliot.namespace import NegativeSamplingConfig
 from elliot.utils.enums import NegativeSamplingStrategy
-from elliot.utils.config import NegativeSamplingConfig
-from elliot.utils.sparse import zero_intervals
 from elliot.utils.read import Reader
 from elliot.utils.write import Writer
 
 reader = Reader()
 writer = Writer()
+
+
+def zero_intervals(n_cols, nnz_sorted):
+    intervals = []
+    prev = -1
+    for c in nnz_sorted:
+        if c > prev + 1:
+            intervals.append((prev + 1, c - 1))
+        prev = c
+    if prev < n_cols - 1:
+        intervals.append((prev + 1, n_cols - 1))
+    return intervals
 
 
 class NegativeSampler:
@@ -28,7 +38,7 @@ class NegativeSampler:
     - `fixed`: Uses negative items provided in an external file.
 
     Args:
-        config (SimpleNamespace): Configuration object containing negative sampling parameters.
+        neg_sampling_config (NegativeSamplingConfig): Configuration object containing negative sampling parameters.
         mappings (Tuple[dict, dict]): User and item mappings from public ids to internal indices.
         inv_mappings (Tuple[np.ndarray, np.ndarray]): Inverse mappings from internal indices
             to public user and item ids.
@@ -50,11 +60,11 @@ class NegativeSampler:
         read_folder: this/is/the/path
     """
 
-    config: NegativeSamplingConfig
+    neg_sampling_config: NegativeSamplingConfig
 
     def __init__(
         self,
-        config: SimpleNamespace,
+        neg_sampling_config: NegativeSamplingConfig,
         mappings: Tuple[dict, dict],
         inv_mappings: Tuple[np.ndarray, np.ndarray],
         num_users: int,
@@ -62,9 +72,7 @@ class NegativeSampler:
         pos_items: Tuple[List[List[int]], List[List[int]], List[List[int]]],
         random_seed: int = 42
     ):
-        self.config = NegativeSamplingConfig(**vars(config))
-        self.reader_config = self._get_reader_writer_config()
-        self.writer_config = self._get_reader_writer_config()
+        self.neg_sampling_config = neg_sampling_config
 
         self._u_map, self._i_map = mappings
         self._inv_u_map, self._inv_i_map = inv_mappings
@@ -78,12 +86,6 @@ class NegativeSampler:
 
         np.random.seed(random_seed)
         random.seed(random_seed)
-
-    def _get_reader_writer_config(self):
-        return {
-            "sep": "\t",
-            "ext": ".tsv"
-        }
 
     def _merge_positives(
         self,
@@ -132,7 +134,7 @@ class NegativeSampler:
         Returns:
             List[List[int]]: Negative item indices per user.
         """
-        if self.config.strategy == NegativeSamplingStrategy.RANDOM:
+        if self.neg_sampling_config.strategy == NegativeSamplingStrategy.RANDOM:
             neg = self.random_strategy(validation)
         else:
             neg = self.fixed_strategy(validation)
@@ -163,7 +165,7 @@ class NegativeSampler:
             candidate_negatives_count = self._num_items - len(u_indices)
 
             # Randomly sample negatives...
-            if candidate_negatives_count > self.config.num_negatives:
+            if candidate_negatives_count > self.neg_sampling_config.num_negatives:
                 sampled = self._sample_by_random_uniform(u_indices)
             # ...or pick them all
             else:
@@ -175,7 +177,7 @@ class NegativeSampler:
             neg.append(sampled)
 
         # Optionally save negatives to file
-        if self.config.save_on_disk:
+        if self.neg_sampling_config.save_on_disk:
             self._save_to_file(neg, validation=validation)
 
         return neg
@@ -203,7 +205,7 @@ class NegativeSampler:
         total = cum[-1]
         sampled = set()
 
-        while len(sampled) < self.config.num_negatives:
+        while len(sampled) < self.neg_sampling_config.num_negatives:
             # Pick a random sample
             u = random.randrange(total)
 
@@ -237,9 +239,10 @@ class NegativeSampler:
         # Write to file
         writer.write_negatives(
             neg_dict=neg_dict,
-            save_folder=self.config.save_folder,
+            save_folder=self.neg_sampling_config.save_folder,
             scope="val" if validation else "test",
-            **self.writer_config
+            sep=self.neg_sampling_config.writer.sep,
+            ext=self.neg_sampling_config.writer.ext,
         )
 
     def fixed_strategy(self, validation: bool = False) -> List[List[int]]:
@@ -253,9 +256,10 @@ class NegativeSampler:
         """
         # Read from file
         neg_dict = reader.read_negatives(
-            read_folder=self.config.read_folder,
+            read_folder=self.neg_sampling_config.read_folder,
             scope="val" if validation else "test",
-            **self.reader_config
+            sep=self.neg_sampling_config.reader.sep,
+            ext=self.neg_sampling_config.reader.ext,
         )
 
         neg = [[]] * self._num_users

@@ -1,30 +1,29 @@
 import pytest
 
 from elliot.dataset import DataSetLoader
-from elliot.utils.enums import PreFilteringStrategy, DataLoadingStrategy
-from elliot.utils.folder import parent_dir
+from elliot.namespace import build_namespace
+from elliot.utils.folder import path_joiner
 
 from tests.params import params_pre_filtering_fail as p
-from tests.utils import create_namespace, dataset_path
+from tests.utils import dataset_path
 
-current_path = parent_dir(__file__)
+current_path = path_joiner(__file__)
 
 
 def load_and_filter_data(config_dict):
-    config = {
+    config_data = {
         "experiment": {
             "data_config": {
-                "strategy": DataLoadingStrategy.DATASET.value,
+                "strategy": "dataset",
                 "dataset_path": dataset_path,
-                "header": True
+                "reader": {"header": True}
             },
             **config_dict
         }
     }
-    ns_model = create_namespace(config, current_path)
-    ns = ns_model.base_namespace
-    loader = DataSetLoader(ns)
-    return loader.interactions
+    config = build_namespace(config_path=current_path, config_data=config_data)
+    dataset_loader = DataSetLoader(config=config)
+    return dataset_loader.interactions
 
 
 class TestPreFilter:
@@ -33,7 +32,7 @@ class TestPreFilter:
         config = {
             "dataset": "filter_ratings_by_global_threshold",
             "prefiltering": {
-                "strategy": PreFilteringStrategy.GLOBAL_TH.value,
+                "strategy": "global_threshold",
                 "threshold": 3
             }
         }
@@ -48,7 +47,7 @@ class TestPreFilter:
         config = {
             "dataset": "filter_ratings_by_global_threshold",
             "prefiltering": {
-                "strategy": PreFilteringStrategy.GLOBAL_TH.value,
+                "strategy": "global_threshold",
             }
         }
 
@@ -60,7 +59,7 @@ class TestPreFilter:
         config = {
             "dataset": "filter_ratings_by_user_average",
             "prefiltering": {
-                "strategy": PreFilteringStrategy.USER_AVG.value,
+                "strategy": "user_average",
             }
         }
 
@@ -72,7 +71,7 @@ class TestPreFilter:
         config = {
             "dataset": "filter_user_k_core",
             "prefiltering": {
-                "strategy": PreFilteringStrategy.USER_K_CORE.value,
+                "strategy": "user_k_core",
                 "core": 2
             }
         }
@@ -87,7 +86,7 @@ class TestPreFilter:
         config = {
             "dataset": "filter_item_k_core",
             "prefiltering": {
-                "strategy": PreFilteringStrategy.ITEM_K_CORE.value,
+                "strategy": "item_k_core",
                 "core": 3
             }
         }
@@ -102,7 +101,7 @@ class TestPreFilter:
         config = {
             "dataset": "filter_iterative_k_core",
             "prefiltering": {
-                "strategy": PreFilteringStrategy.ITER_K_CORE.value,
+                "strategy": "iterative_k_core",
                 "core": 2
             }
         }
@@ -118,7 +117,7 @@ class TestPreFilter:
         config = {
             "dataset": "filter_n_rounds_k_core",
             "prefiltering": {
-                "strategy": PreFilteringStrategy.N_ROUNDS_K_CORE.value,
+                "strategy": "n_rounds_k_core",
                 "core": 2,
                 "rounds": 2
             }
@@ -135,7 +134,7 @@ class TestPreFilter:
         config = {
             "dataset": "filter_retain_cold_users",
             "prefiltering": {
-                "strategy": PreFilteringStrategy.COLD_USERS.value,
+                "strategy": "cold_users",
                 "threshold": 2
             }
         }
@@ -154,7 +153,7 @@ class TestPreFilterFailures:
         config = {
             "dataset": "filter_ratings_by_global_threshold",
             "prefiltering": {
-                "strategy": PreFilteringStrategy.GLOBAL_TH.value,
+                "strategy": "global_threshold",
                 "threshold": params["threshold"]
             }
         }
@@ -166,7 +165,7 @@ class TestPreFilterFailures:
         config = {
             "dataset": "filter_ratings_by_user_average",
             "prefiltering": {
-                "strategy": PreFilteringStrategy.USER_AVG.value,
+                "strategy": "user_average",
                 "threshold": None
             }
         }
@@ -178,7 +177,7 @@ class TestPreFilterFailures:
         config = {
             "dataset": "filter_user_k_core",
             "prefiltering": {
-                "strategy": PreFilteringStrategy.USER_K_CORE.value,
+                "strategy": "user_k_core",
                 **({"core": params["core"]} if params["core"] is not None else {})
             }
         }
@@ -191,7 +190,7 @@ class TestPreFilterFailures:
         config = {
             "dataset": "filter_item_k_core",
             "prefiltering": {
-                "strategy": PreFilteringStrategy.ITEM_K_CORE.value,
+                "strategy": "item_k_core",
                 **({"core": params["core"]} if params["core"] is not None else {})
             }
         }
@@ -204,7 +203,7 @@ class TestPreFilterFailures:
         config = {
             "dataset": "filter_iterative_k_core",
             "prefiltering": {
-                "strategy": PreFilteringStrategy.ITER_K_CORE.value,
+                "strategy": "iterative_k_core",
                 **({"core": params["core"]} if params["core"] is not None else {})
             }
         }
@@ -220,7 +219,7 @@ class TestPreFilterFailures:
         config = {
             "dataset": "filter_n_rounds_k_core",
             "prefiltering": {
-                "strategy": PreFilteringStrategy.N_ROUNDS_K_CORE.value,
+                "strategy": "n_rounds_k_core",
                 "core": params["core"],
                 "rounds": params["rounds"]
             }
@@ -234,7 +233,7 @@ class TestPreFilterFailures:
         config = {
             "dataset": "filter_retain_cold_users",
             "prefiltering": {
-                "strategy": PreFilteringStrategy.COLD_USERS.value,
+                "strategy": "cold_users",
                 **({"threshold": params["threshold"]} if params["threshold"] is not None else {})
             }
         }

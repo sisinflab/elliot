@@ -1,40 +1,42 @@
 from types import SimpleNamespace
 import typing as t
 
+from elliot.namespace import EarlyStoppingConfig
 from elliot.utils import logging
 import logging as pylog
 
 
 class EarlyStopping:
-    def __init__(self, early_stopping_ns: SimpleNamespace, validation_metric: str, validation_k: int, cutoffs: t.List,
+    def __init__(self, early_stopping_config: EarlyStoppingConfig, validation_metric: str, validation_k: int, cutoffs: t.List,
                  simple_metrics: t.List, ):
         self.logger = logging.get_logger(self.__class__.__name__, pylog.DEBUG)
-        self.validation_metric = validation_metric
+        # self.validation_metric = validation_metric
         self.validation_k = validation_k
         self.cutoffs = cutoffs
         self.simple_metrics = simple_metrics
-        self.monitor = getattr(early_stopping_ns, "monitor", self.validation_metric)
 
-        if not len(early_stopping_ns.__dict__):
+        if early_stopping_config is None:
             self.active = False
         else:
-            if not hasattr(early_stopping_ns, "patience"):
-                self.patience = 0
-            else:
-                self.patience = early_stopping_ns.patience
+            self.monitor = (
+                early_stopping_config.monitor
+                if early_stopping_config.monitor else validation_metric
+            )
+
+            self.patience = early_stopping_config.patience
     
             if self.monitor == "loss":
-                if not hasattr(early_stopping_ns, "mode"):
+                if early_stopping_config.mode is None:
                     self.mode = "min"
-                elif early_stopping_ns.mode == "auto":
+                elif early_stopping_config.mode == "auto":
                     self.mode = "min"
                 # observed_quantity = self._losses
                 self.metric = False
     
             else:
-                if not hasattr(early_stopping_ns, "mode"):
+                if early_stopping_config.mode is None:
                     self.mode = "max"
-                elif early_stopping_ns.mode == "auto":
+                elif early_stopping_config.mode == "auto":
                     self.mode = "max"
     
                 metric = self.monitor.split("@")
@@ -47,16 +49,16 @@ class EarlyStopping:
                 self.metric = metric[0]
                 # observed_quantity = [r[early_stopping_nsmetric_k]["val_results"][early_stopping_ns.metric] for r in self._results]
 
-            if hasattr(early_stopping_ns, "min_delta"):
-                self.min_delta = early_stopping_ns.min_delta
+            if early_stopping_config.min_delta is not None:
+                self.min_delta = early_stopping_config.min_delta
 
-            if hasattr(early_stopping_ns, "rel_delta"):
-                self.rel_delta = early_stopping_ns.rel_delta
+            if early_stopping_config.rel_delta is not None:
+                self.rel_delta = early_stopping_config.rel_delta
 
-            if hasattr(early_stopping_ns, "baseline"):
-                self.baseline = early_stopping_ns.baseline
+            if early_stopping_config.baseline is not None:
+                self.baseline = early_stopping_config.baseline
 
-            self.verbose = getattr(early_stopping_ns, "verbose", False)
+            self.verbose = early_stopping_config.verbose
             self.active = True
         
     def stop(self, losses, results):

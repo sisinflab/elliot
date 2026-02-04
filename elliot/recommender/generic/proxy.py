@@ -1,21 +1,18 @@
 import ntpath
-import os
-from typing import Iterable, Optional, Tuple, Union
+from typing import Iterable, Optional, Tuple
 
 import numpy as np
 import pandas as pd
 import torch
 
 from elliot.recommender.base_recommender import Recommender
+from elliot.utils.read import Reader
+
+reader = Reader()
 
 
 class ProxyRecommender(Recommender):
     path: str = ""
-    sep: str = "\t"
-    header: Union[bool, int] = False
-    user_col: Optional[Union[int, str]] = None
-    item_col: Optional[Union[int, str]] = None
-    score_col: Optional[Union[int, str]] = None
     id_space: str = "public"
     deduplicate: bool = True
     filter_seen: bool = True
@@ -30,8 +27,9 @@ class ProxyRecommender(Recommender):
         :param args: parameters
         """
         super().__init__(data, params, seed, logger)
-        if not self.path:
-            raise ValueError("ProxyRecommender requires 'path' parameter.")
+
+        self._reader_config = params.reader
+        reader.logger = self.logger
 
         self._model_name = self.model_name or ntpath.basename(self.path).rsplit(".", 1)[0]
         self._public_user_map, self._public_item_map = self._resolve_public_maps()
@@ -104,19 +102,18 @@ class ProxyRecommender(Recommender):
         return
 
     def read_recommendations(self, path: str, top_k: Optional[int] = None):
-        if not path or not os.path.isfile(path):
-            raise FileNotFoundError(f"Recommendation file not found: {path}")
+        data = reader.read_tabular(
+            file_path=path,
+            columns=self._reader_config.column_names(),
+            datatypes=self._reader_config.column_dtypes(),
+            sep=self._reader_config.sep,
+            header=self._reader_config.header
+        )
 
-        header = self._resolve_header(self.header)
-        data = pd.read_csv(path, sep=self.sep, header=header, dtype=str)
-
-        user_col = self._resolve_column(self.user_col, 0)
-        item_col = self._resolve_column(self.item_col, 1)
-        score_col = self._resolve_column(self.score_col, 2)
-
-        user_col = self._normalize_column_ref(data, user_col)
-        item_col = self._normalize_column_ref(data, item_col)
-        score_col = self._normalize_column_ref(data, score_col)
+        column_names = self._reader_config.column_names()
+        user_col = column_names[0]
+        item_col = column_names[1]
+        score_col = column_names[2]
 
         data, score_col = self._select_columns(data, user_col, item_col, score_col)
 
@@ -165,7 +162,7 @@ class ProxyRecommender(Recommender):
         if hasattr(self._data, "get_mappings"):
             return self._data.get_mappings()
         if hasattr(self._data, "_u_map") and hasattr(self._data, "_i_map"):
-            return self._data._u_map, self._data._i_map
+            return self._data.get_mappings()
         return {}, {}
 
     def _resolve_private_maps(self) -> Tuple[Iterable, Iterable]:
@@ -174,7 +171,7 @@ class ProxyRecommender(Recommender):
         if hasattr(self._data, "get_inverse_mappings"):
             return self._data.get_inverse_mappings()
         if hasattr(self._data, "_users") and hasattr(self._data, "_items"):
-            return self._data._users, self._data._items
+            return self._data.get_users_items()
         return [], []
 
     def _infer_public_id_types(self) -> Tuple[type, type]:
@@ -207,54 +204,24 @@ class ProxyRecommender(Recommender):
                 return getter()
         return getattr(self._data, f"{scope}_dict", None) or getattr(self._data, f"_{scope}_dict", None)
 
-    def _resolve_header(self, header_value):
-        if isinstance(header_value, bool):
-            return 0 if header_value else None
-        if header_value is None:
-            return None
-        if isinstance(header_value, int):
-            return header_value
-        header_str = str(header_value).strip().lower()
-        if header_str in {"true", "yes", "1"}:
-            return 0
-        if header_str in {"false", "no", "0"}:
-            return None
-        try:
-            return int(header_str)
-        except ValueError:
-            return None
-
-    def _resolve_column(self, col_value, default_idx):
-        if col_value is None:
-            return default_idx
-        if isinstance(col_value, str) and col_value.isdigit():
-            return int(col_value)
-        return col_value
-
-    def _normalize_column_ref(self, data: pd.DataFrame, col_value):
-        if col_value is None:
-            return None
-        if isinstance(col_value, int) and col_value not in data.columns:
-            if 0 <= col_value < data.shape[1]:
-                return data.columns[col_value]
-        return col_value
-
     def _select_columns(self, data: pd.DataFrame, user_col, item_col, score_col):
         missing = [col for col in (user_col, item_col) if col not in data.columns]
+        # If there are missing columns among the ones provided by the user,
+        # the reader does not read them
+        # if missing:
+        #     if self.strict:
+        #         raise ValueError(f"Missing columns in recommendation file: {missing}")
+        #     self.logger.warning(
+        #         "Missing columns, falling back to default indices",
+        #         extra={"context": {"missing": missing}}
+        #     )
+        #     user_col, item_col, score_col = 0, 1, 2
+        #     user_col = self._normalize_column_ref(data, user_col)
+        #     item_col = self._normalize_column_ref(data, item_col)
+        #     score_col = self._normalize_column_ref(data, score_col)
+        #     missing = [col for col in (user_col, item_col) if col not in data.columns]
         if missing:
-            if self.strict:
-                raise ValueError(f"Missing columns in recommendation file: {missing}")
-            self.logger.warning(
-                "Missing columns, falling back to default indices",
-                extra={"context": {"missing": missing}}
-            )
-            user_col, item_col, score_col = 0, 1, 2
-            user_col = self._normalize_column_ref(data, user_col)
-            item_col = self._normalize_column_ref(data, item_col)
-            score_col = self._normalize_column_ref(data, score_col)
-            missing = [col for col in (user_col, item_col) if col not in data.columns]
-            if missing:
-                raise ValueError(f"Missing required columns in recommendation file: {missing}")
+            raise ValueError(f"Missing required columns in recommendation file: {missing}")
 
         if score_col not in data.columns:
             if self.strict:

@@ -7,17 +7,16 @@ __version__ = '0.3.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
-from types import SimpleNamespace
-import typing as t
+from typing import Optional
+import copy
 import numpy as np
 import logging as pylog
 import time
-
-from elliot.recommender.utils import get_model
-from elliot.utils import logging
-
 from hyperopt import STATUS_OK
+
+from elliot.namespace import RecommenderConfig
 from elliot.hyperoptimization.policy import EvaluationPolicy, FinalPolicy, SearchPolicy
+from elliot.utils import logging, get_trainer, get_model
 
 
 class ModelCoordinator(object):
@@ -25,7 +24,7 @@ class ModelCoordinator(object):
     This class handles the selection of hyperparameters for the hyperparameter tuning realized with HyperOpt.
     """
 
-    def __init__(self, data_objs, base: SimpleNamespace, params, model_class: t.ClassVar, test_fold_index: int):
+    def __init__(self, data_objs, config, model_config, model_name, test_fold_index: int):
         """
         The constructor creates a Placeholder of the recommender model.
 
@@ -33,82 +32,108 @@ class ModelCoordinator(object):
         :param params: a SimpleNamespace that contains the hyper-parameters of the model
         :param model_class: the class of the recommendation model
         """
-        self.logger = logging.get_logger(self.__class__.__name__, pylog.CRITICAL if base.config_test else pylog.DEBUG)
+        self.logger = logging.get_logger(
+            self.__class__.__name__, pylog.CRITICAL if config.config_test else pylog.DEBUG
+        )
         self.data_objs = data_objs
-        self.base = base
-        self.params = params
-        self.model_class = model_class
+        self.config = config
+        self.model_config = model_config
         self.test_fold_index = test_fold_index
         self.model_config_index = 0
 
-    def _build_params(self, args: t.Optional[dict] = None) -> SimpleNamespace:
-        base_params = self.params[0] if isinstance(self.params, tuple) else self.params
-        model_params = SimpleNamespace(**base_params.__dict__)
-        if args:
-            for k, v in args.items():
-                model_params.__setattr__(k, v)
-        return model_params
+        self._model_class = get_model(model_name, config)
+        self._trainer_class = get_trainer(self._model_class)
 
-    def run(self, policy: EvaluationPolicy, args: t.Optional[dict] = None) -> dict:
+    def run(self, policy: EvaluationPolicy, args: Optional[dict] = None) -> dict:
         include_test = policy.include_test
-        model_params = self._build_params(args)
+        model_config = copy.deepcopy(self.model_config)
 
-        if args:
-            self.logger.info("Hyperparameter tuning exploration:")
-            for k, v in args.items():
-                self.logger.info(f"Exploration for {k}. Value extracted: {v}")
-        else:
-            self.logger.info("Hyperparameters:")
-            for k, v in model_params.__dict__.items():
-                self.logger.info(f"{k} set to {v}")
+        self.logger.info("Hyperparameter tuning exploration:")
+        for k, v in args.items():
+            setattr(model_config, k, v)
+            self.logger.info(f"Exploration for {k}. Value extracted: {v}")
 
         internal_losses = []
-        results = []
-        times = []
+        reports = []
+
         for trainval_index, data_obj in enumerate(self.data_objs):
-            if args:
-                self.logger.info(f"Exploration: Hyperparameter exploration number {self.model_config_index + 1}")
+            self.logger.info(f"Exploration: Hyperparameter exploration number {self.model_config_index + 1}")
             self.logger.info(f"Exploration: Test Fold exploration number {self.test_fold_index + 1}")
             self.logger.info(f"Exploration: Train-Validation Fold exploration number {trainval_index + 1}")
-            model = get_model(data_obj, self.base, model_params, self.model_class)
+
+            trainer = self._trainer_class(
+                data=data_obj,
+                config=self.config,
+                params=model_config,
+                model_class=self._model_class
+            )
+
             tic = time.perf_counter()
-            model.train()
+            report = trainer.train()
             toc = time.perf_counter()
-            times.append(toc - tic)
-            internal_losses.append(self._get_internal_loss(model))
-            results.append(model.get_results())
+
+            report["time"] = toc - tic
+            reports.append(report)
+            internal_losses.append(self._get_internal_loss(trainer))
 
         self.model_config_index += 1
 
-        results_mean = self._average_results(results, include_test=include_test) if results else {}
-        objective = self._compute_objective(results_mean, internal_losses, model_params)
+        aggregated_results = self._aggregate(reports, include_test=include_test)
+
+        objective = self._compute_objective(
+            aggregated_results.get("val_results", {}),
+            internal_losses,
+            model_config
+        )
 
         payload = {
             "loss": objective["loss"],
-            "status": STATUS_OK,
-            "params": model.get_params(),
-            "val_results": {k: result_dict["val_results"] for k, result_dict in results_mean.items()},
-            "val_statistical_results": {k: result_dict["val_statistical_results"] for k, result_dict in model.get_results().items()},
-            "time": times,
-            "name": model.name,
             "objective": objective["meta"],
+            **aggregated_results
         }
-
-        if include_test:
-            payload.update({
-                "test_results": {k: result_dict["test_results"] for k, result_dict in results_mean.items()},
-                "test_statistical_results": {k: result_dict["test_statistical_results"] for k, result_dict in model.get_results().items()},
-            })
 
         if objective["meta"]["target"] == "validation_metric":
             metric = objective["meta"]["metric"]
             k = objective["meta"]["k"]
-            if metric is not None and k in results_mean:
-                payload["val_metric"] = results_mean[k]["val_results"].get(metric)
+            if metric is not None and k in aggregated_results.get("val_results", {}):
+                payload["val_metric"] = aggregated_results["val_results"][k].get(metric)
                 if include_test:
-                    payload["test_metric"] = results_mean[k]["test_results"].get(metric)
+                    payload["test_metric"] = aggregated_results["test_results"][k].get(metric)
 
         return payload
+
+    def _aggregate(self, reports_list, include_test=True):
+        if not reports_list:
+            return {}
+
+        first, last = reports_list[0], reports_list[-1]
+
+        result = {}
+
+        sections = ["val_results"]
+        if include_test:
+            sections.append("test_results")
+
+        for section in sections:
+            result[section] = {
+                k: {
+                    m: np.average([r[section][k][m] for r in reports_list])
+                    for m in first[section][k]
+                }
+                for k in first[section]
+            }
+
+        result["name"] = first["name"]
+        result["params"] = first["params"]
+        result["val_statistical_results"] = last["val_statistical_results"]
+        if include_test:
+            result["test_statistical_results"] = last["test_statistical_results"]
+
+        result["time"] = [r["time"] for r in reports_list]
+
+        result["status"] = STATUS_OK
+
+        return result
 
     def objective(self, args):
         """
@@ -119,7 +144,7 @@ class ModelCoordinator(object):
         """
         return self.run(SearchPolicy(), args=args)
 
-    def evaluate(self, args: t.Optional[dict] = None):
+    def evaluate(self, args: Optional[dict] = None):
         return self.run(FinalPolicy(), args=args)
 
     def single(self):
@@ -132,19 +157,6 @@ class ModelCoordinator(object):
 
         return self.run(FinalPolicy(), args=None)
 
-    @staticmethod
-    def _average_results(results_list, include_test: bool = True):
-        ks = list(results_list[0].keys())
-        eval_result_types = ["val_results"]
-        if include_test:
-            eval_result_types.append("test_results")
-        metrics = list(results_list[0][ks[0]]["val_results"].keys())
-        return {k: {type_: {metric: np.average([fold_result[k][type_][metric]
-                                                for fold_result in results_list])
-                            for metric in metrics}
-                for type_ in eval_result_types}
-                for k in ks}
-
     def _get_internal_loss(self, model):
         losses = getattr(model, "_losses", None)
         if losses:
@@ -152,26 +164,29 @@ class ModelCoordinator(object):
         loss = getattr(model, "get_loss", None)
         return float(loss()) if callable(loss) else None
 
-    def _resolve_validation_target(self, model_params: SimpleNamespace):
-        cutoff_k = getattr(self.base.evaluation, "cutoffs", [self.base.top_k])
-        cutoff_k = cutoff_k if isinstance(cutoff_k, list) else [cutoff_k]
-        first_metric = self.base.evaluation.simple_metrics[0] if self.base.evaluation.simple_metrics else None
-        default_k = cutoff_k[0]
-        raw = getattr(model_params.meta, "validation_metric", None) if hasattr(model_params, "meta") else None
-        if not raw:
-            return first_metric, default_k
-        parts = str(raw).split("@")
-        metric = parts[0]
-        k = int(parts[1]) if len(parts) > 1 else default_k
-        return metric, k
+    # def _resolve_validation_target(self, model_config: RecommenderConfig):
+    #     cutoff_k = self.config.evaluation.cutoffs or [self.config.top_k]
+    #
+    #     first_metric = (
+    #         self.config.evaluation.simple_metrics[0]
+    #         if self.config.evaluation.simple_metrics else None
+    #     )
+    #
+    #     default_k = cutoff_k[0]
+    #
+    #     raw = model_config.meta.validation_metric
+    #
+    #     if raw is None:
+    #         return first_metric, default_k
+    #
+    #     parts = str(raw).split("@")
+    #     metric = parts[0]
+    #     k = int(parts[1]) if len(parts) > 1 else default_k
+    #
+    #     return metric, k
 
-    def _compute_objective(self, results_mean: dict, internal_losses: list, model_params: SimpleNamespace):
-        target = None
-        if hasattr(model_params, "meta"):
-            target = getattr(model_params.meta, "optimization_target", None)
-            if not target and getattr(model_params.meta, "optimize_internal_loss", False):
-                target = "internal_loss"
-        target = target or "validation_metric"
+    def _compute_objective(self, val_results: dict, internal_losses: list, model_config: RecommenderConfig):
+        target = model_config.meta.optimization_target
 
         internal_loss = None
         valid_internal = [l for l in internal_losses if l is not None and np.isfinite(l)]
@@ -189,27 +204,29 @@ class ModelCoordinator(object):
             }
             return {"loss": loss, "meta": meta}
 
-        metric, k = self._resolve_validation_target(model_params)
-        metric_value = None
-        if metric is not None and k in results_mean:
-            metric_value = results_mean[k]["val_results"].get(metric)
+        metric = model_config.meta.validation_metric
+        k = model_config.meta.validation_k
+
+        # metric_value = None
+        # if metric is not None and k in val_results:
+        metric_value = val_results[k].get(metric)
 
         minimize_metrics = {"MSE", "RMSE", "MAE"}
-        if metric_value is not None and metric.upper() in minimize_metrics:
+        if metric.upper() in minimize_metrics:
             loss = float(metric_value)
             direction = "minimize"
         else:
-            loss = float(-metric_value) if metric_value is not None else np.inf
+            loss = float(-metric_value) #if metric_value is not None else np.inf
             direction = "maximize"
 
-        if not np.isfinite(loss):
-            # Fallback to internal loss if validation metric is unavailable
-            loss = internal_loss if internal_loss is not None else np.inf
-            target = "internal_loss"
-            metric = None
-            k = None
-            direction = "minimize"
-            metric_value = loss if np.isfinite(loss) else None
+        # if not np.isfinite(loss):
+        #     # Fallback to internal loss if validation metric is unavailable
+        #     loss = internal_loss if internal_loss is not None else np.inf
+        #     target = "internal_loss"
+        #     metric = None
+        #     k = None
+        #     direction = "minimize"
+        #     metric_value = loss if np.isfinite(loss) else None
 
         meta = {
             "target": target,
@@ -220,12 +237,12 @@ class ModelCoordinator(object):
         }
         return {"loss": loss, "meta": meta}
 
-    @staticmethod
-    def _std_results(results_list):
-        ks = list(results_list[0].keys())
-        eval_result_types = ["val_results"]
-        metrics = list(results_list[0][ks[0]]["val_results"].keys())
-        return {k: {type_: {metric: np.std([fold_result[k][type_][metric] for fold_result in results_list])
-                            for metric in metrics}
-                    for type_ in eval_result_types}
-                for k in ks}
+    # @staticmethod
+    # def _std_results(results_list):
+    #     ks = list(results_list[0].keys())
+    #     eval_result_types = ["val_results"]
+    #     metrics = list(results_list[0][ks[0]]["val_results"].keys())
+    #     return {k: {type_: {metric: np.std([fold_result[k][type_][metric] for fold_result in results_list])
+    #                         for metric in metrics}
+    #                 for type_ in eval_result_types}
+    #             for k in ks}

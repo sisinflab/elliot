@@ -1,7 +1,6 @@
 import functools
 import time
 
-from elliot.namespace import NameSpaceModel
 from elliot.utils.folder import parent_dir, path_joiner
 
 test_path = parent_dir(__file__)
@@ -20,9 +19,3 @@ def time_single_test(func):
             duration = end - start
             print(f"[{func.__name__}] executed in {duration:.4f} seconds")
     return wrapper
-
-
-def create_namespace(config, source_path):
-    ns_model = NameSpaceModel(config, str(test_path), str(source_path))
-    ns_model.fill_base()
-    return ns_model

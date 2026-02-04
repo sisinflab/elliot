@@ -1,23 +1,22 @@
 import pytest
 
 from elliot.dataset import DataSetLoader
-from elliot.utils.enums import DataLoadingStrategy
-from elliot.utils.folder import parent_dir
+from elliot.namespace import build_namespace
+from elliot.utils.folder import path_joiner
 
 from tests.params import params_dataset_loader_fail as p
-from tests.utils import create_namespace, data_folder, dataset_path
+from tests.utils import data_folder, dataset_path
 
-current_path = parent_dir(__file__)
+current_path = path_joiner(__file__)
 
 
 def load_data(config_dict):
-    config = {
+    config_data = {
         "experiment": {**config_dict}
     }
-    ns_model = create_namespace(config, current_path)
-    ns = ns_model.base_namespace
-    loader = DataSetLoader(ns)
-    return loader.interactions
+    config = build_namespace(config_path=current_path, config_data=config_data)
+    dataset_loader = DataSetLoader(config=config)
+    return dataset_loader.interactions
 
 
 class TestDataSetLoader:
@@ -26,9 +25,9 @@ class TestDataSetLoader:
         config = {
             "dataset": "fixed_strategy",
             "data_config": {
-                "strategy": DataLoadingStrategy.FIXED.value,
+                "strategy": "fixed",
                 "data_folder": data_folder,
-                "header": True
+                "reader": {"header": True}
             }
         }
 
@@ -41,9 +40,9 @@ class TestDataSetLoader:
         config = {
             "dataset": "fixed_strategy_with_validation",
             "data_config": {
-                "strategy": DataLoadingStrategy.FIXED.value,
+                "strategy": "fixed",
                 "data_folder": data_folder,
-                "header": True
+                "reader": {"header": True}
             }
         }
 
@@ -58,7 +57,7 @@ class TestDataSetLoader:
         config = {
             "dataset": "hierarchy_strategy",
             "data_config": {
-                "strategy": DataLoadingStrategy.HIERARCHY.value,
+                "strategy": "hierarchy",
                 "data_folder": data_folder
             }
         }
@@ -78,9 +77,9 @@ class TestDataSetLoader:
         config = {
             "dataset": "dataset_strategy",
             "data_config": {
-                "strategy": DataLoadingStrategy.DATASET.value,
+                "strategy": "dataset",
                 "dataset_path": dataset_path,
-                "header": True
+                "reader": {"header": True}
             }
         }
 
@@ -92,9 +91,9 @@ class TestDataSetLoader:
         config = {
             "dataset": "filter_nan",
             "data_config": {
-                "strategy": DataLoadingStrategy.DATASET.value,
+                "strategy": "dataset",
                 "dataset_path": dataset_path,
-                "header": True
+                "reader": {"header": True}
             }
         }
 
@@ -112,7 +111,7 @@ class TestDataSetLoaderFailures:
         config = {
             "dataset": "fixed_strategy",
             "data_config": {
-                "strategy": DataLoadingStrategy.FIXED.value,
+                "strategy": "fixed",
                 **({"data_folder": params["data_folder"]} if params["data_folder"] is not None else {}),
             }
         }
@@ -125,7 +124,7 @@ class TestDataSetLoaderFailures:
         config = {
             "dataset": "fixed_strategy",
             "data_config": {
-                "strategy": DataLoadingStrategy.DATASET.value,
+                "strategy": "dataset",
                 **({"dataset_path": params["dataset_path"]} if params["dataset_path"] is not None else {}),
             }
         }
@@ -150,9 +149,9 @@ class TestDataSetLoaderFailures:
         config = {
             "dataset": "missing_required_column",
             "data_config": {
-                "strategy": DataLoadingStrategy.DATASET.value,
+                "strategy": "dataset",
                 "dataset_path": dataset_path,
-                "header": True
+                "reader": {"header": True}
             }
         }
 

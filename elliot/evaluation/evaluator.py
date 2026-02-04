@@ -26,36 +26,36 @@ from time import time
 from types import SimpleNamespace
 import logging as pylog
 import numpy as np
+from sklearn.metrics import mean_squared_error
 
-import elliot.dataset.dataset as ds
+from elliot.dataset import DataSet
+from elliot.namespace import RecommenderConfig
 from elliot.utils import logging
 from elliot.utils.folder import path_absolute, check_path
 from . import metrics
 from . import popularity_utils
 from . import relevance
 
-from sklearn.metrics import mean_squared_error
-
 
 class Evaluator(object):
-    def __init__(self, data: ds.DataSet, params: SimpleNamespace):
+    def __init__(self, data: DataSet, params: RecommenderConfig):
         """
         Class to manage all the evaluation methods and operation
         :param data: dataset object
         :param k: top-k evaluation
         """
-        self.logger = logging.get_logger(self.__class__.__name__, pylog.CRITICAL if data.config.config_test else
-                                         pylog.DEBUG)
+        self.logger = logging.get_logger(
+            self.__class__.__name__, pylog.CRITICAL if data.config.config_test else pylog.DEBUG
+        )
         self._data = data
         self._params = params
-        self._k = getattr(data.config.evaluation, "cutoffs", [data.config.top_k])
-        self._k = self._k if isinstance(self._k, list) else [self._k]
+        self._k = data.config.evaluation.cutoffs
         if any(np.array(self._k) > data.config.top_k):
             raise Exception("Cutoff values must be smaller than recommendation list length (top_k)")
         self._rel_threshold = data.config.evaluation.relevance_threshold
-        self._paired_ttest = self._data.config.evaluation.paired_ttest
+        self._paired_ttest = data.config.evaluation.paired_ttest
         self._metrics = metrics.parse_metrics(data.config.evaluation.simple_metrics)
-        self._complex_metrics = getattr(data.config.evaluation, "complex_metrics", dict())
+        self._complex_metrics = data.config.evaluation.complex_metrics
         #TODO integrate complex metrics in validation metric (the problem is that usually complex metrics generate a complex name that does not match with the base name when looking for the loss value)
         # if _validation_metric.lower() not in [m.lower()
         #                                       for m in data.config.evaluation.simple_metrics]+[m["metric"].lower()
@@ -67,18 +67,18 @@ class Evaluator(object):
         if self._eval_users is not None:
             self._apply_user_filter()
 
-        self._pop = popularity_utils.Popularity(self._data)
+        self._pop = popularity_utils.Popularity(data)
 
         self._evaluation_objects = SimpleNamespace(relevance=relevance.Relevance(self._test, self._rel_threshold),
                                                    pop=self._pop,
-                                                   num_items=self._data.num_items,
-                                                   data=self._data,
+                                                   num_items=data.num_items,
+                                                   data=data,
                                                    additional_metrics=self._complex_metrics)
         if self._val is not None:
             self._val_evaluation_objects = SimpleNamespace(relevance=relevance.Relevance(self._val, self._rel_threshold),
                                                            pop=self._pop,
-                                                           num_items=self._data.num_items,
-                                                           data=self._data,
+                                                           num_items=data.num_items,
+                                                           data=data,
                                                            additional_metrics=self._complex_metrics)
         self._needed_recommendations = self._compute_needed_recommendations()
 

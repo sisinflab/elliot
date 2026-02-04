@@ -8,7 +8,6 @@ __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
 from ast import literal_eval
-from collections import defaultdict
 
 import torch
 import pandas as pd
@@ -16,7 +15,7 @@ import configparser
 import numpy as np
 import os
 
-from typing import List, Tuple, Dict, Any, Callable, Optional
+from typing import List, Tuple, Dict, Any, Callable, Optional, Union
 from types import SimpleNamespace
 
 from elliot.utils.folder import path_joiner, list_dir, is_dir, check_path
@@ -30,31 +29,88 @@ class Reader:
     def read_tabular(
         self,
         file_path: str,
-        columns: Optional[List[str]] = None,
-        datatypes: List[str] = [],
+        columns: Optional[List[Union[str, int]]] = None,
+        datatypes: Dict[Union[str, int], str] = {},
         sep: str = "\t",
         header: bool = False,
         callback_fn: Callable = None,
         **kwargs: Any,
     ) -> pd.DataFrame:
+        """Read a tabular file and return a pandas DataFrame.
 
+        The function supports column selection either by column names
+        or by positional indices. If positional indices are provided,
+        columns are selected and reordered accordingly.
+
+        Args:
+            file_path (str): Path to the input data file.
+            columns (Optional[List[Union[str, int]]]):
+                List of column names or positional indices.
+                If integers are provided, columns are selected and reordered
+                by position (e.g., [1, 2, 0]).
+            datatypes (List[str]): List of data types to cast columns to.
+            sep (str): Field separator used in the file.
+            header (bool): Whether the file contains a header row.
+            callback_fn (Callable): Optional function applied to the DataFrame.
+            **kwargs (Any): Additional keyword arguments (unused).
+
+        Returns:
+            pd.DataFrame: Loaded and processed DataFrame.
+        """
         try:
+            # Determine header row index for pandas
             header_row = 0 if header else None
+
             data = pd.read_csv(file_path, sep=sep, header=header_row)
         except pd.errors.EmptyDataError:
             self.logger.warning(
                 "The data file is empty. Returning an empty DataFrame."
             )
-            cols_to_use = columns if columns is not None else []
-            dtype_to_use = {c: d for c, d in zip(cols_to_use, datatypes)}
-            df = pd.DataFrame(columns=cols_to_use).astype(dtype_to_use)
+            # Create empty DataFrame with expected columns
+            cols = (
+                columns if columns and all(isinstance(c, str) for c in columns)
+                else []
+            )
+            df = pd.DataFrame(columns=cols)
+
+            # Apply dtypes if provided
+            if datatypes:
+                df = df.astype({c: t for c, t in datatypes.items() if c in df.columns})
         else:
-            if not header and columns is not None:
+            # Check whether columns are specified as positional indices
+            is_positional = columns is not None and any(isinstance(c, int) for c in columns)
+
+            # Assign column names only if header is missing and columns are semantic
+            if not header and columns is not None and not is_positional:
                 data.columns = columns[:len(data.columns)]
 
+            # Case 1: no column selection requested
             if columns is None:
-                dtype_to_use = {c: d for c, d in zip(list(data.columns), datatypes)}
-                df = data.astype(dtype_to_use)
+                df = data
+
+            # Case 2: positional column selection and reordering
+            elif is_positional:
+                columns = [c for c in columns if isinstance(c, int)]
+                max_idx = data.shape[1] - 1
+                valid_idx = [i for i in columns if 0 <= i <= max_idx]
+
+                if not valid_idx:
+                    self.logger.warning(
+                        "None of the desired column indices were found. Returning an empty DataFrame."
+                    )
+                    df = pd.DataFrame()
+                else:
+                    df = data.iloc[:, valid_idx]
+                    df.columns = valid_idx
+
+                    # Apply datatypes if provided
+                    dtype_to_use = {
+                        df.columns[i]: datatypes[i]
+                        for i in range(len(valid_idx)) if i in datatypes
+                    }
+                    df = df.astype(dtype_to_use)
+
+            # Case 3: semantic column selection by name
             else:
                 cols_to_use = [c for c in columns if c in data.columns]
                 if not cols_to_use:
@@ -63,11 +119,8 @@ class Reader:
                     )
                     df = pd.DataFrame()
                 else:
-                    dtype_to_use = {
-                        c: datatypes[i]
-                        for i, c in enumerate(columns)
-                        if datatypes and c in data.columns
-                    }
+                    # Apply datatypes if provided
+                    dtype_to_use = {c: d for c, d in datatypes.items() if c in cols_to_use}
                     df = data[cols_to_use].astype(dtype_to_use)
 
         self.logger.info(f"{file_path} - Loaded")

@@ -1,4 +1,3 @@
-import logging as pylog
 import numpy as np
 import similaripy as sim
 from scipy.sparse import csr_matrix
@@ -6,7 +5,6 @@ from tqdm import tqdm
 from sklearn.metrics.pairwise import chi2_kernel, pairwise_distances_chunked
 
 from elliot.utils import logging as elog
-from elliot.utils.sparse import center_data
 
 
 class Similarity(object):

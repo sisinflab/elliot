@@ -46,10 +46,11 @@ def xavier_uniform_init(module):
     elif isinstance(module, np.ndarray):
         module[:] = xavier_init(module.shape, init=np.random.uniform)
 
+
 def xavier_init(shape, init=np.random.normal, fan_in=None, fan_out=None, gain=1.0, dtype=np.float32):
     if fan_in is None or fan_out is None:
         if len(shape) < 2:
-            raise ValueError("Serve fan_in/fan_out oppure una shape >=2")
+            raise ValueError("Both `fan_in` and `fan_out` are required with `shape` length less than 2.")
         fan_out = shape[0]
         fan_in = shape[1]
     limit = gain * np.sqrt(6.0 / (fan_in + fan_out))

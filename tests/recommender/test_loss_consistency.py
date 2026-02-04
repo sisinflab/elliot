@@ -1,9 +1,10 @@
-import logging
-from types import SimpleNamespace
-
 import pytest
+import logging
 import torch
 
+from types import SimpleNamespace
+
+from elliot.namespace import RecommenderConfig
 from elliot.recommender.base_trainer import AbstractTrainer, GeneralTrainer, Trainer
 
 
@@ -37,9 +38,8 @@ class _DummyOptimizer:
 
 
 def _make_config(batch_size=1):
-    return SimpleNamespace(
+    return RecommenderConfig(
         batch_size=batch_size,
-        meta=SimpleNamespace(verbose=False, validation_rate=1, restore=False),
         epochs=1,
     )
 
@@ -47,7 +47,7 @@ def _make_config(batch_size=1):
 def test_trainer_epoch_loss_is_mean():
     trainer = Trainer.__new__(Trainer)
     trainer.model = _DummyModel([1.0, 2.0, 3.0])
-    trainer.config = _make_config()
+    trainer.model_config = _make_config()
 
     loss = Trainer._train_epoch(trainer, it=0, dataloader=[0, 1, 2])
 
@@ -58,7 +58,7 @@ def test_general_trainer_epoch_loss_is_mean():
     trainer = GeneralTrainer.__new__(GeneralTrainer)
     trainer.model = _DummyTorchModel([1.0, 3.0, 5.0])
     trainer.optimizer = _DummyOptimizer()
-    trainer.config = _make_config()
+    trainer.model_config = _make_config()
 
     loss = GeneralTrainer._train_epoch(trainer, it=0, dataloader=[0, 1, 2])
 
@@ -68,8 +68,8 @@ def test_general_trainer_epoch_loss_is_mean():
 class _DummyTrainer(AbstractTrainer):
     def __init__(self):
         # Do not call AbstractTrainer.__init__ (too heavy for unit test)
-        self._data = SimpleNamespace(transactions=1)
-        self.config = _make_config()
+        self.data = SimpleNamespace(transactions=1)
+        self.model_config = _make_config()
         self.logger = logging.getLogger("dummy-trainer")
         self.model = SimpleNamespace(
             transactions=1,
@@ -86,9 +86,16 @@ class _DummyTrainer(AbstractTrainer):
     def evaluate(self, it=0, loss=0):
         self.last_loss = loss
 
+    def get_report(self):
+        return {}
+
 
 def test_train_passes_epoch_loss_to_evaluate():
     trainer = _DummyTrainer()
     trainer.train()
 
     assert trainer.last_loss == pytest.approx(5.0)
+
+
+if __name__ == "__main__":
+    pytest.main()

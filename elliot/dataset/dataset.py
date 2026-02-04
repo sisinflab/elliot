@@ -26,14 +26,15 @@ from torch.nn.utils.rnn import pad_sequence
 from torch_sparse import SparseTensor
 
 from elliot.dataset.samplers.base_sampler import build_dataset
+from elliot.dataset.fusion.fuser import FeatureFuser
 from elliot.negative_sampling import NegativeSampler
 from elliot.utils import logging
-from elliot.dataset.fusion.fuser import FeatureFuser
 
 
 class NegEvalDataset(Dataset):
-    def __init__(self, num_users, sampler, val_pos_items, test_pos_items):
+    def __init__(self, num_users, sampler, val_pos_items, test_pos_items, leave_one_out=False):
         self.num_users = num_users
+        self.leave_one_out = leave_one_out
 
         val_neg_items, test_neg_items = sampler.sample()
 
@@ -52,14 +53,19 @@ class NegEvalDataset(Dataset):
 
         with tqdm(total=total, desc=f"Adding {text} items to sampled negatives", leave=False) as t:
             while i < len(neg):
-                a = neg[i]
-                b = [pos[i][-1]] if pos[i] and a else []
+                neg_u = neg[i]
 
-                final_items.append(torch.tensor(a + b))
+                if not neg_u:
+                    pos_u = []
+                elif self.leave_one_out:
+                    pos_u = [pos[i][-1]] if pos[i] else []
+                else:
+                    pos_u = pos[i]
+
+                final_items.append(torch.tensor(neg_u + pos_u))
 
                 # Manual garbage collection
-                del neg[i]
-                del pos[i]
+                del neg[i], pos[i]
 
                 t.update()
 
@@ -313,11 +319,11 @@ class DataSet:
         cache_key = self._eval_cache_key
 
         if cache_key is None:
-            if hasattr(self.config, "negative_sampling"):
+            if self.config.negative_sampling is not None:
                 train, val, test = self.get_positive_items()
 
                 sampler = NegativeSampler(
-                    config=self.config.negative_sampling,
+                    neg_sampling_config=self.config.negative_sampling,
                     mappings=self.get_mappings(),
                     inv_mappings=self.get_inverse_mappings(),
                     num_users=self.num_users,
@@ -325,10 +331,16 @@ class DataSet:
                     pos_items=(train, val, test)
                 )
 
-                eval_dataset = NegEvalDataset(self.num_users, sampler, val, test)
+                eval_dataset = NegEvalDataset(
+                    num_users=self.num_users,
+                    sampler=sampler,
+                    val_pos_items=val,
+                    test_pos_items=test,
+                    leave_one_out=self.config.negative_sampling.leave_one_out
+                )
                 cache_key = "neg"
             else:
-                eval_dataset = FullEvalDataset(self.num_users)
+                eval_dataset = FullEvalDataset(num_users=self.num_users)
                 cache_key = "full"
 
             self._cached_dataloaders[cache_key] = DataLoader(

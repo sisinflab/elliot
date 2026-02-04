@@ -24,3 +24,16 @@ from .adversarial import AMF, MSAPMF, AMR
 from .gan import IRGAN, CFGAN
 from .generic import ProxyRecommender
 
+from .base_recommender import (
+    AbstractRecommender,
+    Recommender,
+    TraditionalRecommender,
+    GeneralRecommender,
+    GraphBasedRecommender
+)
+from .base_trainer import (
+    AbstractTrainer,
+    Trainer,
+    TraditionalTrainer,
+    GeneralTrainer
+)

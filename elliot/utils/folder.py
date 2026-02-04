@@ -7,10 +7,22 @@ __version__ = '0.3.1'
 __author__ = 'Vito Walter Anelli, Claudio Pomo'
 __email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
-from typing import Generator, Union
+from typing import List, Generator, Union
 from os import PathLike
+import re
 import shutil
 from pathlib import Path
+
+regexp = re.compile(r'[\D][\w-]+\.[\w-]+')
+
+
+_CTX = {}
+
+def set_config_folder(path):
+    _CTX["config_folder"] = path
+
+def get_config_folder():
+    return _CTX["config_folder"]
 
 
 def check_dir(
@@ -78,3 +90,22 @@ def path_relative(
     start: Union[str, PathLike[str]]
 ) -> str:
     return str(Path(path).relative_to(start))
+
+
+def path_resolver(local_path: str, values: Union[str, List[str]] = "") -> str:
+    if local_path.startswith((".", "..")) or regexp.search(local_path):
+        local_path = path_absolute(
+            path_joiner(get_config_folder(), local_path)
+        )
+    if values:
+        try:
+            local_path = local_path.format(values)
+        except (KeyError, IndexError, ValueError, TypeError, AttributeError):
+            pass
+    return local_path
+
+
+def file_ext(
+    path: Union[str, PathLike[str]],
+) -> str:
+    return str(Path(path).suffix)

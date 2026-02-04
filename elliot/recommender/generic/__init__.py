@@ -1,1 +1,1 @@
-from .Proxy import ProxyRecommender
+from .proxy import ProxyRecommender

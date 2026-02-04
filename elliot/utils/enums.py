@@ -38,3 +38,25 @@ class ModelType(Enum):
     BASE = 1
     TRADITIONAL = 2
     GENERAL = 3
+
+
+class SearchSpace(Enum):
+    CHOICE = "choice"
+    RANDINT = "randint"
+    UNIFORM = "uniform"
+    QUNIFORM = "quniform"
+    LOGUNIFORM = "loguniform"
+    QLOGUNIFORM = "qloguniform"
+    NORMAL = "normal"
+    QNORMAL = "qnormal"
+    LOGNORMAL = "lognormal"
+    QLOGNORMAL = "qlognormal"
+
+
+class OptimizationAlgorithm(Enum):
+    TPE = "tpe"
+    ATPE = "atpe"
+    MIX = "mix"
+    RAND = "rand"
+    ANNEAL = "anneal"
+    GRID = "grid"

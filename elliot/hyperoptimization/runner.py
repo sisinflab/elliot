@@ -2,12 +2,14 @@
 Facade for running hyperparameter optimization and final evaluation.
 """
 
+from typing import List, Optional
 from dataclasses import dataclass
-from typing import Optional
+import numpy as np
 
+from elliot.dataset import DataSet
 from elliot.hyperoptimization.engine import HyperOptEngine
 from elliot.hyperoptimization.model_coordinator import ModelCoordinator
-from elliot.hyperoptimization.policy import FinalPolicy
+from elliot.namespace import RecommenderConfig, ExperimentConfig
 
 
 @dataclass(frozen=True)
@@ -17,29 +19,31 @@ class RunOutcome:
     all_trial_results: list
 
 
-class HyperoptRunner:
-    def __init__(self, engine: HyperOptEngine):
-        self.engine = engine
-        self._final_policy = FinalPolicy()
+def run_hyperopt(
+    data_test: List[DataSet],
+    config: ExperimentConfig,
+    model_config: RecommenderConfig,
+    model_name: str,
+    test_fold_index: int
+) -> RunOutcome:
 
-    def run(self, data_test, base_namespace, model_base, model_class, test_fold_index: int) -> RunOutcome:
-        coordinator = ModelCoordinator(data_test, base_namespace, model_base, model_class, test_fold_index)
-        if isinstance(model_base, tuple):
-            tuning = self.engine.optimize(
-                coordinator=coordinator,
-                space=model_base[1],
-                algo=model_base[3],
-                max_evals=model_base[2],
-            )
-            if tuning.best_trial is None:
-                best_eval = coordinator.run(self._final_policy)
-            else:
-                best_eval = coordinator.run(self._final_policy, tuning.best_params)
-            return RunOutcome(
-                best_eval=best_eval,
-                trials=tuning.trials,
-                all_trial_results=tuning.trials.results,
-            )
+    rstate = np.random.default_rng(seed=config.random_seed)
+    engine = HyperOptEngine(rstate=rstate)
 
-        best_eval = coordinator.run(self._final_policy)
-        return RunOutcome(best_eval=best_eval, trials=None, all_trial_results=[best_eval])
+    model_config.prepare_fields_for_search()
+
+    coordinator = ModelCoordinator(data_test, config, model_config, model_name, test_fold_index)
+
+    tuning = engine.optimize(
+        coordinator=coordinator,
+        model_config=model_config
+    )
+
+    params = tuning.best_params if tuning.best_trial is not None else None
+    best_eval = coordinator.evaluate(params)
+
+    return RunOutcome(
+        best_eval=best_eval,
+        trials=tuning.trials,
+        all_trial_results=tuning.trials.results,
+    )

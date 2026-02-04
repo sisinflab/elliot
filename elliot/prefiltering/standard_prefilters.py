@@ -1,10 +1,8 @@
 from typing import List, Optional
-from types import SimpleNamespace
-import warnings
 import pandas as pd
 
+from elliot.namespace import PreFilteringConfig
 from elliot.utils.enums import PreFilteringStrategy
-from elliot.utils.config import PreFilteringConfig
 from elliot.utils import logging as elog
 
 
@@ -16,7 +14,7 @@ class PreFilter:
 
     Args:
         data (pd.DataFrame): The input dataset, typically containing 'userId', 'itemId', and 'rating' columns.
-        config (List[SimpleNamespace]): A list of configurations specifying filtering strategies.
+        prefiltering_config (List[PreFilteringConfig]): A list of configuration objects specifying filtering strategies.
 
     Supported pre-filtering strategies:
 
@@ -47,12 +45,12 @@ class PreFilter:
         Pre-filtering is optional and can be applied regardless of the `data_config.strategy` value.
     """
 
-    config: List[PreFilteringConfig]
+    prefiltering_config: List[PreFilteringConfig]
 
-    def __init__(self, data: pd.DataFrame, config: List[SimpleNamespace]):
+    def __init__(self, data: pd.DataFrame, prefiltering_config: List[PreFilteringConfig]):
         self.logger = elog.get_logger(self.__class__.__name__)
         self.data = data
-        self.config = [PreFilteringConfig(**vars(ns)) for ns in config]
+        self.prefiltering_config = prefiltering_config
         self._mask = None
 
     def filter(self) -> pd.DataFrame:
@@ -63,7 +61,7 @@ class PreFilter:
             pd.DataFrame: The filtered dataset.
         """
         dataframe = self.data
-        for cfg in self.config:
+        for cfg in self.prefiltering_config:
             dataframe = self.single_filter(dataframe, cfg)
         return dataframe
 

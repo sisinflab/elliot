@@ -4,13 +4,18 @@ Hyperopt optimization engine for Elliot.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from itertools import product
+from functools import reduce
 from typing import Any, Dict, Optional, Tuple
+from dataclasses import dataclass
+from collections import OrderedDict
+from itertools import product
 
 import numpy as np
-from hyperopt import Trials, STATUS_FAIL, STATUS_OK, fmin, space_eval
+from hyperopt import Trials, STATUS_FAIL, STATUS_OK, fmin, space_eval, hp, anneal, atpe, mix, rand, tpe
 from hyperopt.base import JOB_STATE_DONE
+
+from elliot.namespace import RecommenderConfig
+from elliot.utils.enums import OptimizationAlgorithm, SearchSpace
 
 
 @dataclass(frozen=True)
@@ -27,8 +32,10 @@ class HyperOptEngine:
         self._rstate = rstate
         self._show_progressbar = show_progressbar
 
-    def optimize(self, coordinator, space, algo, max_evals: int) -> TuningResult:
-        if algo == "grid":
+    def optimize(self, coordinator, model_config) -> TuningResult:
+        space, max_evals, algo = build_hyperopt_space(model_config)
+
+        if algo == OptimizationAlgorithm.GRID.value:
             return self._grid_search(coordinator, space, max_evals)
 
         trials = Trials()
@@ -158,3 +165,63 @@ class HyperOptEngine:
                 vals[key] = [value]
             idxs[key] = [tid]
         return {"tid": tid, "cmd": None, "idxs": idxs, "vals": vals}
+
+
+OPT_ALGORITHMS = {
+    OptimizationAlgorithm.TPE: tpe.suggest,
+    OptimizationAlgorithm.ATPE: atpe.suggest,
+    OptimizationAlgorithm.MIX: mix.suggest,
+    OptimizationAlgorithm.RAND: rand.suggest,
+    OptimizationAlgorithm.ANNEAL: anneal.suggest,
+    OptimizationAlgorithm.GRID: OptimizationAlgorithm.GRID.value
+}
+
+
+def build_hyperopt_space(config: RecommenderConfig):
+    space_list = []
+    uses_distributions = False
+    opt_alg_name = config.meta.hyper_opt_alg
+    model_params = config.model_dump()
+
+    for k, value in model_params.items():
+        if not isinstance(value, list):
+            continue
+        func_ = getattr(hp, value[0])
+        val_items = value[1:]
+        if value[0] == SearchSpace.CHOICE.value:
+            space_list.append((k, func_(k, val_items)))
+        else:
+            uses_distributions = True
+            space_list.append((k, func_(k, *val_items)))
+
+    space = OrderedDict(space_list)
+
+    estimated_evals = reduce(lambda x, y: x * y, [len(param.pos_args) - 1 for _, param in space.items()], 1)
+    hyper_max_evals = config.meta.hyper_max_evals
+    max_evals = hyper_max_evals if hyper_max_evals is not None else estimated_evals
+
+    if opt_alg_name == OptimizationAlgorithm.GRID and uses_distributions:
+        raise Exception(
+            "Grid search supports only discrete choices. "
+            "Please use explicit lists or 'choice' in model.meta configuration."
+        )
+
+    if max_evals is None:
+        if uses_distributions:
+            raise Exception(
+                "`hyper_max_evals` must be provided when using hyperopt distributions. "
+                "Please define `hyper_max_evals` in model.meta configuration."
+            )
+        max_evals = estimated_evals
+
+    if max_evals <= 0:
+        raise Exception("`hyper_max_evals` must be a positive integer in model.meta configuration.")
+
+    if opt_alg_name == OptimizationAlgorithm.GRID and max_evals < estimated_evals:
+        raise Exception(
+            "`hyper_max_evals` must be >= the full grid size when using grid search."
+        )
+
+    opt_alg = OPT_ALGORITHMS[config.meta.hyper_opt_alg]
+
+    return space, max_evals, opt_alg
