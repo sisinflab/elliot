@@ -50,6 +50,7 @@ class ModelCoordinator(object):
 
         self.logger.info("Hyperparameter tuning exploration:")
         for k, v in args.items():
+            v = self._coerce_param(k, v)
             setattr(model_config, k, v)
             self.logger.info(f"Exploration for {k}. Value extracted: {v}")
 
@@ -101,6 +102,14 @@ class ModelCoordinator(object):
                     payload["test_metric"] = aggregated_results["test_results"][k].get(metric)
 
         return payload
+
+    def _coerce_param(self, name, value):
+        annotations = getattr(self._model_class, "__annotations__", {})
+        ann = annotations.get(name)
+        if ann is int and isinstance(value, (float, np.floating)):
+            if float(value).is_integer():
+                return int(value)
+        return value
 
     def _aggregate(self, reports_list, include_test=True):
         if not reports_list:
