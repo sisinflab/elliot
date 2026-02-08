@@ -3,9 +3,6 @@ This is the implementation of the Popularity-based Ranking-based Equal Opportuni
 It proceeds from a user-wise computation, and average the values over the users.
 """
 
-__version__ = '0.3.1'
-__author__ = 'Vito Walter Anelli, Claudio Pomo, Alejandro Bellogín'
-__email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, alejandro.bellogin@uam.es'
 
 import numpy as np
 

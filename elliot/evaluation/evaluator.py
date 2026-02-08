@@ -18,9 +18,6 @@ evaluation:
     - metric: IELD
       content_file: path
 """
-__version__ = '0.3.1'
-__author__ = 'Vito Walter Anelli, Claudio Pomo'
-__email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
 from time import time
 from types import SimpleNamespace

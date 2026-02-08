@@ -19,7 +19,6 @@ except ImportError:
 else:
     USE_CYTHON = True
 
-__version__ = '1.0.0'
 
 here = path.abspath(path.dirname(__file__))
 # Get the long description from README.md

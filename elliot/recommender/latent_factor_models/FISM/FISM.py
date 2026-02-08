@@ -3,10 +3,6 @@ Module description:
 
 """
 
-__version__ = '0.2'
-__author__ = 'Zhankui (Aaron) He, Vito Walter Anelli, Claudio Pomo, Felice Antonio Merra'
-__email__ = 'zkhe15@fudan.edu.cn, vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, felice.merra@poliba.it'
-__paper__ = 'FISM: Factored Item Similarity Models for Top-N Recommender Systems by Santosh Kabbur, Xia Ning, and George Karypis'
 
 import numpy as np
 from tqdm import tqdm

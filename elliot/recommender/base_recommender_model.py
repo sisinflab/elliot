@@ -11,9 +11,6 @@ import random
 
 from elliot.evaluation.evaluator import Evaluator
 
-__version__ = '0.3.1'
-__author__ = 'Vito Walter Anelli, Claudio Pomo'
-__email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
 from abc import ABC
 from abc import abstractmethod

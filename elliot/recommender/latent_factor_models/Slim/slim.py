@@ -4,9 +4,6 @@ Module description:
 """
 
 
-__version__ = '0.3'
-__author__ = 'Massimo Quadrana, Vito Walter Anelli, Claudio Pomo, Felice Antonio Merra'
-__email__ = 'mquadrana@pandora.com, vitowalter.anelli@poliba.it, claudio.pomo@poliba.it, felice.merra@poliba.it'
 
 import pickle
 

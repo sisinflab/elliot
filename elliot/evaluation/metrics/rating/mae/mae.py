@@ -3,9 +3,6 @@ This is the implementation of the Mean Absolute Error metric.
 It proceeds from a system-wise computation.
 """
 
-__version__ = '0.3.1'
-__author__ = 'Vito Walter Anelli, Claudio Pomo'
-__email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
 from elliot.evaluation.metrics.base_metric import BaseMetric
 from elliot.utils import logging

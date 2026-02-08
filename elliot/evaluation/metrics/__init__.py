@@ -8,9 +8,6 @@ See the implementation of Precision metric for creating new per-user metrics.
 See the implementation of Item Coverage for creating new cross-user metrics.
 """
 
-__version__ = '0.3.1'
-__author__ = 'Vito Walter Anelli, Claudio Pomo'
-__email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
 from elliot.evaluation.metrics.accuracy.ndcg import nDCG, nDCGRendle2020
 from elliot.evaluation.metrics.accuracy.precision import Precision

@@ -3,9 +3,6 @@ This is the implementation of the Item Coverage metric.
 It directly proceeds from a system-wise computation, and it considers all the users at the same time.
 """
 
-__version__ = '0.3.1'
-__author__ = 'Vito Walter Anelli, Claudio Pomo'
-__email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
 from elliot.evaluation.metrics.base_metric import BaseMetric
 

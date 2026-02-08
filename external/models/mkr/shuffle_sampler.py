@@ -3,9 +3,6 @@ Module description:
 
 """
 
-__version__ = '0.3.1'
-__author__ = 'Alberto Carlo Maria Mancino'
-__email__ = 'alberto.mancino@poliba.it'
 
 import numpy as np
 import random

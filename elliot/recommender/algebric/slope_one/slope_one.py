@@ -5,9 +5,6 @@ Proceedings of the 2005 SIAM International Conference on Data Mining. Society fo
 """
 
 
-__version__ = '0.3.1'
-__author__ = 'Vito Walter Anelli, Claudio Pomo'
-__email__ = 'vitowalter.anelli@poliba.it, claudio.pomo@poliba.it'
 
 import pickle
 

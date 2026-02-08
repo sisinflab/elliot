@@ -3,9 +3,6 @@ Module description:
 
 """
 
-__version__ = '0.1'
-__author__ = 'Vito Walter Anelli, Antonio Ferrara, Alberto Carlo Maria Mancino'
-__email__ = 'vitowalter.anelli@poliba.it, antonio.ferrara@poliba.it, alberto.mancino@poliba.it'
 
 
 from tqdm import tqdm

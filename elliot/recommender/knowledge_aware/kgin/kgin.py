@@ -3,9 +3,6 @@ Module description:
 
 """
 
-__version__ = '0.3.1'
-__author__ = 'Antonio Ferrara'
-__email__ = 'antonio.ferrara@poliba.it'
 
 import numpy as np
 import scipy.sparse as sp

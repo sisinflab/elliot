@@ -2,9 +2,6 @@
 Module description:
 """
 
-__version__ = '0.1'
-__author__ = 'Antonio Ferrara'
-__email__ = 'antonio.ferrara@poliba.it'
 
 import os
 import numpy as np
