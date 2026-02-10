@@ -3,6 +3,7 @@ Module description:
 
 """
 
+__version__ = '0.3.1'
 
 from typing import List, Optional
 import copy
@@ -11,7 +12,7 @@ import numpy as np
 
 from elliot.dataset import DataSetLoader
 from elliot.namespace import build_namespace, ExperimentConfig
-from elliot.hyperoptimization import run_hyperopt
+from elliot.hyperoptimization import run_hyperopt, run_single
 from elliot.result_handler.result_handler import ResultHandler, StatTest
 from elliot.utils import logging as logging_project
 from elliot.utils import set_device
@@ -71,15 +72,27 @@ def run_experiment(config_path: str = "", config_overrides: Optional[List[str]] 
         for test_fold_index, data_test in enumerate(data_test_list):
             logging_project.prepare_logger(model_name, config.path_log_folder)
 
-            logger.info(f"Tuning begun for {model_name}\n")
-
-            outcome = run_hyperopt(
-                data_test=data_test,
-                config=config,
-                model_config=model_config,
-                model_name=model_name,
-                test_fold_index=test_fold_index
-            )
+            is_proxy = model_name.startswith("ProxyRecommender")
+            if is_proxy:
+                logger.info(f"Evaluation begun for {model_name}\n")
+                outcome = run_single(
+                    data_test=data_test,
+                    config=config,
+                    model_config=model_config,
+                    model_name=model_name,
+                    test_fold_index=test_fold_index
+                )
+                logger.info(f"Evaluation ended for {model_name}")
+            else:
+                logger.info(f"Tuning begun for {model_name}\n")
+                outcome = run_hyperopt(
+                    data_test=data_test,
+                    config=config,
+                    model_config=model_config,
+                    model_name=model_name,
+                    test_fold_index=test_fold_index
+                )
+                logger.info(f"Tuning ended for {model_name}")
             best_eval = outcome.best_eval
 
             ############################################
@@ -91,10 +104,9 @@ def run_experiment(config_path: str = "", config_overrides: Optional[List[str]] 
             # aggiunta a lista performance test
             test_results.append(best_eval)
 
-            test_trials.append(outcome.all_trial_results)
-            all_trials[model_name].append(outcome.all_trial_results)
-
-            logger.info(f"Tuning ended for {model_name}")
+            if outcome.trials is not None:
+                test_trials.append(outcome.all_trial_results)
+                all_trials[model_name].append(outcome.all_trial_results)
 
             logger.info(f"Loss:\t{best_model_loss}")
             logger.info(f"Best Model params:\t{best_model_params}")
@@ -110,8 +122,9 @@ def run_experiment(config_path: str = "", config_overrides: Optional[List[str]] 
 
         res_handler.add_oneshot_recommender(**best_eval)
 
-        res_handler.add_trials(test_trials[min_val], name=model_name)
-        all_trials[model_name] = all_trials[model_name][min_val]
+        if test_trials:
+            res_handler.add_trials(test_trials[min_val], name=model_name)
+            all_trials[model_name] = all_trials[model_name][min_val]
 
     _save_outputs(res_handler, config)
 

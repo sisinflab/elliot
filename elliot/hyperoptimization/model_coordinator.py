@@ -46,10 +46,11 @@ class ModelCoordinator(object):
         model_config = copy.deepcopy(self.model_config)
 
         self.logger.info("Hyperparameter tuning exploration:")
-        for k, v in args.items():
-            v = self._coerce_param(k, v)
-            setattr(model_config, k, v)
-            self.logger.info(f"Exploration for {k}. Value extracted: {v}")
+        if args:
+            for k, v in args.items():
+                v = self._coerce_param(k, v)
+                setattr(model_config, k, v)
+                self.logger.info(f"Exploration for {k}. Value extracted: {v}")
 
         internal_losses = []
         reports = []

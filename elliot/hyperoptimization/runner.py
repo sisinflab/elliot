@@ -47,3 +47,20 @@ def run_hyperopt(
         trials=tuning.trials,
         all_trial_results=tuning.trials.results,
     )
+
+
+def run_single(
+    data_test: List[DataSet],
+    config: ExperimentConfig,
+    model_config: RecommenderConfig,
+    model_name: str,
+    test_fold_index: int
+) -> RunOutcome:
+    coordinator = ModelCoordinator(data_test, config, model_config, model_name, test_fold_index)
+    best_eval = coordinator.single()
+
+    return RunOutcome(
+        best_eval=best_eval,
+        trials=None,
+        all_trial_results=[],
+    )

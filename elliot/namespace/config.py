@@ -3,6 +3,7 @@ Module description:
 
 """
 
+__version__ = '0.3.1'
 
 from typing import List, Dict, Any, Optional
 import fnmatch
@@ -156,7 +157,7 @@ class ExperimentConfig(BaseConfig):
 
         # Get all the files in the folder
         only_files = [f for f in list_dir(folder_path)
-                      if is_file(path_joiner(folder_path, f))]
+                      if is_file(f)]
 
         # Optionally filter files by filename patterns (e.g., "*.tsv")
         patterns = model_data.get("pattern")
