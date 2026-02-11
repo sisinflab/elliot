@@ -60,3 +60,8 @@ class OptimizationAlgorithm(Enum):
     RAND = "rand"
     ANNEAL = "anneal"
     GRID = "grid"
+
+
+class StatTest(Enum):
+    PAIRED_TTEST = "paired_ttest"
+    WILCOXON_TEST = "wilcoxon_test"

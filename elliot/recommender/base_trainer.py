@@ -56,25 +56,19 @@ class AbstractTrainer(ABC):
 
         # Model
         self.model = model_class(data, model_config, self.config.random_seed, self.logger)
+        self.model_config.name = self.model.name
 
         # Validation metric
-        cutoff_k = self.config.evaluation.cutoffs or [self.config.top_k]
-        self.config.evaluation.cutoffs = cutoff_k
+        default_metric = self.config.results.default_metric
+        default_k = self.config.results.default_k
 
-        first_metric = (
-            self.config.evaluation.simple_metrics[0]
-            if self.config.evaluation.simple_metrics else ""
-        )
-
-        default_k = cutoff_k[0]
-
-        validation_metric = self.model_config.meta.validation_metric or first_metric
+        validation_metric = self.model_config.meta.validation_metric or default_metric
         validation_k = self.model_config.meta.validation_k or default_k
 
         if validation_metric.lower() not in [m.lower() for m in self.config.evaluation.simple_metrics]:
             raise Exception("Validation metric must be in the list of simple metrics")
 
-        if validation_k not in cutoff_k:
+        if validation_k not in self.config.evaluation.cutoffs:
             raise Exception("Validation cutoff must be in general cutoff values")
 
         self.model_config.meta.validation_metric = validation_metric
@@ -88,7 +82,7 @@ class AbstractTrainer(ABC):
             early_stopping_config=self.model_config.early_stopping,
             validation_metric=self._validation_metric,
             validation_k=self._validation_k,
-            cutoffs=cutoff_k,
+            cutoffs=self.config.evaluation.cutoffs,
             simple_metrics=self.config.evaluation.simple_metrics
         )
 
@@ -106,7 +100,6 @@ class AbstractTrainer(ABC):
         # Further parameters
         self._num_items = data.num_items
         self._num_users = data.num_users
-        self.model_config.name = self.name
 
         self.best_metric_value = 0
 
@@ -182,11 +175,15 @@ class AbstractTrainer(ABC):
         if self.model_config.meta.save_recs:
             self.logger.info(f"Writing recommendations at: {self.config.path_output_rec_result}")
             # if it is not None:
-            writer.write_recommendation(
+            writer.write_recommendations(
                 recommendations=recs[1],
                 save_folder=self.config.path_output_rec_result,
                 model_name=self.name,
-                it=it
+                it=it,
+                header=self.model_config.meta.rec_writer.header,
+                columns=self.model_config.meta.rec_writer.columns,
+                sep=self.model_config.meta.rec_writer.sep,
+                ext=self.model_config.meta.rec_writer.ext
             )
             # else:
             #    store_recommendation(recs[1], os.path.abspath(
@@ -205,7 +202,8 @@ class AbstractTrainer(ABC):
                 writer.write_model(
                     obj=self.model.get_model_state(),
                     save_folder=self.config.path_output_rec_weight,
-                    model_name=self.name
+                    model_name=self.name,
+                    ext=self.model_config.meta.model_writer.ext
                 )
 
     def get_recs(self, k: int = 100):
@@ -286,7 +284,8 @@ class AbstractTrainer(ABC):
         try:
             weights = reader.read_model(
                 read_folder=self.config.path_output_rec_weight,
-                model_name=self.name
+                model_name=self.name,
+                ext=self.model_config.meta.model_reader.ext
             )
             self.model.set_model_state(weights)
             self.evaluate()

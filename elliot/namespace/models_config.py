@@ -4,7 +4,8 @@ from pydantic import Field, model_validator, field_validator
 from pydantic_core.core_schema import ValidationInfo
 
 from elliot.namespace.common import BaseConfig, check_type
-from elliot.namespace.read_write_config import ReaderConfig, WriterConfig
+from elliot.namespace.read_config import InteractionsReaderConfig, ModelReaderConfig
+from elliot.namespace.write_config import TabularWriterConfig, ModelWriterConfig
 from elliot.utils.enums import SearchSpace, OptimizationAlgorithm
 
 MODEL_FIELD = lambda t: Union[t, List[Union[str, t]]]
@@ -14,17 +15,23 @@ class MetaConfig(BaseConfig):
     """Meta configuration.
 
     Attributes:
-        restore (bool): Whether to restore a previous training state; default is False.
-        save_weights (bool): Whether to save model weights after training; default is False.
-        save_recs (bool): Whether to save generated recommendations; default is False.
-        verbose (bool): Enable verbose logging; default is True.
-        validation_metric (Optional[str]): Metric used for validation.
-        validation_k (Optional[int]): Cutoff value for validation metrics (automatically set).
-        validation_rate (int): Frequency (in epochs) of validation runs; default is 1, min is 1.
-        optimization_target (Optional[str]): Target metric or loss to optimize.
-        optimize_internal_loss (bool): Whether to optimize the internal loss; default is False.
-        hyper_max_evals (Optional[int]): Maximum number of hyperparameter evaluations.
-        hyper_opt_alg (OptimizationAlgorithm): Hyperparameter optimization algorithm; default is "tpe".
+        restore (bool): Whether to restore a previous training state. Defaults to False.
+        save_weights (bool): Whether to save model weights after training. Defaults to False.
+        save_recs (bool): Whether to save generated recommendations. Defaults to False.
+        verbose (bool): Enable verbose logging. Defaults to True.
+        validation_metric (str): Metric used for validation (automatically set if not provided).
+            Defaults to None.
+        validation_k (int): Cutoff value for validation metrics (automatically set if not provided).
+            Defaults to None.
+        validation_rate (int): Frequency (in epochs) of validation runs. Defaults to 1, min is 1.
+        optimization_target (str, optional): Target metric or loss to optimize.
+        optimize_internal_loss (bool): Whether to optimize the internal loss. Defaults to False.
+        hyper_max_evals (int, optional): Maximum number of hyperparameter evaluations.
+        hyper_opt_alg (OptimizationAlgorithm): Hyperparameter optimization algorithm. Defaults to "tpe".
+        model_reader (ModelReaderConfig): Model reading configuration.
+        model_writer (ModelWriterConfig): Model writing configuration.
+        rec_reader (InteractionsReaderConfig): Recommendation reading configuration.
+        rec_writer (TabularWriterConfig): Recommendation writing configuration.
     """
 
     restore: bool = False
@@ -38,6 +45,10 @@ class MetaConfig(BaseConfig):
     optimize_internal_loss: bool = False
     hyper_max_evals: Optional[int] = None
     hyper_opt_alg: OptimizationAlgorithm = OptimizationAlgorithm.TPE
+    model_reader: ModelReaderConfig = Field(default_factory=ModelReaderConfig, exclude=True)
+    model_writer: ModelWriterConfig = Field(default_factory=ModelWriterConfig, exclude=True)
+    rec_reader: InteractionsReaderConfig = Field(default_factory=InteractionsReaderConfig, exclude=True)
+    rec_writer: TabularWriterConfig = Field(default_factory=TabularWriterConfig, exclude=True)
 
     @model_validator(mode="after")
     def validate_optimization_target(self) -> "MetaConfig":
@@ -56,13 +67,13 @@ class EarlyStoppingConfig(BaseConfig):
     """Early stopping configuration.
 
     Attributes:
-        monitor (str): Metric or quantity to monitor; default is "".
-        patience (int): Number of epochs with no improvement before stopping; default is 0.
-        mode (Optional[str]): Optimization mode ("min" or "max").
-        min_delta (Optional[int]): Minimum absolute change to qualify as improvement.
-        rel_delta (Optional[int]): Minimum relative change to qualify as improvement.
-        baseline (Optional[int]): Baseline value for the monitored quantity.
-        verbose (bool): Enable verbose logging; default is True.
+        monitor (str): Metric or quantity to monitor. Defaults to "".
+        patience (int): Number of epochs with no improvement before stopping. Defaults to 0.
+        mode (str, optional): Optimization mode ("min" or "max"). Defaults to None.
+        min_delta (int, optional): Minimum absolute change to qualify as improvement. Defaults to None.
+        rel_delta (int, optional): Minimum relative change to qualify as improvement. Defaults to None.
+        baseline (int, optional): Baseline value for the monitored quantity. Defaults to None.
+        verbose (bool): Enable verbose logging. Defaults to True.
     """
 
     monitor: str = ""
@@ -80,26 +91,24 @@ class RecommenderConfig(BaseConfig):
     Attributes:
         meta (MetaConfig): Meta-level training configuration.
         early_stopping (Optional[EarlyStoppingConfig]): Early stopping configuration.
-        epochs (MODEL_FIELD(int)): Number of training epochs (or search space); default is 1.
-        batch_size (MODEL_FIELD(int)): Training batch size (or search space); default is 1024.
-        eval_batch_size (MODEL_FIELD(int)): Evaluation batch size (or search space).
+        epochs (MODEL_FIELD(int)): Number of training epochs (or search space). Defaults to 1.
+        batch_size (MODEL_FIELD(int)): Training batch size (or search space). Defaults to 1024.
+        eval_batch_size (MODEL_FIELD(int)): Evaluation batch size (or search space). Defaults to None.
         best_iteration (int): Best epoch selected during training (automatically set).
         name (str): Recommender instance name (automatically set).
     """
 
-    meta: MetaConfig = Field(default_factory=MetaConfig, exclude=True)
+    meta: MetaConfig = Field(default_factory=MetaConfig)
     early_stopping: Optional[EarlyStoppingConfig] = Field(default=None, exclude=True)
     epochs: MODEL_FIELD(int) = 1
     batch_size: MODEL_FIELD(int) = 1024
     eval_batch_size: MODEL_FIELD(int) = None
-    best_iteration: int = 0
-    name: str = ""
-    reader: ReaderConfig = Field(default_factory=ReaderConfig, exclude=True)
-    writer: WriterConfig = Field(default_factory=WriterConfig, exclude=True)
+    best_iteration: int = None
+    name: str = None
 
     @field_validator("*", mode="before")
     @classmethod
-    def eval_tuple_fields(cls, value: Any, info: ValidationInfo):
+    def eval_tuple_fields(cls, value: Any, info: ValidationInfo) -> Any:
         """Parse tuple-like configuration fields.
 
         Args:

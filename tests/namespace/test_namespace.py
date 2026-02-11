@@ -16,10 +16,10 @@ def _sample_config():
             "data_config": {
                 "strategy": "dataset",
                 "dataset_path": "../data/{0}/dataset.tsv",
-                "side_information": [{
+                "side_information": {
                     "dataloader": "FeatureLoader1",
                     "folder_map_features": "../data/{0}/map"
-                }]
+                }
             },
             "splitting": {
                 "test_splitting": {
@@ -107,7 +107,7 @@ class TestNamespace:
 
         model_config.prepare_fields_for_search()
 
-        fields = model_config.model_dump(exclude={"name", "best_iteration"})
+        fields = model_config.model_dump(exclude={"name", "best_iteration", "meta"})
         for value in fields.values():
             assert isinstance(value, list)
             assert len(value) >= 2

@@ -1,5 +1,6 @@
-from typing import Any, Union, get_origin, get_args
-from pydantic import BaseModel, ConfigDict, model_validator
+from typing import Any, Union, get_origin, get_args, List, Optional
+from pydantic import BaseModel, ConfigDict, model_validator, field_validator
+from pydantic_core.core_schema import ValidationInfo
 
 
 class BaseConfig(BaseModel):
@@ -16,30 +17,52 @@ class BaseConfig(BaseModel):
         """Attach extra configuration fields as object attributes.
 
         Returns:
-            BaseConfig: The updated configuration object.
+            BaseConfig: The object itself with the new fields.
         """
         for key, value in (self.model_extra or {}).items():
             if not hasattr(self, key):
                 setattr(self, key, value)
         return self
 
+    @field_validator("*", mode="before")
+    @classmethod
+    def transform_to_list(cls, value: Any, info: ValidationInfo) -> List[Any]:
+        """Ensure that a configuration value is represented as a list.
 
-def check_type(annotation: Any, desired_type: type) -> bool:
+        Args:
+            value (Any): Input value from the configuration.
+            info (ValidationInfo): Pydantic field metadata.
+
+        Returns:
+            List[Any]: Value converted to a list.
+        """
+        field = cls.model_fields[info.field_name]
+        hint = field.annotation
+
+        if check_type(hint, list, inspect_union=False):
+            if not isinstance(value, list) and value is not None:
+                value = [value]
+
+        return value
+
+
+def check_type(annotation: Any, desired_type: type, inspect_union: bool = True) -> bool:
     """Check whether an annotation contains a specific generic type.
 
-    Support Union annotations by inspecting their generic arguments.
+    Support Union annotations by optionally inspecting their generic arguments.
 
     Args:
         annotation (Any): Type annotation to inspect.
         desired_type (type): Generic type to check for (e.g., list, tuple).
+        inspect_union (bool): Whether to inspect Union arguments. Defaults to True.
 
     Returns:
         bool: True if the desired type is found, False otherwise.
     """
     origin = get_origin(annotation)
-    if origin is Union:
+    if (origin is Union and inspect_union) or origin is Optional:
         return any(get_origin(arg) is desired_type for arg in get_args(annotation))
-    return get_origin(annotation) is desired_type
+    return origin is desired_type
 
 
 def check_range(
@@ -62,3 +85,18 @@ def check_range(
     if not min_val <= attr_val <= max_val:
         raise ValueError(f"Attribute `{attr_name}` must be between {min_val} and {max_val} "
                          f"for the provided dataset.")
+
+
+def normalize_ext(ext: str) -> str:
+    """Normalize a file extension.
+
+    Args:
+        ext (str): File extension to normalize.
+
+    Returns:
+        str: Normalized file extension.
+    """
+    ext = ext.lower()
+    if not ext.startswith("."):
+        ext = f".{ext}"
+    return ext

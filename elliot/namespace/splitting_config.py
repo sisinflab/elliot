@@ -2,7 +2,7 @@ from typing import Optional
 from pydantic import Field, model_validator
 
 from elliot.namespace.common import BaseConfig
-from elliot.namespace.read_write_config import WriterConfig
+from elliot.namespace.write_config import TabularWriterConfig
 from elliot.utils.enums import SplittingStrategy
 from elliot.utils.folder import path_joiner
 
@@ -12,12 +12,12 @@ class SplittingSingleConfig(BaseConfig):
 
     Attributes:
         strategy (SplittingStrategy): Splitting strategy to apply.
-        timestamp (Optional[float]): Optional timestamp for splitting.
-        min_below (int): Minimum number of items below threshold; default is 1, min is 1.
-        min_over (int): Minimum number of items over threshold; default is 1, min is 1.
-        test_ratio (Optional[float]): Fraction of data for testing; min is 0.1, max is 0.9.
-        leave_n_out (Optional[int]): Number of items to leave out for test.
-        folds (int): Number of folds for cross-validation; default is 5, min is 1, max is 20.
+        timestamp (float, optional): Optional timestamp for splitting. Defaults to None.
+        min_below (int): Minimum number of items below threshold. Defaults to 1, min is 1.
+        min_over (int): Minimum number of items over threshold. Defaults to 1, min is 1.
+        test_ratio (float, optional): Fraction of data for testing; min is 0.1, max is 0.9.
+        leave_n_out (int, optional): Number of items to leave out for test. Defaults to None.
+        folds (int): Number of folds for cross-validation. Defaults to 5, min is 1, max is 20.
     """
 
     strategy: SplittingStrategy
@@ -63,15 +63,16 @@ class SplittingConfig(BaseConfig):
     """Splitting general configuration.
 
     Attributes:
-        save_on_disk (bool): Whether to save split data to disk; default is False.
-        save_folder (str): Folder path to save splits if `save_on_disk` is True.
+        save_on_disk (bool): Whether to save split data to disk. Defaults to False.
+        save_folder (str): Path to the folder where splits files will be saved (if `save_on_disk` is True).
         test_splitting (SplittingSingleConfig): Test splitting configuration.
-        validation_splitting (Optional[SplittingSingleConfig]): Validation splitting configuration.
-        writer (WriterConfig): Writing configuration.
+        validation_splitting (SplittingSingleConfig, optional): Validation splitting configuration.
+            Defaults to None.
+        writer (TabularWriterConfig): Writing configuration.
     """
 
     save_on_disk: bool = False
     save_folder: str = path_joiner("..", "data", "{0}", "splitting")
     test_splitting: SplittingSingleConfig
     validation_splitting: Optional[SplittingSingleConfig] = None
-    writer: WriterConfig = Field(default_factory=WriterConfig, exclude=True)
+    writer: TabularWriterConfig = Field(default_factory=TabularWriterConfig, exclude=True)

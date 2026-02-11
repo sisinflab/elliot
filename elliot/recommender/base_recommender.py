@@ -59,7 +59,7 @@ class AbstractRecommender(ABC):
         for name, val in params.model_dump().items():
             if name in self.__class__.__annotations__:
                 setattr(self, name, val)
-                self.logger.info(f"Parameter {name} set to {val}")
+                self.logger.info(f"Parameter '{name}' set to {val}")
                 self.params_list.append(name)
 
         self.params_to_save = self.params_list.copy()
@@ -115,7 +115,7 @@ class Recommender(AbstractRecommender):
                 init_func(m, **kwargs)
 
     def get_model_state(self):
-        return {p[0]: getattr(self, p[0]) for p in self.params_to_save}
+        return {p: getattr(self, p) for p in self.params_to_save}
 
     def set_model_state(self, checkpoint):
         for k, v in checkpoint:

@@ -2,7 +2,7 @@ from typing import List, Optional
 from pydantic import Field, model_validator
 
 from elliot.namespace.common import BaseConfig
-from elliot.namespace.read_write_config import ReaderConfig
+from elliot.namespace.read_config import TabularReaderConfig, InteractionsReaderConfig
 from elliot.utils.enums import DataLoadingStrategy
 
 
@@ -11,11 +11,11 @@ class SideInformationConfig(BaseConfig):
 
     Attributes:
         dataloader (str): Dataloader name.
-        reader (ReaderConfig): Reading configuration.
+        reader (TabularReaderConfig): Reading configuration.
     """
 
     dataloader: str
-    reader: ReaderConfig = Field(default_factory=ReaderConfig, exclude=True)
+    reader: TabularReaderConfig = Field(default_factory=TabularReaderConfig, exclude=True)
 
 
 class DataConfig(BaseConfig):
@@ -23,16 +23,16 @@ class DataConfig(BaseConfig):
 
     Attributes:
         strategy (DataLoadingStrategy): Loading strategy to use.
-        data_folder (Optional[str]): Folder containing dataset files.
-        dataset_path (Optional[str]): Path to the dataset file.
-        reader (ReaderConfig): Reading configuration.
-        side_information(List[SideInformationConfig]): List of side-info configurations; default is [].
+        data_folder (str, optional): Path to the folder containing dataset files.
+        dataset_path (str, optional): Path to the dataset file.
+        reader (InteractionsReaderConfig): Reading configuration.
+        side_information(List[SideInformationConfig]): List of side-info configurations. Defaults to [].
     """
 
     strategy: DataLoadingStrategy
     data_folder: Optional[str] = None
     dataset_path: Optional[str] = None
-    reader: ReaderConfig = Field(default_factory=ReaderConfig, exclude=True)
+    reader: InteractionsReaderConfig = Field(default_factory=InteractionsReaderConfig, exclude=True)
     side_information: List[SideInformationConfig] = []
 
     @model_validator(mode="after")
@@ -40,7 +40,7 @@ class DataConfig(BaseConfig):
         """Validate conditional requirements based on the chosen loading strategy.
 
         Returns:
-            DataSetLoadingConfig: The object itself.
+            DataConfig: The object itself.
         """
         match self.strategy:
 

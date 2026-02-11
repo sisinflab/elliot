@@ -106,3 +106,9 @@ def file_ext(
     path: Union[str, PathLike[str]],
 ) -> str:
     return str(Path(path).suffix)
+
+
+def file_name(
+    path: Union[str, PathLike[str]],
+) -> str:
+    return str(Path(path).stem)

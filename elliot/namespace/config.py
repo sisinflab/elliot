@@ -6,8 +6,7 @@ Module description:
 __version__ = '0.3.1'
 
 from typing import List, Dict, Any, Optional
-import fnmatch
-from pydantic import BaseModel, Field, model_validator, field_validator, create_model
+from pydantic import BaseModel, Field, model_validator, create_model
 
 from elliot.namespace.common import BaseConfig
 from elliot.namespace.data_config import DataConfig
@@ -18,40 +17,43 @@ from elliot.namespace.prefiltering_config import PreFilteringConfig
 from elliot.namespace.results_config import ResultsConfig
 from elliot.namespace.splitting_config import SplittingConfig
 from elliot.utils import get_model
-from elliot.utils.folder import set_config_folder, parent_dir, path_joiner, path_resolver, list_dir, is_file, file_ext
+from elliot.utils.folder import set_config_folder, parent_dir, path_joiner, path_resolver, file_ext
 from elliot.utils.hydra_config import load_config
+from elliot.utils.read import Reader
+
+reader = Reader()
 
 
 class ExperimentConfig(BaseConfig):
     """Experiment configuration.
 
     Attributes:
-        version (str): Experiment configuration version.
-        config_test (bool): Whether to use the configuration in test mode before execution; default is False.
+        version (str): Experiment configuration version. Defaults to the current version.
+        config_test (bool): Whether to use the configuration in test mode before execution. Defaults to False.
         dataset (str): Dataset name.
         data_config (DataConfig): Dataset loading configuration.
-        binarize (bool): Whether to binarize interaction values; default is False.
-        verbose (bool): Enable verbose logging; default is True.
-        random_seed (int): Random seed for reproducibility; default is 42.
-        align_side_with_train (bool): Align side information with training split; default is True.
-        prefiltering (List[PreFilteringConfig]): List of pre-filtering configurations; default is [].
-        splitting (Optional[SplittingConfig]): Dataset splitting configuration.
-        negative_sampling (Optional[NegativeSamplingConfig]): Negative sampling configuration.
-        top_k (int): Number of recommended items per user; default is 10.
+        binarize (bool): Whether to binarize interaction values. Defaults to False.
+        verbose (bool): Enable verbose logging. Defaults to True.
+        random_seed (int): Random seed for reproducibility. Defaults to 42.
+        align_side_with_train (bool): Align side information with training split. Defaults to True.
+        prefiltering (List[PreFilteringConfig]): List of pre-filtering configurations. Defaults to [].
+        splitting (SplittingConfig, optional): Dataset splitting configuration.
+        negative_sampling (NegativeSamplingConfig, optional): Negative sampling configuration.
+        top_k (int): Number of recommended items per user. Defaults to 10.
         evaluation (EvaluationConfig): Evaluation configuration.
         results (ResultsConfig): Results handling configuration.
-        gpu (Optional[int]): GPU device index (do not set for CPU).
-        device (Optional[str]): Device to use (automatically picked if not set).
-        torch_device (Optional[str]): Torch device to use (automatically picked if not set).
-        backend (List[str]): List of supported training backends; default is ["tensorflow"].
+        gpu (int, optional): GPU device index (do not set for CPU).
+        device (str, optional): Device to use (automatically picked if not set).
+        torch_device (str, optional): Torch device to use (automatically picked if not set).
+        backend (List[str]): List of supported training backends. Defaults to ["tensorflow"].
         path_logger_config (str): Path to the logger configuration file.
-        path_log_folder (str): Directory for log files.
-        path_output_rec_result (str): Output path for recommendation results.
-        path_output_rec_weight (str): Output path for learned model weights.
-        path_output_rec_performance (str): Output path for performance metrics.
-        external_models_path (Optional[str]): Path to external model implementations.
-        external_posthoc_path (Optional[str]): Path to external post-hoc evaluators.
-        models (Dict[str, Any]): Dictionary of recommender model configurations; default is {}.
+        path_log_folder (str): Path to the folder for log files.
+        path_output_rec_result (str): Path to the folder for recommendation results output.
+        path_output_rec_weight (str): Path to the folder for learned model weights output.
+        path_output_rec_performance (str): Path to the folder for performance metrics output.
+        external_models_path (str, optional): Path to the folder containing external model implementations.
+        external_posthoc_path (str, optional): Path to the folder containing external post-hoc evaluators.
+        models (Dict[str, Any]): Dictionary of recommender model configurations. Defaults to {}.
     """
 
     version: str = __version__
@@ -109,6 +111,25 @@ class ExperimentConfig(BaseConfig):
         return self
 
     @model_validator(mode="after")
+    def handle_evaluation_metrics_and_cutoffs(self) -> "ExperimentConfig":
+        """Adjust evaluation metrics and cutoff values after model validation.
+
+        Returns:
+            ExperimentConfig: The object itself with modified evaluation settings.
+        """
+        cutoff_k = self.evaluation.cutoffs or [self.top_k]
+        self.evaluation.cutoffs = cutoff_k
+        self.results.default_k = cutoff_k[0]
+
+        first_metric = (
+            self.evaluation.simple_metrics[0]
+            if self.evaluation.simple_metrics else ""
+        )
+        self.results.default_metric = first_metric
+
+        return self
+
+    @model_validator(mode="after")
     def parse_models(self) -> "ExperimentConfig":
         """Parse and instantiate recommender model configurations.
 
@@ -155,33 +176,17 @@ class ExperimentConfig(BaseConfig):
         if folder_path is None:
             raise AttributeError(f"{recommender_name} meta-model must expose the `folder` field.")
 
-        # Get all the files in the folder
-        only_files = [f for f in list_dir(folder_path)
-                      if is_file(f)]
-
-        # Optionally filter files by filename patterns (e.g., "*.tsv")
-        patterns = model_data.get("pattern")
-        if patterns is not None:
-            patterns = patterns if isinstance(patterns, list) else [patterns]
-            only_files = [f for f in only_files if any(fnmatch.fnmatch(f, p) for p in patterns)]
-
-        # Filter files by extension defined in the reader configuration
-        reader = model_data.get("reader", {})
-        extensions = reader.get("ext")
-        if extensions is not None:
-            extensions = extensions if isinstance(extensions, list) else [extensions]
-            normalized = set()
-            for ext in extensions:
-                ext = ext.lower()
-                if not ext.startswith("."):
-                    ext = f".{ext}"
-                normalized.add(ext)
-            only_files = [f for f in only_files if file_ext(f).lower() in normalized]
+        files = reader.read_folder(
+            folder=folder_path,
+            patterns=model_data.get("patterns"),
+            ext=model_data.get("ext")
+        )
 
         # Create one 'ProxyRecommender' configuration for each file
-        for i, file_ in enumerate(only_files):
+        for i, file_ in enumerate(files):
             single_data = {k: v for k, v in model_data.items() if k != "folder"}
             single_data["path"] = file_
+            single_data.setdefault("reader", {})["ext"] = file_ext(file_)
             self.models[f"ProxyRecommender{i+1}"] = single_data
 
         # Remove 'RecommendationFolder' entry
@@ -211,19 +216,6 @@ class ExperimentConfig(BaseConfig):
 
         return fields
 
-    @field_validator("prefiltering", "backend", mode="before")
-    @classmethod
-    def transform_to_list(cls, v: Any) -> List[Any]:
-        """Ensure some configuration values are represented as lists.
-
-        Args:
-            v (Any): Input value from the configuration.
-
-        Returns:
-            List[Any]: Value converted to a list.
-        """
-        return v if isinstance(v, list) else [v]
-
 
 def build_namespace(
     config_path: str,
@@ -232,13 +224,10 @@ def build_namespace(
 ) -> ExperimentConfig:
     """Build the experiment namespace from configuration sources.
 
-    Load configuration file, apply overrides if provided, and
-    instantiate the experiment configuration.
-
     Args:
         config_path (str): Path to the main configuration file.
-        config_overrides (Optional[List[str]]): Optional override directives.
-        config_data (Optional[dict]): Optional pre-loaded configuration data.
+        config_overrides (List[str], optional): Optional override directives.
+        config_data (dict, optional): Optional pre-loaded configuration data.
 
     Returns:
         ExperimentConfig: Fully initialized experiment configuration.

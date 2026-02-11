@@ -16,7 +16,7 @@ def load_data(config_dict):
     }
     config = build_namespace(config_path=current_path, config_data=config_data)
     dataset_loader = DataSetLoader(config=config)
-    return dataset_loader.interactions
+    return dataset_loader.interactions_df
 
 
 class TestDataSetLoader:

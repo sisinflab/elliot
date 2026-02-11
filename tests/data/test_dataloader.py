@@ -29,10 +29,7 @@ def _load_data_and_get_trainer(config_dict):
             "data_config": {
                 "strategy": "dataset",
                 "dataset_path": dataset_path,
-                "reader": {
-                    "header": True,
-                    "columns": ["userId", "itemId", "", "timestamp"]
-                }
+                "reader": {"header": True}
             },
             "splitting": {
                 "test_splitting": {

@@ -10,9 +10,9 @@ class PreFilteringConfig(BaseConfig):
 
     Attributes:
         strategy (PreFilteringStrategy): Pre-filtering strategy to use.
-        threshold (Optional[Union[float, int]]): Threshold value for filtering; min is 0.
-        core (int): Core parameter for the strategy; default is 5, min is 0.
-        rounds (int): Number of rounds to perform; default is 2, min is 0.
+        threshold (Union[float, int], optional): Threshold value for filtering. Defaults to None, min is 0.
+        core (int): Core parameter for the strategy. Defaults to 5, min is 0.
+        rounds (int): Number of rounds to perform. Defaults to 2, min is 0.
     """
 
     strategy: PreFilteringStrategy

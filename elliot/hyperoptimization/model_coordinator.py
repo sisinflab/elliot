@@ -13,6 +13,7 @@ from hyperopt import STATUS_OK
 
 from elliot.namespace import RecommenderConfig
 from elliot.hyperoptimization.policy import EvaluationPolicy, FinalPolicy, SearchPolicy
+from elliot.result_handler import aggregate_val_folds_results
 from elliot.utils import logging, get_trainer, get_model
 
 
@@ -43,22 +44,28 @@ class ModelCoordinator(object):
 
     def run(self, policy: EvaluationPolicy, args: Optional[dict] = None) -> dict:
         include_test = policy.include_test
+        phase = "Test" if include_test else "Exploration"
         model_config = copy.deepcopy(self.model_config)
 
-        self.logger.info("Hyperparameter tuning exploration:")
-        if args:
+        if not include_test:
+            self.logger.info("Hyperparameter tuning exploration:")
+
+        if args is not None:
             for k, v in args.items():
                 v = self._coerce_param(k, v)
                 setattr(model_config, k, v)
-                self.logger.info(f"Exploration for {k}. Value extracted: {v}")
+                self.logger.info(
+                    f"{phase} for '{k}'. Value extracted: {v}"
+                )
 
         internal_losses = []
         reports = []
 
         for trainval_index, data_obj in enumerate(self.data_objs):
-            self.logger.info(f"Exploration: Hyperparameter exploration number {self.model_config_index + 1}")
-            self.logger.info(f"Exploration: Test Fold exploration number {self.test_fold_index + 1}")
-            self.logger.info(f"Exploration: Train-Validation Fold exploration number {trainval_index + 1}")
+            if not include_test and args is not None:
+                self.logger.info(f"{phase}: Hyperparameter exploration number {self.model_config_index + 1}")
+            self.logger.info(f"{phase}: Test Fold number {self.test_fold_index + 1}")
+            self.logger.info(f"{phase}: Train-Validation Fold number {trainval_index + 1}")
 
             trainer = self._trainer_class(
                 data=data_obj,
@@ -77,7 +84,8 @@ class ModelCoordinator(object):
 
         self.model_config_index += 1
 
-        aggregated_results = self._aggregate(reports, include_test=include_test)
+        aggregated_results = aggregate_val_folds_results(reports, include_test=include_test)
+        aggregated_results["status"] = STATUS_OK
 
         objective = self._compute_objective(
             aggregated_results.get("val_results", {}),
@@ -108,39 +116,6 @@ class ModelCoordinator(object):
             if float(value).is_integer():
                 return int(value)
         return value
-
-    def _aggregate(self, reports_list, include_test=True):
-        if not reports_list:
-            return {}
-
-        first, last = reports_list[0], reports_list[-1]
-
-        result = {}
-
-        sections = ["val_results"]
-        if include_test:
-            sections.append("test_results")
-
-        for section in sections:
-            result[section] = {
-                k: {
-                    m: np.average([r[section][k][m] for r in reports_list])
-                    for m in first[section][k]
-                }
-                for k in first[section]
-            }
-
-        result["name"] = first["name"]
-        result["params"] = first["params"]
-        result["val_statistical_results"] = last["val_statistical_results"]
-        if include_test:
-            result["test_statistical_results"] = last["test_statistical_results"]
-
-        result["time"] = [r["time"] for r in reports_list]
-
-        result["status"] = STATUS_OK
-
-        return result
 
     def objective(self, args):
         """

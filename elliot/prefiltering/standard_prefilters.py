@@ -51,11 +51,11 @@ class PreFilter:
         self.logger = elog.get_logger(self.__class__.__name__)
         self.data = data
         self.prefiltering_config = prefiltering_config
+
         self._mask = None
 
     def filter(self) -> pd.DataFrame:
-        """
-        Apply all configured pre-filtering strategies in sequence to the dataset.
+        """Apply all configured pre-filtering strategies in sequence to the dataset.
 
         Returns:
             pd.DataFrame: The filtered dataset.
@@ -69,7 +69,7 @@ class PreFilter:
         """Apply a single pre-filtering strategy to the dataset based on the provided configuration.
 
         Args:
-            data (pd.DataFrame): The input dataset to be filtered.
+            data (pd.DataFrame): Input dataset to be filtered.
             cfg (PreFilteringConfig): Object containing the strategy name and any required parameters.
 
         Returns:
@@ -128,7 +128,11 @@ class PreFilter:
         self._mask = data['rating'] >= threshold
         self.logger.info(
             "Applied threshold prefilter",
-            extra={"context": {"threshold": round(threshold, 1), "above": int(self._mask.sum()), "below": int((~self._mask).sum())}}
+            extra={"context": {
+                "threshold": round(threshold, 1),
+                "above": int(self._mask.sum()),
+                "below": int((~self._mask).sum())}
+            }
         )
 
     def filter_ratings_by_user_average(self, data: pd.DataFrame):
@@ -140,7 +144,10 @@ class PreFilter:
         self._mask = data['rating'] >= data.groupby('userId')['rating'].transform('mean')
         self.logger.info(
             "Applied user-average prefilter",
-            extra={"context": {"above": int(self._mask.sum()), "below": int((~self._mask).sum())}}
+            extra={"context": {
+                "above": int(self._mask.sum()),
+                "below": int((~self._mask).sum())}
+            }
         )
 
     def filter_user_k_core(self, data: pd.DataFrame, threshold: int):
@@ -273,12 +280,12 @@ class PreFilter:
         filtered_data: Optional[pd.DataFrame] = None
     ) -> pd.DataFrame:
         """Apply a boolean mask to the data and checks whether the resulting filtered dataset
-        is sufficiently large to be considered valid. If not, returns the original data.
+        is large enough to be considered valid. If not, returns the original data.
 
         Args:
             cfg (PreFilteringConfig): The object containing the current strategy configuration.
             data (pd.DataFrame): The original dataset to be filtered.
-            filtered_data (Optional[pd.DataFrame]): Pre-filtered data to use instead of applying
+            filtered_data (pd.DataFrame, optional): Pre-filtered data to use instead of applying
                 the mask. If None, `self._mask` is applied to `data`.
 
         Returns:

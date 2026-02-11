@@ -3,15 +3,13 @@ Simple results and trials storage for experiments.
 """
 
 import json
-import os
-from datetime import datetime
-from enum import Enum
-from types import SimpleNamespace
-
-import pandas as pd
 import numpy as np
+from enum import Enum
 
 from elliot.evaluation.statistical_significance import PairedTTest, WilcoxonTest
+from elliot.namespace import ExperimentConfig, ResultsConfig
+from elliot.utils.enums import StatTest
+from elliot.utils.write import Writer
 
 _EVAL_RESULTS = "test_results"
 _EVAL_STD_RESULTS = "test_std_results"
@@ -19,131 +17,168 @@ _EVAL_MEAN_RESULTS = "test_mean_results"
 _EVAL_STAT_RESULTS = "test_statistical_results"
 _EVAL_TIME = "time"
 
+STAT_TESTS = {
+    StatTest.PAIRED_TTEST: PairedTTest,
+    StatTest.WILCOXON_TEST: WilcoxonTest
+}
 
-class StatTest(Enum):
-    PairedTTest = [PairedTTest, "paired_ttest"]
-    WilcoxonTest = [WilcoxonTest, "wilcoxon_test"]
-
-
-def _timestamp():
-    return datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
+writer = Writer()
 
 
 class ResultHandler:
-    def __init__(self, rel_threshold=1):
-        self.rel_threshold = rel_threshold
+    results_config: ResultsConfig
+
+    def __init__(self, config: ExperimentConfig):
+        self.results_config = config.results
+        self.output_folder = config.path_output_rec_performance
+        self.paired_ttest = config.evaluation.paired_ttest
+        self.wilcoxon_test = config.evaluation.wilcoxon_test
+        self.rel_threshold = config.evaluation.relevance_threshold
+
         self.results = {}  # model_name -> result dict
         self.trials = {}   # model_name -> list[dict]
 
+        self._suffix = f"_relthreshold_{self.rel_threshold}"
+
     def add_oneshot_recommender(self, **kwargs):
-        self.results[kwargs["params"]["name"]] = kwargs
+        self.results[kwargs["name"]] = kwargs
 
     def add_trials(self, obj, name=None):
         results = obj.results if hasattr(obj, "results") else obj
         if not results:
             return
         if name is None:
-            name = results[0]["params"]["name"].split("_")[0]
+            name = results[0]["params"]["name"]#.split("_")[0]
         self.trials[name] = results
 
-    def _normalize(self, value):
-        if isinstance(value, SimpleNamespace):
-            return {k: self._normalize(v) for k, v in vars(value).items()}
-        if isinstance(value, dict):
-            return {k: self._normalize(v) for k, v in value.items()}
-        if isinstance(value, (list, tuple)):
-            return [self._normalize(v) for v in value]
-        if isinstance(value, np.ndarray):
-            return value.tolist()
-        if isinstance(value, np.generic):
-            return value.item()
-        return value
+    def save_outputs(self):
+        output = self.output_folder
 
-    def _to_json(self, value):
-        if value is None:
-            return None
-        return json.dumps(self._normalize(value), ensure_ascii=True)
+        if self.results_config.save_performance:
+            self.save_results(output=output, triplets=False)
+        if self.results_config.save_performance_triplets:
+            self.save_results(output=output, triplets=True)
 
-    def _is_new_recommender(self, params):
-        if isinstance(params, SimpleNamespace):
-            return False
-        if isinstance(params, dict):
-            return "meta" not in params
-        return False
+        if self.results_config.save_fold_stats:
+            self.save_results(output=output, key="test_mean_results", triplets=False)
+            self.save_results(output=output, key="test_std_results", triplets=False)
+            if self.results_config.save_fold_stats_triplets:
+                self.save_results(output=output, key="test_mean_results", triplets=True)
+                self.save_results(output=output, key="test_std_results", triplets=True)
 
-    def _cutoffs(self, items, key):
-        for entry in items:
-            if key in entry:
-                return list(entry[key].keys())
-        return []
+        if self.results_config.save_times:
+            self.save_times(output=output)
 
-    def _collect_cutoff(self, items, key, k):
-        data = {}
-        for entry in items:
-            if key in entry and k in entry[key]:
-                data[entry["params"]["name"]] = entry[key][k]
-        return data
+        if self.results_config.save_best_models:
+            metric = self.results_config.default_metric
+            cutoff = self.results_config.default_k
+            self.save_best_models(output=output, default_metric=metric, default_k=cutoff)
 
-    def _write_table(self, data, output, filename):
-        if not data:
-            return
-        info = pd.DataFrame.from_dict(data, orient="index")
-        info.insert(0, "model", info.index)
-        info.to_csv(os.path.abspath(os.sep.join([output, filename])), sep="\t", index=False)
+        if self.results_config.save_trials:
+            self.save_trials(output=output)
 
-    def _write_triplets(self, data, output, filename):
-        if not data:
-            return
-        info = pd.DataFrame.from_dict(data, orient="index")
-        info.insert(0, "model", info.index)
-        triplets = info.set_index("model").stack().reset_index()
-        triplets.to_csv(
-            os.path.abspath(os.sep.join([output, filename])),
-            sep="\t",
-            index=False,
-            header=["model", "metric", "value"],
-        )
+        if self.results_config.save_statistical:
+            if self.paired_ttest:
+                self.save_statistical_results(StatTest.PAIRED_TTEST, output=output)
+            if self.wilcoxon_test:
+                self.save_statistical_results(StatTest.WILCOXON_TEST, output=output)
+
+    # def _is_new_recommender(self, params):
+    #     if isinstance(params, SimpleNamespace):
+    #         return False
+    #     if isinstance(params, dict):
+    #         return "meta" not in params
+    #     return False
+    #
+    # def _cutoffs(self, items, key):
+    #     for entry in items:
+    #         if key in entry:
+    #             return list(entry[key].keys())
+    #     return []
+
+    # def _collect_cutoff(self, items, key, k):
+    #     data = {}
+    #     for entry in items:
+    #         if key in entry and k in entry[key]:
+    #             data[entry["params"]["name"]] = entry[key][k]
+    #     return data
+
+    # def _write_table(self, data, output, filename):
+    #     if not data:
+    #         return
+    #     info = pd.DataFrame.from_dict(data, orient="index")
+    #     info.insert(0, "model", info.index)
+    #     info.to_csv(os.path.abspath(os.sep.join([output, filename])), sep="\t", index=False)
+    #
+    # def _write_triplets(self, data, output, filename):
+    #     if not data:
+    #         return
+    #     info = pd.DataFrame.from_dict(data, orient="index")
+    #     info.insert(0, "model", info.index)
+    #     triplets = info.set_index("model").stack().reset_index()
+    #     triplets.to_csv(
+    #         os.path.abspath(os.sep.join([output, filename])),
+    #         sep="\t",
+    #         index=False,
+    #         header=["model", "metric", "value"],
+    #     )
 
     def save_results(self, output="", key=_EVAL_RESULTS, triplets=False):
-        items = list(self.results.values())
-        for k in self._cutoffs(items, key):
-            data = self._collect_cutoff(items, key, k)
-            prefix = "triplets_rec" if triplets else "rec"
-            name = f"{prefix}_cutoff_{k}_relthreshold_{self.rel_threshold}_{_timestamp()}.tsv"
-            if triplets:
-                self._write_triplets(data, output, name)
-            else:
-                self._write_table(data, output, name)
+        results_dict = {
+            name: entry.get(key, {})
+            for name, entry in self.results.items()
+        }
 
-    def save_times(self, output=""):
-        data = {entry["params"]["name"]: entry.get(_EVAL_TIME) for entry in self.results.values() if _EVAL_TIME in entry}
-        self._write_table(
-            data,
-            output,
-            f"rec_training_time_relthreshold_{self.rel_threshold}_{_timestamp()}.tsv",
+        values = next(iter(results_dict.values()))
+
+        results = {}
+        for k in values.keys():
+            results[k] = {name: entry[k] for name, entry in results_dict.items()}
+
+        writer.write_results(
+            results=results,
+            save_folder=output,
+            file_name=f"_{key}{self._suffix}",
+            header=self.results_config.writer.header,
+            ext=self.results_config.writer.ext,
+            sep=self.results_config.writer.sep,
+            triplets=triplets
         )
 
-    def save_trials(self, output="", formats=("json", "tsv")):
+    def save_times(self, output=""):
+        data = {
+            name: {_EVAL_TIME: entry[_EVAL_TIME]}
+            for name, entry in self.results.items() if _EVAL_TIME in entry
+        }
+
+        writer.write_times(
+            data=data,
+            save_folder=output,
+            file_name=self._suffix,
+            header=self.results_config.writer.header,
+            ext=self.results_config.writer.ext,
+            sep=self.results_config.writer.sep
+        )
+
+    def save_trials(self, output=""):
         if not self.trials:
             return
-        if isinstance(formats, str):
-            formats = [formats]
-        for model_name, trials in self.trials.items():
-            if not trials:
-                continue
-            first_params = trials[0].get("params", {}) if isinstance(trials[0], dict) else {}
-            if isinstance(first_params, SimpleNamespace):
-                first_params = vars(first_params)
-            if not self._is_new_recommender(first_params):
-                continue
-            normalized = [self._normalize(entry) for entry in trials]
-            if "json" in formats:
-                filename = f"trials_{model_name}_relthreshold_{self.rel_threshold}_{_timestamp()}.json"
-                with open(os.path.abspath(os.sep.join([output, filename])), "w", encoding="utf-8") as handle:
-                    json.dump(normalized, handle, indent=2, ensure_ascii=True)
-            if "tsv" in formats:
+
+        trials = self._normalize(self.trials)
+
+        if "json" in self.results_config.trials_formats:
+            writer.write_trials(
+                trials=trials,
+                save_folder=output,
+                file_name=self._suffix,
+                frmt="json"
+            )
+
+        if "tabular" in self.results_config.trials_formats:
+            trials_dict = {}
+            for model_name, trials_list in trials.items():
                 rows = []
-                for idx, entry in enumerate(normalized):
+                for idx, entry in enumerate(trials_list):
                     rows.append({
                         "model": model_name,
                         "trial": idx,
@@ -157,9 +192,17 @@ class ResultHandler:
                         "val_results": self._to_json(entry.get("val_results")),
                         "test_results": self._to_json(entry.get("test_results")),
                     })
-                info = pd.DataFrame(rows)
-                filename = f"trials_{model_name}_relthreshold_{self.rel_threshold}_{_timestamp()}.tsv"
-                info.to_csv(os.path.abspath(os.sep.join([output, filename])), sep="\t", index=False)
+                trials_dict[model_name] = rows
+
+            writer.write_trials(
+                trials=trials_dict,
+                save_folder=output,
+                file_name=self._suffix,
+                frmt="tabular",
+                header=self.results_config.writer.header,
+                ext=self.results_config.writer.ext,
+                sep=self.results_config.writer.sep
+            )
 
     def save_best_models(self, output="../results/", default_metric="nDCG", default_k=10):
         models = [{
@@ -167,52 +210,59 @@ class ResultHandler:
             "default_validation_cutoff": default_k,
             "rel_threshold": self.rel_threshold,
         }]
-        for rec, entry in self.results.items():
-            params = entry.get("params", {})
-            if isinstance(params, SimpleNamespace):
-                params = vars(params)
-            if not self._is_new_recommender(params):
-                continue
-            meta_obj = None
-            if isinstance(params, dict):
-                meta_obj = params.get("meta")
-            else:
-                meta_obj = getattr(params, "meta", None)
-            meta = self._normalize(meta_obj) if meta_obj is not None else {}
-            models.append({
-                "meta": meta,
-                "recommender": rec,
+
+        results = {name: entry.get("params", {}) for name, entry in self.results.items()}
+        results = self._normalize(results)
+
+        for model_name, params in results.items():
+            models += [{
+                "meta": params["meta"],
+                "recommender": model_name,
                 "configuration": {key: value for key, value in params.items() if key != "meta"},
-            })
-        with open(os.path.abspath(os.sep.join([output,
-                f"bestmodelparams_cutoff_{default_k}_relthreshold_{self.rel_threshold}_{_timestamp()}.json"])),
-                mode="w") as f:
-            json.dump(models, f, indent=4)
+            }]
+
+        writer.write_params(
+            params=models,
+            save_folder=output,
+            file_name=self._suffix,
+        )
 
     def save_statistical_results(self, stat_test, output="../results/"):
-        items = list(self.results.values())
-        for k in self._cutoffs(items, _EVAL_STAT_RESULTS):
-            results = []
+        results_dict = {
+            name: entry.get(_EVAL_STAT_RESULTS, {})
+            for name, entry in self.results.items()
+        }
+
+        values = next(iter(results_dict.values()))
+
+        results = {}
+        for k in values.keys():
+            results_list = []
             paired = set()
-            for i, left in enumerate(items):
-                for j, right in enumerate(items):
+            for i, left in results_dict.items():
+                for j, right in results_dict.items():
                     if i == j or (j, i) in paired:
                         continue
                     paired.add((i, j))
-                    metrics = left[_EVAL_STAT_RESULTS][k].keys()
+                    metrics = left[k].keys()
                     for metric_name in metrics:
-                        array_0 = left[_EVAL_STAT_RESULTS][k][metric_name]
-                        array_1 = right[_EVAL_STAT_RESULTS][k][metric_name]
-                        common_users = stat_test.value[0].common_users(array_0, array_1)
-                        p_value = stat_test.value[0].compare(array_0, array_1, common_users)
-                        results.append((left["params"]["name"], right["params"]["name"], metric_name, p_value))
-                        results.append((right["params"]["name"], left["params"]["name"], metric_name, p_value))
+                        array_0 = left[k][metric_name]
+                        array_1 = right[k][metric_name]
+                        common_users = STAT_TESTS[stat_test].common_users(array_0, array_1)
+                        p_value = STAT_TESTS[stat_test].compare(array_0, array_1, common_users)
+                        results_list.append((i, j, metric_name, p_value))
+                        results_list.append((j, i, metric_name, p_value))
+            results[k] = results_list
 
-            with open(os.path.abspath(os.sep.join([output,
-                    f"stat_{stat_test.value[1]}_cutoff_{k}_relthreshold_{self.rel_threshold}_{_timestamp()}.tsv"])),
-                    "w") as f:
-                for tup in results:
-                    f.write(f"{tup[0]}\t{tup[1]}\t{tup[2]}\t{tup[3]}\n")
+        writer.write_statistical_results(
+            results=results,
+            save_folder=output,
+            file_name=self._suffix,
+            header=self.results_config.writer.header,
+            ext=self.results_config.writer.ext,
+            sep=self.results_config.writer.sep,
+            stat_test=stat_test.value
+        )
 
     # Backward-compatible wrappers
     def save_best_results(self, output=""):
@@ -229,3 +279,23 @@ class ResultHandler:
 
     def save_best_results_std_as_triplets(self, output="../results/"):
         self.save_results(output=output, key=_EVAL_STD_RESULTS, triplets=True)
+
+    def _normalize(self, value):
+        # if isinstance(value, SimpleNamespace):
+        #     return {k: self._normalize(v) for k, v in vars(value).items()}
+        if isinstance(value, dict):
+            return {k: self._normalize(v) for k, v in value.items()}
+        if isinstance(value, (list, tuple)):
+            return [self._normalize(v) for v in value]
+        if isinstance(value, np.ndarray):
+            return value.tolist()
+        if isinstance(value, np.generic):
+            return value.item()
+        if isinstance(value, Enum):
+            return value.value
+        return value
+
+    def _to_json(self, value):
+        if value is None:
+            return None
+        return json.dumps(self._normalize(value), ensure_ascii=True)

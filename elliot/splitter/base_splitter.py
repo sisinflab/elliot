@@ -100,9 +100,11 @@ class Splitter:
             )
 
         if self.splitting_config.save_on_disk:
-            writer.write_split(
+            writer.write_tabular_split(
                 fold_dataset=tuple_list,
                 save_folder=self.splitting_config.save_folder,
+                header=self.splitting_config.writer.header,
+                columns=self.splitting_config.writer.columns,
                 sep=self.splitting_config.writer.sep,
                 ext=self.splitting_config.writer.ext
             )

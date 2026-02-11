@@ -1,5 +1,4 @@
 from typing import Tuple, List
-
 import bisect
 import random
 import numpy as np
@@ -14,7 +13,7 @@ reader = Reader()
 writer = Writer()
 
 
-def zero_intervals(n_cols, nnz_sorted):
+def _zero_intervals(n_cols, nnz_sorted):
     intervals = []
     prev = -1
     for c in nnz_sorted:
@@ -46,7 +45,7 @@ class NegativeSampler:
         num_items (int): Total number of items.
         pos_items (Tuple[List[List[int]], List[List[int]], List[List[int]]]):
             Positive item indices per user for train, validation, and test splits.
-        random_seed (int): Random seed for reproducibility; default is 42.
+        random_seed (int): Random seed for reproducibility. Defaults to 42.
 
     To configure the negative sampling, include the appropriate
     settings in the configuration file using the pattern shown below.
@@ -129,7 +128,7 @@ class NegativeSampler:
         """Run negative sampling according to the configured strategy.
 
         Args:
-            validation (bool): Whether to generate negatives for validation or test; default is False.
+            validation (bool): Whether to generate negatives for validation or test. Defaults to False.
 
         Returns:
             List[List[int]]: Negative item indices per user.
@@ -145,7 +144,7 @@ class NegativeSampler:
         """Sample negative items uniformly at random for each user.
 
         Args:
-            validation (bool): Whether to generate negatives for validation or test; default is False.
+            validation (bool): Whether to generate negatives for validation or test. Defaults to False.
 
         Returns:
             List[List[int]]: Randomly sampled negative item indices per user.
@@ -192,7 +191,7 @@ class NegativeSampler:
             List[int]: Randomly sampled negative item indices.
         """
         # Compute empty intervals between item ids (candidate negatives)
-        intervals = zero_intervals(self._num_items, indices)
+        intervals = _zero_intervals(self._num_items, indices)
 
         # Set some initial parameters
         lengths = [b - a + 1 for (a, b) in intervals]
@@ -226,7 +225,7 @@ class NegativeSampler:
 
         Args:
             neg (List[List[int]]): Negative item indices per user (private ids).
-            validation (bool): Whether the negatives belong to validation or test split; default is False.
+            validation (bool): Whether the negatives belong to validation or test split. Defaults to False.
         """
         neg_dict = {}
 
@@ -249,7 +248,7 @@ class NegativeSampler:
         """Load precomputed negative samples from disk.
 
         Args:
-            validation (bool): Whether to load validation or test negatives; default is False.
+            validation (bool): Whether to load validation or test negatives. Defaults to False.
 
         Returns:
             List[List[int]]: Negative item indices per user mapped to private ids.

@@ -22,7 +22,8 @@ reader = Reader()
 
 
 class DataSetLoader:
-    """The DataSetLoader class is responsible for loading and preparing datasets for training, validation, and testing.
+    """The DataSetLoader class is responsible for loading and preparing datasets for training,
+    validation, and testing.
 
     It supports multiple loading strategies and integrates optional pre-filtering and side information loading.
     The final output is a list of `DataSet` objects, ready to be consumed by the recommendation pipeline.
@@ -57,7 +58,7 @@ class DataSetLoader:
     """
 
     data_config: DataConfig
-    interactions: Union[list, pd.DataFrame]
+    interactions_df: Union[list, pd.DataFrame]
     tuple_list: list
     side_information: SimpleNamespace
 
@@ -86,43 +87,46 @@ class DataSetLoader:
         match self.data_config.strategy:
 
             case DataLoadingStrategy.FIXED:
-                self.interactions = reader.read_tabular_split(
+                self.interactions_df = reader.read_tabular_split(
                     read_folder=self.data_config.data_folder,
+                    header=reader_config.header,
                     columns=reader_config.column_names(),
                     datatypes=reader_config.column_dtypes(),
                     sep=reader_config.sep,
                     ext=reader_config.ext,
-                    header=reader_config.header,
                     callback_fn=self._rename_cols_and_binarize
                 )
 
             case DataLoadingStrategy.HIERARCHY:
-                self.interactions = reader.read_tabular_split(
+                self.interactions_df = reader.read_tabular_split(
                     read_folder=self.data_config.data_folder,
                     hierarchical=True,
+                    header=reader_config.header,
                     columns=reader_config.column_names(),
                     datatypes=reader_config.column_dtypes(),
                     sep=reader_config.sep,
                     ext=reader_config.ext,
-                    header=reader_config.header,
                     callback_fn=self._rename_cols_and_binarize
                 )
 
             case DataLoadingStrategy.DATASET:
-                self.interactions = reader.read_tabular(
-                    file_path=self.data_config.dataset_path,
+                self.interactions_df = reader.read_tabular(
+                    path=self.data_config.dataset_path,
+                    header=reader_config.header,
                     columns=reader_config.column_names(),
                     datatypes=reader_config.column_dtypes(),
                     sep=reader_config.sep,
-                    header=reader_config.header,
                     callback_fn=self._rename_cols_and_binarize
                 )
 
         self._clean(self._filter_nan_and_duplicates)
 
-    def _rename_cols_and_binarize(self, data):
+    def _rename_cols_and_binarize(self, data, **kwargs):
         names = ["userId", "itemId", "rating", "timestamp"]
         current_names = self.data_config.reader.column_names()
+
+        col_iter = iter(data.columns)
+        current_names = [next(col_iter) if isinstance(c, int) else c for c in current_names]
 
         col_mapping = {c: names[i] for i, c in enumerate(current_names) if c in data.columns}
 
@@ -145,7 +149,7 @@ class DataSetLoader:
             TypeError: If a provided loader does not inherit from AbstractLoader.
         """
         users, items = set(), set()
-        df = self.interactions
+        df = self.interactions_df
 
         if isinstance(df, list):
             train_val, test = df[0]
@@ -202,8 +206,8 @@ class DataSetLoader:
 
         del self._items, self._users, self._side_info_objs
 
-        prefilter = PreFilter(self.interactions, self.config.prefiltering)
-        self.interactions = prefilter.filter()
+        prefilter = PreFilter(self.interactions_df, self.config.prefiltering)
+        self.interactions_df = prefilter.filter()
 
     def _intersect_users_items(self):
         """Align users/items with side information based on alignment mode:
@@ -240,15 +244,15 @@ class DataSetLoader:
         """Clean all loaded DataFrames by filtering users/items and removing duplicates."""
         def clean(df): return clean_fn(df) if df is not None else None
 
-        if isinstance(self.interactions, list):
+        if isinstance(self.interactions_df, list):
             new_dataframe = []
-            for tr, te in self.interactions:
+            for tr, te in self.interactions_df:
                 test = clean(te)
                 train_fold = [(clean(tr_), clean(va)) for tr_, va in tr]
                 new_dataframe.append((train_fold, test))
-            self.interactions = new_dataframe
+            self.interactions_df = new_dataframe
         else:
-            self.interactions = clean(self.interactions)
+            self.interactions_df = clean(self.interactions_df)
 
     def _filter_nan_and_duplicates(self, df: pd.DataFrame) -> pd.DataFrame:
         """Filter a single DataFrame based on valid users/items and applies basic cleanup,
@@ -295,10 +299,10 @@ class DataSetLoader:
 
     def build(self) -> List[List[DataSet]]:
         if self.data_config.strategy != DataLoadingStrategy.DATASET:
-            tuple_list = self.interactions
+            tuple_list = self.interactions_df
         else:
             self.logger.info("There will be the splitting")
-            splitter = Splitter(self.interactions, self.config.splitting, self.config.random_seed)
+            splitter = Splitter(self.interactions_df, self.config.splitting, self.config.random_seed)
             tuple_list = splitter.process_splitting()
 
         if len(tuple_list) > 1:
@@ -310,10 +314,10 @@ class DataSetLoader:
         data_list = []
 
         for p1, (train_val, test) in enumerate(tuple_list):
-            # test level
+            # Test level
             val_list = []
             for p2, (train, val) in enumerate(train_val):
-                # validation level
+                # Validation level
                 self.logger.info(
                     f"Test Fold {p1}{f" - Validation Fold {p2}" if val is not None else ""}"
                 )
@@ -327,16 +331,29 @@ class DataSetLoader:
 
         return data_list
 
-    def generate_dataobjects_mock(self) -> List[List[DataSet]]:
-        _column_names = ["userId", "itemId", "rating"]
-        np.random.seed(self.config.random_seed)
-        training_set = np.hstack(
-            (np.random.randint(0, 5 * 20, size=(5 * 20, 2)), np.random.randint(0, 2, size=(5 * 20, 1))))
-        test_set = np.hstack(
-            (np.random.randint(0, 5 * 20, size=(5 * 20, 2)), np.random.randint(0, 2, size=(5 * 20, 1))))
 
-        training_set = pd.DataFrame(np.array(training_set), columns=_column_names)
-        test_set = pd.DataFrame(np.array(test_set), columns=_column_names)
-        data_list = [[DataSet(self.config, (training_set, test_set))]]
+def build_mock_dataset(config) -> List[List[DataSet]]:
+    names = ["userId", "itemId", "rating"]
+    np.random.seed(config.random_seed)
 
-        return data_list
+    train_set = np.hstack((
+        np.random.randint(0, 5 * 20, size=(5 * 20, 2)),
+        np.random.randint(0, 2, size=(5 * 20, 1))
+    ))
+    test_set = np.hstack((
+        np.random.randint(0, 5 * 20, size=(5 * 20, 2)),
+        np.random.randint(0, 2, size=(5 * 20, 1))
+    ))
+
+    train_set = pd.DataFrame(np.array(train_set), columns=names)
+    test_set = pd.DataFrame(np.array(test_set), columns=names)
+
+    data_list = [[
+        DataSet(
+            config=config,
+            data_tuple=(train_set, None, test_set),
+            side_information_data=SimpleNamespace()
+        )
+    ]]
+
+    return data_list

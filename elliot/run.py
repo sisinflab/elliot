@@ -10,13 +10,12 @@ import copy
 import os
 import numpy as np
 
-from elliot.dataset import DataSetLoader
+from elliot.dataset import DataSetLoader, build_mock_dataset
 from elliot.namespace import build_namespace, ExperimentConfig
 from elliot.hyperoptimization import run_hyperopt, run_single
-from elliot.result_handler.result_handler import ResultHandler, StatTest
+from elliot.result_handler import ResultHandler, attach_test_fold_stats
 from elliot.utils import logging as logging_project
 from elliot.utils import set_device
-from elliot.utils.folder import check_dir
 
 
 print(u'''
@@ -60,7 +59,7 @@ def run_experiment(config_path: str = "", config_overrides: Optional[List[str]] 
     dataset_loader = DataSetLoader(config=config)
     data_test_list = dataset_loader.build()
 
-    res_handler = ResultHandler(rel_threshold=config.evaluation.relevance_threshold)
+    res_handler = ResultHandler(config=config)
 
     all_trials = {}
 
@@ -118,7 +117,7 @@ def run_experiment(config_path: str = "", config_overrides: Optional[List[str]] 
 
         results_config = config.results
         if results_config.save_fold_stats:
-            _attach_fold_stats(best_eval, test_results, config)
+            attach_test_fold_stats(best_eval, test_results)
 
         res_handler.add_oneshot_recommender(**best_eval)
 
@@ -126,7 +125,7 @@ def run_experiment(config_path: str = "", config_overrides: Optional[List[str]] 
             res_handler.add_trials(test_trials[min_val], name=model_name)
             all_trials[model_name] = all_trials[model_name][min_val]
 
-    _save_outputs(res_handler, config)
+    res_handler.save_outputs()
 
     logger.info("End experiment")
     # TODO: check before to push only this feature!
@@ -141,67 +140,6 @@ def run_experiment(config_path: str = "", config_overrides: Optional[List[str]] 
     # logger.info("End Post-Hoc scripts")
 
 
-def _attach_fold_stats(best_eval, fold_results, config):
-    if len(fold_results) < 2:
-        return
-    sample = fold_results[0].get("test_results", {})
-    if not sample:
-        return
-    metrics = list(next(iter(sample.values())).keys())
-
-    def _aggregate(key, reducer):
-        agg = {}
-        for k in config.evaluation.cutoffs:
-            agg[k] = {}
-            for metric in metrics:
-                values = [fold[key][k][metric] for fold in fold_results if k in fold[key]]
-                if not values:
-                    continue
-                agg[k][metric] = float(reducer(values))
-        return agg
-
-    best_eval["test_mean_results"] = _aggregate("test_results", np.mean)
-    best_eval["test_std_results"] = _aggregate("test_results", np.std)
-
-
-def _save_outputs(res_handler, config):
-    results_config = config.results
-    output = config.path_output_rec_performance
-    check_dir(output)
-
-    if results_config.save_performance:
-        res_handler.save_results(output=output, triplets=False)
-    if results_config.save_performance_triplets:
-        res_handler.save_results(output=output, triplets=True)
-
-    if results_config.save_fold_stats:
-        res_handler.save_results(output=output, key="test_mean_results", triplets=False)
-        res_handler.save_results(output=output, key="test_std_results", triplets=False)
-        if results_config.save_fold_stats_triplets:
-            res_handler.save_results(output=output, key="test_mean_results", triplets=True)
-            res_handler.save_results(output=output, key="test_std_results", triplets=True)
-
-    if results_config.save_times:
-        res_handler.save_times(output=output)
-
-    if results_config.save_best_models:
-        cutoffs = config.evaluation.cutoffs
-        first_metric = (
-            config.evaluation.simple_metrics[0]
-            if config.evaluation.simple_metrics else ""
-        )
-        res_handler.save_best_models(output=output, default_metric=first_metric, default_k=cutoffs[0])
-
-    if results_config.save_trials:
-        res_handler.save_trials(output=output, formats=results_config.trials_formats)
-
-    if results_config.save_statistical:
-        if results_config.evaluation.paired_ttest:
-            res_handler.save_statistical_results(StatTest.PairedTTest, output=output)
-        if results_config.evaluation.wilcoxon_test:
-            res_handler.save_statistical_results(StatTest.WilcoxonTest, output=output)
-
-
 def config_test(config: ExperimentConfig):
     logging_project.init(config.path_logger_config, config.path_log_folder)
     logger = logging_project.get_logger("__main__")
@@ -210,10 +148,9 @@ def config_test(config: ExperimentConfig):
 
     logger.info("Start config test")
 
-    dataset_loader = DataSetLoader(config=config)
-    data_test_list = dataset_loader.generate_dataobjects_mock()
+    data_test_list = build_mock_dataset(config)
 
-    res_handler = ResultHandler(rel_threshold=config.evaluation.relevance_threshold)
+    res_handler = ResultHandler(config=config)
 
     for model_name, model_config in config.models.items():
         test_results = []

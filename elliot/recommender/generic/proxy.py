@@ -5,13 +5,13 @@ import numpy as np
 import pandas as pd
 import torch
 
-from elliot.recommender.base_recommender import Recommender
+from elliot.recommender.base_recommender import TraditionalRecommender
 from elliot.utils.read import Reader
 
 reader = Reader()
 
 
-class ProxyRecommender(Recommender):
+class ProxyRecommender(TraditionalRecommender):
     path: str = ""
     id_space: str = "public"
     deduplicate: bool = True
@@ -28,7 +28,7 @@ class ProxyRecommender(Recommender):
         """
         super().__init__(data, params, seed, logger)
 
-        self._reader_config = params.reader
+        self._reader_config = params.meta.rec_reader
         reader.logger = self.logger
 
         self._model_name = self.model_name or ntpath.basename(self.path).rsplit(".", 1)[0]
@@ -39,9 +39,7 @@ class ProxyRecommender(Recommender):
         self._val_dict = self._get_dict("val", private=True)
         self._test_dict = self._get_dict("test", private=True)
 
-        self._seen_items = self._build_seen_items(self._train_dict)
-        self._recommendations = self.read_recommendations(self.path)
-        self._rec_scores = {user: dict(recs) for user, recs in self._recommendations.items()}
+        self.params_to_save = []
 
     @property
     def name(self):
@@ -51,11 +49,9 @@ class ProxyRecommender(Recommender):
     def name_param(self):
         return ""
 
-    def get_training_dataloader(self, batch_size):
-        yield None
-
-    def train_step(self, batch, *args):
-        return 0.0
+    def initialize(self):
+        self._seen_items = self._build_seen_items(self._train_dict)
+        self._recommendations = self.load_recommendations(self.path)
 
     def predict_full(self, user_indices):
         num_users = user_indices.shape[0]
@@ -67,7 +63,7 @@ class ProxyRecommender(Recommender):
             if not user_recs:
                 continue
             seen = self._seen_items.get(user) if self.filter_seen else None
-            for item, score in user_recs:
+            for item, score in user_recs.items():
                 if seen and item in seen:
                     continue
                 scores[row, item] = score
@@ -80,7 +76,7 @@ class ProxyRecommender(Recommender):
         item_list = item_indices.tolist()
 
         for row, user in enumerate(user_list):
-            user_scores = self._rec_scores.get(user, {})
+            user_scores = self._recommendations.get(user, {})
             if not user_scores:
                 continue
             seen = self._seen_items.get(user) if self.filter_seen else None
@@ -95,21 +91,30 @@ class ProxyRecommender(Recommender):
 
         return scores
 
-    def get_model_state(self):
-        return {}
-
-    def set_model_state(self, checkpoint):
-        return
-
-    def read_recommendations(self, path: str, top_k: Optional[int] = None):
+    def load_recommendations(self, path: str, top_k: Optional[int] = None):
         data = reader.read_tabular(
-            file_path=path,
+            path=path,
             columns=self._reader_config.column_names(),
             datatypes=self._reader_config.column_dtypes(),
             sep=self._reader_config.sep,
-            header=self._reader_config.header
+            header=self._reader_config.header,
         )
 
+        data = self._process_tabular_rec(data, top_k=top_k)
+
+        recs = {
+            user: dict(zip(group["item_idx"], group["prediction"]))
+            for user, group in data.groupby("user_idx", sort=False)
+        }
+
+        self.logger.info(
+            "Recommendations loaded",
+            extra={"context": {"users": len(recs), "rows": len(data)}}
+        )
+
+        return recs
+
+    def _process_tabular_rec(self, data: pd.DataFrame, top_k: Optional[int] = None) -> pd.DataFrame:
         column_names = self._reader_config.column_names()
         user_col = column_names[0]
         item_col = column_names[1]
@@ -127,7 +132,7 @@ class ProxyRecommender(Recommender):
 
         if data.empty:
             self.logger.warning("No recommendations loaded after normalization")
-            return {}
+            return pd.DataFrame()
 
         data = self._map_internal_ids(data)
 
@@ -146,15 +151,7 @@ class ProxyRecommender(Recommender):
         if top_k is not None:
             data = data.groupby("user_idx", sort=False).head(top_k)
 
-        recs = {
-            int(user): list(group[["item_idx", "prediction"]].itertuples(index=False, name=None))
-            for user, group in data.groupby("user_idx", sort=False)
-        }
-        self.logger.info(
-            "Recommendations loaded",
-            extra={"context": {"users": len(recs), "rows": len(data)}}
-        )
-        return recs
+        return data
 
     def _resolve_public_maps(self) -> Tuple[dict, dict]:
         if hasattr(self._data, "public_users") and hasattr(self._data, "public_items"):
