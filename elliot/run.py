@@ -38,12 +38,15 @@ def run_experiment(config_path: str = "", config_overrides: Optional[List[str]] 
     if config.gpu is not None:
         os.environ["CUDA_VISIBLE_DEVICES"] = str(config.gpu)
 
+    _configure_wandb_environment(config)
+
     if config.config_test:
         config_test(config)
 
     logging_project.init(config.path_logger_config, config.path_log_folder)
     logger = logging_project.get_logger("__main__")
 
+    _login_wandb(config, logger)
     _configure_torch_device(config, logger)
 
     if config.version != __version__:
@@ -188,6 +191,52 @@ def _configure_torch_device(config, logger=None):
     device = set_device(requested)
     if logger is not None:
         logger.info("Torch device selected", extra={"context": {"device": str(device)}})
+
+
+def _configure_wandb_environment(config):
+    wandb_cfg = getattr(config, "wandb", None)
+    if wandb_cfg is None:
+        return
+
+    api_key = getattr(wandb_cfg, "api_key", None)
+    project = getattr(wandb_cfg, "project", None)
+
+    if not (api_key and project):
+        return
+
+    os.environ["WANDB_API_KEY"] = str(api_key)
+    os.environ["WANDB_PROJECT"] = str(project)
+
+
+def _login_wandb(config, logger=None):
+    wandb_cfg = getattr(config, "wandb", None)
+    if wandb_cfg is None:
+        return
+
+    api_key = getattr(wandb_cfg, "api_key", None)
+    project = getattr(wandb_cfg, "project", None)
+    if not (api_key and project):
+        return
+
+    try:
+        import wandb
+    except ImportError as exc:
+        raise ImportError(
+            "W&B is configured but the `wandb` package is not installed. "
+            "Install it with `pip install wandb`."
+        ) from exc
+
+    login_ok = wandb.login(key=os.environ.get("WANDB_API_KEY"))
+    if logger is not None:
+        logger.info(
+            "Weights & Biases login completed",
+            extra={
+                "context": {
+                    "project": project,
+                    "logged_in": bool(login_ok) if login_ok is not None else True,
+                }
+            },
+        )
 
 
 if __name__ == '__main__':
