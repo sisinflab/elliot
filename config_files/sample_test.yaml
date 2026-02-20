@@ -17,7 +17,7 @@ experiment:
       meta:
         save_recs: False
       neighborhood: 500
-      similarity: [rp3beta, jaccard, cosine]
+      similarity: rp3beta
       alpha: 1.0
       beta: 0.6
       normalize_similarity: True

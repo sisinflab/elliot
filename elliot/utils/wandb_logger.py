@@ -23,6 +23,8 @@ class _WandBState:
     run_name: Optional[str] = None
     active_model: Optional[str] = None
     global_step: int = 0
+    summary_rows: list = None
+    summary_metric_keys: set = None
 
 
 STATE = _WandBState()
@@ -74,6 +76,8 @@ def init_tracking(config, logger=None) -> bool:
     STATE.run_name = None
     STATE.active_model = None
     STATE.global_step = 0
+    STATE.summary_rows = []
+    STATE.summary_metric_keys = set()
 
     if logger is not None:
         logger.info(
@@ -178,6 +182,114 @@ def log_hyperopt_trial(
     wandb.log(data)
 
 
+def _flatten_test_results(test_results: Optional[dict]) -> dict:
+    out = {}
+    if not isinstance(test_results, dict):
+        return out
+    for cutoff, metrics in test_results.items():
+        if not isinstance(metrics, dict):
+            continue
+        for metric_name, value in metrics.items():
+            out[f"{metric_name}@{cutoff}"] = value
+    return out
+
+
+def _params_label(params: Optional[dict]) -> str:
+    if not isinstance(params, dict):
+        return ""
+    parts = []
+    for key in sorted(params.keys()):
+        if key in {"meta", "name", "best_iteration"}:
+            continue
+        value = params.get(key)
+        if isinstance(value, (str, int, float, bool)) or value is None:
+            parts.append(f"{key}={value}")
+    label = ", ".join(parts)
+    if len(label) > 180:
+        return label[:177] + "..."
+    return label
+
+
+def collect_best_model_result(model_name: str, best_eval: Optional[dict], selected_test_fold: int):
+    if not STATE.enabled:
+        return
+    if not isinstance(best_eval, dict):
+        return
+
+    params = best_eval.get("params", {})
+    flattened_metrics = _flatten_test_results(best_eval.get("test_results", {}))
+    STATE.summary_metric_keys.update(flattened_metrics.keys())
+
+    params_label = _params_label(params)
+    row_name = model_name if not params_label else f"{model_name} | {params_label}"
+
+    STATE.summary_rows.append(
+        {
+            "row_name": row_name,
+            "model_name": model_name,
+            "selected_test_fold": int(selected_test_fold),
+            "evaluation_source": "elliot.test_results",
+            "best_params": _sanitize(params),
+            "metrics": flattened_metrics,
+        }
+    )
+
+
+def log_summary_table(config, logger=None):
+    if not STATE.enabled or not STATE.summary_rows:
+        return
+
+    import wandb
+
+    run_name = f"{_base_name(config)}-summary-{_timestamp()}"
+    run = wandb.init(
+        project=STATE.project,
+        group=STATE.experiment_group,
+        name=run_name,
+        config={
+            "dataset": config.dataset,
+            "top_k": config.top_k,
+            "random_seed": config.random_seed,
+            "summary_type": "test_results_comparison",
+        },
+        tags=["summary", "comparison"],
+        job_type="summary",
+        reinit=True,
+    )
+    try:
+        metric_columns = sorted(STATE.summary_metric_keys)
+        columns = ["row_name", "model_name", "selected_test_fold", "evaluation_source", "best_params"] + metric_columns
+        table = wandb.Table(columns=columns)
+
+        for row in STATE.summary_rows:
+            values = [
+                row["row_name"],
+                row["model_name"],
+                row["selected_test_fold"],
+                row["evaluation_source"],
+                row["best_params"],
+            ]
+            metric_values = [row["metrics"].get(metric_name) for metric_name in metric_columns]
+            table.add_data(*(values + metric_values))
+
+        wandb.log({"comparison/test_results_table": table})
+        if logger is not None:
+            logger.info(
+                "Weights & Biases comparison table logged",
+                extra={
+                    "context": {
+                        "project": STATE.project,
+                        "group": STATE.experiment_group,
+                        "run_name": run_name,
+                        "rows": len(STATE.summary_rows),
+                        "metric_columns": len(metric_columns),
+                    }
+                },
+            )
+    finally:
+        run.finish()
+
+
 def finish_model_run(logger=None):
     if not STATE.enabled or STATE.run is None:
         return
@@ -218,3 +330,5 @@ def finish(logger=None):
     STATE.run_name = None
     STATE.active_model = None
     STATE.global_step = 0
+    STATE.summary_rows = None
+    STATE.summary_metric_keys = None

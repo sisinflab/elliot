@@ -128,6 +128,7 @@ def run_experiment(config_path: str = "", config_overrides: Optional[List[str]] 
                     attach_test_fold_stats(best_eval, test_results)
 
                 res_handler.add_oneshot_recommender(**best_eval)
+                wandb_logger.collect_best_model_result(model_name, best_eval, selected_test_fold=min_val + 1)
 
                 if test_trials:
                     res_handler.add_trials(test_trials[min_val], name=model_name)
@@ -136,6 +137,7 @@ def run_experiment(config_path: str = "", config_overrides: Optional[List[str]] 
                 wandb_logger.finish_model_run(logger)
 
         res_handler.save_outputs()
+        wandb_logger.log_summary_table(config, logger)
 
         logger.info("End experiment")
     finally:
