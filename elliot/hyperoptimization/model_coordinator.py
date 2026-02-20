@@ -15,6 +15,7 @@ from elliot.namespace import RecommenderConfig
 from elliot.hyperoptimization.policy import EvaluationPolicy, FinalPolicy, SearchPolicy
 from elliot.result_handler import aggregate_val_folds_results
 from elliot.utils import logging, get_trainer, get_model
+from elliot.utils import wandb_logger
 
 
 class ModelCoordinator(object):
@@ -37,6 +38,7 @@ class ModelCoordinator(object):
         self.config = config
         self.model_config = model_config
         self.test_fold_index = test_fold_index
+        self.model_name = model_name
         self.model_config_index = 0
 
         self._model_class = get_model(model_name, config)
@@ -106,6 +108,16 @@ class ModelCoordinator(object):
                 payload["val_metric"] = aggregated_results["val_results"][k].get(metric)
                 if include_test:
                     payload["test_metric"] = aggregated_results["test_results"][k].get(metric)
+
+        if not include_test and args is not None:
+            wandb_logger.log_hyperopt_trial(
+                model_name=self.model_name,
+                test_fold_index=self.test_fold_index,
+                trial_index=self.model_config_index,
+                hyperparams=args,
+                objective=objective["meta"],
+                payload=payload,
+            )
 
         return payload
 

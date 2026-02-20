@@ -10,10 +10,12 @@ class WandBConfig(BaseConfig):
     Attributes:
         project (str, optional): W&B project name.
         api_key (str, optional): W&B API key.
+        run_name (str, optional): Custom run name prefix.
     """
 
     project: Optional[str] = None
     api_key: Optional[str] = None
+    run_name: Optional[str] = None
 
     @model_validator(mode="after")
     def normalize_values(self) -> "WandBConfig":
@@ -21,6 +23,8 @@ class WandBConfig(BaseConfig):
             self.project = self.project.strip() or None
         if isinstance(self.api_key, str):
             self.api_key = self.api_key.strip() or None
+        if isinstance(self.run_name, str):
+            self.run_name = self.run_name.strip() or None
         return self
 
     def enabled(self) -> bool:

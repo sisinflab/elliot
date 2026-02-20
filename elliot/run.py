@@ -16,6 +16,7 @@ from elliot.hyperoptimization import run_hyperopt, run_single
 from elliot.result_handler import ResultHandler, attach_test_fold_stats
 from elliot.utils import logging as logging_project
 from elliot.utils import set_device
+from elliot.utils import wandb_logger
 
 
 print(u'''
@@ -47,6 +48,7 @@ def run_experiment(config_path: str = "", config_overrides: Optional[List[str]] 
     logger = logging_project.get_logger("__main__")
 
     _login_wandb(config, logger)
+    wandb_logger.init_tracking(config, logger)
     _configure_torch_device(config, logger)
 
     if config.version != __version__:
@@ -57,80 +59,87 @@ def run_experiment(config_path: str = "", config_overrides: Optional[List[str]] 
         raise Exception(
             'Version mismatch! In different versions of Elliot the results may slightly change due to progressive improvement!')
 
-    logger.info("Start experiment")
+    try:
+        logger.info("Start experiment")
 
-    dataset_loader = DataSetLoader(config=config)
-    data_test_list = dataset_loader.build()
+        dataset_loader = DataSetLoader(config=config)
+        data_test_list = dataset_loader.build()
 
-    res_handler = ResultHandler(config=config)
+        res_handler = ResultHandler(config=config)
 
-    all_trials = {}
+        all_trials = {}
 
-    for model_name, model_config in config.models.items():
-        test_results = []
-        test_trials = []
-        all_trials[model_name] = []
+        for model_name, model_config in config.models.items():
+            wandb_logger.start_model_run(config, model_name, logger)
+            test_results = []
+            test_trials = []
+            all_trials[model_name] = []
 
-        for test_fold_index, data_test in enumerate(data_test_list):
-            logging_project.prepare_logger(model_name, config.path_log_folder)
+            try:
+                for test_fold_index, data_test in enumerate(data_test_list):
+                    logging_project.prepare_logger(model_name, config.path_log_folder)
 
-            is_proxy = model_name.startswith("ProxyRecommender")
-            if is_proxy:
-                logger.info(f"Evaluation begun for {model_name}\n")
-                outcome = run_single(
-                    data_test=data_test,
-                    config=config,
-                    model_config=model_config,
-                    model_name=model_name,
-                    test_fold_index=test_fold_index
-                )
-                logger.info(f"Evaluation ended for {model_name}")
-            else:
-                logger.info(f"Tuning begun for {model_name}\n")
-                outcome = run_hyperopt(
-                    data_test=data_test,
-                    config=config,
-                    model_config=model_config,
-                    model_name=model_name,
-                    test_fold_index=test_fold_index
-                )
-                logger.info(f"Tuning ended for {model_name}")
-            best_eval = outcome.best_eval
+                    is_proxy = model_name.startswith("ProxyRecommender")
+                    if is_proxy:
+                        logger.info(f"Evaluation begun for {model_name}\n")
+                        outcome = run_single(
+                            data_test=data_test,
+                            config=config,
+                            model_config=model_config,
+                            model_name=model_name,
+                            test_fold_index=test_fold_index
+                        )
+                        logger.info(f"Evaluation ended for {model_name}")
+                    else:
+                        logger.info(f"Tuning begun for {model_name}\n")
+                        outcome = run_hyperopt(
+                            data_test=data_test,
+                            config=config,
+                            model_config=model_config,
+                            model_name=model_name,
+                            test_fold_index=test_fold_index
+                        )
+                        logger.info(f"Tuning ended for {model_name}")
+                    best_eval = outcome.best_eval
 
-            ############################################
-            best_model_loss = best_eval["loss"]
-            best_model_params = best_eval["params"]
-            best_model_results = best_eval["test_results"]
-            ############################################
+                    ############################################
+                    best_model_loss = best_eval["loss"]
+                    best_model_params = best_eval["params"]
+                    best_model_results = best_eval["test_results"]
+                    ############################################
 
-            # aggiunta a lista performance test
-            test_results.append(best_eval)
+                    # aggiunta a lista performance test
+                    test_results.append(best_eval)
 
-            if outcome.trials is not None:
-                test_trials.append(outcome.all_trial_results)
-                all_trials[model_name].append(outcome.all_trial_results)
+                    if outcome.trials is not None:
+                        test_trials.append(outcome.all_trial_results)
+                        all_trials[model_name].append(outcome.all_trial_results)
 
-            logger.info(f"Loss:\t{best_model_loss}")
-            logger.info(f"Best Model params:\t{best_model_params}")
-            logger.info(f"Best Model results:\t{best_model_results}")
+                    logger.info(f"Loss:\t{best_model_loss}")
+                    logger.info(f"Best Model params:\t{best_model_params}")
+                    logger.info(f"Best Model results:\t{best_model_results}")
 
-        # Migliore sui test, aggiunta a performance totali
-        min_val = np.argmin([i["loss"] for i in test_results])
-        best_eval = test_results[min_val]
+                # Migliore sui test, aggiunta a performance totali
+                min_val = np.argmin([i["loss"] for i in test_results])
+                best_eval = test_results[min_val]
 
-        results_config = config.results
-        if results_config.save_fold_stats:
-            attach_test_fold_stats(best_eval, test_results)
+                results_config = config.results
+                if results_config.save_fold_stats:
+                    attach_test_fold_stats(best_eval, test_results)
 
-        res_handler.add_oneshot_recommender(**best_eval)
+                res_handler.add_oneshot_recommender(**best_eval)
 
-        if test_trials:
-            res_handler.add_trials(test_trials[min_val], name=model_name)
-            all_trials[model_name] = all_trials[model_name][min_val]
+                if test_trials:
+                    res_handler.add_trials(test_trials[min_val], name=model_name)
+                    all_trials[model_name] = all_trials[model_name][min_val]
+            finally:
+                wandb_logger.finish_model_run(logger)
 
-    res_handler.save_outputs()
+        res_handler.save_outputs()
 
-    logger.info("End experiment")
+        logger.info("End experiment")
+    finally:
+        wandb_logger.finish(logger)
     # TODO: check before to push only this feature!
     # logger.info("Start Post-Hoc scripts")
 
