@@ -8,6 +8,7 @@ __version__ = '0.3.1'
 from typing import List, Optional
 import copy
 import os
+from pathlib import Path
 import numpy as np
 
 from elliot.dataset import DataSetLoader, build_mock_dataset
@@ -39,7 +40,7 @@ def run_experiment(config_path: str = "", config_overrides: Optional[List[str]] 
     if config.gpu is not None:
         os.environ["CUDA_VISIBLE_DEVICES"] = str(config.gpu)
 
-    _configure_wandb_environment(config)
+    _configure_wandb_environment(config, config_path)
 
     if config.config_test:
         config_test(config)
@@ -204,18 +205,48 @@ def _configure_torch_device(config, logger=None):
         logger.info("Torch device selected", extra={"context": {"device": str(device)}})
 
 
-def _configure_wandb_environment(config):
+def _load_dotenv(dotenv_path: Path):
+    if not dotenv_path.is_file():
+        return
+
+    for raw_line in dotenv_path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+
+        key, value = line.split("=", 1)
+        key = key.strip()
+        value = value.strip()
+
+        if not key:
+            continue
+
+        if (
+            len(value) >= 2
+            and value[0] == value[-1]
+            and value[0] in {"'", '"'}
+        ):
+            value = value[1:-1]
+
+        os.environ.setdefault(key, value)
+
+
+def _configure_wandb_environment(config, config_path: str = ""):
     wandb_cfg = getattr(config, "wandb", None)
     if wandb_cfg is None:
         return
 
-    api_key = getattr(wandb_cfg, "api_key", None)
     project = getattr(wandb_cfg, "project", None)
-
-    if not (api_key and project):
+    if not project:
         return
 
-    os.environ["WANDB_API_KEY"] = str(api_key)
+    dotenv_candidates = [Path.cwd() / ".env"]
+    if config_path:
+        dotenv_candidates.append(Path(config_path).resolve().parent / ".env")
+
+    for dotenv_path in dotenv_candidates:
+        _load_dotenv(dotenv_path)
+
     os.environ["WANDB_PROJECT"] = str(project)
 
 
@@ -224,9 +255,9 @@ def _login_wandb(config, logger=None):
     if wandb_cfg is None:
         return
 
-    api_key = getattr(wandb_cfg, "api_key", None)
     project = getattr(wandb_cfg, "project", None)
-    if not (api_key and project):
+    api_key = os.environ.get("WANDB_API_KEY")
+    if not (project and api_key):
         return
 
     try:
@@ -237,7 +268,7 @@ def _login_wandb(config, logger=None):
             "Install it with `pip install wandb`."
         ) from exc
 
-    login_ok = wandb.login(key=os.environ.get("WANDB_API_KEY"))
+    login_ok = wandb.login(key=api_key)
     if logger is not None:
         logger.info(
             "Weights & Biases login completed",

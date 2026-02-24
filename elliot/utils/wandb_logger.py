@@ -9,6 +9,7 @@ Behavior:
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Optional
@@ -43,7 +44,7 @@ def _is_configured(config) -> bool:
     wandb_cfg = getattr(config, "wandb", None)
     if wandb_cfg is None:
         return False
-    return bool(getattr(wandb_cfg, "project", None) and getattr(wandb_cfg, "api_key", None))
+    return bool(getattr(wandb_cfg, "project", None) and os.environ.get("WANDB_API_KEY"))
 
 
 def _timestamp() -> str:

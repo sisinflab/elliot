@@ -1,10 +1,11 @@
 experiment:
   dataset: movielens_1m_v030
   # Optional W&B integration: leave absent (or commented) to disable.
+  # Put WANDB_API_KEY in a local .env file (ignored by git), e.g.:
+  # WANDB_API_KEY=your_wandb_api_key_here
   wandb:
      project: "Elliot-experiments"
-     api_key: "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"
-     run_name: "movielens-debug"
+     run_name: "movielens_1m"
   device: cpu
   data_config:
     strategy: hierarchy
