@@ -9,15 +9,14 @@ Behavior:
 from __future__ import annotations
 
 import json
-import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any, Optional, Literal
 
 
 @dataclass
 class _WandBState:
-    enabled: bool = False
+    mode: Optional[Literal["online", "offline", "disabled"]] = None
     project: Optional[str] = None
     experiment_group: Optional[str] = None
     run: Optional[object] = None
@@ -32,65 +31,129 @@ STATE = _WandBState()
 
 
 def _sanitize(value: Any) -> Any:
+    """Convert values to W&B-safe primitives for logging.
+
+    Primitive values are returned unchanged. Non-primitive values are
+    serialized to JSON when possible, with a final string fallback to avoid
+    runtime failures during logging.
+
+    Args:
+        value (Any): Value to sanitize before logging.
+
+    Returns:
+        Any: A W&B-compatible value (primitive or stringified representation).
+    """
+
     if value is None or isinstance(value, (str, int, float, bool)):
         return value
     try:
         return json.dumps(value, ensure_ascii=True, default=str)
-    except Exception:
+    except (TypeError, ValueError):
         return str(value)
 
 
-def _is_configured(config) -> bool:
-    wandb_cfg = getattr(config, "wandb", None)
-    if wandb_cfg is None:
-        return False
-    return bool(getattr(wandb_cfg, "project", None) and os.environ.get("WANDB_API_KEY"))
-
-
 def _timestamp() -> str:
+    """Return a UTC timestamp string used to build unique W&B names.
+
+    Returns:
+        str: Timestamp in the format YYYYMMDD-HHMMSS.
+    """
+
     return datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
 
 
 def _base_name(config) -> str:
-    custom_name = getattr(config.wandb, "run_name", None)
+    """Build the base name used for W&B run and group naming.
+
+    If a custom run prefix/name is provided in the W&B config, it is used;
+    otherwise the default pattern ``elliot-{dataset}`` is applied.
+
+    Args:
+        config (ExperimentConfig): Experiment configuration namespace.
+
+    Returns:
+        str: Base name for W&B run/group identifiers.
+    """
+
+    custom_name = getattr(config.wandb, "run_prefix", None)
     if isinstance(custom_name, str):
         custom_name = custom_name.strip() or None
     return custom_name or f"elliot-{config.dataset}"
 
 
 def _setup_metrics(wandb):
+    """Register W&B metric definitions for hyperparameter search logs.
+
+    This configures ``search/global_step`` as the shared x-axis and binds
+    all metrics under ``search/*`` to that step, so trial-level charts are
+    aligned across the run.
+
+    Args:
+        wandb: Imported Weights & Biases module.
+    """
+
     wandb.define_metric("search/global_step")
     wandb.define_metric("search/*", step_metric="search/global_step")
 
 
-def init_tracking(config, logger=None) -> bool:
-    if not _is_configured(config):
-        return False
+def init_tracking(mode, config, logger=None):
+    """Initialize W&B tracking state for the current experiment.
 
-    if STATE.enabled:
-        return True
+    This function sets the shared tracking context (project, group, and
+    runtime state) only once per process. If mode is "disabled", tracking
+    remains inactive and no W&B runs are created.
 
-    STATE.enabled = True
-    STATE.project = config.wandb.project
-    STATE.experiment_group = f"{_base_name(config)}-{_timestamp()}"
-    STATE.run = None
-    STATE.run_name = None
-    STATE.active_model = None
-    STATE.global_step = 0
-    STATE.summary_rows = []
-    STATE.summary_metric_keys = set()
+    Args:
+        mode (Literal["online", "offline", "disabled"]): W&B execution mode
+            resolved during setup.
+        config (ExperimentConfig): Experiment configuration namespace.
+        logger (logging.Logger, optional): Elliot logger used for status logs.
+    """
 
-    if logger is not None:
-        logger.info(
-            "Weights & Biases tracking enabled",
-            extra={"context": {"project": STATE.project, "group": STATE.experiment_group}},
-        )
+    # if already enabled exit
+    if STATE.mode is not None:
+        return
 
-    return True
+    STATE.mode = mode
+
+    if mode not in ["online", "offline", "disabled"]:
+        raise ValueError(f"Invalid mode: {mode}")
+
+    if STATE.mode == "disabled":
+        return
+
+    if mode in {"online", "offline"}:
+        STATE.project = config.wandb.project
+        STATE.experiment_group = f"{_base_name(config)}-{_timestamp()}"
+        STATE.run = None
+        STATE.run_name = None
+        STATE.active_model = None
+        STATE.global_step = 0
+        STATE.summary_rows = []
+        STATE.summary_metric_keys = set()
+
+        if logger is not None:
+            logger.info(
+                f"Weights & Biases tracking enabled in mode {STATE.mode}",
+                extra={"context": {"project": STATE.project, "group": STATE.experiment_group}},
+            )
+
+        return
 
 
 def start_model_run(config, model_name: str, logger=None):
-    if not STATE.enabled:
+    """Start a W&B run for a single model inside the current experiment group.
+
+    The run is created only when tracking mode is "online" or "offline".
+    If another run is still active, it is closed before creating the new one.
+
+    Args:
+        config (ExperimentConfig): Experiment configuration namespace.
+        model_name (str): Name of the model currently being processed.
+        logger (logging.Logger, optional): Elliot logger used for status logs.
+    """
+
+    if STATE.mode not in ["online", "offline"]:
         return
 
     import wandb
@@ -105,6 +168,7 @@ def start_model_run(config, model_name: str, logger=None):
         "random_seed": config.random_seed,
         "model_name": model_name,
     }
+
     STATE.run = wandb.init(
         project=STATE.project,
         group=STATE.experiment_group,
@@ -112,12 +176,14 @@ def start_model_run(config, model_name: str, logger=None):
         config=run_config,
         tags=[model_name],
         reinit=True,
+        mode=STATE.mode
     )
-    _setup_metrics(wandb)
 
     STATE.run_name = run_name
     STATE.active_model = model_name
     STATE.global_step = 0
+
+    _setup_metrics(wandb)
 
     if logger is not None:
         logger.info(
@@ -125,9 +191,10 @@ def start_model_run(config, model_name: str, logger=None):
             extra={
                 "context": {
                     "project": STATE.project,
-                    "group": STATE.experiment_group,
-                    "run_name": run_name,
-                    "model": model_name,
+                    "group": STATE.experiment_group, # forse rimovibile
+                    "run_name": STATE.run_name,
+                    "model": STATE.active_model,
+                    "mode": STATE.mode,
                 }
             },
         )
@@ -142,7 +209,16 @@ def log_hyperopt_trial(
     objective: Optional[dict],
     payload: Optional[dict],
 ):
-    if not STATE.enabled or STATE.run is None:
+    """Log a single hyperparameter-search trial to the active W&B model run.
+
+    The function records trial identifiers, objective metadata, selected
+    validation values, loss, and trial hyperparameters under the ``search/*``
+    and ``hparams/*`` namespaces.
+
+    Logging is skipped when tracking mode is disabled or no run is active.
+    """
+
+    if STATE.mode not in {"online", "offline"} or STATE.run is None:
         return
 
     STATE.global_step += 1
@@ -184,6 +260,15 @@ def log_hyperopt_trial(
 
 
 def _flatten_test_results(test_results: Optional[dict]) -> dict:
+    """Flatten nested test metrics into ``metric@cutoff`` key-value pairs.
+
+    Args:
+        test_results (dict, optional): Nested test results as
+            ``{cutoff: {metric_name: value}}``.
+
+    Returns:
+        dict: Flattened mapping as ``{f"{metric}@{cutoff}": value}``.
+    """
     out = {}
     if not isinstance(test_results, dict):
         return out
@@ -196,6 +281,17 @@ def _flatten_test_results(test_results: Optional[dict]) -> dict:
 
 
 def _params_label(params: Optional[dict]) -> str:
+    """Build a compact, human-readable label from selected model parameters.
+
+    Internal/meta keys are skipped and only primitive values are included.
+    The final string is truncated to avoid excessively long table row names.
+
+    Args:
+        params (dict, optional): Model parameter dictionary.
+
+    Returns:
+        str: Compact parameter label string.
+    """
     if not isinstance(params, dict):
         return ""
     parts = []
@@ -212,7 +308,21 @@ def _params_label(params: Optional[dict]) -> str:
 
 
 def collect_best_model_result(model_name: str, best_eval: Optional[dict], selected_test_fold: int):
-    if not STATE.enabled:
+    """Collect the best evaluation result of a model for final summary logging.
+
+    The function stores one normalized row per model in in-memory summary
+    buffers, to be later exported as a W&B comparison table.
+
+    Collection is skipped when tracking mode is disabled or when the provided
+    evaluation payload is invalid.
+
+    Args:
+        model_name (str): Name of the evaluated model.
+        best_eval (dict, optional): Best evaluation payload returned by Elliot.
+        selected_test_fold (int): 1-based index of the selected best test fold.
+    """
+
+    if STATE.mode not in {"online", "offline"}:
         return
     if not isinstance(best_eval, dict):
         return
@@ -237,7 +347,21 @@ def collect_best_model_result(model_name: str, best_eval: Optional[dict], select
 
 
 def log_summary_table(config, logger=None):
-    if not STATE.enabled or not STATE.summary_rows:
+    """Log a final W&B comparison table with best test results per model.
+
+    A dedicated summary run is created in the current experiment group, where
+    a ``comparison/test_results_table`` artifact is logged with one row per
+    selected best model result.
+
+    Logging is skipped when tracking mode is disabled or when no summary rows
+    were collected.
+
+    Args:
+        config (ExperimentConfig): Experiment configuration namespace.
+        logger (logging.Logger, optional): Elliot logger used for status logs.
+    """
+
+    if STATE.mode not in {'online', 'offline'} or not STATE.summary_rows:
         return
 
     import wandb
@@ -256,6 +380,7 @@ def log_summary_table(config, logger=None):
         tags=["summary", "comparison"],
         job_type="summary",
         reinit=True,
+        mode=STATE.mode
     )
     try:
         metric_columns = sorted(STATE.summary_metric_keys)
@@ -292,7 +417,15 @@ def log_summary_table(config, logger=None):
 
 
 def finish_model_run(logger=None):
-    if not STATE.enabled or STATE.run is None:
+    """Close the currently active W&B model run and reset run-level state.
+
+    If no model run is active, the function is a no-op.
+
+    Args:
+        logger (logging.Logger, optional): Elliot logger used for status logs.
+    """
+
+    if STATE.mode not in {"online","offline"} or STATE.run is None:
         return
 
     import wandb
@@ -311,7 +444,15 @@ def finish_model_run(logger=None):
 
 
 def finish(logger=None):
-    if not STATE.enabled:
+    """Close W&B tracking for the experiment and reset global tracking state.
+
+    If a model run is still active, it is closed before resetting state.
+
+    Args:
+        logger (logging.Logger, optional): Elliot logger used for status logs.
+    """
+
+    if STATE.mode not in {"online","offline"}:
         return
 
     if STATE.run is not None:
@@ -324,12 +465,12 @@ def finish(logger=None):
             extra={"context": {"project": STATE.project, "group": STATE.experiment_group}},
         )
 
-    STATE.enabled = False
+    STATE.mode = None
     STATE.project = None
     STATE.experiment_group = None
     STATE.run = None
     STATE.run_name = None
     STATE.active_model = None
     STATE.global_step = 0
-    STATE.summary_rows = None
-    STATE.summary_metric_keys = None
+    STATE.summary_rows = []
+    STATE.summary_metric_keys = set()

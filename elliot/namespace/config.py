@@ -85,14 +85,6 @@ class ExperimentConfig(BaseConfig):
     external_posthoc_path: Optional[str] = None
     models: Dict[str, Any] = {}
 
-    @model_validator(mode="before")
-    @classmethod
-    def normalize_wandb_key(cls, data: Any) -> Any:
-        """Support both `wandb` and legacy/mistyped `wand` keys in configs."""
-        if isinstance(data, dict) and "wandb" not in data and "wand" in data:
-            data = dict(data)
-            data["wandb"] = data["wand"]
-        return data
 
     @model_validator(mode="after")
     def resolve_paths(self) -> "ExperimentConfig":

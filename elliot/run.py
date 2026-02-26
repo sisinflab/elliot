@@ -40,16 +40,15 @@ def run_experiment(config_path: str = "", config_overrides: Optional[List[str]] 
     if config.gpu is not None:
         os.environ["CUDA_VISIBLE_DEVICES"] = str(config.gpu)
 
-    _configure_wandb_environment(config, config_path)
-
     if config.config_test:
         config_test(config)
 
     logging_project.init(config.path_logger_config, config.path_log_folder)
     logger = logging_project.get_logger("__main__")
 
-    _login_wandb(config, logger)
-    wandb_logger.init_tracking(config, logger)
+    mode = _setup_wandb(config, logger, config_path)
+    wandb_logger.init_tracking(mode, config, logger)
+
     _configure_torch_device(config, logger)
 
     if config.version != __version__:
@@ -231,54 +230,69 @@ def _load_dotenv(dotenv_path: Path):
         os.environ.setdefault(key, value)
 
 
-def _configure_wandb_environment(config, config_path: str = ""):
+def _setup_wandb(config, logger=None, config_path: str = ""):
     wandb_cfg = getattr(config, "wandb", None)
-    if wandb_cfg is None:
-        return
+    mode = getattr(wandb_cfg, "mode", "disabled") if wandb_cfg is not None else "disabled"
 
-    project = getattr(wandb_cfg, "project", None)
-    if not project:
-        return
+    if mode == "disabled":
+        if logger is not None:
+            logger.info("W&B disabled by configuration", extra={"context": {"mode": mode}})
+        return mode
 
-    dotenv_candidates = [Path.cwd() / ".env"]
-    if config_path:
-        dotenv_candidates.append(Path(config_path).resolve().parent / ".env")
-
-    for dotenv_path in dotenv_candidates:
-        _load_dotenv(dotenv_path)
-
-    os.environ["WANDB_PROJECT"] = str(project)
-
-
-def _login_wandb(config, logger=None):
-    wandb_cfg = getattr(config, "wandb", None)
-    if wandb_cfg is None:
-        return
-
-    project = getattr(wandb_cfg, "project", None)
-    api_key = os.environ.get("WANDB_API_KEY")
-    if not (project and api_key):
-        return
 
     try:
         import wandb
     except ImportError as exc:
         raise ImportError(
-            "W&B is configured but the `wandb` package is not installed. "
+            "W&B mode is enabled but `wandb` is not installed."
             "Install it with `pip install wandb`."
         ) from exc
 
-    login_ok = wandb.login(key=api_key)
-    if logger is not None:
-        logger.info(
-            "Weights & Biases login completed",
-            extra={
-                "context": {
-                    "project": project,
-                    "logged_in": bool(login_ok) if login_ok is not None else True,
-                }
-            },
-        )
+    project = getattr(wandb_cfg, "project", None)
+
+    if mode == "offline":
+        if logger:
+            logger.info(
+                "W&B offline mode enabled",
+                extra={"context": {"mode": mode, "project": project}},
+            )
+
+    if mode == "online":
+
+        api_key = os.environ.get("WANDB_API_KEY")
+
+        # Optional local fallback for developer workflows:
+        # load .env only if the API key is not already present in the environment.
+        if not api_key:
+            dotenv_candidates = [Path.cwd() / ".env"]
+            if config_path:
+                dotenv_candidates.append(Path(config_path).resolve().parent / ".env")
+
+            for dotenv_path in dotenv_candidates:
+                _load_dotenv(dotenv_path)
+
+            api_key = os.environ.get("WANDB_API_KEY")
+
+        if not api_key:
+            raise RuntimeError(
+                "W&B online mode requires WANDB_API_KEY in environment variables."
+            )
+
+        try:
+            login = wandb.login(key=api_key)
+        except Exception as exc:
+            raise RuntimeError("W&B login failed.") from exc
+
+        if not login:
+            raise RuntimeError("W&B login failed with provided WANDB_API_KEY.")
+
+        if logger:
+            logger.info(
+                "W&B online login successful",
+                extra={"context": {"mode": mode, "project": project}},
+            )
+
+    return mode
 
 
 if __name__ == '__main__':
