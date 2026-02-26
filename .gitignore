@@ -67,3 +67,5 @@ config_files/*
 .env
 .env.*
 !.env.example
+wandb/
+*.wandb
