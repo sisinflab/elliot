@@ -1,0 +1,31 @@
+experiment:
+  dataset: movielens_1m_v030
+  # Optional W&B integration: default mode disabled if absent.
+  # For online mode, set WANDB_API_KEY in your shell (or optional local .env fallback).
+  wandb:
+    mode: online
+    project: "Elliot-experiments"
+    run_prefix: "movielens_1m"
+  device: cpu
+  data_config:
+    strategy: hierarchy
+    data_folder: ../data/{0}/splitting
+  top_k: 20
+  evaluation:
+    simple_metrics: [nDCG, HR]
+  models:
+    ItemKNN:
+      meta:
+        save_recs: False
+      neighborhood: 500
+      similarity: rp3beta
+      alpha: 1.0
+      beta: 0.6
+      normalize_similarity: True
+      eval_batch_size: 2048
+    BPRMFBatch:
+      meta:
+        save_recs: False
+      batch_size: 2048
+      eval_batch_size: 512
+
