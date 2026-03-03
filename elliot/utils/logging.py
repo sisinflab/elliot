@@ -8,7 +8,10 @@ from typing import Any, Dict, Optional
 
 import yaml
 
-from elliot.utils.folder import check_dir, check_path, path_absolute, path_joiner
+from elliot.utils.folder import check_dir, check_path, path_absolute, path_joiner, path_resolver
+
+path_config = path_resolver(path_joiner("elliot", "config", "logger_config.yml"))
+folder_log = path_resolver(path_joiner("log"))
 
 DEFAULT_SETTINGS: Dict[str, Any] = {
     "app_name": "elliot",
@@ -74,7 +77,7 @@ def _coerce_level(value: Any, fallback: int) -> int:
     return fallback
 
 
-def _load_settings(path_config: Optional[str]) -> Dict[str, Any]:
+def _load_settings() -> Dict[str, Any]:
     settings = dict(DEFAULT_SETTINGS)
     if path_config and check_path(path_config):
         with open(path_config, "r", encoding="utf-8") as stream:
@@ -266,8 +269,8 @@ def _configure_root_handlers(settings: Dict[str, Any]) -> None:
     root.addHandler(file_handler)
 
 
-def init(path_config: str, folder_log: str, log_level: int = logging.INFO) -> None:
-    settings = _load_settings(path_config)
+def init(log_level: int = logging.INFO) -> None:
+    settings = _load_settings()
     settings["console_level"] = _coerce_level(
         settings.get("console_level"), log_level
     )
@@ -307,10 +310,10 @@ def get_logger_model(name: str, log_level: int = logging.DEBUG) -> logging.Logge
 
 
 def prepare_logger(
-    name: str, path: str, log_level: int = logging.DEBUG
+    name: str, log_level: int = logging.DEBUG
 ) -> logging.LoggerAdapter:
     _ensure_state()
-    check_dir(path)
+    check_dir(folder_log)
 
     logger = logging.getLogger(name)
     logger.setLevel(log_level)
@@ -320,7 +323,7 @@ def prepare_logger(
             logger.removeHandler(handler)
 
     logfilepath = path_absolute(
-        path_joiner(path, f"{name}-{STATE.run_id}.log")
+        path_joiner(folder_log, f"{name}-{STATE.run_id}.log")
     )
 
     handler = RotatingFileHandler(

@@ -80,6 +80,6 @@ class LAUC(BaseMetric):
         Evaluation function
         :return: the overall averaged value of LAUC per user
         """
-        return {u: LAUC.__user_auc_at_k(u_r, self._cutoff, self._relevance.get_user_rel(u), self._num_items, len(self._evaluation_objects.data.train_dict[u]))
+        return {u: LAUC.__user_auc_at_k(u_r, self._cutoff, self._relevance.get_user_rel(u), self._num_items, len(self._evaluation_objects.data.get_train_dict()[u]))
              for u, u_r in self._recommendations.items() if len(self._relevance.get_user_rel(u))}
 

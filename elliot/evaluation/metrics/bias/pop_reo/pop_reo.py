@@ -53,7 +53,7 @@ class PopREO(BaseMetric):
         self._relevance = self._evaluation_objects.relevance.binary_relevance
         self._short_head = set(self._evaluation_objects.pop.get_short_head())
         self._long_tail = set(self._evaluation_objects.pop.get_long_tail())
-        self._train = self._evaluation_objects.data.train_dict
+        self._train = self._evaluation_objects.data.get_train_dict()
         self._num = []
         self._den = []
 

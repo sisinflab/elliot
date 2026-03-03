@@ -82,11 +82,11 @@ class ExtendedEPC(BaseMetric):
     #     """
     #
     #     item_count = {}
-    #     for u_h in self._evaluation_objects.data.train_dict.values():
+    #     for u_h in self._evaluation_objects.data.get_train_dict().values():
     #         for i in u_h.keys():
     #             item_count[i] = item_count.get(i, 0) + 1
     #
-    #     num_users = len(self._evaluation_objects.data.train_dict)
+    #     num_users = len(self._evaluation_objects.data.get_train_dict())
     #     self._item_novelty_dict = {i: 1 - (v / num_users) for i, v in item_count.items()}
     #
     #     a = [self.__user_EPC(u_r, u, self._cutoff)
@@ -101,11 +101,11 @@ class ExtendedEPC(BaseMetric):
 
 
         item_count = {}
-        for u_h in self._evaluation_objects.data.train_dict.values():
+        for u_h in self._evaluation_objects.data.get_train_dict().values():
             for i in u_h.keys():
                 item_count[i] = item_count.get(i, 0) + 1
 
-        num_users = len(self._evaluation_objects.data.train_dict)
+        num_users = len(self._evaluation_objects.data.get_train_dict())
         self._item_novelty_dict = {i: 1 - (v / num_users) for i, v in item_count.items()}
 
         return {u: self.__user_EPC(u_r, u, self._cutoff)

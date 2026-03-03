@@ -106,6 +106,8 @@ class RecommenderConfig(BaseConfig):
     best_iteration: int = None
     name: str = None
 
+    warn_on_extra_fields = True
+
     @field_validator("*", mode="before")
     @classmethod
     def eval_tuple_fields(cls, value: Any, info: ValidationInfo) -> Any:

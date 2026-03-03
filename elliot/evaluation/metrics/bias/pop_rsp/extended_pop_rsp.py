@@ -42,7 +42,7 @@ class ExtendedPopRSP(BaseMetric):
 
         self._short_head = set(self._pop_obj.get_short_head())
         self._long_tail = set(self._pop_obj.get_long_tail())
-        self._train = self._evaluation_objects.data.train_dict
+        self._train = self._evaluation_objects.data.get_train_dict()
         self._num = []
         self._den = []
 

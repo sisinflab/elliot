@@ -18,10 +18,11 @@ class Popularity(object):
         self._short_head = []
         self._long_tail = []
         self._pop_ratio = pop_ratio
+        _, self._inv_i_map = data.get_inverse_mappings()
 
     def get_pop_items(self):
         if not self._pop_items:
-            self._pop_items = {self._data.private_items[p]: pop for p, pop in
+            self._pop_items = {self._inv_i_map[p]: pop for p, pop in
                                enumerate(self._data.sp_i_train.astype(bool).sum(axis=0).tolist()[0])}
         return self._pop_items
 

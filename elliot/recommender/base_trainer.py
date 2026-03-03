@@ -54,10 +54,6 @@ class AbstractTrainer(ABC):
             pylog.CRITICAL if self.config.config_test else pylog.DEBUG
         )
 
-        # Model
-        self.model = model_class(data, model_config, self.config.random_seed, self.logger)
-        self.model_config.name = self.model.name
-
         # Validation metric
         default_metric = self.config.results.default_metric
         default_k = self.config.results.default_k
@@ -92,6 +88,11 @@ class AbstractTrainer(ABC):
 
         if self.model_config.eval_batch_size is None:
             self.model_config.eval_batch_size = self.model_config.batch_size
+
+        # Model
+        model_cfg = self.model_config.model_copy(deep=True)
+        self.model = model_class(data, model_cfg, self.config.random_seed, self.logger)
+        self.model_config.name = self.model.name
 
         # Set seed
         np.random.seed(self.config.random_seed)

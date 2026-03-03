@@ -294,7 +294,7 @@ class Reader:
             FileNotFoundError: If the file is not found in the specified folder.
             RuntimeError: If there is an error while loading the model.
         """
-        files = self.read_folder(path_joiner(read_folder, model_name), **kwargs)
+        files = self.read_folder(read_folder, **kwargs)
         by_name = {file_name(p): p for p in files}
         path = by_name.get(f"best-weights-{model_name}")
 

@@ -188,7 +188,7 @@ class Writer:
             **kwargs (Any): Additional keyword arguments.
         """
         check_dir(save_folder)
-        file_path = path_joiner(save_folder, model_name, f"best-weights-{model_name}{ext}")
+        file_path = path_joiner(save_folder, f"best-weights-{model_name}{ext}")
         torch.save(obj, file_path)
 
         self.logger.info(

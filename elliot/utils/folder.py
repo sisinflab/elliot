@@ -19,7 +19,7 @@ def set_config_folder(path):
     _CTX["config_folder"] = path
 
 def get_config_folder():
-    return _CTX["config_folder"]
+    return _CTX.get("config_folder", working_dir())
 
 
 def check_dir(
@@ -50,6 +50,10 @@ def parent_dir(
     path: Union[str, PathLike[str]]
 ) -> str:
     return str(Path(path).parent)
+
+
+def working_dir() -> str:
+    return str(Path.cwd())
 
 
 def is_dir(

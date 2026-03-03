@@ -53,7 +53,7 @@ class RSP(BaseMetric):
         """
         super().__init__(recommendations, config, params, eval_objects, additional_data)
         self._cutoff = self._evaluation_objects.cutoff
-        self._train = self._evaluation_objects.data.train_dict
+        self._train = self._evaluation_objects.data.get_train_dict()
 
         self._item_clustering_path = self._additional_data.get("clustering_file", False)
 

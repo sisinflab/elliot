@@ -1,4 +1,5 @@
 import torch
+from sklearn.preprocessing import normalize
 
 from elliot.recommender.base_recommender import TraditionalRecommender
 from elliot.recommender.knn.similarity import Similarity
@@ -12,6 +13,7 @@ class KNN(TraditionalRecommender):
     asymmetric_alpha: float
     alpha: float
     beta: float
+    normalize_similarity: bool
 
     def __init__(self, data, params, seed, logger, transpose):
         super().__init__(data, params, seed, logger)
@@ -35,6 +37,9 @@ class KNN(TraditionalRecommender):
     def initialize(self):
         self.similarity_matrix = self._backend.compute_similarity()
 
+        if self.normalize_similarity:
+            self.similarity_matrix = normalize(self.similarity_matrix, norm="l1", axis=1)
+
 
 class ItemKNN(KNN):
     # Model hyperparameters
@@ -44,6 +49,7 @@ class ItemKNN(KNN):
     asymmetric_alpha: float = 0.5
     alpha: float = 1.0
     beta: float = 1.0
+    normalize_similarity: bool = False
 
     def __init__(self, data, params, seed, logger):
         super().__init__(data, params, seed, logger, transpose=True)
@@ -70,6 +76,7 @@ class UserKNN(KNN):
     asymmetric_alpha: float = 0.5
     alpha: float = 1.0
     beta: float = 1.0
+    normalize_similarity: bool = False
 
     def __init__(self, data, params, seed, logger):
         super().__init__(data, params, seed, logger, transpose=False)

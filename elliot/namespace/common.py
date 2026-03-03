@@ -1,6 +1,9 @@
-from typing import Any, Union, get_origin, get_args, List, Optional
+from typing import List, Any, Optional, Union, ClassVar, get_origin, get_args
+from logging import LoggerAdapter
 from pydantic import BaseModel, ConfigDict, model_validator, field_validator
 from pydantic_core.core_schema import ValidationInfo
+
+from elliot.utils.logging import get_logger
 
 
 class BaseConfig(BaseModel):
@@ -8,9 +11,16 @@ class BaseConfig(BaseModel):
 
     Extend Pydantic BaseModel to allow extra fields and dynamically
     expose them as class attributes.
+
+    Attributes:
+        warn_on_extra_fields (ClassVar[bool]): Whether to log warnings for extra fields
+            in the configuration. Defaults to False.
+        logger (ClassVar[LoggerAdapter]): A logging instance. Defaults to `get_logger("__main__")`.
     """
 
     model_config = ConfigDict(extra="allow")
+    warn_on_extra_fields: ClassVar[bool] = False
+    logger: ClassVar[LoggerAdapter] = get_logger("__main__")
 
     @model_validator(mode="after")
     def set_extra_to_attrs(self):
@@ -20,6 +30,10 @@ class BaseConfig(BaseModel):
             BaseConfig: The object itself with the new fields.
         """
         for key, value in (self.model_extra or {}).items():
+            if self.warn_on_extra_fields:
+                self.logger.warning(
+                    f"Unknown field '{key}' in {self.__class__.__name__} configuration."
+                )
             if not hasattr(self, key):
                 setattr(self, key, value)
         return self

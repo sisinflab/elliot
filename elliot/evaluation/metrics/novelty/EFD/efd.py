@@ -81,7 +81,7 @@ class EFD(BaseMetric):
     #     """
     #
     #     self._item_count = {}
-    #     for u_h in self._evaluation_objects.data.train_dict.values():
+    #     for u_h in self._evaluation_objects.data.get_train_dict().values():
     #         for i in u_h.keys():
     #             self._item_count[i] = self._item_count.get(i, 0) + 1
     #
@@ -100,7 +100,7 @@ class EFD(BaseMetric):
         """
 
         self._item_count = {}
-        for u_h in self._evaluation_objects.data.train_dict.values():
+        for u_h in self._evaluation_objects.data.get_train_dict().values():
             for i in u_h.keys():
                 self._item_count[i] = self._item_count.get(i, 0) + 1
 

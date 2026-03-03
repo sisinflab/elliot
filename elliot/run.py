@@ -33,6 +33,9 @@ print(u'''
 
 
 def run_experiment(config_path: str = "", config_overrides: Optional[List[str]] = None):
+    logging_project.init()
+    logger = logging_project.get_logger("__main__")
+
     config = build_namespace(config_path, config_overrides)
 
     if config.gpu is not None:
@@ -40,9 +43,6 @@ def run_experiment(config_path: str = "", config_overrides: Optional[List[str]] 
 
     if config.config_test:
         config_test(config)
-
-    logging_project.init(config.path_logger_config, config.path_log_folder)
-    logger = logging_project.get_logger("__main__")
 
     _configure_torch_device(config, logger)
 
@@ -69,7 +69,7 @@ def run_experiment(config_path: str = "", config_overrides: Optional[List[str]] 
         all_trials[model_name] = []
 
         for test_fold_index, data_test in enumerate(data_test_list):
-            logging_project.prepare_logger(model_name, config.path_log_folder)
+            logging_project.prepare_logger(model_name)
 
             is_proxy = model_name.startswith("ProxyRecommender")
             if is_proxy:

@@ -37,7 +37,8 @@ class SRecall(BaseMetric):
         self._cutoff = self._evaluation_objects.cutoff
         self._relevance = self._evaluation_objects.relevance.binary_relevance
         self._feature_map = SRecall._load_attribute_file(additional_data["feature_data"])
-        self._total_features = len({topic for item in eval_objects.data.items for topic in self._feature_map.get(item, [])})
+        _, items = eval_objects.data.get_users_items()
+        self._total_features = len({topic for item in items for topic in self._feature_map.get(item, [])})
 
     @staticmethod
     def name():

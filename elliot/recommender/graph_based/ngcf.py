@@ -54,7 +54,7 @@ class NGCF(GraphBasedRecommender):
     # Model hyperparameters
     factors: int = 64
     n_layers: int = 1
-    weight_size: Tuple[int, ...] = (64,)
+    # weight_size: int = 64
     node_dropout: float = 0.0
     message_dropout: float = 0.5
     normalize: bool = True
@@ -65,7 +65,7 @@ class NGCF(GraphBasedRecommender):
         super(NGCF, self).__init__(data, params, seed, logger)
 
         # Initialize the hidden dimensions
-        self.weight_size_list = [self.factors] + list(self.weight_size)
+        self.weight_size_list = [self.factors] * (self.n_layers + 1)
 
         # Embeddings
         self.Gu = nn.Embedding(self._num_users, self.factors)

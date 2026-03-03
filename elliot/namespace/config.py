@@ -46,8 +46,6 @@ class ExperimentConfig(BaseConfig):
         device (str, optional): Device to use (automatically picked if not set).
         torch_device (str, optional): Torch device to use (automatically picked if not set).
         backend (List[str]): List of supported training backends. Defaults to ["tensorflow"].
-        path_logger_config (str): Path to the logger configuration file.
-        path_log_folder (str): Path to the folder for log files.
         path_output_rec_result (str): Path to the folder for recommendation results output.
         path_output_rec_weight (str): Path to the folder for learned model weights output.
         path_output_rec_performance (str): Path to the folder for performance metrics output.
@@ -74,8 +72,6 @@ class ExperimentConfig(BaseConfig):
     device: Optional[str] = None
     torch_device: Optional[str] = None
     backend: List[str] = ["tensorflow"]
-    path_logger_config: str = path_joiner("..", "elliot", "config", "logger_config.yml")
-    path_log_folder: str = path_joiner("..", "log")
     path_output_rec_result: str = path_joiner("..", "results", "{0}", "recs")
     path_output_rec_weight: str = path_joiner("..", "results", "{0}", "weights")
     path_output_rec_performance: str = path_joiner("..", "results", "{0}", "performance")

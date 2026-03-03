@@ -45,7 +45,7 @@ class ModelCoordinator(object):
     def run(self, policy: EvaluationPolicy, args: Optional[dict] = None) -> dict:
         include_test = policy.include_test
         phase = "Test" if include_test else "Exploration"
-        model_config = copy.deepcopy(self.model_config)
+        model_config = self.model_config.model_copy(deep=True)
 
         if not include_test:
             self.logger.info("Hyperparameter tuning exploration:")

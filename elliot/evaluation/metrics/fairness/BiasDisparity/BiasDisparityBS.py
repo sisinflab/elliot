@@ -44,7 +44,7 @@ class BiasDisparityBS(BaseMetric):
         :param eval_objects: list of objects that may be useful for the computation of the different metrics
         """
         super().__init__(recommendations, config, params, eval_objects, additional_data)
-        self._train = self._evaluation_objects.data.train_dict
+        self._train = self._evaluation_objects.data.get_train_dict()
 
         self._item_clustering_path = self._additional_data.get("item_clustering_file", False)
 

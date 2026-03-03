@@ -57,7 +57,7 @@ class REO(BaseMetric):
         self._cutoff = self._evaluation_objects.cutoff
         self._relevance = self._evaluation_objects.relevance.binary_relevance
 
-        self._train = self._evaluation_objects.data.train_dict
+        self._train = self._evaluation_objects.data.get_train_dict()
 
         self._item_clustering_path = self._additional_data.get("clustering_file", False)
 
