@@ -9,6 +9,7 @@ from typing import List, Optional
 import copy
 import os
 from pathlib import Path
+import socket
 import numpy as np
 
 from elliot.dataset import DataSetLoader, build_mock_dataset
@@ -230,6 +231,14 @@ def _load_dotenv(dotenv_path: Path):
         os.environ.setdefault(key, value)
 
 
+def _has_wandb_online_connectivity(host: str = "api.wandb.ai", port: int = 443, timeout: float = 3.0) -> bool:
+    try:
+        with socket.create_connection((host, port), timeout=timeout):
+            return True
+    except OSError:
+        return False
+
+
 def _setup_wandb(config, logger=None, config_path: str = ""):
     wandb_cfg = getattr(config, "wandb", None)
     mode = getattr(wandb_cfg, "mode", "disabled") if wandb_cfg is not None else "disabled"
@@ -258,6 +267,11 @@ def _setup_wandb(config, logger=None, config_path: str = ""):
             )
 
     if mode == "online":
+        if not _has_wandb_online_connectivity():
+            raise RuntimeError(
+                "W&B online mode requires internet connectivity."
+                " Unable to reach api.wandb.ai:443."
+            )
 
         api_key = os.environ.get("WANDB_API_KEY")
 
