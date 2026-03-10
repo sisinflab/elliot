@@ -14,18 +14,19 @@ experiment:
   evaluation:
     simple_metrics: [nDCG, HR]
   models:
-    ItemKNN:
-      meta:
-        save_recs: False
-      neighborhood: 500
-      similarity: rp3beta
-      alpha: 1.0
-      beta: 0.6
-      normalize_similarity: True
-      eval_batch_size: 2048
+#    ItemKNN:
+#      meta:
+#        save_recs: False
+#      neighborhood: 500
+#      similarity: rp3beta
+#      alpha: 1.0
+#      beta: 0.6
+#      normalize_similarity: True
+#      eval_batch_size: 2048
     BPRMFBatch:
       meta:
         save_recs: False
-      batch_size: 2048
-      eval_batch_size: 512
+      batch_size: [1024, 2048]
+      epochs: 10
+      eval_batch_size: 2048
 

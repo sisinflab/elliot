@@ -62,6 +62,7 @@ class ModelCoordinator(object):
 
         internal_losses = []
         reports = []
+        fold_trends = []
 
         for trainval_index, data_obj in enumerate(self.data_objs):
             if not include_test and args is not None:
@@ -83,6 +84,7 @@ class ModelCoordinator(object):
             report["time"] = toc - tic
             reports.append(report)
             internal_losses.append(self._get_internal_loss(trainer))
+            fold_trends.append(self._extract_fold_trend(trainer))
 
         self.model_config_index += 1
 
@@ -109,8 +111,13 @@ class ModelCoordinator(object):
                 if include_test:
                     payload["test_metric"] = aggregated_results["test_results"][k].get(metric)
 
+        trend = self._aggregate_fold_trends(fold_trends, objective["meta"])
+        if trend:
+            payload["trend"] = trend
+
         if not include_test and args is not None:
             wandb_logger.log_hyperopt_trial(
+                config=self.config,
                 model_name=self.model_name,
                 test_fold_index=self.test_fold_index,
                 trial_index=self.model_config_index,
@@ -157,6 +164,106 @@ class ModelCoordinator(object):
             return float(np.min(losses))
         loss = getattr(model, "get_loss", None)
         return float(loss()) if callable(loss) else None
+
+    @staticmethod
+    def _safe_float(value):
+        if value is None:
+            return None
+        try:
+            casted = float(value)
+        except (TypeError, ValueError):
+            return None
+        return casted if np.isfinite(casted) else None
+
+    def _extract_fold_trend(self, trainer) -> dict:
+        train_history = list(getattr(trainer, "_epoch_train_history", []) or [])
+        validation_history = list(getattr(trainer, "_validation_history", []) or [])
+        train_points = []
+        validation_points = []
+
+        for point in train_history:
+            epoch = point.get("epoch")
+            if epoch is None:
+                continue
+            train_points.append(
+                {
+                    "epoch": int(epoch),
+                    "train_loss": self._safe_float(point.get("train_loss")),
+                }
+            )
+
+        for point in validation_history:
+            epoch = point.get("epoch")
+            if epoch is None:
+                continue
+            validation_points.append(
+                {
+                    "epoch": int(epoch),
+                    "val_metric": self._safe_float(point.get("val_metric")),
+                    "val_loss": self._safe_float(point.get("val_loss")),
+                }
+            )
+
+        return {"train": train_points, "validation": validation_points}
+
+    def _aggregate_fold_trends(self, fold_trends: list, objective_meta: dict) -> dict:
+        if not fold_trends:
+            return {}
+
+        metric = objective_meta.get("metric")
+        k = objective_meta.get("k")
+        metric_name = f"{metric}@{k}" if metric is not None and k is not None else None
+
+        bucket = {}
+        val_bucket = {}
+        for fold_points in fold_trends:
+            train_points = fold_points.get("train", []) if isinstance(fold_points, dict) else []
+            validation_points = fold_points.get("validation", []) if isinstance(fold_points, dict) else []
+
+            for point in train_points:
+                epoch = point.get("epoch")
+                if epoch is None:
+                    continue
+                bucket.setdefault(epoch, {"train_loss": []})
+                train_loss = point.get("train_loss")
+                if train_loss is not None:
+                    bucket[epoch]["train_loss"].append(train_loss)
+
+            for point in validation_points:
+                epoch = point.get("epoch")
+                if epoch is None:
+                    continue
+                val_bucket.setdefault(epoch, {"val_metric": [], "val_loss": []})
+                val_metric = point.get("val_metric")
+                val_loss = point.get("val_loss")
+                if val_metric is not None:
+                    val_bucket[epoch]["val_metric"].append(val_metric)
+                if val_loss is not None:
+                    val_bucket[epoch]["val_loss"].append(val_loss)
+
+        if not bucket and not val_bucket:
+            return {}
+
+        epochs = sorted(bucket.keys())
+        val_epochs = sorted(val_bucket.keys())
+
+        def avg_or_none(values):
+            return float(np.mean(values)) if values else None
+
+        train_loss = [avg_or_none(bucket[epoch]["train_loss"]) for epoch in epochs]
+        val_metric_values = [avg_or_none(val_bucket[epoch]["val_metric"]) for epoch in val_epochs]
+        val_loss_values = [avg_or_none(val_bucket[epoch]["val_loss"]) for epoch in val_epochs]
+
+        trend = {
+            "epochs": epochs,
+            "train_loss": train_loss,
+            "val_epochs": val_epochs,
+            "val_metric": val_metric_values,
+            "val_loss": val_loss_values,
+            "val_metric_name": metric_name,
+        }
+
+        return trend
 
     # def _resolve_validation_target(self, model_config: RecommenderConfig):
     #     cutoff_k = self.config.evaluation.cutoffs or [self.config.top_k]

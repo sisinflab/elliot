@@ -106,6 +106,8 @@ class AbstractTrainer(ABC):
         self._losses = []
         self._results = []
         self._params_list = []
+        self._epoch_train_history = []
+        self._validation_history = []
 
         # Evaluator
         self.evaluator = Evaluator(data, model_config)
@@ -150,6 +152,15 @@ class AbstractTrainer(ABC):
             start = time.perf_counter()
             loss = self._train_epoch(it, training_dataloader)
             end = time.perf_counter()
+            try:
+                train_loss = float(loss)
+            except (TypeError, ValueError):
+                train_loss = None
+            if train_loss is not None and np.isfinite(train_loss):
+                epoch_number = self._trend_epoch_for_iteration(it)
+                self._epoch_train_history.append(
+                    {"epoch": int(epoch_number), "train_loss": train_loss}
+                )
             self.logger.debug(
                 "Completed iteration",
                 extra={"context": {"iteration": it + 1, "duration_sec": end - start}}
@@ -189,10 +200,24 @@ class AbstractTrainer(ABC):
             #    store_recommendation(recs[1], os.path.abspath(
             #        os.sep.join([self._config.path_output_rec_result, f"{self.name}.tsv"])))
 
+        epoch_number = int(self._trend_epoch_for_iteration(it)) if it is not None else None
+        val_metric = result_dict[self._validation_k]["val_results"][self._validation_metric]
+        if self._validation_metric.upper() in {"MSE", "RMSE", "MAE"}:
+            val_loss = float(val_metric)
+        else:
+            val_loss = 1.0 - float(val_metric)
+        self._validation_history.append(
+            {
+                "epoch": epoch_number,
+                "val_metric": float(val_metric),
+                "val_loss": val_loss,
+            }
+        )
+
         if (len(self._results) - 1) == self.get_best_arg():
             # if it is not None:
             self.config.best_iteration = it + 1
-            best_val = self._results[-1][self._validation_k]["val_results"][self._validation_metric]
+            best_val = val_metric
             self.best_metric_value = best_val
             self.logger.info(
                 "Recorded best validation result",
@@ -340,6 +365,9 @@ class AbstractTrainer(ABC):
             else:
                 yield iteration
 
+    def _trend_epoch_for_iteration(self, it: int) -> int:
+        return int(it + 1)
+
     @abstractmethod
     def _train_epoch(self, it, dataloader, *args):
         raise NotImplementedError()
@@ -384,6 +412,9 @@ class TraditionalTrainer(Trainer):
 
     def _train_epoch(self, *args):
         self.model.initialize()
+        return 0
+
+    def _trend_epoch_for_iteration(self, it: int) -> int:
         return 0
 
 
