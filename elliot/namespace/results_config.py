@@ -21,7 +21,6 @@ class ResultsConfig(BaseConfig):
         save_statistical (bool): Whether to save statistical analysis results. Defaults to False.
         writer (TabularWriterConfig): Writing configuration.
         default_metric (str): Default metric to use for evaluation (automatically set).
-        default_k (int): Default 'top_k' to use for evaluation (automatically set).
     """
 
     save_performance: bool = True
@@ -34,5 +33,4 @@ class ResultsConfig(BaseConfig):
     save_fold_stats_triplets: bool = False
     save_statistical: bool = False
     writer: TabularWriterConfig = Field(default_factory=TabularWriterConfig, exclude=True)
-    default_metric: str = None
-    default_k: int = None
+    default_metric: str = ""

@@ -99,6 +99,14 @@ def get_trainer(model_class):
 
     return trainer_class
 
+
+def split_metric(metric: str):
+    split = metric.split("@")
+    metric_name = split[0]
+    top_k = split[1] if len(split) > 1 else ""
+    top_k = int(top_k) if top_k else None
+    return metric_name, top_k
+
 #
 # def center_data(
 #     R: Union[csr_matrix, csc_matrix],

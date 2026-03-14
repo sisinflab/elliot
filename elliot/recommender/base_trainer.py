@@ -16,7 +16,7 @@ from elliot.recommender.early_stopping import EarlyStopping
 
 from elliot.utils.read import Reader
 from elliot.utils.write import Writer
-from elliot.utils import logging
+from elliot.utils import logging, split_metric
 
 reader = Reader()
 writer = Writer()
@@ -55,32 +55,10 @@ class AbstractTrainer(ABC):
         )
 
         # Validation metric
-        default_metric = self.config.results.default_metric
-        default_k = self.config.results.default_k
-
-        validation_metric = self.model_config.meta.validation_metric or default_metric
-        validation_k = self.model_config.meta.validation_k or default_k
-
-        if validation_metric.lower() not in [m.lower() for m in self.config.evaluation.simple_metrics]:
-            raise Exception("Validation metric must be in the list of simple metrics")
-
-        if validation_k not in self.config.evaluation.cutoffs:
-            raise Exception("Validation cutoff must be in general cutoff values")
-
-        self.model_config.meta.validation_metric = validation_metric
-        self.model_config.meta.validation_k = validation_k
-
-        self._validation_metric = validation_metric
-        self._validation_k = validation_k
+        self._val_metric, self._val_k = split_metric(self.model_config.meta.validation_metric)
 
         # Early stopping
-        self._early_stopping = EarlyStopping(
-            early_stopping_config=self.model_config.early_stopping,
-            validation_metric=self._validation_metric,
-            validation_k=self._validation_k,
-            cutoffs=self.config.evaluation.cutoffs,
-            simple_metrics=self.config.evaluation.simple_metrics
-        )
+        self._early_stopping = EarlyStopping(self.model_config.early_stopping)
 
         if self.model_config.epochs < self.model_config.meta.validation_rate:
             raise ValueError(f"The first validation epoch ({self.model_config.meta.validation_rate}) "
@@ -193,11 +171,11 @@ class AbstractTrainer(ABC):
         if (len(self._results) - 1) == self.get_best_arg():
             # if it is not None:
             self.config.best_iteration = it + 1
-            best_val = self._results[-1][self._validation_k]["val_results"][self._validation_metric]
+            best_val = self._results[-1][self._val_k]["val_results"][self._val_metric]
             self.best_metric_value = best_val
             self.logger.info(
                 "Recorded best validation result",
-                extra={"context": {"metric": self._validation_metric, "value": best_val, "iteration": it + 1}}
+                extra={"context": {"metric": self._val_metric, "value": best_val, "iteration": it + 1}}
             )
             if self.model_config.meta.save_weights:
                 writer.write_model(
@@ -298,7 +276,7 @@ class AbstractTrainer(ABC):
         if self.model_config.meta.optimize_internal_loss:
             return min(self._losses)
         else:
-            return -max([r[self._validation_k]["val_results"][self._validation_metric] for r in self._results])
+            return -max([r[self._val_k]["val_results"][self._val_metric] for r in self._results])
 
     def get_params(self):
         return self.model_config.model_dump()
@@ -311,7 +289,7 @@ class AbstractTrainer(ABC):
             val_results = np.argmin(self._losses)
         else:
             val_results = np.argmax(
-                [r[self._validation_k]["val_results"][self._validation_metric] for r in self._results])
+                [r[self._val_k]["val_results"][self._val_metric] for r in self._results])
         return val_results
 
     def get_report(self):
@@ -335,8 +313,9 @@ class AbstractTrainer(ABC):
 
     def iterate(self, epochs):
         for iteration in range(epochs):
-            if self._early_stopping.stop(self._losses[:], self._results):
-                self.logger.info(f"Met Early Stopping conditions: {self._early_stopping}")
+            stop, reasons = self._early_stopping.stop(self._losses[:], self._results)
+            if stop:
+                self.logger.info(f"Met Early Stopping conditions: {reasons}")
                 break
             else:
                 yield iteration
@@ -361,7 +340,7 @@ class Trainer(AbstractTrainer):
         steps = 0
         iter_ = tqdm(
             total=int(self.model.transactions // self.model_config.batch_size),
-            desc="Training",
+            desc=f"Epoch {it + 1}/{self.model_config.epochs}",
             disable=not self.model_config.meta.verbose
         )
         with iter_ as t:
@@ -399,7 +378,7 @@ class GeneralTrainer(AbstractTrainer):
         total_loss, steps = 0.0, 0
         iter_ = tqdm(
             total=int(self.model.transactions // self.model_config.batch_size),
-            desc="Training",
+            desc=f"Epoch {it + 1}/{self.model_config.epochs}",
             disable=not self.model_config.meta.verbose
         )
         with iter_ as t:

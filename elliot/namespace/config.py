@@ -16,7 +16,7 @@ from elliot.namespace.negative_sampling_config import NegativeSamplingConfig
 from elliot.namespace.prefiltering_config import PreFilteringConfig
 from elliot.namespace.results_config import ResultsConfig
 from elliot.namespace.splitting_config import SplittingConfig
-from elliot.utils import get_model
+from elliot.utils import get_model, split_metric
 from elliot.utils.folder import set_config_folder, parent_dir, path_joiner, path_resolver, file_ext
 from elliot.utils.hydra_config import load_config
 from elliot.utils.read import Reader
@@ -115,13 +115,12 @@ class ExperimentConfig(BaseConfig):
         """
         cutoff_k = self.evaluation.cutoffs or [self.top_k]
         self.evaluation.cutoffs = cutoff_k
-        self.results.default_k = cutoff_k[0]
 
         first_metric = (
             self.evaluation.simple_metrics[0]
             if self.evaluation.simple_metrics else ""
         )
-        self.results.default_metric = first_metric
+        self.results.default_metric = first_metric + "@" + str(cutoff_k[0])
 
         return self
 
@@ -137,6 +136,8 @@ class ExperimentConfig(BaseConfig):
         if "RecommendationFolder" in self.models:
             self.handle_recommendation_folder()
 
+        parsed_models = {}
+
         # ...and all the other models
         for model_name, model_data in self.models.items():
             cls = get_model(model_name, self)
@@ -150,8 +151,26 @@ class ExperimentConfig(BaseConfig):
                 **fields
             )
 
-            self.models[model_name] = model_config(**model_data)
+            model_cfg = model_config(**model_data)
 
+            # Handle validation metric
+            metric = self._check_metric(
+                metric=model_cfg.meta.validation_metric,
+                default=self.results.default_metric
+            )
+            model_cfg.meta.validation_metric = metric
+
+            # Handle early stopping metric
+            if model_cfg.early_stopping is not None:
+                metric = self._check_metric(
+                    metric=model_cfg.early_stopping.monitor,
+                    default=model_cfg.meta.validation_metric
+                )
+                model_cfg.early_stopping.monitor = metric
+
+            parsed_models[model_name] = model_cfg
+
+        self.models = parsed_models
         return self
 
     def handle_recommendation_folder(self):
@@ -211,6 +230,36 @@ class ExperimentConfig(BaseConfig):
             fields[name] = (MODEL_FIELD(hint), default)
 
         return fields
+
+    def _check_metric(self, metric: str, default: str) -> str:
+        """Check and validate a metric name and cutoff value combination.
+
+        Args:
+            metric (str): Metric string to validate. Can be a combination of metric name
+                and cutoff value (e.g., 'precision@5').
+            default (str): Default metric string to use if parts of the given metric are missing.
+
+        Returns:
+            str: Final validated metric string in the format 'metric_name@cutoff_value'.
+
+        Raises:
+            ValueError: If the metric name is not one of the simple metrics in `self.evaluation.simple_metrics`,
+                or if the cutoff value is not one of the cutoffs in `self.evaluation.cutoffs`.
+        """
+        metric_name, top_k = split_metric(metric)
+        default_name, default_k = split_metric(default)
+
+        # Pick the metric and cutoff value to use
+        final_name = metric_name or default_name
+        final_k = top_k or default_k
+
+        if final_name.lower() not in [m.lower() for m in self.evaluation.simple_metrics]:
+            raise ValueError(f"Metric '{final_name}' is not in the list of simple metrics.")
+
+        if final_k not in self.evaluation.cutoffs:
+            raise ValueError(f"Cutoff {final_k} is not in general cutoff values.")
+
+        return final_name + "@" + str(final_k)
 
 
 def build_namespace(

@@ -5,7 +5,6 @@ Module description:
 
 
 from typing import Optional
-import copy
 import numpy as np
 import logging as pylog
 import time
@@ -14,7 +13,7 @@ from hyperopt import STATUS_OK
 from elliot.namespace import RecommenderConfig
 from elliot.hyperoptimization.policy import EvaluationPolicy, FinalPolicy, SearchPolicy
 from elliot.result_handler import aggregate_val_folds_results
-from elliot.utils import logging, get_trainer, get_model
+from elliot.utils import logging, get_trainer, get_model, split_metric
 
 
 class ModelCoordinator(object):
@@ -186,8 +185,7 @@ class ModelCoordinator(object):
             }
             return {"loss": loss, "meta": meta}
 
-        metric = model_config.meta.validation_metric
-        k = model_config.meta.validation_k
+        metric, k = split_metric(model_config.meta.validation_metric)
 
         # metric_value = None
         # if metric is not None and k in val_results:

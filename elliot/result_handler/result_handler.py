@@ -8,6 +8,7 @@ from enum import Enum
 
 from elliot.evaluation.statistical_significance import PairedTTest, WilcoxonTest
 from elliot.namespace import ExperimentConfig, ResultsConfig
+from elliot.utils import split_metric
 from elliot.utils.enums import StatTest
 from elliot.utils.write import Writer
 
@@ -70,8 +71,7 @@ class ResultHandler:
             self.save_times(output=output)
 
         if self.results_config.save_best_models:
-            metric = self.results_config.default_metric
-            cutoff = self.results_config.default_k
+            metric, cutoff = split_metric(self.results_config.default_metric)
             self.save_best_models(output=output, default_metric=metric, default_k=cutoff)
 
         if self.results_config.save_trials:

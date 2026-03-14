@@ -9,39 +9,40 @@ from tests.utils import test_path
 config_path = path_joiner(test_path, "configs", "test.yml")
 
 
-def _sample_config():
-    return {
-        "experiment": {
-            "dataset": "demo",
-            "data_config": {
-                "strategy": "dataset",
-                "dataset_path": "../data/{0}/dataset.tsv",
-                "side_information": {
-                    "dataloader": "FeatureLoader1",
-                    "folder_map_features": "../data/{0}/map"
-                }
-            },
-            "splitting": {
-                "test_splitting": {
-                    "strategy": "temporal_holdout",
-                    "test_ratio": 0.2,
-                }
-            },
-            "negative_sampling": {
-                "strategy": "random",
-                "num_negatives": 20
-            },
-            "backend": "pytorch",
-            "evaluation": {"simple_metrics": ["nDCG"]},
-            "top_k": 10,
-            "models": {
-                "ItemKNN": {
-                    "meta": {},
-                    "neighborhood": [50, 100],
-                }
-            }
+_experiment_config = {
+    "dataset": "demo",
+    "data_config": {
+        "strategy": "dataset",
+        "dataset_path": "../data/{0}/dataset.tsv",
+        "side_information": {
+            "dataloader": "FeatureLoader1",
+            "folder_map_features": "../data/{0}/map"
+        }
+    },
+    "splitting": {
+        "test_splitting": {
+            "strategy": "temporal_holdout",
+            "test_ratio": 0.2,
+        }
+    },
+    "negative_sampling": {
+        "strategy": "random",
+        "num_negatives": 20
+    },
+    "backend": "pytorch",
+    "evaluation": {"simple_metrics": ["nDCG", "HR"]},
+    "top_k": 10,
+    "models": {
+        "ItemKNN": {
+            "meta": {"validation_metric": "HR"},
+            "neighborhood": [50, 100],
         }
     }
+}
+
+def _sample_config(config_dict=None):
+    config_dict = config_dict or _experiment_config
+    return {"experiment": config_dict}
 
 
 class TestNamespace:
@@ -53,10 +54,10 @@ class TestNamespace:
                 assert value is not None
 
     def test_resolve_paths_and_defaults(self):
-        config_data = {
-            **_sample_config(),
+        config_data = _sample_config({
+            **_experiment_config,
             "models": {}
-        }
+        })
         config = build_namespace(config_path=config_path, config_data=config_data)
 
         self._check_not_none(config)
@@ -87,7 +88,7 @@ class TestNamespace:
         assert config.negative_sampling.num_negatives == 20
         assert config.backend == ["pytorch"]
         assert config.top_k == 10
-        assert config.evaluation.simple_metrics == ["nDCG"]
+        assert config.evaluation.simple_metrics == ["nDCG", "HR"]
 
     def test_parse_models(self):
         config = build_namespace(config_path=config_path, config_data=_sample_config())
@@ -97,7 +98,7 @@ class TestNamespace:
         assert model_name == "ItemKNN"
 
         self._check_not_none(model_config)
-        self._check_not_none(model_config.meta, excluded={"validation_metric", "validation_k"})
+        self._check_not_none(model_config.meta)
 
         assert model_config.neighborhood == [50, 100]
 
@@ -112,6 +113,29 @@ class TestNamespace:
             assert isinstance(value, list)
             assert len(value) >= 2
             assert value[0] == SearchSpace.CHOICE.value
+
+    def test_validation_metric(self):
+        config = build_namespace(config_path=config_path, config_data=_sample_config())
+        (_, model_config), = config.models.items()
+
+        assert config.results.default_metric == "nDCG@10"
+        assert model_config.meta.validation_metric == "HR@10"
+
+    def test_early_stopping_monitor(self):
+        config_data = _sample_config({
+            **_experiment_config,
+            "models": {
+                "BPRMF": {
+                    "early_stopping": {"patience": 3}
+                }
+            }
+        })
+        config = build_namespace(config_path=config_path, config_data=config_data)
+        (_, model_config), = config.models.items()
+
+        assert config.results.default_metric == "nDCG@10"
+        assert model_config.meta.validation_metric == "nDCG@10"
+        assert model_config.early_stopping.monitor == "nDCG@10"
 
         # TODO: Put the following in the hyperoptimization tests
         # model_ns, space, max_evals, opt_alg = payload

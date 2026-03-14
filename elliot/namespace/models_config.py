@@ -21,8 +21,6 @@ class MetaConfig(BaseConfig):
         verbose (bool): Enable verbose logging. Defaults to True.
         validation_metric (str): Metric used for validation (automatically set if not provided).
             Defaults to None.
-        validation_k (int): Cutoff value for validation metrics (automatically set if not provided).
-            Defaults to None.
         validation_rate (int): Frequency (in epochs) of validation runs. Defaults to 1, min is 1.
         optimization_target (str, optional): Target metric or loss to optimize.
         optimize_internal_loss (bool): Whether to optimize the internal loss. Defaults to False.
@@ -38,8 +36,7 @@ class MetaConfig(BaseConfig):
     save_weights: bool = False
     save_recs: bool = False
     verbose: bool = True
-    validation_metric: str = None
-    validation_k: int = None
+    validation_metric: str = ""
     validation_rate: int = Field(default=1, ge=1)
     optimization_target: str = None
     optimize_internal_loss: bool = False
@@ -70,19 +67,40 @@ class EarlyStoppingConfig(BaseConfig):
         monitor (str): Metric or quantity to monitor. Defaults to "".
         patience (int): Number of epochs with no improvement before stopping. Defaults to 0.
         mode (str, optional): Optimization mode ("min" or "max"). Defaults to None.
-        min_delta (int, optional): Minimum absolute change to qualify as improvement. Defaults to None.
-        rel_delta (int, optional): Minimum relative change to qualify as improvement. Defaults to None.
+        min_delta (int, optional): Minimum absolute change to qualify as an improvement. Defaults to None.
+        rel_delta (int, optional): Minimum relative change to qualify as an improvement. Defaults to None.
         baseline (int, optional): Baseline value for the monitored quantity. Defaults to None.
         verbose (bool): Enable verbose logging. Defaults to True.
     """
 
     monitor: str = ""
-    patience: int = 0
+    patience: int = Field(default=0, ge=0)
     mode: Optional[str] = None
-    min_delta: Optional[int] = None
-    rel_delta: Optional[int] = None
-    baseline: Optional[int] = None
+    min_delta: Optional[float] = Field(default=None, ge=0)
+    rel_delta: Optional[float] = Field(default=None, ge=0)
+    baseline: Optional[float] = Field(default=None, ge=0)
     verbose: bool = True
+
+    @field_validator("mode", mode="before")
+    @classmethod
+    def check_mode(cls, value: Any) -> Any:
+        """Validate the "mode" configuration field.
+
+        Args:
+            value (Any): Raw field value from the configuration.
+
+        Returns:
+            Any: Validated field value.
+
+        Raises:
+            ValueError: If the value of "mode" is not None and not one of ['min', 'max', 'auto'].
+        """
+        allowed = ["min", "max", "auto"]
+
+        if value is not None and value not in allowed:
+            raise ValueError(f"Attribute `mode` must be one of {allowed}.")
+
+        return value
 
 
 class RecommenderConfig(BaseConfig):

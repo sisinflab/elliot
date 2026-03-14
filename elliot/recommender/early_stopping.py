@@ -1,139 +1,170 @@
-from types import SimpleNamespace
-import typing as t
+from typing import List, Tuple, Dict, Optional
+import logging as pylog
 
 from elliot.namespace import EarlyStoppingConfig
-from elliot.utils import logging
-import logging as pylog
+from elliot.utils import logging, split_metric
 
 
 class EarlyStopping:
-    def __init__(self, early_stopping_config: EarlyStoppingConfig, validation_metric: str, validation_k: int, cutoffs: t.List,
-                 simple_metrics: t.List, ):
-        self.logger = logging.get_logger(self.__class__.__name__, pylog.DEBUG)
-        # self.validation_metric = validation_metric
-        self.validation_k = validation_k
-        self.cutoffs = cutoffs
-        self.simple_metrics = simple_metrics
+    """The EarlyStopping class implements an early stopping mechanism for monitoring training metrics.
 
+    This class helps to terminate training when a monitored metric stops improving,
+    potentially avoiding overfitting and saving computational resources.
+
+    Supported early stopping strategies:
+
+    - `no_improvement`: Terminates training when the metric stops improving (always active).
+    - `min_delta`: Terminates training when the metric stops improving by a specified amount.
+    - `rel_delta`: Terminates training when the metric stops improving by a relative amount.
+    - `baseline`: Terminates training when the metric reaches a baseline value.
+
+    Args:
+        early_stopping_config (EarlyStoppingConfig, optional): Configuration object containing
+            early stopping parameters. Defaults to None.
+
+    To configure the early stopping, include the appropriate
+    settings in the configuration file using the pattern shown below.
+
+    .. code:: yaml
+
+      evaluation:
+        simple_metrics: [nDCG, Recall]
+      models:
+        BPRMF:
+          early_stopping:
+            monitor: loss|nDCG|Recall
+            patience: 3
+            mode: min|max|auto
+            min_delta: 0.01
+            rel_delta: 0.05
+            baseline: 0.01
+            verbose: True|False
+    """
+
+    def __init__(self, early_stopping_config: Optional[EarlyStoppingConfig] = None):
+        self.logger = logging.get_logger(self.__class__.__name__, pylog.DEBUG)
+
+        # Do not activate early stopping without any configuration
         if early_stopping_config is None:
             self.active = False
+
+        # Activate early stopping with the provided configuration
         else:
-            self.monitor = (
-                early_stopping_config.monitor
-                if early_stopping_config.monitor else validation_metric
-            )
+            monitor = early_stopping_config.monitor
+            self.mode = early_stopping_config.mode
 
-            self.patience = early_stopping_config.patience
-    
-            if self.monitor == "loss":
-                if early_stopping_config.mode is None:
-                    self.mode = "min"
-                elif early_stopping_config.mode == "auto":
-                    self.mode = "min"
-                # observed_quantity = self._losses
-                self.metric = False
-    
+            # Automatically set mode to 'min' or 'max' based on the selected metric
+            if self.mode in (None, "auto"):
+                self.mode = "min" if monitor == "loss" else "max"
+
+            if monitor == "loss":
+                self.metric, self.metric_k = "", None
             else:
-                if early_stopping_config.mode is None:
-                    self.mode = "max"
-                elif early_stopping_config.mode == "auto":
-                    self.mode = "max"
-    
-                metric = self.monitor.split("@")
-                if metric[0].lower() not in [m.lower() for m in self.simple_metrics]:
-                    raise Exception("Early stopping metric must be in the list of simple metrics")
-    
-                self.metric_k = int(metric[1]) if len(metric) > 1 else self.validation_k
-                if self.metric_k not in self.cutoffs:
-                    raise Exception("Validation cutoff must be in general cutoff values")
-                self.metric = metric[0]
-                # observed_quantity = [r[early_stopping_nsmetric_k]["val_results"][early_stopping_ns.metric] for r in self._results]
+                self.metric, self.metric_k = split_metric(monitor)
 
-            if early_stopping_config.min_delta is not None:
-                self.min_delta = early_stopping_config.min_delta
+            # Other parameters
+            self.patience = early_stopping_config.patience
 
-            if early_stopping_config.rel_delta is not None:
-                self.rel_delta = early_stopping_config.rel_delta
-
-            if early_stopping_config.baseline is not None:
-                self.baseline = early_stopping_config.baseline
+            self.min_delta = early_stopping_config.min_delta
+            self.rel_delta = early_stopping_config.rel_delta
+            self.baseline = early_stopping_config.baseline
 
             self.verbose = early_stopping_config.verbose
+
             self.active = True
-        
-    def stop(self, losses, results):
+
+    def stop(
+        self,
+        losses: List[float],
+        results: List[dict]
+    ) -> Tuple[bool, List[List[str]]]:
+        """Evaluate stopping criteria based on observed metric values or losses.
+
+        Args:
+            losses (List[float]): List of loss values observed during training.
+            results (List[dict]): List of dictionaries containing validation results
+                and metrics.
+
+        Returns:
+            Tuple[bool, List[List[str]]]: A tuple where the first element indicates whether
+                the stopping condition is met (True or False), while the second element is
+                a list of triggered conditions if stopping is met (empty otherwise).
+        """
+        # If early stopping is not active, return False immediately
         if not self.active:
-            return False
+            return False, []
+
+        # Pick the observed metric values or losses
+        if not self.metric:
+            observed = losses[:]
         else:
-            if not self.metric:
-                observed_quantity = losses[:]
-            else:
-                observed_quantity = [r[self.metric_k]["val_results"][self.metric]
-                                     for
-                                     r in results]
+            observed = [
+                r[self.metric_k]["val_results"][self.metric]
+                for r in results
+            ]
 
-            if len(observed_quantity) > self.patience:
-                observed_quantity = observed_quantity[:-(2 + self.patience):-1]
-                if self.mode == "min":
-                    observed_quantity = observed_quantity[::-1]
-                check = []
-                for p in range(len(observed_quantity) - 1):
-                    if self.check_conditions(observed_quantity[p], observed_quantity[p + 1]):
-                        check.append(True)
-                    else:
-                        check.append(False)
-                    if self.verbose:
-                        self.logger.info(f"Analyzed pair: ({round(observed_quantity[p], 5)}, {round(observed_quantity[p + 1], 5)}): {check[-1]}")
-                if self.verbose:
-                    self.logger.info(f"Check List: {check}")
-                if check and all(check):
-                    return True
-                else:
-                    return False
+        # If there are not enough observations, return False immediately
+        if len(observed) <= self.patience:
+            return False, []
 
-    def check_conditions(self, obs_0: float, obs_1:float):
-        if hasattr(self, "min_delta") and hasattr(self, "rel_delta") and hasattr(self, "baseline"):
-            return self.condition_base(obs_0, obs_1) \
-                   or self.condition_min_delta(obs_0, obs_1) \
-                   or self.condition_rel_delta(obs_0, obs_1) \
-                   or self.condition_baseline(obs_0, obs_1)
-        elif hasattr(self, "min_delta") and hasattr(self, "rel_delta"):
-            return self.condition_base(obs_0, obs_1) \
-                   or self.condition_min_delta(obs_0, obs_1) \
-                   or self.condition_rel_delta(obs_0, obs_1)
-        elif hasattr(self, "min_delta") and hasattr(self, "baseline"):
-            return self.condition_base(obs_0, obs_1) \
-                   or self.condition_min_delta(obs_0, obs_1) \
-                   or self.condition_baseline(obs_0, obs_1)
-        elif hasattr(self, "baseline") and hasattr(self, "rel_delta"):
-            return self.condition_base(obs_0, obs_1) \
-                   or self.condition_baseline(obs_0, obs_1) \
-                   or self.condition_rel_delta(obs_0, obs_1)
-        elif hasattr(self, "min_delta"):
-            return self.condition_base(obs_0, obs_1) or self.condition_min_delta(obs_0, obs_1)
-        elif hasattr(self, "rel_delta"):
-            return self.condition_base(obs_0, obs_1) or self.condition_rel_delta(obs_0, obs_1)
-        elif hasattr(self, "baseline"):
-            return self.condition_base(obs_0, obs_1) or self.condition_baseline(obs_0, obs_1)
-        else:
-            return self.condition_base(obs_0, obs_1)
+        # Keep only the last 'patience' observations
+        observed = observed[-(self.patience + 1):]
 
-    def condition_base(self, obs_0: float, obs_1:float):
-        return obs_1 > obs_0
-
-    def condition_min_delta(self, obs_0: float, obs_1:float):
-        return (obs_0 - obs_1) <= self.min_delta
-
-    def condition_rel_delta(self, obs_0: float, obs_1:float):
-        return (obs_0 - obs_1) <= obs_0 * self.rel_delta
-
-    def condition_baseline(self, obs_0: float, obs_1:float):
+        # Reverse the list if the mode is 'min'
         if self.mode == "min":
-            return obs_0 >= self.baseline
-        elif self.mode == "max":
-            return obs_0 <= self.baseline
-        else:
-            raise ValueError("mode option must be in the list [min, max, auto]")
+            observed = list(reversed(observed))
 
-    def __str__(self):
-        return ", ".join([f"{str(k)}: {str(v)}" for k,v in self.__dict__.items()])
+        # Check conditions for each pair of observations
+        checks = []
+        triggered_conditions = []
+        for a, b in zip(observed[1:], observed):
+            conds = self.check_conditions(a, b)
+
+            pair_stop = any(conds.values())
+            checks.append(pair_stop)
+
+            triggered_conditions.append(
+                [name for name, v in conds.items() if v]
+            )
+
+            if self.verbose:
+                self.logger.info(f"Analyzed pair ({a:.5f}, {b:.5f}) -> {conds}")
+
+        if self.verbose:
+            self.logger.info(f"Check List: {checks}")
+
+        return True if all(checks) else False, triggered_conditions
+
+    def check_conditions(self, obs_0: float, obs_1: float) -> Dict[str, bool]:
+        """Check various conditions based on the provided observations and thresholds.
+
+        Args:
+            obs_0 (float): First observation value used in condition checks.
+            obs_1 (float): Second observation value used in condition checks.
+
+        Returns:
+            Dict[str, bool]: A dictionary containing boolean flags for each condition:
+
+            - "no_improvement": True if obs_1 is greater than obs_0.
+            - "min_delta": Present if self.min_delta is not None; True if the difference
+              (obs_0 - obs_1) is less than or equal to self.min_delta.
+            - "rel_delta": Present if self.rel_delta is not None; True if the difference
+              (obs_0 - obs_1) is less than or equal to a fraction (obs_0 * self.rel_delta).
+            - "baseline": Present if self.baseline is not None; evaluates to True if both
+              obs_0 and obs_1 satisfy the baseline condition depending on the mode ("min" or "max").
+        """
+        conditions = {"no_improvement": obs_1 > obs_0}
+
+        if self.min_delta is not None:
+            conditions["min_delta"] = (obs_0 - obs_1) <= self.min_delta
+
+        if self.rel_delta is not None:
+            conditions["rel_delta"] = (obs_0 - obs_1) <= obs_0 * self.rel_delta
+
+        if self.baseline is not None:
+            if self.mode == "min":
+                conditions["baseline"] = (obs_0 >= self.baseline) and (obs_1 >= self.baseline)
+            else:
+                conditions["baseline"] = (obs_0 <= self.baseline) and (obs_1 <= self.baseline)
+
+        return conditions
