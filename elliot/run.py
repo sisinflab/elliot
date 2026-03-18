@@ -8,6 +8,8 @@ __version__ = '0.3.1'
 from typing import List, Optional
 import copy
 import os
+from pathlib import Path
+import socket
 import numpy as np
 
 from elliot.dataset import DataSetLoader, build_mock_dataset
@@ -16,6 +18,7 @@ from elliot.hyperoptimization import run_hyperopt, run_single
 from elliot.result_handler import ResultHandler, attach_test_fold_stats
 from elliot.utils import logging as logging_project
 from elliot.utils import set_device
+from elliot.utils import wandb_logger
 
 
 print(u'''
@@ -44,6 +47,12 @@ def run_experiment(config_path: str = "", config_overrides: Optional[List[str]] 
     if config.config_test:
         config_test(config)
 
+    logging_project.init(config.path_logger_config, config.path_log_folder)
+    logger = logging_project.get_logger("__main__")
+
+    mode = _setup_wandb(config, logger, config_path)
+    wandb_logger.init_tracking(mode, config, logger)
+
     _configure_torch_device(config, logger)
 
     if config.version != __version__:
@@ -54,80 +63,89 @@ def run_experiment(config_path: str = "", config_overrides: Optional[List[str]] 
         raise Exception(
             'Version mismatch! In different versions of Elliot the results may slightly change due to progressive improvement!')
 
-    logger.info("Start experiment")
+    try:
+        logger.info("Start experiment")
 
-    dataset_loader = DataSetLoader(config=config)
-    data_test_list = dataset_loader.build()
+        dataset_loader = DataSetLoader(config=config)
+        data_test_list = dataset_loader.build()
 
-    res_handler = ResultHandler(config=config)
+        res_handler = ResultHandler(config=config)
 
-    all_trials = {}
+        all_trials = {}
 
-    for model_name, model_config in config.models.items():
-        test_results = []
-        test_trials = []
-        all_trials[model_name] = []
+        for model_name, model_config in config.models.items():
+            wandb_logger.start_model_run(config, model_name, logger)
+            test_results = []
+            test_trials = []
+            all_trials[model_name] = []
 
-        for test_fold_index, data_test in enumerate(data_test_list):
-            logging_project.prepare_logger(model_name)
+            try:
+                for test_fold_index, data_test in enumerate(data_test_list):
+                    logging_project.prepare_logger(model_name)
 
-            is_proxy = model_name.startswith("ProxyRecommender")
-            if is_proxy:
-                logger.info(f"Evaluation begun for {model_name}\n")
-                outcome = run_single(
-                    data_test=data_test,
-                    config=config,
-                    model_config=model_config,
-                    model_name=model_name,
-                    test_fold_index=test_fold_index
-                )
-                logger.info(f"Evaluation ended for {model_name}")
-            else:
-                logger.info(f"Tuning begun for {model_name}\n")
-                outcome = run_hyperopt(
-                    data_test=data_test,
-                    config=config,
-                    model_config=model_config,
-                    model_name=model_name,
-                    test_fold_index=test_fold_index
-                )
-                logger.info(f"Tuning ended for {model_name}")
-            best_eval = outcome.best_eval
+                    is_proxy = model_name.startswith("ProxyRecommender")
+                    if is_proxy:
+                        logger.info(f"Evaluation begun for {model_name}\n")
+                        outcome = run_single(
+                            data_test=data_test,
+                            config=config,
+                            model_config=model_config,
+                            model_name=model_name,
+                            test_fold_index=test_fold_index
+                        )
+                        logger.info(f"Evaluation ended for {model_name}")
+                    else:
+                        logger.info(f"Tuning begun for {model_name}\n")
+                        outcome = run_hyperopt(
+                            data_test=data_test,
+                            config=config,
+                            model_config=model_config,
+                            model_name=model_name,
+                            test_fold_index=test_fold_index
+                        )
+                        logger.info(f"Tuning ended for {model_name}")
+                    best_eval = outcome.best_eval
 
-            ############################################
-            best_model_loss = best_eval["loss"]
-            best_model_params = best_eval["params"]
-            best_model_results = best_eval["test_results"]
-            ############################################
+                    ############################################
+                    best_model_loss = best_eval["loss"]
+                    best_model_params = best_eval["params"]
+                    best_model_results = best_eval["test_results"]
+                    ############################################
 
-            # aggiunta a lista performance test
-            test_results.append(best_eval)
+                    # aggiunta a lista performance test
+                    test_results.append(best_eval)
 
-            if outcome.trials is not None:
-                test_trials.append(outcome.all_trial_results)
-                all_trials[model_name].append(outcome.all_trial_results)
+                    if outcome.trials is not None:
+                        test_trials.append(outcome.all_trial_results)
+                        all_trials[model_name].append(outcome.all_trial_results)
 
-            logger.info(f"Loss:\t{best_model_loss}")
-            logger.info(f"Best Model params:\t{best_model_params}")
-            logger.info(f"Best Model results:\t{best_model_results}")
+                    logger.info(f"Loss:\t{best_model_loss}")
+                    logger.info(f"Best Model params:\t{best_model_params}")
+                    logger.info(f"Best Model results:\t{best_model_results}")
 
-        # Migliore sui test, aggiunta a performance totali
-        min_val = np.argmin([i["loss"] for i in test_results])
-        best_eval = test_results[min_val]
+                # Migliore sui test, aggiunta a performance totali
+                min_val = np.argmin([i["loss"] for i in test_results])
+                best_eval = test_results[min_val]
 
-        results_config = config.results
-        if results_config.save_fold_stats:
-            attach_test_fold_stats(best_eval, test_results)
+                results_config = config.results
+                if results_config.save_fold_stats:
+                    attach_test_fold_stats(best_eval, test_results)
 
-        res_handler.add_oneshot_recommender(**best_eval)
+                res_handler.add_oneshot_recommender(**best_eval)
+                wandb_logger.collect_best_model_result(model_name, best_eval, selected_test_fold=min_val + 1)
 
-        if test_trials:
-            res_handler.add_trials(test_trials[min_val], name=model_name)
-            all_trials[model_name] = all_trials[model_name][min_val]
+                if test_trials:
+                    res_handler.add_trials(test_trials[min_val], name=model_name)
+                    all_trials[model_name] = all_trials[model_name][min_val]
+            finally:
+                wandb_logger.finish_model_run(logger)
 
-    res_handler.save_outputs()
+        res_handler.save_outputs()
+        wandb_logger.log_summary_table(config, logger)
 
-    logger.info("End experiment")
+        logger.info("End experiment")
+    finally:
+        wandb_logger.finish(logger)
     # TODO: check before to push only this feature!
     # logger.info("Start Post-Hoc scripts")
 
@@ -188,6 +206,110 @@ def _configure_torch_device(config, logger=None):
     device = set_device(requested)
     if logger is not None:
         logger.info("Torch device selected", extra={"context": {"device": str(device)}})
+
+
+def _load_dotenv(dotenv_path: Path):
+    if not dotenv_path.is_file():
+        return
+
+    for raw_line in dotenv_path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+
+        key, value = line.split("=", 1)
+        key = key.strip()
+        value = value.strip()
+
+        if not key:
+            continue
+
+        if (
+            len(value) >= 2
+            and value[0] == value[-1]
+            and value[0] in {"'", '"'}
+        ):
+            value = value[1:-1]
+
+        os.environ.setdefault(key, value)
+
+
+def _has_wandb_online_connectivity(host: str = "api.wandb.ai", port: int = 443, timeout: float = 3.0) -> bool:
+    try:
+        with socket.create_connection((host, port), timeout=timeout):
+            return True
+    except OSError:
+        return False
+
+
+def _setup_wandb(config, logger=None, config_path: str = ""):
+    wandb_cfg = getattr(config, "wandb", None)
+    mode = getattr(wandb_cfg, "mode", "disabled") if wandb_cfg is not None else "disabled"
+
+    if mode == "disabled":
+        if logger is not None:
+            logger.info("W&B disabled by configuration", extra={"context": {"mode": mode}})
+        return mode
+
+
+    try:
+        import wandb
+    except ImportError as exc:
+        raise ImportError(
+            "W&B mode is enabled but `wandb` is not installed."
+            "Install it with `pip install wandb`."
+        ) from exc
+
+    project = getattr(wandb_cfg, "project", None)
+
+    if mode == "offline":
+        if logger:
+            logger.info(
+                "W&B offline mode enabled",
+                extra={"context": {"mode": mode, "project": project}},
+            )
+
+    if mode == "online":
+        if not _has_wandb_online_connectivity():
+            raise RuntimeError(
+                "W&B online mode requires internet connectivity."
+                " Unable to reach api.wandb.ai:443."
+            )
+
+        api_key = os.environ.get("WANDB_API_KEY")
+
+        # Optional local fallback for developer workflows:
+        # load .env only if the API key is not already present in the environment.
+        if not api_key:
+            dotenv_candidates = [Path.cwd() / ".env"]
+            if config_path:
+                dotenv_candidates.append(Path(config_path).resolve().parent / ".env")
+
+            for dotenv_path in dotenv_candidates:
+                _load_dotenv(dotenv_path)
+
+            api_key = os.environ.get("WANDB_API_KEY")
+
+        if not api_key:
+            raise RuntimeError(
+                "W&B online mode requires WANDB_API_KEY in environment variables."
+            )
+
+        try:
+            login = wandb.login(key=api_key)
+        except Exception as exc:
+            raise RuntimeError("W&B login failed.") from exc
+
+        if not login:
+            raise RuntimeError("W&B login failed with provided WANDB_API_KEY.")
+
+        if logger:
+            logger.info(
+                "W&B online login successful",
+                extra={"context": {"mode": mode, "project": project}},
+            )
+
+    return mode
 
 
 if __name__ == '__main__':

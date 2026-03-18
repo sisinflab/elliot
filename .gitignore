@@ -64,3 +64,8 @@ docs/source/_templates
 !/data/cat_dbpedia_movielens_1m_v030/properties.conf
 .DS_Store
 config_files/*
+.env
+.env.*
+!.env.example
+wandb/
+*.wandb
