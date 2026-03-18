@@ -2,13 +2,15 @@
 Optional Weights & Biases tracking helpers.
 
 Behavior:
-- if W&B is configured, create one run per model
-- log all that model's hyperopt trials into that run
+- if W&B is configured, create one run per hyperopt trial
+- log trial trends and metadata in the corresponding trial run
 """
 
 from __future__ import annotations
 
 import json
+import os
+import platform
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Optional, Literal
@@ -19,10 +21,7 @@ class _WandBState:
     mode: Optional[Literal["online", "offline", "disabled"]] = None
     project: Optional[str] = None
     experiment_group: Optional[str] = None
-    run: Optional[object] = None
-    run_name: Optional[str] = None
     active_model: Optional[str] = None
-    global_step: int = 0
     summary_rows: list = None
     summary_metric_keys: set = None
 
@@ -81,19 +80,120 @@ def _base_name(config) -> str:
     return custom_name or f"elliot-{config.dataset}"
 
 
+def _slugify(value: str) -> str:
+    allowed = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_.=@")
+    return "".join(ch if ch in allowed else "-" for ch in value)
+
+
+def _trial_hparams_label(hyperparams: Optional[dict], max_len: int = 120) -> str:
+    if not isinstance(hyperparams, dict) or not hyperparams:
+        return "default"
+    parts = []
+    for key in sorted(hyperparams.keys()):
+        value = hyperparams.get(key)
+        parts.append(f"{key}={value}")
+    label = "__".join(parts)
+    label = _slugify(label)
+    if len(label) > max_len:
+        return label[:max_len]
+    return label
+
+
 def _setup_metrics(wandb):
-    """Register W&B metric definitions for hyperparameter search logs.
+    """Reserved hook for metric setup."""
+    return None
 
-    This configures ``search/global_step`` as the shared x-axis and binds
-    all metrics under ``search/*`` to that step, so trial-level charts are
-    aligned across the run.
 
-    Args:
-        wandb: Imported Weights & Biases module.
-    """
+def _collect_system_metrics() -> dict:
+    metrics = {}
 
-    wandb.define_metric("search/global_step")
-    wandb.define_metric("search/*", step_metric="search/global_step")
+    # 1) Cross-platform baseline via psutil (macOS/Linux/Windows).
+    try:
+        import psutil
+
+        process = psutil.Process(os.getpid())
+        vm = psutil.virtual_memory()
+        swap = psutil.swap_memory()
+
+        metrics["system.cpu"] = float(psutil.cpu_percent(interval=None))
+        metrics["system.memory"] = float(vm.percent)
+        metrics["system.memory.usedGB"] = float(vm.used / (1024 ** 3))
+        metrics["system.memory.availableGB"] = float(vm.available / (1024 ** 3))
+        metrics["system.swap"] = float(swap.percent)
+        metrics["proc.memory.rssMB"] = float(process.memory_info().rss / (1024 ** 2))
+        metrics["proc.cpu"] = float(process.cpu_percent(interval=None))
+        metrics["proc.cpu.threads"] = int(process.num_threads())
+        metrics["system.disk"] = float(psutil.disk_usage("/").percent)
+        return metrics
+    except Exception:
+        pass
+
+    # 2) Fallback when psutil is unavailable.
+    try:
+        cpu_count = os.cpu_count() or 1
+        load_avg_1m = os.getloadavg()[0]
+        metrics["system.cpu"] = float((load_avg_1m / cpu_count) * 100.0)
+    except Exception:
+        pass
+
+    try:
+        total_pages = os.sysconf("SC_PHYS_PAGES")
+        avail_pages = os.sysconf("SC_AVPHYS_PAGES")
+        page_size = os.sysconf("SC_PAGE_SIZE")
+        total_bytes = float(total_pages * page_size)
+        avail_bytes = float(avail_pages * page_size)
+        used_bytes = max(total_bytes - avail_bytes, 0.0)
+        metrics["system.memory"] = float((used_bytes / total_bytes) * 100.0) if total_bytes else 0.0
+        metrics["system.memory.usedGB"] = used_bytes / (1024 ** 3)
+        metrics["system.memory.availableGB"] = avail_bytes / (1024 ** 3)
+    except Exception:
+        pass
+
+    # 3) Optional NVIDIA GPU telemetry.
+    try:
+        import pynvml
+
+        pynvml.nvmlInit()
+        try:
+            for gpu_id in range(pynvml.nvmlDeviceGetCount()):
+                handle = pynvml.nvmlDeviceGetHandleByIndex(gpu_id)
+                util = pynvml.nvmlDeviceGetUtilizationRates(handle)
+                mem = pynvml.nvmlDeviceGetMemoryInfo(handle)
+                metrics[f"system.gpu.{gpu_id}.gpu"] = float(util.gpu)
+                metrics[f"system.gpu.{gpu_id}.memory"] = float(util.memory)
+                metrics[f"system.gpu.{gpu_id}.memoryAllocatedGB"] = float(mem.used / (1024 ** 3))
+                metrics[f"system.gpu.{gpu_id}.memoryTotalGB"] = float(mem.total / (1024 ** 3))
+                metrics[f"system.gpu.{gpu_id}.temp"] = float(
+                    pynvml.nvmlDeviceGetTemperature(handle, pynvml.NVML_TEMPERATURE_GPU)
+                )
+        finally:
+            pynvml.nvmlShutdown()
+    except Exception:
+        pass
+
+    # 4) Optional CUDA memory from torch (works even without pynvml).
+    try:
+        import torch
+
+        if torch.cuda.is_available():
+            for gpu_id in range(torch.cuda.device_count()):
+                metrics[f"system.gpu.{gpu_id}.memoryAllocatedGB"] = float(
+                    torch.cuda.memory_allocated(gpu_id) / (1024 ** 3)
+                )
+                metrics[f"system.gpu.{gpu_id}.memoryReservedGB"] = float(
+                    torch.cuda.memory_reserved(gpu_id) / (1024 ** 3)
+                )
+    except Exception:
+        pass
+
+    # 5) Apple Silicon hint for runs on macOS where detailed GPU telemetry is unavailable.
+    try:
+        if platform.system().lower() == "darwin" and platform.machine().lower() in {"arm64", "aarch64"}:
+            metrics["system.gpu.0.backend"] = "mps"
+    except Exception:
+        pass
+
+    return metrics
 
 
 def init_tracking(mode, config, logger=None):
@@ -125,10 +225,7 @@ def init_tracking(mode, config, logger=None):
     if mode in {"online", "offline"}:
         STATE.project = config.wandb.project
         STATE.experiment_group = f"{_base_name(config)}-{_timestamp()}"
-        STATE.run = None
-        STATE.run_name = None
         STATE.active_model = None
-        STATE.global_step = 0
         STATE.summary_rows = []
         STATE.summary_metric_keys = set()
 
@@ -142,10 +239,10 @@ def init_tracking(mode, config, logger=None):
 
 
 def start_model_run(config, model_name: str, logger=None):
-    """Start a W&B run for a single model inside the current experiment group.
+    """Track currently active model in W&B state.
 
-    The run is created only when tracking mode is "online" or "offline".
-    If another run is still active, it is closed before creating the new one.
+    With trial-level logging, no run is opened at model scope. The function
+    stores model metadata for compatibility with the existing call sites.
 
     Args:
         config (ExperimentConfig): Experiment configuration namespace.
@@ -156,43 +253,15 @@ def start_model_run(config, model_name: str, logger=None):
     if STATE.mode not in ["online", "offline"]:
         return
 
-    import wandb
-
-    if STATE.run is not None:
-        finish_model_run(logger)
-
-    run_name = f"{_base_name(config)}-{model_name}-{_timestamp()}"
-    run_config = {
-        "dataset": config.dataset,
-        "top_k": config.top_k,
-        "random_seed": config.random_seed,
-        "model_name": model_name,
-    }
-
-    STATE.run = wandb.init(
-        project=STATE.project,
-        group=STATE.experiment_group,
-        name=run_name,
-        config=run_config,
-        tags=[model_name],
-        reinit=True,
-        mode=STATE.mode
-    )
-
-    STATE.run_name = run_name
     STATE.active_model = model_name
-    STATE.global_step = 0
-
-    _setup_metrics(wandb)
 
     if logger is not None:
         logger.info(
-            "Weights & Biases model run initialized",
+            "Weights & Biases model context initialized",
             extra={
                 "context": {
                     "project": STATE.project,
-                    "group": STATE.experiment_group, # forse rimovibile
-                    "run_name": STATE.run_name,
+                    "group": STATE.experiment_group,
                     "model": STATE.active_model,
                     "mode": STATE.mode,
                 }
@@ -202,6 +271,7 @@ def start_model_run(config, model_name: str, logger=None):
 
 def log_hyperopt_trial(
     *,
+    config,
     model_name: str,
     test_fold_index: int,
     trial_index: int,
@@ -209,54 +279,91 @@ def log_hyperopt_trial(
     objective: Optional[dict],
     payload: Optional[dict],
 ):
-    """Log a single hyperparameter-search trial to the active W&B model run.
+    """Log a single hyperparameter-search trial to a dedicated W&B run.
 
-    The function records trial identifiers, objective metadata, selected
-    validation values, loss, and trial hyperparameters under the ``search/*``
-    and ``hparams/*`` namespaces.
+    The function records only training and validation trends for a trial run.
 
-    Logging is skipped when tracking mode is disabled or no run is active.
+    Logging is skipped when tracking mode is disabled.
     """
 
-    if STATE.mode not in {"online", "offline"} or STATE.run is None:
+    if STATE.mode not in {"online", "offline"}:
         return
 
-    STATE.global_step += 1
-    safe_model_name = str(model_name).replace("/", "_")
-    model_trial_id = f"{model_name}|fold={int(test_fold_index)+1}|trial={int(trial_index)}"
-
-    data = {
-        "search/global_step": int(STATE.global_step),
-        "search/model_name": model_name,
-        "search/test_fold": int(test_fold_index) + 1,
-        "search/trial_index": int(trial_index),
-        "search/model_trial_id": model_trial_id,
-    }
-
-    if payload:
-        data["search/loss"] = _sanitize(payload.get("loss"))
-        val_metric = _sanitize(payload.get("val_metric"))
-        data["search/val_metric"] = val_metric
-        data[f"search/val_metric_{safe_model_name}"] = val_metric
-
-    if objective:
-        metric = objective.get("metric")
-        k = objective.get("k")
-        target = objective.get("target")
-        direction = objective.get("direction")
-        value = objective.get("value")
-
-        metric_label = f"{metric}@{k}" if metric is not None and k is not None else None
-        data["search/objective_target"] = _sanitize(target)
-        data["search/objective_direction"] = _sanitize(direction)
-        data["search/objective_metric"] = _sanitize(metric_label)
-        data["search/objective_value"] = _sanitize(value)
-
-    for key, value in (hyperparams or {}).items():
-        data[f"hparams/{key}"] = _sanitize(value)
+    metric = objective.get("metric") if objective else None
+    k = objective.get("k") if objective else None
+    metric_label = f"{metric}@{k}" if metric is not None and k is not None else None
 
     import wandb
-    wandb.log(data)
+
+    run_name = (
+        f"{_base_name(config)}-{model_name}-fold{int(test_fold_index)+1}-trial{int(trial_index)}"
+        f"-{_trial_hparams_label(hyperparams)}-{_timestamp()}"
+    )
+    run_config = {
+        "dataset": config.dataset,
+        "top_k": config.top_k,
+        "random_seed": config.random_seed,
+        "model_name": model_name,
+        "test_fold": int(test_fold_index) + 1,
+        "trial_index": int(trial_index),
+    }
+
+    run = wandb.init(
+        project=STATE.project,
+        group=STATE.experiment_group,
+        name=run_name,
+        config=run_config,
+        tags=[model_name, "trial"],
+        job_type="trial",
+        reinit=True,
+        mode=STATE.mode
+    )
+
+    _setup_metrics(wandb)
+
+    try:
+        trend = payload.get("trend") if payload else None
+        if isinstance(trend, dict):
+            epochs = trend.get("epochs", [])
+            train_losses = trend.get("train_loss", [])
+            val_epochs = trend.get("val_epochs", [])
+            val_losses = trend.get("val_loss", [])
+            val_metrics = trend.get("val_metric", [])
+            trend_metric_name = trend.get("val_metric_name") or metric_label
+
+            train_map = {}
+            for idx in range(max(len(epochs), len(train_losses))):
+                step = int(epochs[idx]) if idx < len(epochs) and epochs[idx] is not None else idx + 1
+                if idx < len(train_losses) and train_losses[idx] is not None:
+                    train_map[step] = _sanitize(train_losses[idx])
+
+            val_loss_map = {}
+            val_metric_map = {}
+            for idx in range(max(len(val_epochs), len(val_losses), len(val_metrics))):
+                step = int(val_epochs[idx]) if idx < len(val_epochs) and val_epochs[idx] is not None else idx + 1
+                if idx < len(val_losses) and val_losses[idx] is not None:
+                    val_loss_map[step] = _sanitize(val_losses[idx])
+                if idx < len(val_metrics) and val_metrics[idx] is not None:
+                    val_metric_map[step] = _sanitize(val_metrics[idx])
+
+            all_steps = sorted(set(train_map.keys()) | set(val_loss_map.keys()) | set(val_metric_map.keys()))
+            for step in all_steps:
+                point = {}
+                if step in train_map:
+                    point["train/loss"] = train_map[step]
+                if step in val_loss_map:
+                    point["validation/loss"] = val_loss_map[step]
+                if step in val_metric_map:
+                    if trend_metric_name:
+                        point[f"validation/{trend_metric_name}"] = val_metric_map[step]
+                    else:
+                        point["validation/metric"] = val_metric_map[step]
+
+                point.update(_collect_system_metrics())
+                if point:
+                    wandb.log(point, step=step)
+    finally:
+        run.finish()
 
 
 def _flatten_test_results(test_results: Optional[dict]) -> dict:
@@ -417,30 +524,24 @@ def log_summary_table(config, logger=None):
 
 
 def finish_model_run(logger=None):
-    """Close the currently active W&B model run and reset run-level state.
+    """Clear active model metadata from W&B state.
 
-    If no model run is active, the function is a no-op.
+    With trial-level logging there is no open model-level run to close.
 
     Args:
         logger (logging.Logger, optional): Elliot logger used for status logs.
     """
 
-    if STATE.mode not in {"online","offline"} or STATE.run is None:
+    if STATE.mode not in {"online","offline"}:
         return
-
-    import wandb
-    wandb.finish()
 
     if logger is not None:
         logger.info(
-            "Weights & Biases model run closed",
-            extra={"context": {"project": STATE.project, "run_name": STATE.run_name, "model": STATE.active_model}},
+            "Weights & Biases model context cleared",
+            extra={"context": {"project": STATE.project, "model": STATE.active_model}},
         )
 
-    STATE.run = None
-    STATE.run_name = None
     STATE.active_model = None
-    STATE.global_step = 0
 
 
 def finish(logger=None):
@@ -455,10 +556,6 @@ def finish(logger=None):
     if STATE.mode not in {"online","offline"}:
         return
 
-    if STATE.run is not None:
-        import wandb
-        wandb.finish()
-
     if logger is not None:
         logger.info(
             "Weights & Biases tracking closed",
@@ -468,9 +565,6 @@ def finish(logger=None):
     STATE.mode = None
     STATE.project = None
     STATE.experiment_group = None
-    STATE.run = None
-    STATE.run_name = None
     STATE.active_model = None
-    STATE.global_step = 0
     STATE.summary_rows = []
     STATE.summary_metric_keys = set()

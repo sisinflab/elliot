@@ -47,9 +47,6 @@ def run_experiment(config_path: str = "", config_overrides: Optional[List[str]] 
     if config.config_test:
         config_test(config)
 
-    logging_project.init(config.path_logger_config, config.path_log_folder)
-    logger = logging_project.get_logger("__main__")
-
     mode = _setup_wandb(config, logger, config_path)
     wandb_logger.init_tracking(mode, config, logger)
 
