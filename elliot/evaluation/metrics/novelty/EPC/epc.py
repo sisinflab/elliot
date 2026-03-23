@@ -4,8 +4,6 @@ It proceeds from a user-wise computation, and average the values over the users.
 """
 
 
-import math
-import numpy as np
 from elliot.evaluation.metrics.base_metric import BaseMetric
 
 
@@ -97,16 +95,19 @@ class EPC(BaseMetric):
         Evaluation function
         :return: the overall averaged value of Expected Popularity Complement per user
         """
-
-
-        item_count = {}
-        for u_h in self._evaluation_objects.data.get_train_dict().values():
-            for i in u_h.keys():
-                item_count[i] = item_count.get(i, 0) + 1
-
-        num_users = len(self._evaluation_objects.data.get_train_dict())
-        self._item_novelty_dict = {i: 1 - (v / num_users) for i, v in item_count.items()}
+        pop_cache = getattr(self._evaluation_objects, "pop_cache", None)
+        if pop_cache and getattr(pop_cache, "item_novelty_epc", None) is not None:
+            self._item_novelty_dict = pop_cache.item_novelty_epc
+        else:
+            item_count = {}
+            for user_hist in self._evaluation_objects.data.get_train_dict().values():
+                for item in user_hist.keys():
+                    item_count[item] = item_count.get(item, 0) + 1
+            num_users = len(self._evaluation_objects.data.get_train_dict())
+            self._item_novelty_dict = {
+                item: 1 - (count / num_users)
+                for item, count in item_count.items()
+            } if num_users > 0 else {}
 
         return {u: self.__user_EPC(u_r, u, self._cutoff)
              for u, u_r in self._recommendations.items() if len(self._relevance.get_user_rel(u))}
-

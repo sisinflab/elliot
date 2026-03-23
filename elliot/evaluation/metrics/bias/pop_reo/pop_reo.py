@@ -54,6 +54,7 @@ class PopREO(BaseMetric):
         self._short_head = set(self._evaluation_objects.pop.get_short_head())
         self._long_tail = set(self._evaluation_objects.pop.get_long_tail())
         self._train = self._evaluation_objects.data.get_train_dict()
+        self._train_sets = {u: set(u_train.keys()) for u, u_train in self._train.items()}
         self._num = []
         self._den = []
 
@@ -87,11 +88,17 @@ class PopREO(BaseMetric):
         """
         for u, u_r in self._recommendations.items():
             if len(self._relevance.get_user_rel(u)):
-                num_h, num_t, den_h, den_t = self.__user_pop_reo(u_r, self._cutoff, self._long_tail, self._short_head, set(self._train[u].keys()), set(self._relevance.get_user_rel(u)))
+                num_h, num_t, den_h, den_t = self.__user_pop_reo(
+                    u_r,
+                    self._cutoff,
+                    self._long_tail,
+                    self._short_head,
+                    self._train_sets.get(u, set()),
+                    set(self._relevance.get_user_rel(u)),
+                )
                 self._num.append([num_h, num_t])
                 self._den.append([den_h, den_t])
         self._num = np.sum(np.array(self._num), axis=0)
         self._den = np.sum(np.array(self._den), axis=0)
         pr = self._num / self._den
         return np.std(pr)/np.mean(pr)
-

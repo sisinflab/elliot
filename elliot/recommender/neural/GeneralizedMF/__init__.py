@@ -1,1 +1,0 @@
-from .generalized_matrix_factorization import GMF

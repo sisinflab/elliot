@@ -54,6 +54,7 @@ class RSP(BaseMetric):
         super().__init__(recommendations, config, params, eval_objects, additional_data)
         self._cutoff = self._evaluation_objects.cutoff
         self._train = self._evaluation_objects.data.get_train_dict()
+        self._train_sets = {u: set(u_train.keys()) for u, u_train in self._train.items()}
 
         self._item_clustering_path = self._additional_data.get("clustering_file", False)
 
@@ -103,7 +104,7 @@ class RSP(BaseMetric):
         """
 
         for u, u_r in self._recommendations.items():
-            self.__user_pop_rsp(u_r, set(self._train[u].keys()), self._cutoff)
+            self.__user_pop_rsp(u_r, self._train_sets.get(u, set()), self._cutoff)
 
         PR = self._num / self._den
 
@@ -119,4 +120,3 @@ class RSP(BaseMetric):
 
     def get(self):
         return self._metric_objs_list
-

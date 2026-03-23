@@ -44,7 +44,12 @@ class APLT(BaseMetric):
         """
         super().__init__(recommendations, config, params, eval_objects)
         self._cutoff = self._evaluation_objects.cutoff
-        self._long_tail = self._evaluation_objects.pop.get_long_tail()
+        pop_cache = getattr(self._evaluation_objects, "pop_cache", None)
+        self._long_tail = (
+            pop_cache.long_tail_set
+            if pop_cache and getattr(pop_cache, "long_tail_set", None) is not None
+            else set(self._evaluation_objects.pop.get_long_tail())
+        )
 
     @staticmethod
     def name():
@@ -63,7 +68,7 @@ class APLT(BaseMetric):
         :param user_relevant_items: list of user relevant items in the form [item1,...]
         :return: the value of the Average Recommendation Popularity metric for the specific user
         """
-        return len(set([i for i,v in user_recommendations[:cutoff]]) & set(long_tail)) / len(user_recommendations[:cutoff])
+        return len({i for i, _ in user_recommendations[:cutoff]} & long_tail) / len(user_recommendations[:cutoff])
 
     # def eval(self):
     #     """
@@ -82,4 +87,3 @@ class APLT(BaseMetric):
         """
         return {u: APLT.__user_aplt(u_r, self._cutoff, self._long_tail)
              for u, u_r in self._recommendations.items()}
-

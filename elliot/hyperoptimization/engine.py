@@ -13,9 +13,58 @@ from itertools import product
 import numpy as np
 from hyperopt import Trials, STATUS_FAIL, STATUS_OK, fmin, space_eval, hp, anneal, atpe, mix, rand, tpe
 from hyperopt.base import JOB_STATE_DONE
+import hyperopt.base as hyperopt_base
+from hyperopt.pyll import scope
+import hyperopt.pyll.stochastic as stochastic
 
 from elliot.namespace import RecommenderConfig
 from elliot.utils.enums import OptimizationAlgorithm, SearchSpace
+
+
+def _patch_hyperopt_randint():
+    original = scope._impls.get("randint")
+    if original is None or getattr(original, "_elliot_patched", False):
+        return
+
+    def randint_compat(low, high=None, rng=None, size=()):
+        value = rng.integers(low, high, size)
+        if isinstance(value, np.integer):
+            return int(value)
+        if isinstance(value, np.ndarray) and value.shape == ():
+            return int(value.item())
+        return value
+
+    randint_compat._elliot_patched = True
+    stochastic.randint = randint_compat
+    scope._impls["randint"] = randint_compat
+
+
+def _patch_hyperopt_spec_from_misc():
+    original = hyperopt_base.spec_from_misc
+    if getattr(original, "_elliot_patched", False):
+        return
+
+    def spec_from_misc_compat(misc):
+        spec = {}
+        for k, v in list(misc["vals"].items()):
+            if len(v) == 0:
+                continue
+            if len(v) != 1:
+                raise NotImplementedError("multiple values", (k, v))
+            value = v[0]
+            if isinstance(value, np.generic):
+                value = value.item()
+            elif isinstance(value, np.ndarray) and value.shape == ():
+                value = value.item()
+            spec[k] = value
+        return spec
+
+    spec_from_misc_compat._elliot_patched = True
+    hyperopt_base.spec_from_misc = spec_from_misc_compat
+
+
+_patch_hyperopt_randint()
+_patch_hyperopt_spec_from_misc()
 
 
 @dataclass(frozen=True)

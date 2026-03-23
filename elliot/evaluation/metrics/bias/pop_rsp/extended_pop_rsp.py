@@ -43,6 +43,7 @@ class ExtendedPopRSP(BaseMetric):
         self._short_head = set(self._pop_obj.get_short_head())
         self._long_tail = set(self._pop_obj.get_long_tail())
         self._train = self._evaluation_objects.data.get_train_dict()
+        self._train_sets = {u: set(u_train.keys()) for u, u_train in self._train.items()}
         self._num = []
         self._den = []
 
@@ -75,11 +76,16 @@ class ExtendedPopRSP(BaseMetric):
         :return: the overall averaged value of PopRSP
         """
         for u, u_r in self._recommendations.items():
-            num_h, num_t, den_h, den_t = self.__user_pop_rsp(u_r, self._cutoff, self._long_tail, self._short_head, set(self._train[u].keys()))
+            num_h, num_t, den_h, den_t = self.__user_pop_rsp(
+                u_r,
+                self._cutoff,
+                self._long_tail,
+                self._short_head,
+                self._train_sets.get(u, set()),
+            )
             self._num.append([num_h, num_t])
             self._den.append([den_h, den_t])
         self._num = np.sum(np.array(self._num), axis = 0)
         self._den = np.sum(np.array(self._den), axis = 0)
         pr = self._num / self._den
         return np.std(pr)/np.mean(pr)
-

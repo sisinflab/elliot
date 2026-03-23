@@ -8,6 +8,8 @@ import typing as t
 import math
 from abc import ABC, abstractmethod
 
+_EMPTY_SET = frozenset()
+
 
 class Relevance(object):
     def __init__(self, test, rel_threshold):
@@ -55,12 +57,16 @@ class AbstractRelevanceSingleton(ABC):
 class DiscountedRelevance(AbstractRelevanceSingleton):
     def __init__(self, test, rel_threshold):
         self._discounted_relevance = self._compute_user_gain_map(test, rel_threshold)
+        self._discounted_user_rel = {
+            user: list(gains.keys())
+            for user, gains in self._discounted_relevance.items()
+        }
 
     def get_user_rel_gains(self, user):
         return self._discounted_relevance.get(user, {})
 
     def get_user_rel(self, user):
-        return list(self._discounted_relevance.get(user, {}).keys())
+        return self._discounted_user_rel.get(user, [])
 
     def get_rel(self, user, item):
         return self._discounted_relevance.get(user, {}).get(item, 0)
@@ -81,7 +87,14 @@ class DiscountedRelevance(AbstractRelevanceSingleton):
 
 class BinaryRelevance(AbstractRelevanceSingleton):
     def __init__(self, test, rel_threshold):
-        self._binary_relevance = {u: [i for i, r in test_items.items() if r >= rel_threshold] for u, test_items in test.items()}
+        self._binary_relevance = {
+            u: [i for i, r in test_items.items() if r >= rel_threshold]
+            for u, test_items in test.items()
+        }
+        self._binary_relevance_set = {
+            u: set(items)
+            for u, items in self._binary_relevance.items()
+        }
 
     def get_user_rel_gains(self, user):
         return dict.fromkeys(self._binary_relevance.get(user, []), 1)
@@ -90,5 +103,4 @@ class BinaryRelevance(AbstractRelevanceSingleton):
         return self._binary_relevance.get(user, [])
 
     def get_rel(self, user, item):
-        return 1 if item in self._binary_relevance.get(user, []) else 0
-
+        return 1 if item in self._binary_relevance_set.get(user, _EMPTY_SET) else 0

@@ -14,7 +14,7 @@ import numpy as np
 
 from elliot.dataset import DataSetLoader, build_mock_dataset
 from elliot.namespace import build_namespace, ExperimentConfig
-from elliot.hyperoptimization import run_hyperopt, run_single
+from elliot.hyperoptimization import run_hyperopt, run_single, requires_hyperopt
 from elliot.result_handler import ResultHandler, attach_test_fold_stats
 from elliot.utils import logging as logging_project
 from elliot.utils import set_device
@@ -81,6 +81,8 @@ def run_experiment(config_path: str = "", config_overrides: Optional[List[str]] 
                     logging_project.prepare_logger(model_name)
 
                     is_proxy = model_name.startswith("ProxyRecommender")
+                    use_hyperopt = (not is_proxy) and requires_hyperopt(model_config)
+
                     if is_proxy:
                         logger.info(f"Evaluation begun for {model_name}\n")
                         outcome = run_single(
@@ -91,7 +93,7 @@ def run_experiment(config_path: str = "", config_overrides: Optional[List[str]] 
                             test_fold_index=test_fold_index
                         )
                         logger.info(f"Evaluation ended for {model_name}")
-                    else:
+                    elif use_hyperopt:
                         logger.info(f"Tuning begun for {model_name}\n")
                         outcome = run_hyperopt(
                             data_test=data_test,
@@ -101,6 +103,16 @@ def run_experiment(config_path: str = "", config_overrides: Optional[List[str]] 
                             test_fold_index=test_fold_index
                         )
                         logger.info(f"Tuning ended for {model_name}")
+                    else:
+                        logger.info(f"Training begun for {model_name}\n")
+                        outcome = run_single(
+                            data_test=data_test,
+                            config=config,
+                            model_config=model_config,
+                            model_name=model_name,
+                            test_fold_index=test_fold_index
+                        )
+                        logger.info(f"Training ended for {model_name}")
                     best_eval = outcome.best_eval
 
                     ############################################
@@ -177,13 +189,25 @@ def config_test(config: ExperimentConfig):
             model_config_mock.meta.save_recs = False
             model_config_mock.meta.save_weights = False
 
-            outcome = run_hyperopt(
-                data_test=data_test,
-                config=config,
-                model_config=model_config_mock,
-                model_name=model_name,
-                test_fold_index=test_fold_index
-            )
+            is_proxy = model_name.startswith("ProxyRecommender")
+            use_hyperopt = (not is_proxy) and requires_hyperopt(model_config_mock)
+
+            if use_hyperopt:
+                outcome = run_hyperopt(
+                    data_test=data_test,
+                    config=config,
+                    model_config=model_config_mock,
+                    model_name=model_name,
+                    test_fold_index=test_fold_index
+                )
+            else:
+                outcome = run_single(
+                    data_test=data_test,
+                    config=config,
+                    model_config=model_config_mock,
+                    model_name=model_name,
+                    test_fold_index=test_fold_index
+                )
 
             test_results.append(outcome.best_eval)
             if outcome.trials is not None:

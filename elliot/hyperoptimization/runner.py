@@ -19,6 +19,30 @@ class RunOutcome:
     all_trial_results: list
 
 
+class HyperoptRandomState:
+    def __init__(self, seed: int):
+        self._rng = np.random.default_rng(seed=seed)
+
+    def integers(self, *args, **kwargs):
+        value = self._rng.integers(*args, **kwargs)
+        if isinstance(value, np.integer):
+            return int(value)
+        return value
+
+    def __getattr__(self, name):
+        return getattr(self._rng, name)
+
+
+def requires_hyperopt(model_config: RecommenderConfig) -> bool:
+    excluded = {"meta", "early_stopping", "best_iteration", "name"}
+    for field_name in model_config.model_fields:
+        if field_name in excluded:
+            continue
+        if isinstance(getattr(model_config, field_name), list):
+            return True
+    return False
+
+
 def run_hyperopt(
     data_test: List[DataSet],
     config: ExperimentConfig,
@@ -26,8 +50,16 @@ def run_hyperopt(
     model_name: str,
     test_fold_index: int
 ) -> RunOutcome:
+    if not requires_hyperopt(model_config):
+        return run_single(
+            data_test=data_test,
+            config=config,
+            model_config=model_config,
+            model_name=model_name,
+            test_fold_index=test_fold_index,
+        )
 
-    rstate = np.random.default_rng(seed=config.random_seed)
+    rstate = HyperoptRandomState(seed=config.random_seed)
     engine = HyperOptEngine(rstate=rstate)
 
     model_config.prepare_fields_for_search()

@@ -22,16 +22,22 @@ evaluation:
 from time import time
 from types import SimpleNamespace
 import logging as pylog
+import math
 import numpy as np
 from sklearn.metrics import mean_squared_error
 
 from elliot.dataset import DataSet
 from elliot.namespace import RecommenderConfig
-from elliot.utils import logging
+from elliot.utils import logging, get_device
 from elliot.utils.folder import path_absolute, check_path
 from . import metrics
 from . import popularity_utils
 from . import relevance
+from .accelerated_metrics import (
+    compute_accelerated_metrics,
+    is_supported_metric,
+)
+from .metrics.base_metric import BaseMetric
 
 
 class Evaluator(object):
@@ -53,6 +59,19 @@ class Evaluator(object):
         self._paired_ttest = data.config.evaluation.paired_ttest
         self._metrics = metrics.parse_metrics(data.config.evaluation.simple_metrics)
         self._complex_metrics = data.config.evaluation.complex_metrics
+        selected_device = str(get_device())
+        configured_accelerate = getattr(data.config.evaluation, "accelerate", None)
+        self._accelerate = (
+            selected_device in {"cuda", "mps"}
+            if configured_accelerate is None
+            else bool(configured_accelerate)
+        )
+        self._accelerate_verify = bool(getattr(data.config.evaluation, "accelerate_verify", True))
+        self._accelerate_verify_once = bool(getattr(data.config.evaluation, "accelerate_verify_once", True))
+        self._accelerate_tolerance = float(getattr(data.config.evaluation, "accelerate_tolerance", 1e-6))
+        configured_accelerate_device = getattr(data.config.evaluation, "accelerate_device", None)
+        self._accelerate_device = str(configured_accelerate_device or selected_device)
+        self._accelerate_verified = False
         #TODO integrate complex metrics in validation metric (the problem is that usually complex metrics generate a complex name that does not match with the base name when looking for the loss value)
         # if _validation_metric.lower() not in [m.lower()
         #                                       for m in data.config.evaluation.simple_metrics]+[m["metric"].lower()
@@ -65,15 +84,18 @@ class Evaluator(object):
             self._apply_user_filter()
 
         self._pop = popularity_utils.Popularity(data)
+        self._pop_cache = self._build_popularity_cache()
 
         self._evaluation_objects = SimpleNamespace(relevance=relevance.Relevance(self._test, self._rel_threshold),
                                                    pop=self._pop,
+                                                   pop_cache=self._pop_cache,
                                                    num_items=data.num_items,
                                                    data=data,
                                                    additional_metrics=self._complex_metrics)
         if self._val is not None:
             self._val_evaluation_objects = SimpleNamespace(relevance=relevance.Relevance(self._val, self._rel_threshold),
                                                            pop=self._pop,
+                                                           pop_cache=self._pop_cache,
                                                            num_items=data.num_items,
                                                            data=data,
                                                            additional_metrics=self._complex_metrics)
@@ -129,6 +151,43 @@ class Evaluator(object):
                 (self._test if hasattr(self, '_test') else None,
                  self._evaluation_objects if hasattr(self, '_evaluation_objects') else None)
                 ]
+
+    def _build_popularity_cache(self):
+        train_dict = self._data.get_train_dict()
+        item_count = {}
+        for user_hist in train_dict.values():
+            for item in user_hist.keys():
+                item_count[item] = item_count.get(item, 0) + 1
+
+        num_users = len(train_dict)
+        item_novelty_epc = {}
+        item_novelty_efd = {}
+        max_nov_efd = 0.0
+
+        if item_count:
+            if num_users > 0:
+                item_novelty_epc = {item: 1.0 - (count / num_users) for item, count in item_count.items()}
+            norm = float(sum(item_count.values()))
+            if norm > 0:
+                min_count = min(item_count.values())
+                max_nov_efd = -math.log2(min_count / norm)
+                item_novelty_efd = {
+                    item: -math.log2(count / norm)
+                    for item, count in item_count.items()
+                }
+
+        short_head = set(self._pop.get_short_head())
+        long_tail = set(self._pop.get_long_tail())
+
+        return SimpleNamespace(
+            item_count=item_count,
+            item_novelty_epc=item_novelty_epc,
+            item_novelty_efd=item_novelty_efd,
+            max_nov_efd=max_nov_efd,
+            short_head_set=short_head,
+            long_tail_set=long_tail,
+            pop_items=self._pop.get_pop_items(),
+        )
 
     def _load_eval_users(self):
         eval_cfg = getattr(self._data.config, "evaluation", None)
@@ -257,11 +316,90 @@ class Evaluator(object):
             rounding_factor = 5
             eval_start_time = time()
 
-            metric_objects = [m(recommendations, self._data.config, self._params, eval_objs) for m in self._metrics]
+            results = {}
+            statistical_results = {}
+
+            remaining_metric_classes = list(self._metrics)
+            accelerated_metric_names = []
+
+            if self._accelerate:
+                accelerated_metric_names = [
+                    m.name() for m in self._metrics if is_supported_metric(m.name())
+                ]
+                remaining_metric_classes = [
+                    m for m in self._metrics if m.name() not in set(accelerated_metric_names)
+                ]
+
+                if accelerated_metric_names:
+                    try:
+                        accel = compute_accelerated_metrics(
+                            recommendations=recommendations,
+                            test_data=test_data,
+                            cutoff=eval_objs.cutoff,
+                            relevance_threshold=self._rel_threshold,
+                            metric_names=accelerated_metric_names,
+                            device=self._accelerate_device or str(get_device()),
+                            return_user_metrics=bool(self._paired_ttest),
+                        )
+
+                        results.update(accel.results)
+                        if self._paired_ttest:
+                            statistical_results.update(accel.user_results)
+
+                        self.logger.info(
+                            "Accelerated simple metrics enabled",
+                            extra={
+                                "context": {
+                                    "phase": val_test,
+                                    "device": accel.device,
+                                    "users": accel.users,
+                                    "metrics": accelerated_metric_names,
+                                }
+                            }
+                        )
+
+                    except Exception as ex:
+                        accelerated_metric_names = []
+                        remaining_metric_classes = list(self._metrics)
+                        self.logger.warning(
+                            "Accelerated metric evaluation failed, falling back to legacy pipeline",
+                            extra={"context": {"error": str(ex)}}
+                        )
+
+            legacy_metric_objects = [
+                m(recommendations, self._data.config, self._params, eval_objs)
+                for m in remaining_metric_classes
+            ]
+            for metric_object in legacy_metric_objects:
+                metric_name = metric_object.name()
+                user_metric = None
+
+                if self._paired_ttest and isinstance(metric_object, metrics.StatisticalMetric):
+                    user_metric = metric_object.eval_user_metric()
+                    statistical_results[metric_name] = user_metric
+
+                if user_metric is not None and metric_object.__class__.eval is BaseMetric.eval:
+                    metric_values = list(user_metric.values())
+                    results[metric_name] = float(np.average(metric_values)) if metric_values else float("nan")
+                else:
+                    results[metric_name] = metric_object.eval()
+
+            if accelerated_metric_names and self._should_verify_accelerated():
+                self._verify_accelerated_results(
+                    accelerated_metric_names=accelerated_metric_names,
+                    recommendations=recommendations,
+                    eval_objs=eval_objs,
+                    scalar_results=results,
+                    user_results=statistical_results,
+                )
+
+            metric_objects = legacy_metric_objects[:]
             for metric in self._complex_metrics:
                 metric_objects.extend(metrics.parse_metric(metric["metric"])(recommendations, self._data.config,
                                                                              self._params, eval_objs, metric).get())
-            results = {m.name(): m.eval() for m in metric_objects}
+            for m in metric_objects:
+                if m.name() not in results:
+                    results[m.name()] = m.eval()
 
             str_results = {k: str(round(v, rounding_factor)) for k, v in results.items()}
             # res_print = "\t".join([":".join(e) for e in str_results.items()])
@@ -272,14 +410,87 @@ class Evaluator(object):
             self.logger.info(f"Results")
             [self.logger.info("\t".join(e)) for e in str_results.items()]
 
-            statistical_results = {}
-            if self._paired_ttest:
-                statistical_results = {metric_object.name(): metric_object.eval_user_metric()
-                                       for metric_object in
-                                       [m(recommendations, self._data.config, self._params, eval_objs) for m
-                                        in self._metrics]
-                                       if isinstance(metric_object, metrics.StatisticalMetric)}
             return results, statistical_results
+
+    def _should_verify_accelerated(self) -> bool:
+        if not self._accelerate_verify:
+            return False
+        if self._accelerate_verify_once and self._accelerate_verified:
+            return False
+        return True
+
+    def _verify_accelerated_results(
+        self,
+        accelerated_metric_names,
+        recommendations,
+        eval_objs,
+        scalar_results,
+        user_results,
+    ):
+        if not accelerated_metric_names:
+            return
+
+        verify_objects = [
+            m(recommendations, self._data.config, self._params, eval_objs)
+            for m in self._metrics
+            if m.name() in set(accelerated_metric_names)
+        ]
+
+        mismatch_found = False
+        for metric_object in verify_objects:
+            metric_name = metric_object.name()
+            legacy_value = metric_object.eval()
+            accelerated_value = scalar_results.get(metric_name)
+
+            if not self._is_close(accelerated_value, legacy_value):
+                mismatch_found = True
+                self.logger.error(
+                    "Accelerated metric mismatch, using legacy value",
+                    extra={"context": {
+                        "metric": metric_name,
+                        "accelerated": accelerated_value,
+                        "legacy": legacy_value,
+                        "tolerance": self._accelerate_tolerance,
+                    }}
+                )
+                scalar_results[metric_name] = legacy_value
+
+            if self._paired_ttest and isinstance(metric_object, metrics.StatisticalMetric):
+                legacy_user = metric_object.eval_user_metric()
+                accelerated_user = user_results.get(metric_name, {})
+                if not self._is_user_metric_close(accelerated_user, legacy_user):
+                    mismatch_found = True
+                    self.logger.error(
+                        "Accelerated user-wise metric mismatch, using legacy values",
+                        extra={"context": {"metric": metric_name}}
+                    )
+                    user_results[metric_name] = legacy_user
+
+        self._accelerate_verified = not mismatch_found
+
+    def _is_user_metric_close(self, left, right) -> bool:
+        if set(left.keys()) != set(right.keys()):
+            return False
+        return all(self._is_close(left[u], right[u]) for u in left.keys())
+
+    def _is_close(self, left, right) -> bool:
+        if left is None or right is None:
+            return False
+        if isinstance(left, np.generic):
+            left = left.item()
+        if isinstance(right, np.generic):
+            right = right.item()
+        try:
+            if np.isnan(left) and np.isnan(right):
+                return True
+        except TypeError:
+            return False
+        return math.isclose(
+            float(left),
+            float(right),
+            rel_tol=self._accelerate_tolerance,
+            abs_tol=self._accelerate_tolerance
+        )
 
     def _compute_needed_recommendations(self):
         full_recommendations_metrics = any([m.needs_full_recommendations() for m in self._metrics])

@@ -47,10 +47,10 @@ class Popularity(object):
     def get_long_tail(self):
         if not self._long_tail:
             self.get_short_head()
-            self._long_tail = [i for i in self._sorted_pop_items.keys() if i not in self._short_head]
+            short_head = set(self._short_head)
+            self._long_tail = [i for i in self._sorted_pop_items.keys() if i not in short_head]
         return self._long_tail
 
     def get_custom_pop_obj(self, pop_ratio=.8):
         return Popularity(self._data, pop_ratio)
-
 

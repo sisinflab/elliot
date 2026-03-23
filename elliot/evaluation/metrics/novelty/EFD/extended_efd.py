@@ -5,7 +5,6 @@ It proceeds from a user-wise computation, and average the values over the users.
 
 
 import math
-import numpy as np
 from elliot.evaluation.metrics.base_metric import BaseMetric
 
 
@@ -98,17 +97,26 @@ class ExtendedEFD(BaseMetric):
         Evaluation function
         :return: the overall averaged value of Expected Free Discovery per user
         """
-
-        self._item_count = {}
-        for u_h in self._evaluation_objects.data.get_train_dict().values():
-            for i in u_h.keys():
-                self._item_count[i] = self._item_count.get(i, 0) + 1
-
-        novelty_profile = self._item_count.values()
-        norm = sum(novelty_profile)
-        self._max_nov = -math.log(min(novelty_profile) / norm) / math.log(2)
-        self._item_novelty_dict = {i: -math.log(v / norm) / math.log(2) for i, v in self._item_count.items()}
+        pop_cache = getattr(self._evaluation_objects, "pop_cache", None)
+        if pop_cache and getattr(pop_cache, "item_novelty_efd", None) is not None:
+            self._item_novelty_dict = pop_cache.item_novelty_efd
+            self._max_nov = pop_cache.max_nov_efd
+        else:
+            item_count = {}
+            for user_hist in self._evaluation_objects.data.get_train_dict().values():
+                for item in user_hist.keys():
+                    item_count[item] = item_count.get(item, 0) + 1
+            novelty_profile = item_count.values()
+            norm = sum(novelty_profile)
+            if norm > 0:
+                self._max_nov = -math.log(min(novelty_profile) / norm) / math.log(2)
+                self._item_novelty_dict = {
+                    item: -math.log(count / norm) / math.log(2)
+                    for item, count in item_count.items()
+                }
+            else:
+                self._max_nov = 0.0
+                self._item_novelty_dict = {}
 
         return {u: self.__user_EFD(u_r, u, self._cutoff)
                 for u, u_r in self._recommendations.items() if len(self._relevance.get_user_rel(u))}
-
