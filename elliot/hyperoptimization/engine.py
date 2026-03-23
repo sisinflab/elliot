@@ -177,6 +177,24 @@ OPT_ALGORITHMS = {
 }
 
 
+def _convert_to_native(value: Any) -> Any:
+    """Convert NumPy types to Python native types for hyperopt compatibility.
+    
+    Args:
+        value: Value to convert (may be NumPy scalar or Python native type)
+        
+    Returns:
+        Python native type equivalent
+    """
+    if isinstance(value, np.integer):
+        return int(value)
+    elif isinstance(value, np.floating):
+        return float(value)
+    elif isinstance(value, np.ndarray):
+        return value.tolist()
+    return value
+
+
 def build_hyperopt_space(config: RecommenderConfig):
     space_list = []
     uses_distributions = False
@@ -189,9 +207,13 @@ def build_hyperopt_space(config: RecommenderConfig):
         func_ = getattr(hp, value[0])
         val_items = value[1:]
         if value[0] == SearchSpace.CHOICE.value:
+            # Convert NumPy types to Python native types for hyperopt compatibility
+            val_items = [_convert_to_native(v) for v in val_items]
             space_list.append((k, func_(k, val_items)))
         else:
             uses_distributions = True
+            # Convert NumPy types to Python native types for hyperopt compatibility
+            val_items = [_convert_to_native(v) for v in val_items]
             space_list.append((k, func_(k, *val_items)))
 
     space = OrderedDict(space_list)
