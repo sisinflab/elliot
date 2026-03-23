@@ -180,20 +180,6 @@ class AbstractTrainer(ABC):
             #        os.sep.join([self._config.path_output_rec_result, f"{self.name}.tsv"])))
 
         epoch_number = int(self._trend_epoch_for_iteration(it)) if it is not None else None
-        val_metric = result_dict[self._validation_k]["val_results"][self._validation_metric]
-        if self._validation_metric.upper() in {"MSE", "RMSE", "MAE"}:
-            val_loss = float(val_metric)
-        else:
-            val_loss = 1.0 - float(val_metric)
-        self._validation_history.append(
-            {
-                "epoch": epoch_number,
-                "val_metric": float(val_metric),
-                "val_loss": val_loss,
-            }
-        )
-
-        epoch_number = int(self._trend_epoch_for_iteration(it)) if it is not None else None
         val_metric = result_dict[self._val_k]["val_results"][self._val_metric]
         if self._val_metric.upper() in {"MSE", "RMSE", "MAE"}:
             val_loss = float(val_metric)
@@ -209,10 +195,9 @@ class AbstractTrainer(ABC):
 
         if (len(self._results) - 1) == self.get_best_arg():
             # if it is not None:
-            self.config.best_iteration = it + 1
+            self.model_config.best_iteration = it + 1
             best_val = val_metric
 
-            best_val = val_metric
             self.best_metric_value = best_val
             self.logger.info(
                 "Recorded best validation result",
