@@ -25,9 +25,9 @@ def load_and_split_data(config_dict):
         }
     }
     config = build_namespace(config_path=current_path, config_data=config_data)
-    dataset_loader = DataSetLoader(config=config)
-    data_list = dataset_loader.build()
-    return data_list
+    loader = DataSetLoader(config=config)
+    val_data, main_data = loader.build()
+    return val_data, main_data
 
 
 class TestSplitter:
@@ -40,10 +40,11 @@ class TestSplitter:
             }
         }
 
-        data = load_and_split_data(config)
+        _, train_test = load_and_split_data(config)
 
-        assert len(data) == 1
-        train, _, test = data[0][0].inter_dataframe
+        assert len(train_test) == 1
+        train = train_test[0].train_set.dataframe
+        test = train_test[0].eval_set.dataframe
         assert not train.empty and not test.empty
         assert len(train) + len(test) == 30
 
@@ -55,10 +56,11 @@ class TestSplitter:
             }
         }
 
-        data = load_and_split_data(config)
+        _, train_test = load_and_split_data(config)
 
-        assert len(data) == 1
-        train, _, test = data[0][0].inter_dataframe
+        assert len(train_test) == 1
+        train = train_test[0].train_set.dataframe
+        test = train_test[0].eval_set.dataframe
         assert not train.empty and not test.empty
         assert all(test.groupby('userId').size() <= 3)
 
@@ -71,11 +73,12 @@ class TestSplitter:
             }
         }
 
-        data = load_and_split_data(config)
+        _, train_test = load_and_split_data(config)
 
-        assert len(data) == 10
-        inter = [d[0].inter_dataframe for d in data]
-        for train, _, test in inter:
+        assert len(train_test) == 10
+        train_list = [t.train_set.dataframe for t in train_test]
+        test_list = [t.eval_set.dataframe for t in train_test]
+        for train, test in zip(train_list, test_list):
             assert not train.empty and not test.empty
             assert len(train) + len(test) == 30
 
@@ -88,11 +91,12 @@ class TestSplitter:
             }
         }
 
-        data = load_and_split_data(config)
+        _, train_test = load_and_split_data(config)
 
-        assert len(data) == 3
-        inter = [d[0].inter_dataframe for d in data]
-        for train, _, test in inter:
+        assert len(train_test) == 3
+        train_list = [t.train_set.dataframe for t in train_test]
+        test_list = [t.eval_set.dataframe for t in train_test]
+        for train, test in zip(train_list, test_list):
             assert not train.empty and not test.empty
             assert len(train) + len(test) == 30
 
@@ -104,11 +108,12 @@ class TestSplitter:
             }
         }
 
-        data = load_and_split_data(config)
+        _, train_test = load_and_split_data(config)
 
-        assert len(data) == 10
-        inter = [d[0].inter_dataframe for d in data]
-        for train, _, test in inter:
+        assert len(train_test) == 10
+        train_list = [t.train_set.dataframe for t in train_test]
+        test_list = [t.eval_set.dataframe for t in train_test]
+        for train, test in zip(train_list, test_list):
             assert not train.empty and not test.empty
             assert len(train) + len(test) == 30
 
@@ -120,10 +125,11 @@ class TestSplitter:
             }
         }
 
-        data = load_and_split_data(config)
+        _, train_test = load_and_split_data(config)
 
-        assert len(data) == 1
-        train, _, test = data[0][0].inter_dataframe
+        assert len(train_test) == 1
+        train = train_test[0].train_set.dataframe
+        test = train_test[0].eval_set.dataframe
         assert not train.empty and not test.empty
         assert all(test["timestamp"] >= 7)
         assert all(train["timestamp"] < 7)
@@ -137,10 +143,11 @@ class TestSplitter:
             }
         }
 
-        data = load_and_split_data(config)
+        _, train_test = load_and_split_data(config)
 
-        assert len(data) == 1
-        train, _, test = data[0][0].inter_dataframe
+        assert len(train_test) == 1
+        train = train_test[0].train_set.dataframe
+        test = train_test[0].eval_set.dataframe
         assert not train.empty and not test.empty
         assert train['timestamp'].max() < test['timestamp'].min()
 
@@ -175,14 +182,19 @@ class TestSplitter:
             }
         }
 
-        data = load_and_split_data(config)
+        train_val, train_test = load_and_split_data(config)
 
-        assert len(data) == 3
-        inter = [d[0].inter_dataframe for d in data]
-        for train, val, test in inter:
-            assert not train.empty
-            assert not val.empty
-            assert not test.empty
+        assert len(train_val) == 3
+        train_list = [t[0].train_set.dataframe for t in train_val]
+        val_list = [t[0].eval_set.dataframe for t in train_val]
+        for train, val in zip(train_list, val_list):
+            assert not train.empty and not val.empty
+
+        assert len(train_test) == 3
+        train_list = [t.train_set.dataframe for t in train_test]
+        test_list = [t.eval_set.dataframe for t in train_test]
+        for train, test in zip(train_list, test_list):
+            assert not train.empty and not test.empty
 
 
 class TestSplitterFailures:

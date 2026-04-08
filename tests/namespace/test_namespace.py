@@ -15,8 +15,8 @@ _experiment_config = {
         "strategy": "dataset",
         "dataset_path": "../data/{0}/dataset.tsv",
         "side_information": {
-            "dataloader": "FeatureLoader1",
-            "folder_map_features": "../data/{0}/map"
+            "dataloader": "ItemAttributes",
+            "attribute_file": "../data/{0}/map"
         }
     },
     "splitting": {
@@ -70,9 +70,10 @@ class TestNamespace:
         expected_data_path = path_absolute(
             path_joiner(parent_dir(config_path), "..", "data", "demo")
         )
+
         side_info_config = config.data_config.side_information[0]
-        assert hasattr(side_info_config, "folder_map_features")
-        assert side_info_config.folder_map_features == path_joiner(expected_data_path, "map")
+
+        assert side_info_config.attribute_file == path_joiner(expected_data_path, "map")
         assert config.data_config.dataset_path == path_joiner(expected_data_path, "dataset.tsv")
         assert config.splitting.save_folder == path_joiner(expected_data_path, "splitting")
         assert config.negative_sampling.save_folder == expected_data_path
@@ -81,7 +82,7 @@ class TestNamespace:
         assert config.path_output_rec_performance.endswith(path_joiner("results", "demo", "performance"))
 
         assert config.data_config.strategy == DataLoadingStrategy.DATASET
-        assert config.data_config.side_information[0].dataloader == "FeatureLoader1"
+        assert side_info_config.dataloader == "ItemAttributes"
         assert config.splitting.test_splitting.strategy == SplittingStrategy.TEMP_HOLDOUT
         assert config.splitting.test_splitting.test_ratio == 0.2
         assert config.negative_sampling.strategy == NegativeSamplingStrategy.RANDOM

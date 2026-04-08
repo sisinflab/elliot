@@ -1,17 +1,15 @@
-import ntpath
 from typing import Iterable, Optional, Tuple
-
+import ntpath
 import numpy as np
 import pandas as pd
 import torch
 
-from elliot.recommender.base_recommender import TraditionalRecommender
-from elliot.utils.read import Reader
-
-reader = Reader()
+from elliot.recommender.base_recommender import BaseRecommender
+from elliot.utils.registry import model_registry
 
 
-class ProxyRecommender(TraditionalRecommender):
+@model_registry.register()
+class ProxyRecommender(BaseRecommender):
     path: str = ""
     id_space: str = "public"
     deduplicate: bool = True
@@ -19,80 +17,72 @@ class ProxyRecommender(TraditionalRecommender):
     strict: bool = False
     model_name: Optional[str] = None
 
-    def __init__(self, data, params, seed, logger):
+    def __init__(self, params, interactions, seed, *args, **kwargs):
         """
         Create a Proxy recommender to evaluate already generated recommendations.
         :param name: data loader object
         :param path: path to the directory rec. results
         :param args: parameters
         """
-        super().__init__(data, params, seed, logger)
+        super().__init__(params, interactions, seed, *args, **kwargs)
 
         self._reader_config = params.meta.rec_reader
-        reader.logger = self.logger
 
-        self._model_name = self.model_name or ntpath.basename(self.path).rsplit(".", 1)[0]
-        self._public_user_map, self._public_item_map = self._resolve_public_maps()
-        self._private_user_map, self._private_item_map = self._resolve_private_maps()
+        self._public_user_map = getattr(self._interactions, "_u_map")
+        self._public_item_map = getattr(self._interactions, "_i_map")
+        self._private_user_map = getattr(self._interactions, "_users")
+        self._private_item_map = getattr(self._interactions, "_items")
         self._user_id_type, self._item_id_type = self._infer_public_id_types()
-        self._train_dict = self._get_dict("train", private=True)
-        self._val_dict = self._get_dict("val", private=True)
-        self._test_dict = self._get_dict("test", private=True)
+        self._train_dict = self._interactions.get_dict(private=True)
+
+        self._seen_items = self._build_seen_items(self._train_dict)
+        self._recommendations = self.load_recommendations(self.path)
 
         self.params_to_save = []
 
     @property
     def name(self):
-        return self._model_name
+        return self.model_name or ntpath.basename(self.path).rsplit(".", 1)[0]
 
     @property
     def name_param(self):
         return ""
 
-    def initialize(self):
-        self._seen_items = self._build_seen_items(self._train_dict)
-        self._recommendations = self.load_recommendations(self.path)
+    def train_step(self, batch, *args):
+        return 0
 
-    def predict_full(self, user_indices):
+    def predict(self, user_indices, item_indices=None):
         num_users = user_indices.shape[0]
-        scores = torch.full((num_users, self._num_items), -torch.inf, dtype=torch.float32)
+        num_items = item_indices.shape[1] if item_indices is not None else self._num_items
+        scores = torch.full((num_users, num_items), -torch.inf, dtype=torch.float32)
+
         user_list = user_indices.tolist()
+        item_list = item_indices.tolist() if item_indices is not None else None
 
         for row, user in enumerate(user_list):
-            user_recs = self._recommendations.get(user)
+            user_recs = self._recommendations.get(user, {})
             if not user_recs:
                 continue
             seen = self._seen_items.get(user) if self.filter_seen else None
-            for item, score in user_recs.items():
-                if seen and item in seen:
-                    continue
-                scores[row, item] = score
-
-        return scores
-
-    def predict_sampled(self, user_indices, item_indices):
-        scores = torch.full(item_indices.shape, -torch.inf, dtype=torch.float32)
-        user_list = user_indices.tolist()
-        item_list = item_indices.tolist()
-
-        for row, user in enumerate(user_list):
-            user_scores = self._recommendations.get(user, {})
-            if not user_scores:
-                continue
-            seen = self._seen_items.get(user) if self.filter_seen else None
-            for col, item in enumerate(item_list[row]):
-                if item == -1:
-                    continue
-                if seen and item in seen:
-                    continue
-                score = user_scores.get(item)
-                if score is not None:
-                    scores[row, col] = score
+            if item_list is None:
+                for item, score in user_recs.items():
+                    if seen is not None and item in seen:
+                        continue
+                    scores[row, item] = score
+            else:
+                for col, item in enumerate(item_list[row]):
+                    if item == -1:
+                        continue
+                    if seen is not None and item in seen:
+                        continue
+                    score = user_recs.get(item)
+                    if score is not None:
+                        scores[row, col] = score
 
         return scores
 
     def load_recommendations(self, path: str, top_k: Optional[int] = None):
-        data = reader.read_tabular(
+        data = self.reader.read_tabular(
             path=path,
             columns=self._reader_config.column_names(),
             datatypes=self._reader_config.column_dtypes(),
@@ -153,24 +143,6 @@ class ProxyRecommender(TraditionalRecommender):
 
         return data
 
-    def _resolve_public_maps(self) -> Tuple[dict, dict]:
-        if hasattr(self._data, "public_users") and hasattr(self._data, "public_items"):
-            return self._data.public_users, self._data.public_items
-        if hasattr(self._data, "get_mappings"):
-            return self._data.get_mappings()
-        if hasattr(self._data, "_u_map") and hasattr(self._data, "_i_map"):
-            return self._data.get_mappings()
-        return {}, {}
-
-    def _resolve_private_maps(self) -> Tuple[Iterable, Iterable]:
-        if hasattr(self._data, "private_users") and hasattr(self._data, "private_items"):
-            return self._data.private_users, self._data.private_items
-        if hasattr(self._data, "get_inverse_mappings"):
-            return self._data.get_inverse_mappings()
-        if hasattr(self._data, "_users") and hasattr(self._data, "_items"):
-            return self._data.get_users_items()
-        return [], []
-
     def _infer_public_id_types(self) -> Tuple[type, type]:
         user_type = str
         item_type = str
@@ -191,15 +163,6 @@ class ProxyRecommender(TraditionalRecommender):
                     break
 
         return user_type, item_type
-
-    def _get_dict(self, scope: str, private: bool = False):
-        getter = getattr(self._data, f"get_{scope}_dict", None)
-        if callable(getter):
-            try:
-                return getter(private=private)
-            except TypeError:
-                return getter()
-        return getattr(self._data, f"{scope}_dict", None) or getattr(self._data, f"_{scope}_dict", None)
 
     def _select_columns(self, data: pd.DataFrame, user_col, item_col, score_col):
         missing = [col for col in (user_col, item_col) if col not in data.columns]

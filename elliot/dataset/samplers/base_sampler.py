@@ -145,4 +145,8 @@ def build_dataset(sampler: AbstractSampler):
         case _:
             raise ValueError(f"Invalid sampler type {sampler.type}")
 
+    collate_fn = getattr(sampler, 'collate_fn', None)
+    if collate_fn is not None:
+        setattr(dataset, 'collate_fn', collate_fn)
+
     return dataset

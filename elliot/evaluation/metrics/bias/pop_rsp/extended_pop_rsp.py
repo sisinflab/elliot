@@ -4,12 +4,12 @@ It proceeds from a user-wise computation, and average the values over the users.
 """
 
 
-import operator
-
 import numpy as np
 from elliot.evaluation.metrics.base_metric import BaseMetric
+from elliot.utils.registry import metric_registry
 
 
+@metric_registry.register()
 class ExtendedPopRSP(BaseMetric):
     r"""
     Extended Popularity-based Ranking-based Statistical Parity
@@ -42,18 +42,10 @@ class ExtendedPopRSP(BaseMetric):
 
         self._short_head = set(self._pop_obj.get_short_head())
         self._long_tail = set(self._pop_obj.get_long_tail())
-        self._train = self._evaluation_objects.data.get_train_dict()
+        self._train = self._evaluation_objects.train_data.get_dict()
         self._train_sets = {u: set(u_train.keys()) for u, u_train in self._train.items()}
         self._num = []
         self._den = []
-
-    @staticmethod
-    def name():
-        """
-        Metric Name Getter
-        :return: returns the public name of the metric
-        """
-        return "ExtendedPopRSP"
 
     def __user_pop_rsp(self, user_recommendations, cutoff, long_tail, short_head, u_train):
         """

@@ -4,6 +4,7 @@ Hyperopt optimization engine for Elliot.
 
 from __future__ import annotations
 
+import copy
 from functools import reduce
 from typing import Any, Dict, Optional, Tuple
 from dataclasses import dataclass
@@ -18,6 +19,7 @@ from hyperopt.pyll import scope
 import hyperopt.pyll.stochastic as stochastic
 
 from elliot.namespace import RecommenderConfig
+from elliot.recommender import AbstractRecommender
 from elliot.utils.enums import OptimizationAlgorithm, SearchSpace
 
 
@@ -70,6 +72,7 @@ _patch_hyperopt_spec_from_misc()
 @dataclass(frozen=True)
 class TuningResult:
     trials: Trials
+    best_model: Optional[AbstractRecommender]
     best_params: Dict[str, Any]
     best_loss: float
     best_trial: Optional[dict]
@@ -113,9 +116,14 @@ class HyperOptEngine:
         best_trial = self._select_best_trial(trials)
         best_params = space_eval(space, best_raw) if best_raw is not None else {}
         best_loss = best_trial["result"]["loss"] if best_trial is not None else np.inf
+        best_model = best_trial["result"].pop("best_model", None)
+
+        for trial in trials.results:
+            trial.pop("best_model", None)
 
         return TuningResult(
             trials=trials,
+            best_model=best_model,
             best_params=best_params,
             best_loss=best_loss,
             best_trial=best_trial,
@@ -152,9 +160,14 @@ class HyperOptEngine:
         best_trial = self._select_best_trial(trials)
         best_params = params_by_tid.get(best_trial["tid"]) if best_trial is not None else {}
         best_loss = best_trial["result"]["loss"] if best_trial is not None else np.inf
+        best_model = best_trial["result"].pop("best_model", None)
+
+        for trial in trials.results:
+            trial.pop("best_model", None)
 
         return TuningResult(
             trials=trials,
+            best_model=best_model,
             best_params=best_params,
             best_loss=best_loss,
             best_trial=best_trial,
@@ -171,7 +184,7 @@ class HyperOptEngine:
             loss = result.get("loss", np.inf)
             if not np.isfinite(loss):
                 continue
-            valid_trials.append(trial)
+            valid_trials.append(copy.deepcopy(trial))
         if not valid_trials:
             return None
         return min(valid_trials, key=lambda t: t["result"]["loss"])

@@ -5,8 +5,10 @@ Module description:
 
 
 from elliot.dataset.samplers.base_sampler import TraditionalSampler, PipelineSampler
+from elliot.utils.registry import sampler_registry
 
 
+@sampler_registry.register()
 class CustomPointWiseSparseSampler(PipelineSampler):
     def __init__(self, **params):
         super().__init__(**params)
@@ -31,6 +33,7 @@ class CustomPointWiseSparseSampler(PipelineSampler):
         return self._r_int(0, self._nusers, size=self.events)
 
 
+@sampler_registry.register()
 class PointWisePosNegRatioRatingsSampler(PipelineSampler):
     def __init__(self, neg_ratio, implicit=False, **params):
         super().__init__(**params)
@@ -67,6 +70,7 @@ class PointWisePosNegRatioRatingsSampler(PipelineSampler):
         return self._r_int(0, self._nusers, size=self.events)
 
 
+@sampler_registry.register()
 class PointWisePosNegRatingsSampler(PointWisePosNegRatioRatingsSampler):
     def __init__(self, **params):
         super().__init__(
@@ -75,6 +79,7 @@ class PointWisePosNegRatingsSampler(PointWisePosNegRatioRatingsSampler):
         )
 
 
+@sampler_registry.register()
 class PointWisePosNegSampler(PointWisePosNegRatioRatingsSampler):
     def __init__(self, **params):
         super().__init__(
@@ -84,6 +89,7 @@ class PointWisePosNegSampler(PointWisePosNegRatioRatingsSampler):
         )
 
 
+@sampler_registry.register()
 class MFPointWisePosNegSampler(PipelineSampler):
     def __init__(self, m, **params):
         super().__init__(**params)

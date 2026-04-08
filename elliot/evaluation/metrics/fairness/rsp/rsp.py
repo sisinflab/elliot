@@ -11,7 +11,10 @@ from collections import Counter
 
 from elliot.evaluation.metrics.base_metric import BaseMetric
 from elliot.evaluation.metrics.metrics_utils import ProxyMetric
+from elliot.utils.registry import metric_registry
 
+
+@metric_registry.register()
 class RSP(BaseMetric):
     r"""
     Ranking-based Statistical Parity
@@ -53,7 +56,7 @@ class RSP(BaseMetric):
         """
         super().__init__(recommendations, config, params, eval_objects, additional_data)
         self._cutoff = self._evaluation_objects.cutoff
-        self._train = self._evaluation_objects.data.get_train_dict()
+        self._train = self._evaluation_objects.train_data.get_dict()
         self._train_sets = {u: set(u_train.keys()) for u, u_train in self._train.items()}
 
         self._item_clustering_path = self._additional_data.get("clustering_file", False)
@@ -73,6 +76,7 @@ class RSP(BaseMetric):
 
         self.process()
 
+    @property
     def name(self):
         """
         Metric Name Getter

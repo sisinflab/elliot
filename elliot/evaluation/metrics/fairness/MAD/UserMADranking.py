@@ -3,15 +3,16 @@ This is the implementation of the User MAD ranking metric.
 It proceeds from a user-wise computation, and average the values over the users.
 """
 
-
+from typing import List
 import math
-
-import typing as t
 import numpy as np
 import pandas as pd
+
 from elliot.evaluation.metrics.base_metric import BaseMetric
+from elliot.utils.registry import metric_registry
 
 
+@metric_registry.register()
 class UserMADranking(BaseMetric):
     r"""
     User MAD Ranking-based
@@ -59,6 +60,7 @@ class UserMADranking(BaseMetric):
         self._sum = np.zeros(self._n_clusters)
         self._n_users = np.zeros(self._n_clusters)
 
+    @property
     def name(self):
         """
         Metric Name Getter
@@ -92,12 +94,12 @@ class UserMADranking(BaseMetric):
         :param cutoff:
         :return:
         """
-        gains: t.List = sorted(list(self._relevance.get_user_rel_gains(user).values()))
+        gains: List = sorted(list(self._relevance.get_user_rel_gains(user).values()))
         n: int = min(len(gains), cutoff)
         m: int = len(gains)
         return sum(map(lambda g, r: gains[m - r - 1] * self._relevance.logarithmic_ranking_discount(r), gains, range(n)))
 
-    def compute_user_ndcg(self, user_recommendations: t.List, user: int, cutoff: int) -> float:
+    def compute_user_ndcg(self, user_recommendations: List, user: int, cutoff: int) -> float:
         """
         Method to compute normalized Discounted Cumulative Gain
         :param sorted_item_predictions:
@@ -130,7 +132,3 @@ class UserMADranking(BaseMetric):
             for j in range(i+1,self._n_clusters):
                 differences.append(abs(avg[i] - avg[j]))
         return np.average(differences)
-
-    def get(self):
-        return [self]
-

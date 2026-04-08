@@ -7,8 +7,10 @@ Module description:
 import numpy as np
 
 from elliot.dataset.samplers.base_sampler import TraditionalSampler, PipelineSampler
+from elliot.utils.registry import sampler_registry
 
 
+@sampler_registry.register()
 class PairWiseSampler(PipelineSampler):
     def __init__(self, **params):
         super().__init__(**params)
@@ -50,6 +52,7 @@ class PairWiseSampler(PipelineSampler):
         return dict(enumerate(self._freq_items))
 
 
+@sampler_registry.register()
 class PairWiseBatchSampler(PairWiseSampler):
     def __init__(self, b_size, **params):
         self.b_size = b_size
@@ -69,6 +72,7 @@ class PairWiseBatchSampler(PairWiseSampler):
         return sampled_users
 
 
+@sampler_registry.register()
 class MFPairWiseSampler(PipelineSampler):
     def __init__(self, m, **params):
         super().__init__(**params)

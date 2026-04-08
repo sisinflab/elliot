@@ -5,8 +5,10 @@ It directly proceeds from a system-wise computation, and it considers all the us
 
 
 from elliot.evaluation.metrics.base_metric import BaseMetric
+from elliot.utils.registry import metric_registry
 
 
+@metric_registry.register()
 class UserCoverageAtN(BaseMetric):
     r"""
     User Coverage on Top-N rec. Lists
@@ -32,14 +34,6 @@ class UserCoverageAtN(BaseMetric):
         """
         super().__init__(recommendations, config, params, eval_objects)
         self._cutoff = self._evaluation_objects.cutoff
-
-    @staticmethod
-    def name():
-        """
-        Metric Name Getter
-        :return: returns the public name of the metric
-        """
-        return "UserCoverageAtN"
 
     def eval(self):
         """

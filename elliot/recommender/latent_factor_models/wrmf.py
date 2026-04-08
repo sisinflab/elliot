@@ -8,11 +8,13 @@ import numpy as np
 import torch
 from tqdm import tqdm
 
-from elliot.recommender.base_recommender import Recommender
+from elliot.recommender.base_recommender import BaseRecommender
 from elliot.recommender.init import normal_init
+from elliot.utils.registry import model_registry
 
 
-class WRMF(Recommender):
+@model_registry.register()
+class WRMF(BaseRecommender):
     """
     Weighted XXX Matrix Factorization
 
@@ -43,10 +45,10 @@ class WRMF(Recommender):
     lambda_weights: float = 0.1
     alpha: float = 1.0
 
-    def __init__(self, data, params, seed, logger):
-        super().__init__(data, params, seed, logger)
+    def __init__(self, params, interactions, seed, *args, **kwargs):
+        super().__init__(params, interactions, seed, *args, **kwargs)
 
-        self.C = self.alpha * self._data.sp_i_train
+        self.C = self.alpha * self._interactions.sparse
 
         # Embeddings
         self.X = np.empty((self._num_users, self.factors))
@@ -98,15 +100,13 @@ class WRMF(Recommender):
 
         return 0
 
-    def predict_full(self, user_indices):
+    def predict(self, user_indices, item_indices=None):
         predictions = self.X[user_indices.numpy()] @ self.Y.T
 
         predictions = torch.from_numpy(predictions)
-        return predictions
 
-    def predict_sampled(self, user_indices, item_indices):
-        predictions = self.X[user_indices.numpy()] @ self.Y.T
+        if item_indices is None:
+            return predictions
 
-        predictions = torch.from_numpy(predictions)
         predictions = predictions.gather(1, item_indices.clamp(min=0))
         return predictions

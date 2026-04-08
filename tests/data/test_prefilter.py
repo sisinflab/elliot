@@ -10,7 +10,7 @@ from tests.utils import dataset_path
 current_path = path_joiner(__file__)
 
 
-def load_and_filter_data(config_dict):
+def load_data(config_dict):
     config_data = {
         "experiment": {
             "data_config": {
@@ -22,8 +22,8 @@ def load_and_filter_data(config_dict):
         }
     }
     config = build_namespace(config_path=current_path, config_data=config_data)
-    dataset_loader = DataSetLoader(config=config)
-    return dataset_loader.interactions_df
+    loader = DataSetLoader(config=config)
+    return loader.dataframe
 
 
 class TestPreFilter:
@@ -37,7 +37,7 @@ class TestPreFilter:
             }
         }
 
-        filtered = load_and_filter_data(config)
+        filtered = load_data(config)
 
         assert not filtered.empty
         if len(filtered) < 20:
@@ -51,7 +51,7 @@ class TestPreFilter:
             }
         }
 
-        filtered = load_and_filter_data(config)
+        filtered = load_data(config)
 
         assert filtered["rating"].mean() >= 3
 
@@ -63,7 +63,7 @@ class TestPreFilter:
             }
         }
 
-        filtered = load_and_filter_data(config)
+        filtered = load_data(config)
 
         assert all(filtered["rating"] >= 3)
 
@@ -76,7 +76,7 @@ class TestPreFilter:
             }
         }
 
-        filtered = load_and_filter_data(config)
+        filtered = load_data(config)
 
         assert not filtered.empty
         if len(filtered) < 13:
@@ -91,7 +91,7 @@ class TestPreFilter:
             }
         }
 
-        filtered = load_and_filter_data(config)
+        filtered = load_data(config)
 
         assert not filtered.empty
         if len(filtered) < 14:
@@ -106,7 +106,7 @@ class TestPreFilter:
             }
         }
 
-        filtered = load_and_filter_data(config)
+        filtered = load_data(config)
 
         assert not filtered.empty
         if len(filtered) < 8:
@@ -123,7 +123,7 @@ class TestPreFilter:
             }
         }
 
-        filtered = load_and_filter_data(config)
+        filtered = load_data(config)
 
         assert not filtered.empty
         if len(filtered) < 9:
@@ -139,7 +139,7 @@ class TestPreFilter:
             }
         }
 
-        filtered = load_and_filter_data(config)
+        filtered = load_data(config)
 
         assert not filtered.empty
         if len(filtered) < 13:
@@ -159,7 +159,7 @@ class TestPreFilterFailures:
         }
 
         with pytest.raises(ValueError):
-            load_and_filter_data(config)
+            load_data(config)
 
     def test_user_average_with_extra_param(self):
         config = {
@@ -170,7 +170,7 @@ class TestPreFilterFailures:
             }
         }
 
-        load_and_filter_data(config)
+        load_data(config)
 
     @pytest.mark.parametrize("params", p["invalid_user_k_core"])
     def test_invalid_or_missing_params_user_k_core(self, params):
@@ -183,7 +183,7 @@ class TestPreFilterFailures:
         }
 
         with pytest.raises(ValueError):
-            load_and_filter_data(config)
+            load_data(config)
 
     @pytest.mark.parametrize("params", p["invalid_item_k_core"])
     def test_invalid_or_missing_params_item_k_core(self, params):
@@ -196,7 +196,7 @@ class TestPreFilterFailures:
         }
 
         with pytest.raises(ValueError):
-            load_and_filter_data(config)
+            load_data(config)
 
     @pytest.mark.parametrize("params", p["invalid_iterative_k_core"])
     def test_invalid_or_missing_params_iterative_k_core(self, params):
@@ -209,7 +209,7 @@ class TestPreFilterFailures:
         }
 
         with pytest.raises(ValueError):
-            load_and_filter_data(config)
+            load_data(config)
 
     @pytest.mark.parametrize("params", p["invalid_n_rounds_combinations"])
     def test_invalid_or_missing_params_rounds_k_core(self, params):
@@ -226,7 +226,7 @@ class TestPreFilterFailures:
         }
 
         with pytest.raises(ValueError):
-            load_and_filter_data(config)
+            load_data(config)
 
     @pytest.mark.parametrize("params", p["invalid_cold_users"])
     def test_invalid_or_missing_params_cold_users_threshold(self, params):
@@ -239,7 +239,7 @@ class TestPreFilterFailures:
         }
 
         with pytest.raises((ValueError, AttributeError)):
-            load_and_filter_data(config)
+            load_data(config)
 
     @pytest.mark.parametrize("params", p["invalid_strategy"])
     def test_invalid_or_missing_strategy(self, params):
@@ -252,7 +252,7 @@ class TestPreFilterFailures:
         }
 
         with pytest.raises(ValueError):
-            load_and_filter_data(config)
+            load_data(config)
 
 
 if __name__ == '__main__':

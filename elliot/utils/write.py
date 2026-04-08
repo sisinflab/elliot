@@ -99,7 +99,7 @@ class Writer:
 
     def write_tabular_split(
         self,
-        fold_dataset: List[Tuple[List[Tuple[pd.DataFrame, pd.DataFrame]], pd.DataFrame]],
+        fold_dataset: List[Tuple[List[Tuple[pd.DataFrame, pd.DataFrame]], pd.DataFrame, pd.DataFrame]],
         save_folder: str,
         ext: str = ".tsv",
         **kwargs: Any
@@ -107,8 +107,9 @@ class Writer:
         """Write tabular dataset splits in a structured manner.
 
         Args:
-            fold_dataset (List[Tuple[List[Tuple[pd.DataFrame, pd.DataFrame]], pd.DataFrame]]):
-                List of tuples containing a list of (train, val) dataset tuples and a test DataFrame.
+            fold_dataset (List[Tuple[List[Tuple[pd.DataFrame, pd.DataFrame]], pd.DataFrame, pd.DataFrame]]):
+                List of tuples containing an optional list of (train, val) dataset tuples,
+                a train DataFrame, and a test DataFrame.
             save_folder (str): Path to the folder where the datasets will be saved.
             ext (str): File extension for the output files. Defaults to ".tsv".
             **kwargs: Additional keyword arguments passed to the `write_tabular` method.
@@ -116,7 +117,7 @@ class Writer:
         check_dir(save_folder, replace=True)
 
         # Test fold level
-        for i, (train_val, test) in enumerate(fold_dataset):
+        for i, (folds, original_train, test) in enumerate(fold_dataset):
             test_folder_path = path_joiner(save_folder, str(i))
             check_dir(test_folder_path, replace=True)
 
@@ -124,13 +125,7 @@ class Writer:
             self.write_tabular(data=test, path=test_file_path, **kwargs)
 
             # Validation fold level
-            for j, (train, val) in enumerate(train_val):
-
-                # Save only train dataset if val dataset is missing
-                if val is None:
-                    train_file_path = path_joiner(test_folder_path, f"train{ext}")
-                    self.write_tabular(data=train, path=train_file_path, **kwargs)
-                    break
+            for j, (train, val) in enumerate(folds):
 
                 val_folder_path = path_joiner(test_folder_path, str(j))
                 check_dir(val_folder_path, replace=True)
@@ -141,13 +136,18 @@ class Writer:
                 self.write_tabular(data=val, path=val_file_path, **kwargs)
                 self.write_tabular(data=train, path=train_file_path, **kwargs)
 
+            if not folds:
+                # Save only train dataset if val dataset is missing
+                train_file_path = path_joiner(test_folder_path, f"train{ext}")
+                self.write_tabular(data=original_train, path=train_file_path, **kwargs)
+
     def write_negatives(
         self,
         neg_dict: Dict[str, List[str]],
         save_folder: str,
         sep: str = "\t",
         ext: str = ".tsv",
-        scope: str = "test",
+        fold_index: Tuple[int, Optional[int]] = (0, None),
         **kwargs: Any
     ):
         """Write negative samples from a dictionary to a delimited file.
@@ -158,11 +158,13 @@ class Writer:
             save_folder (str): Path to the folder where the output file will be saved.
             sep (str, optional): Field separator to use in the output file. Defaults to "\\t".
             ext (str, optional): File extension for the output file. Defaults to ".tsv".
-            scope (str, optional): File naming scope to include in the filename. Defaults to "test".
+            fold_index (Tuple[int, Optional[int]]): Tuple containing the complete fold index.
             **kwargs (Any): Additional keyword arguments.
         """
         check_dir(save_folder)
-        path = path_joiner(save_folder, f"{scope}_negative{ext}")
+        suffix = f"_val{fold_index[1] + 1}" if fold_index[1] is not None else ""
+        name = f"test{fold_index[0] + 1}{suffix}_negative{ext}"
+        path = path_joiner(save_folder, name)
 
         with open(path, "w") as f:
             for user_id, neg_list in neg_dict.items():

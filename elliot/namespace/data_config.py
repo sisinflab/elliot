@@ -1,9 +1,11 @@
-from typing import List, Optional
-from pydantic import Field, model_validator
+from typing import List, Any, Optional
+from pydantic import Field, model_validator, create_model
 
-from elliot.namespace.common import BaseConfig
-from elliot.namespace.read_config import TabularReaderConfig, InteractionsReaderConfig
+from elliot.namespace.common import BaseConfig, build_fields_from_annotations
+from elliot.namespace.read_config import InteractionsReaderConfig, GeneralReaderConfig
 from elliot.utils.enums import DataLoadingStrategy
+from elliot.utils.registry import side_info_registry
+from elliot.utils import import_submodules
 
 
 class SideInformationConfig(BaseConfig):
@@ -11,11 +13,11 @@ class SideInformationConfig(BaseConfig):
 
     Attributes:
         dataloader (str): Dataloader name.
-        reader (TabularReaderConfig): Reading configuration.
+        reader (GeneralReaderConfig): Reading configuration.
     """
 
     dataloader: str
-    reader: TabularReaderConfig = Field(default_factory=TabularReaderConfig, exclude=True)
+    reader: GeneralReaderConfig = Field(default_factory=GeneralReaderConfig, exclude=True)
 
 
 class DataConfig(BaseConfig):
@@ -25,15 +27,15 @@ class DataConfig(BaseConfig):
         strategy (DataLoadingStrategy): Loading strategy to use.
         data_folder (str, optional): Path to the folder containing dataset files.
         dataset_path (str, optional): Path to the dataset file.
-        reader (InteractionsReaderConfig): Reading configuration.
-        side_information(List[SideInformationConfig]): List of side-info configurations. Defaults to [].
+        reader (GeneralReaderConfig): Reading configuration.
+        side_information(List[Any]): List of side-info configurations. Defaults to [].
     """
 
     strategy: DataLoadingStrategy
     data_folder: Optional[str] = None
     dataset_path: Optional[str] = None
     reader: InteractionsReaderConfig = Field(default_factory=InteractionsReaderConfig, exclude=True)
-    side_information: List[SideInformationConfig] = []
+    side_information: List[Any] = []
 
     @model_validator(mode="after")
     def validate_strategy_fields(self) -> "DataConfig":
@@ -54,4 +56,48 @@ class DataConfig(BaseConfig):
                     raise AttributeError(f"Attribute `dataset_path` must be provided "
                                          f"with '{self.strategy.value}' strategy.")
 
+        return self
+
+    @model_validator(mode="after")
+    def parse_modular_loaders(self) -> "DataConfig":
+        """Parse and instantiate modular loader configurations.
+
+        Returns:
+            DataConfig: The object itself with instantiated modular loader configs.
+        """
+        # Import all the side-info loaders to make sure they are registered
+        if self.side_information:
+            import_submodules("elliot.dataset.modular_loaders")
+
+        parsed_loaders = []
+
+        # Handle all the side-info loaders
+        for loader_data in self.side_information:
+            loader_name = loader_data.get("dataloader")
+
+            # If the loader is not registered, skip it...
+            if loader_name not in side_info_registry.all():
+                self.logger.warning(
+                    f"The loader {loader_name} is not registered in the side info registry. "
+                    f"Therefore, it will not be loaded and it will not be available for the experiment. "
+                    f"Check the configuration file."
+                )
+                continue
+
+            # ...otherwise, load it
+            cls = side_info_registry.get_class(loader_name)
+
+            fields = build_fields_from_annotations(cls)
+
+            # Build loader config dynamically
+            loader_config = create_model(
+                f"{cls.__name__}Config",
+                __base__=SideInformationConfig,
+                **fields
+            )
+
+            loader_cfg = loader_config(**loader_data)
+            parsed_loaders.append(loader_cfg)
+
+        self.side_information = parsed_loaders
         return self

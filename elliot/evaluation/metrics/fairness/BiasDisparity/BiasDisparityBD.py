@@ -7,14 +7,12 @@ It proceeds from a user-wise computation, and average the values over the users.
 import numpy as np
 import pandas as pd
 
-from collections import Counter
-
-from . import BiasDisparityBR, BiasDisparityBS
-
 from elliot.evaluation.metrics.base_metric import BaseMetric
 from elliot.evaluation.metrics.metrics_utils import ProxyMetric
+from elliot.utils.registry import metric_registry
 
 
+@metric_registry.register()
 class BiasDisparityBD(BaseMetric):
     r"""
     Bias Disparity - Standard
@@ -78,6 +76,7 @@ class BiasDisparityBD(BaseMetric):
 
         self.process()
 
+    @property
     def name(self):
         """
         Metric Name Getter
@@ -93,9 +92,23 @@ class BiasDisparityBD(BaseMetric):
         Evaluation function
         :return: the overall value of Bias Disparity
         """
+        BR = metric_registry.get(
+            name="BiasDisparityBR",
+            recommendations=self._recommendations,
+            config=self._config,
+            params=self._params,
+            eval_objects=self._evaluation_objects,
+            additional_data=self._additional_data
+        ).get_BR()
 
-        BR = BiasDisparityBR(self._recommendations, self._config, self._params, self._evaluation_objects, self._additional_data).get_BR()
-        BS = BiasDisparityBS(self._recommendations, self._config, self._params, self._evaluation_objects, self._additional_data).get_BS()
+        BS = metric_registry.get(
+            name="BiasDisparityBS",
+            recommendations=self._recommendations,
+            config=self._config,
+            params=self._params,
+            eval_objects=self._evaluation_objects,
+            additional_data=self._additional_data
+        ).get_BS()
 
         BD = (BR - BS) / BS
 
@@ -108,4 +121,3 @@ class BiasDisparityBD(BaseMetric):
 
     def get(self):
         return self._metric_objs_list
-

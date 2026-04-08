@@ -7,11 +7,12 @@ Module description:
 import torch
 from torch import nn
 
-from elliot.dataset.samplers import PointWisePosNegSampler
 from elliot.recommender.base_recommender import GeneralRecommender
 from elliot.recommender.init import xavier_uniform_init
+from elliot.utils.registry import model_registry
 
 
+@model_registry.register()
 class LogisticMF(GeneralRecommender):
     """
     Logistic Matrix Factorization
@@ -46,8 +47,8 @@ class LogisticMF(GeneralRecommender):
     lambda_weights: float = 0.1
     alpha: float = 0.5
 
-    def __init__(self, data, params, seed, logger):
-        super(LogisticMF, self).__init__(data, params, seed, logger)
+    def __init__(self, params, interactions, seed, *args, **kwargs):
+        super(LogisticMF, self).__init__(params, interactions, seed, *args, **kwargs)
 
         # Embeddings
         self.Gu = nn.Embedding(self._num_users, self.factors, dtype=torch.float32)
@@ -59,7 +60,7 @@ class LogisticMF(GeneralRecommender):
         # NOTE: Removed Adagrad optimizer due to its poor performance
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
 
-        self.transactions = self._data.transactions * 2
+        self.transactions = self._interactions.transactions * 2
 
         # Init embedding weights
         self.bias = [self.Bu, self.Bi]
@@ -69,8 +70,8 @@ class LogisticMF(GeneralRecommender):
         self.to(self._device)
 
     def get_training_dataloader(self, batch_size):
-        dataloader = self._data.training_dataloader(
-            PointWisePosNegSampler, batch_size, self._seed, transactions=self.transactions
+        dataloader = self._interactions.get_dataloader(
+            "PointWisePosNegSampler", batch_size, self._seed, transactions=self.transactions
         )
         return dataloader
 
@@ -95,45 +96,38 @@ class LogisticMF(GeneralRecommender):
         ) + self.lambda_weights * reg
 
         steps = args[0]
-        inputs = ([self.Gu.weight, self.Bu.weight] if steps > self._data.transactions
+        inputs = ([self.Gu.weight, self.Bu.weight] if steps > self._interactions.transactions
                   else [self.Gi.weight, self.Bi.weight])
 
         return loss, inputs
 
-    def predict_full(self, user_indices):
-        # Retrieve embeddings
+    def predict(self, user_indices, item_indices=None):
         user_e_all = self.Gu.weight
         item_e_all = self.Gi.weight
         user_b_all = self.Bu.weight
         item_b_all = self.Bi.weight
 
         # Select only the embeddings in the current batch
-        u_embeddings_batch = user_e_all[user_indices]
-        u_bias_batch = user_b_all[user_indices]
+        user_embeddings = user_e_all[user_indices]
+        user_bias = user_b_all[user_indices]
 
         # Compute predictions
-        predictions = (
-            torch.matmul(u_embeddings_batch, item_e_all.T) +
-            u_bias_batch +
-            item_b_all.T
-        )
+        if item_indices is None:
+            item_embeddings = item_e_all
+            item_bias = item_b_all.T
+            einsum_string = "be,ie->bi"
+        else:
+            item_indices = item_indices.clamp(min=0)
+            item_embeddings = item_e_all[item_indices]
+            item_bias = item_b_all[item_indices].squeeze(-1)
+            einsum_string = "be,bse->bs"
 
-        return predictions.to(self._device)
-
-    def predict_sampled(self, user_indices, item_indices):
-        # Retrieve embeddings
-        u_embeddings_batch = self.Gu(user_indices)
-        i_embeddings_candidate = self.Gi(item_indices.clamp(min=0))
-        u_bias_batch = self.Bu(user_indices)
-        i_bias_candidate = self.Bi(item_indices.clamp(min=0))
-
-        # Compute predictions
         predictions = (
             torch.einsum(
-                "bi,bji->bj", u_embeddings_batch, i_embeddings_candidate
-            ) +
-            u_bias_batch +
-            i_bias_candidate.squeeze(-1)
+                einsum_string, user_embeddings, item_embeddings
+            )
+            + user_bias
+            + item_bias
         )
 
-        return predictions.to(self._device)
+        return predictions

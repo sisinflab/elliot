@@ -1,7 +1,7 @@
 from typing import List, Dict, Optional, Union
 from pydantic import Field, field_validator, model_validator
 
-from elliot.namespace.common import BaseConfig, normalize_ext
+from elliot.namespace.common import BaseConfig, normalize_ext, get_default_value
 
 
 class Columns(BaseConfig):
@@ -99,11 +99,11 @@ class InteractionsReaderConfig(TabularReaderConfig):
     columns: Columns = Field(default_factory=Columns)
     dtypes: Dtypes = Field(default_factory=Dtypes)
 
-    def column_names(self) -> List[str]:
+    def column_names(self) -> List[Union[str, int]]:
         """Return the list of names of the columns to read.
 
         Returns:
-            List[str]: The list of column names.
+            List[Union[str, int]]: The list of column names.
         """
         return [
             self.columns.user_id_col,
@@ -140,3 +140,28 @@ class ModelReaderConfig(BaseReaderConfig):
     """
 
     ext: List[str] = [".pt", ".pth"]
+
+
+class NumpyReaderConfig(BaseReaderConfig):
+    """Numpy reader configuration.
+
+    Attributes:
+        ext (List[str]): List of valid file extensions for reading. Defaults to [".npy"].
+    """
+
+    ext: List[str] = [".npy"]
+
+
+class GeneralReaderConfig(TabularReaderConfig, ModelReaderConfig, NumpyReaderConfig):
+    """General reader configuration.
+
+    Attributes:
+        ext (List[str]): List of valid file extensions for reading.
+            Defaults to [".tsv", ".csv", ".pt", ".pth", ".npy"].
+    """
+
+    ext: List[str] = (
+        list(get_default_value(TabularReaderConfig, "ext") or []) +
+        list(get_default_value(ModelReaderConfig, "ext") or []) +
+        list(get_default_value(NumpyReaderConfig, "ext") or [])
+    )

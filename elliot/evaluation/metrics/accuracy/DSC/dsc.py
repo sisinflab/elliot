@@ -4,11 +4,11 @@ It proceeds from a user-wise computation, and average the values over the users.
 """
 
 
-import importlib
 from elliot.evaluation.metrics.base_metric import BaseMetric
-# import elliot.evaluation.metrics as metrics
+from elliot.utils.registry import metric_registry
 
 
+@metric_registry.register()
 class DSC(BaseMetric):
     r"""
     Sørensen–Dice coefficient
@@ -51,28 +51,42 @@ class DSC(BaseMetric):
         self._beta = self._additional_data.get("beta", 1)
         self._squared_beta = self._beta**2
 
-        metric_lib = importlib.import_module("elliot.evaluation.metrics")
-
         self._metric_0 = self._additional_data.get("metric_0", False)
         self._metric_1 = self._additional_data.get("metric_1", False)
 
         if self._metric_0:
-            self._metric_0 = metric_lib.parse_metric(self._metric_0)(recommendations, config, params, eval_objects)
+            self._metric_0 = metric_registry.get(
+                name=self._metric_0,
+                recommendations=recommendations,
+                config=config,
+                params=params,
+                eval_objects=eval_objects
+            )
         else:
-            self._metric_0 = metric_lib.Precision(recommendations, config, params, eval_objects)
+            self._metric_0 = metric_registry.get(
+                name="Precision",
+                recommendations=recommendations,
+                config=config,
+                params=params,
+                eval_objects=eval_objects
+            )
 
         if self._metric_1:
-            self._metric_1 = metric_lib.parse_metric(self._metric_1)(recommendations, config, params, eval_objects)
+            self._metric_1 = metric_registry.get(
+                name=self._metric_1,
+                recommendations=recommendations,
+                config=config,
+                params=params,
+                eval_objects=eval_objects
+            )
         else:
-            self._metric_1 = metric_lib.Recall(recommendations, config, params, eval_objects)
-
-    @staticmethod
-    def name():
-        """
-        Metric Name Getter
-        :return: returns the public name of the metric
-        """
-        return "DSC"
+            self._metric_1 = metric_registry.get(
+                name="Recall",
+                recommendations=recommendations,
+                config=config,
+                params=params,
+                eval_objects=eval_objects
+            )
 
     @staticmethod
     def __user_dsc(metric_0_value, metric_1_value, squared_beta):

@@ -1,5 +1,5 @@
 from .neumf import NeuMF
-from .generalized_matrix_factorization import GMF
+from .generalized_mf import GeneralizedMF
 from .NFM import NFM
 from .DeepFM import DeepFM
 from .DMF import DMF

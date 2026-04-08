@@ -3,12 +3,13 @@ This is the implementation of the normalized Discounted Cumulative Gain metric.
 It proceeds from a user-wise computation, and average the values over the users.
 """
 
-
-import typing as t
+from typing import List
 
 from elliot.evaluation.metrics.base_metric import BaseMetric
+from elliot.utils.registry import metric_registry
 
 
+@metric_registry.register()
 class nDCG(BaseMetric):
     r"""
     normalized Discounted Cumulative Gain
@@ -54,14 +55,6 @@ class nDCG(BaseMetric):
         self._relevance = self._evaluation_objects.relevance.discounted_relevance
         self._rel_threshold = self._evaluation_objects.relevance._rel_threshold
 
-    @staticmethod
-    def name():
-        """
-        Metric Name Getter
-        :return: returns the public name of the metric
-        """
-        return "nDCG"
-
     def compute_idcg(self, user, cutoff: int) -> float:
         """
         Method to compute Ideal Discounted Cumulative Gain
@@ -69,12 +62,12 @@ class nDCG(BaseMetric):
         :param cutoff:
         :return:
         """
-        gains: t.List = sorted(list(self._relevance.get_user_rel_gains(user).values()))
+        gains: List = sorted(list(self._relevance.get_user_rel_gains(user).values()))
         n: int = min(len(gains), cutoff)
         m: int = len(gains)
         return sum(map(lambda g, r: gains[m - r - 1] * self._relevance.logarithmic_ranking_discount(r), gains, range(n)))
 
-    def compute_user_ndcg(self, user_recommendations: t.List, user, cutoff: int) -> float:
+    def compute_user_ndcg(self, user_recommendations: List, user, cutoff: int) -> float:
         """
         Method to compute normalized Discounted Cumulative Gain
         :param sorted_item_predictions:
@@ -88,7 +81,7 @@ class nDCG(BaseMetric):
              for r, x in enumerate([item for item, _ in user_recommendations]) if r < cutoff])
         return dcg / idcg if dcg > 0 else 0
 
-    def __user_ndcg(self, user_recommendations: t.List, user, cutoff: int):
+    def __user_ndcg(self, user_recommendations: List, user, cutoff: int):
         """
         Per User normalized Discounted Cumulative Gain
         :param user_recommendations: list of user recommendation in the form [(item1,value1),...]
@@ -120,8 +113,3 @@ class nDCG(BaseMetric):
 
         return {u: self.__user_ndcg(u_r, u, self._cutoff)
              for u, u_r in self._recommendations.items() if len(self._relevance.get_user_rel(u))}
-
-
-
-
-

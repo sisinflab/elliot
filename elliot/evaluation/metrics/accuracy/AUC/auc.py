@@ -7,9 +7,10 @@ It proceeds from a system-wise computation.
 import numpy as np
 
 from elliot.evaluation.metrics.base_metric import BaseMetric
-from elliot.utils import logging
+from elliot.utils.registry import metric_registry
 
 
+@metric_registry.register()
 class AUC(BaseMetric):
     r"""
     Area Under the Curve
@@ -41,6 +42,8 @@ class AUC(BaseMetric):
         simple_metrics: [AUC]
     """
 
+    needs_full_recommendations = True
+
     def __init__(self, recommendations, config, params, eval_objects):
         """
         Constructor
@@ -55,14 +58,6 @@ class AUC(BaseMetric):
         self._num_items = self._evaluation_objects.num_items
 
     @staticmethod
-    def name():
-        """
-        Metric Name Getter
-        :return: returns the public name of the metric
-        """
-        return "AUC"
-
-    @staticmethod
     def __user_auc(user_recommendations, user_relevant_items, num_items, train_size):
         """
         Per User Computation of AUC values
@@ -74,19 +69,21 @@ class AUC(BaseMetric):
         """
         neg_num = num_items - train_size - len(user_relevant_items) + 1
         pos_ranks = [r for r, (i, _) in enumerate(user_recommendations) if i in user_relevant_items]
-        return [(neg_num - r_r + p_r) / (neg_num) for p_r, r_r in enumerate(pos_ranks)]
+        return [(neg_num - r_r + p_r) / neg_num for p_r, r_r in enumerate(pos_ranks)]
 
     def eval(self):
         """
         Evaluation function
         :return: the overall value of AUC
         """
-        list_of_lists = [AUC.__user_auc(u_r, self._relevance.get_user_rel(u), self._num_items, len(self._evaluation_objects.data.get_train_dict()[u]))
-             for u, u_r in self._recommendations.items() if len(self._relevance.get_user_rel(u))]
+        list_of_lists = [
+            AUC.__user_auc(
+                u_r,
+                self._relevance.get_user_rel(u),
+                self._num_items,
+                len(self._evaluation_objects.train_data.get_dict()[u])
+            )
+            for u, u_r in self._recommendations.items()
+            if len(self._relevance.get_user_rel(u))
+        ]
         return np.average([item for sublist in list_of_lists for item in sublist])
-
-    @staticmethod
-    def needs_full_recommendations():
-        _logger = logging.get_logger("Evaluator")
-        _logger.warn("AUC metric requires full length recommendations")
-        return True

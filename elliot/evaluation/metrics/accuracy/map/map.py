@@ -6,8 +6,10 @@ It proceeds from a user-wise computation, and average the values over the users.
 
 import numpy as np
 from elliot.evaluation.metrics.base_metric import BaseMetric
+from elliot.utils.registry import metric_registry
 
 
+@metric_registry.register()
 class MAP(BaseMetric):
     r"""
     Mean Average Precision
@@ -45,14 +47,6 @@ class MAP(BaseMetric):
         super().__init__(recommendations, config, params, eval_objects)
         self._cutoff = self._evaluation_objects.cutoff
         self._relevance = self._evaluation_objects.relevance.binary_relevance
-
-    @staticmethod
-    def name():
-        """
-        Metric Name Getter
-        :return: returns the public name of the metric
-        """
-        return "MAP"
 
     @staticmethod
     def __user_ap(user_recommendations, cutoff, user_relevant_items):

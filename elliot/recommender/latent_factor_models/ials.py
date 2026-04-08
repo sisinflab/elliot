@@ -9,11 +9,13 @@ import torch
 from scipy import sparse as sp
 from tqdm import tqdm
 
-from elliot.recommender.base_recommender import Recommender
+from elliot.recommender.base_recommender import BaseRecommender
 from elliot.recommender.init import normal_init
+from elliot.utils.registry import model_registry
 
 
-class iALS(Recommender):
+@model_registry.register()
+class iALS(BaseRecommender):
     """
     Simple Matrix Factorization class
     """
@@ -25,10 +27,10 @@ class iALS(Recommender):
     lambda_weights: float = 0.1
     scaling: str = "linear"
 
-    def __init__(self, data, params, seed, logger):
-        super().__init__(data, params, seed, logger)
+    def __init__(self, params, interactions, seed, *args, **kwargs):
+        super().__init__(params, interactions, seed, *args, **kwargs)
 
-        self.C = self._data.sp_i_train
+        self.C = self._interactions.sparse
 
         if self.scaling == "linear":
             self.C.data = 1.0 + self.alpha * self.C.data
@@ -43,7 +45,7 @@ class iALS(Recommender):
         self.X = np.empty((self._num_users, self.factors), dtype=np.float32)
         self.Y = np.empty((self._num_items, self.factors), dtype=np.float32)
 
-        warm_item_mask = np.ediff1d(self._data.sp_i_train.tocsc().indptr) > 0
+        warm_item_mask = np.ediff1d(self.C_csc.indptr) > 0
         self.warm_items = np.arange(0, self._num_items, dtype=np.int32)[warm_item_mask]
 
         self.X_eye = sp.eye(self._num_users)
@@ -86,15 +88,13 @@ class iALS(Recommender):
 
         return 0
 
-    def predict_full(self, user_indices):
+    def predict(self, user_indices, item_indices=None):
         predictions = self.X[user_indices.numpy()] @ self.Y.T
 
         predictions = torch.from_numpy(predictions)
-        return predictions
 
-    def predict_sampled(self, user_indices, item_indices):
-        predictions = self.X[user_indices.numpy()] @ self.Y.T
+        if item_indices is None:
+            return predictions
 
-        predictions = torch.from_numpy(predictions)
         predictions = predictions.gather(1, item_indices.clamp(min=0))
         return predictions

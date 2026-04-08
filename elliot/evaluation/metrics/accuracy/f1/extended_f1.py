@@ -4,13 +4,13 @@ It proceeds from a user-wise computation, and average the values over the users.
 """
 
 
-import importlib
 import numpy as np
 from elliot.evaluation.metrics.base_metric import BaseMetric
 from elliot.evaluation.metrics.metrics_utils import ProxyStatisticalMetric
-# import elliot.evaluation.metrics as metrics
+from elliot.utils.registry import metric_registry
 
 
+@metric_registry.register()
 class ExtendedF1(BaseMetric):
     r"""
     Extended F-Measure
@@ -53,23 +53,25 @@ class ExtendedF1(BaseMetric):
         self._beta = 1 # F-score is the Sørensen-Dice (DSC) coefficient with beta equal to 1
         self._squared_beta = self._beta**2
 
-        parse_metric_func = importlib.import_module("elliot.evaluation.metrics").parse_metric
-
         self._metric_0 = self._additional_data.get("metric_0", False)
         self._metric_1 = self._additional_data.get("metric_1", False)
         if self._metric_0 and self._metric_1:
-            self._metric_0 = parse_metric_func(self._metric_0)(recommendations, config, params, eval_objects)
-            self._metric_1 = parse_metric_func(self._metric_1)(recommendations, config, params, eval_objects)
+            self._metric_0 = metric_registry.get(
+                name=self._metric_0,
+                recommendations=recommendations,
+                config=config,
+                params=params,
+                eval_objects=eval_objects
+            )
+            self._metric_1 = metric_registry.get(
+                name=self._metric_1,
+                recommendations=recommendations,
+                config=config,
+                params=params,
+                eval_objects=eval_objects
+            )
 
         self.process()
-
-    @staticmethod
-    def name():
-        """
-        Metric Name Getter
-        :return: returns the public name of the metric
-        """
-        return "ExtendedF1"
 
     @staticmethod
     def __user_f1(metric_0_value, metric_1_value, squared_beta):
@@ -93,9 +95,6 @@ class ExtendedF1(BaseMetric):
     #         [F1.__user_f1(u_r, self._cutoff, self._relevant_items[u], self._squared_beta)
     #          for u, u_r in self._recommendations.items() if len(self._relevant_items[u])]
     #     )
-
-    def eval_user_metric(self):
-        pass
 
     def process(self):
         """

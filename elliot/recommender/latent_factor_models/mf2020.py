@@ -7,12 +7,12 @@ Module description:
 import numpy as np
 import torch
 
-from elliot.dataset.samplers import MFPointWisePosNegSampler
-from elliot.recommender.base_recommender import Recommender
+from elliot.recommender.base_recommender import BaseRecommender
 from elliot.recommender.init import normal_init
+from elliot.utils.registry import model_registry
 
 
-class AbstractMF2020(Recommender):
+class AbstractMF2020(BaseRecommender):
     """
     Matrix Factorization (implementation from "Neural Collaborative Filtering vs. Matrix Factorization Revisited")
 
@@ -50,8 +50,8 @@ class AbstractMF2020(Recommender):
     lambda_weights: float
     m: int
 
-    def __init__(self, data, params, seed, logger):
-        super().__init__(data, params, seed, logger)
+    def __init__(self, params, interactions, seed, *args, **kwargs):
+        super().__init__(params, interactions, seed, *args, **kwargs)
 
         # Embeddings
         self._user_factors = np.empty((self._num_users, self.factors), dtype=np.float32)
@@ -62,7 +62,7 @@ class AbstractMF2020(Recommender):
         # Global bias
         self._global_bias = 0
 
-        self.transactions = data.transactions * (self.m + 1)
+        self.transactions = self._interactions.transactions * (self.m + 1)
 
         # Init embedding weights
         self.modules = [self._user_factors, self._item_factors, self._user_bias, self._item_bias]
@@ -72,49 +72,43 @@ class AbstractMF2020(Recommender):
         self.params_to_save = ['_global_bias', '_user_bias', '_item_bias', '_user_factor', '_item_factor']
 
     def get_training_dataloader(self, batch_size):
-        dataloader = self._data.training_dataloader(MFPointWisePosNegSampler, batch_size, self._seed, m=self.m)
+        dataloader = self._interactions.get_dataloader(
+            "MFPointWisePosNegSampler", batch_size, self._seed, m=self.m
+        )
         return dataloader
 
-    def predict_full(self, user_indices):
+    def predict(self, user_indices, item_indices=None):
         user_indices = user_indices.numpy()
 
-        u_embeddings_batch = self._user_factors[user_indices]
-        i_embeddings_all = self._item_factors
-        u_bias_batch = self._user_bias[user_indices]
-        i_bias_all = self._item_bias
+        # Select only the embeddings in the current batch
+        user_embeddings = self._user_factors[user_indices]
+        user_bias = self._user_bias[user_indices]
 
-        predictions = (
-            u_embeddings_batch @ i_embeddings_all.T +
-            u_bias_batch[:, None] +
-            i_bias_all[None, :] +
-            self._global_bias
-        )
-
-        predictions = torch.from_numpy(predictions)
-        return predictions
-
-    def predict_sampled(self, user_indices, item_indices):
-        user_indices = user_indices.numpy()
-        item_indices = item_indices.clamp(min=0).numpy()
-
-        u_embeddings_batch = self._user_factors[user_indices]
-        i_embeddings_candidate = self._item_factors[item_indices]
-        u_bias_batch = self._user_bias[user_indices]
-        i_bias_candidate = self._item_bias[item_indices]
+        # Compute predictions
+        if item_indices is None:
+            item_embeddings = self._item_factors
+            item_bias = self._item_bias[None, :]
+            einsum_string = "be,ie->bi"
+        else:
+            item_indices = item_indices.clamp(min=0).numpy()
+            item_embeddings = self._item_factors[item_indices]
+            item_bias = self._item_bias[item_indices]
+            einsum_string = "be,bse->bs"
 
         predictions = (
             np.einsum(
-                "bi,bji->bj", u_embeddings_batch, i_embeddings_candidate
-            ) +
-            u_bias_batch[:, None] +
-            i_bias_candidate +
-            self._global_bias
+                einsum_string, user_embeddings, item_embeddings
+            )
+            + user_bias[:, None]
+            + item_bias
+            + self._global_bias
         )
 
         predictions = torch.from_numpy(predictions)
         return predictions
 
 
+@model_registry.register()
 class MF2020(AbstractMF2020):
     # Model hyperparameters
     factors: int = 10
@@ -122,8 +116,8 @@ class MF2020(AbstractMF2020):
     lambda_weights: float = 0.0
     m: int = 0
 
-    def __init__(self, data, params, seed, logger):
-        super().__init__(data, params, seed, logger)
+    def __init__(self, params, interactions, seed, *args, **kwargs):
+        super().__init__(params, interactions, seed, *args, **kwargs)
 
     def train_step(self, batch, *args):
         batch = [x.numpy() for x in batch]
@@ -160,6 +154,7 @@ class MF2020(AbstractMF2020):
         return sum_of_loss
 
 
+@model_registry.register()
 class MF2020Batch(AbstractMF2020):
     # Model hyperparameters
     factors: int = 10
@@ -167,8 +162,8 @@ class MF2020Batch(AbstractMF2020):
     lambda_weights: float = 0.0
     m: int = 0
 
-    def __init__(self, data, params, seed, logger):
-        super().__init__(data, params, seed, logger)
+    def __init__(self, params, interactions, seed, *args, **kwargs):
+        super().__init__(params, interactions, seed, *args, **kwargs)
 
     def train_step(self, batch, *args):
         u_idx, i_idx, rating = tuple(x.numpy() for x in batch)

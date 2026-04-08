@@ -1,6 +1,7 @@
 import os
 import sys
 import importlib
+import pkgutil
 import torch
 
 from elliot.utils.enums import ModelType
@@ -81,10 +82,12 @@ def get_model(model_name: str, config):
     return model_class
 
 
-def get_trainer(model_class):
+def get_trainer(model):
+    model_class = model.__class__
+
     match model_class.type:
         case ModelType.BASE:
-            trainer_name = "Trainer"
+            trainer_name = "BaseTrainer"
 
         case ModelType.TRADITIONAL:
             trainer_name = "TraditionalTrainer"
@@ -100,12 +103,32 @@ def get_trainer(model_class):
     return trainer_class
 
 
+def get_loader(loader_name: str):
+    loader_class = getattr(
+        importlib.import_module("elliot.dataset.modular_loaders"),
+        loader_name
+    )
+    return loader_class
+
+
 def split_metric(metric: str):
     split = metric.split("@")
     metric_name = split[0]
     top_k = split[1] if len(split) > 1 else ""
     top_k = int(top_k) if top_k else None
     return metric_name, top_k
+
+
+def import_submodules(package_name):
+    """Import all submodules of a given package.
+
+    Args:
+        package_name (str): Name of the package to import submodules from.
+    """
+    package = importlib.import_module(package_name)
+
+    for _, module_name, _ in pkgutil.walk_packages(package.__path__, package.__name__ + "."):
+        importlib.import_module(module_name)
 
 #
 # def center_data(

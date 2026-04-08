@@ -9,8 +9,10 @@ import pandas as pd
 
 from elliot.evaluation.metrics.base_metric import BaseMetric
 from elliot.evaluation.metrics.metrics_utils import ProxyMetric
+from elliot.utils.registry import metric_registry
 
 
+@metric_registry.register()
 class REO(BaseMetric):
     r"""
     Ranking-based Equal Opportunity
@@ -57,7 +59,7 @@ class REO(BaseMetric):
         self._cutoff = self._evaluation_objects.cutoff
         self._relevance = self._evaluation_objects.relevance.binary_relevance
 
-        self._train = self._evaluation_objects.data.get_train_dict()
+        self._train = self._evaluation_objects.train_data.get_dict()
         self._train_sets = {u: set(u_train.keys()) for u, u_train in self._train.items()}
 
         self._item_clustering_path = self._additional_data.get("clustering_file", False)
@@ -77,6 +79,7 @@ class REO(BaseMetric):
 
         self.process()
 
+    @property
     def name(self):
         """
         Metric Name Getter

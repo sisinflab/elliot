@@ -5,9 +5,10 @@ It proceeds from a system-wise computation.
 
 
 from elliot.evaluation.metrics.base_metric import BaseMetric
-from elliot.utils import logging
+from elliot.utils.registry import metric_registry
 
 
+@metric_registry.register()
 class MAE(BaseMetric):
     r"""
     Mean Absolute Error
@@ -28,6 +29,8 @@ class MAE(BaseMetric):
         simple_metrics: [MAE]
     """
 
+    needs_full_recommendations = True
+
     def __init__(self, recommendations, config, params, eval_objects):
         """
         Constructor
@@ -40,14 +43,6 @@ class MAE(BaseMetric):
         self._relevance = self._evaluation_objects.relevance.binary_relevance
         self._total_relevant_items = sum([len(self._relevance.get_user_rel(u)) for u, _ in self._recommendations.items()])
         self._test = self._evaluation_objects.relevance.get_test()
-
-    @staticmethod
-    def name():
-        """
-        Metric Name Getter
-        :return: returns the public name of the metric
-        """
-        return "MAE"
 
     @staticmethod
     def __user_MAE(user_recommendations, user_test, user_relevant_items):
@@ -77,9 +72,3 @@ class MAE(BaseMetric):
         """
         return {u: MAE.__user_MAE(u_r, self._test[u], self._relevance.get_user_rel(u))/len(self._relevance.get_user_rel(u))
              for u, u_r in self._recommendations.items() if len(self._relevance.get_user_rel(u))}
-
-    @staticmethod
-    def needs_full_recommendations():
-        _logger = logging.get_logger("Evaluator")
-        _logger.warn("WARNING: Mean Absolute Error metric requires full length recommendations")
-        return True

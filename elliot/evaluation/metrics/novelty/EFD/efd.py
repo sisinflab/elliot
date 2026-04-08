@@ -6,8 +6,10 @@ It proceeds from a user-wise computation, and average the values over the users.
 
 import math
 from elliot.evaluation.metrics.base_metric import BaseMetric
+from elliot.utils.registry import metric_registry
 
 
+@metric_registry.register()
 class EFD(BaseMetric):
     r"""
     Expected Free Discovery (EFD)
@@ -41,14 +43,6 @@ class EFD(BaseMetric):
         self._cutoff = self._evaluation_objects.cutoff
         self._relevance = self._evaluation_objects.relevance.binary_relevance
 
-    @staticmethod
-    def name():
-        """
-        Metric Name Getter
-        :return: returns the public name of the metric
-        """
-        return "EFD"
-
     def __user_EFD(self, user_recommendations, user, cutoff):
         """
         Per User Expected Free Discovery
@@ -80,7 +74,7 @@ class EFD(BaseMetric):
     #     """
     #
     #     self._item_count = {}
-    #     for u_h in self._evaluation_objects.data.get_train_dict().values():
+    #     for u_h in self._evaluation_objects.train_data.get_dict().values():
     #         for i in u_h.keys():
     #             self._item_count[i] = self._item_count.get(i, 0) + 1
     #
@@ -103,7 +97,7 @@ class EFD(BaseMetric):
             self._max_nov = pop_cache.max_nov_efd
         else:
             item_count = {}
-            for user_hist in self._evaluation_objects.data.get_train_dict().values():
+            for user_hist in self._evaluation_objects.train_data.get_dict().values():
                 for item in user_hist.keys():
                     item_count[item] = item_count.get(item, 0) + 1
             novelty_profile = item_count.values()

@@ -12,25 +12,23 @@ from torch.utils.data import DataLoader
 from elliot.namespace import RecommenderConfig, ExperimentConfig
 from elliot.dataset import DataSet
 from elliot.evaluation.evaluator import Evaluator
+from elliot.recommender import AbstractRecommender
+from elliot.recommender.collector import get_recommendations
 from elliot.recommender.early_stopping import EarlyStopping
 
 from elliot.utils.read import Reader
 from elliot.utils.write import Writer
 from elliot.utils import logging, split_metric
 
-reader = Reader()
-writer = Writer()
-
 
 class AbstractTrainer(ABC):
     model_config: RecommenderConfig
+    model: AbstractRecommender
 
     def __init__(
         self,
-        data: DataSet,
         config: ExperimentConfig,
-        model_config: RecommenderConfig,
-        model_class,
+        model: AbstractRecommender,
         *args,
         **kwargs
     ):
@@ -42,54 +40,38 @@ class AbstractTrainer(ABC):
             data: data loader object
             params: dictionary with all parameters
         """
-        self.data = data
         self.config = config
-        self.model_config = model_config
+        self.model_config = model.model_config
+        self.model = model
 
         # Logger
-        package_name = inspect.getmodule(model_class).__package__
-        rec_name = f"external.{model_class.__name__}" if "external" in package_name else model_class.__name__
+        package_name = inspect.getmodule(self.model.__class__).__package__
+        rec_name = f"external.{self.model.name}" if "external" in package_name else self.model.name
         self.logger = logging.get_logger_model(
             rec_name,
             pylog.CRITICAL if self.config.config_test else pylog.DEBUG
         )
+        self.model.logger = self.logger
+
+        self.reader = Reader(self.logger)
+        self.writer = Writer(self.logger)
 
         # Validation metric
         self._val_metric, self._val_k = split_metric(self.model_config.meta.validation_metric)
-
-        # Early stopping
-        self._early_stopping = EarlyStopping(self.model_config.early_stopping)
 
         if self.model_config.epochs < self.model_config.meta.validation_rate:
             raise ValueError(f"The first validation epoch ({self.model_config.meta.validation_rate}) "
                              f"is later than the overall number of epochs ({self.model_config.epochs}).")
 
-        if self.model_config.eval_batch_size is None:
-            self.model_config.eval_batch_size = self.model_config.batch_size
+        # Early stopping
+        self._early_stopping = EarlyStopping(self.model_config.early_stopping)
 
-        # Model
-        model_cfg = self.model_config.model_copy(deep=True)
-        self.model = model_class(data, model_cfg, self.config.random_seed, self.logger)
-        self.model_config.name = self.model.name
+        # Evaluator
+        self.evaluator = Evaluator(self.config, self.model_config)
 
         # Set seed
         np.random.seed(self.config.random_seed)
         random.seed(self.config.random_seed)
-
-        # Further parameters
-        self._num_items = data.num_items
-        self._num_users = data.num_users
-
-        self.best_metric_value = 0
-
-        self._losses = []
-        self._results = []
-        self._params_list = []
-        self._epoch_train_history = []
-        self._validation_history = []
-
-        # Evaluator
-        self.evaluator = Evaluator(data, model_config)
 
     @property
     def name(self):
@@ -110,27 +92,43 @@ class AbstractTrainer(ABC):
     #          for p in self._model.params_list]
     #     )
 
-    def train(self):
+    def _init_train(self, disable_early_stopping=False):
+        self._best_metric_value = 0
+        self._losses = []
+        self._val_results = []
+        self._params_list = []
+        self._epoch_train_history = []
+        self._validation_history = []
+
+        if disable_early_stopping:
+            self._early_stopping.active = False
+
+    def train(self, dataset, validate=True):
+        self._init_train(disable_early_stopping=not validate)
+        evaluation_set = "val"
+
         if self.model_config.meta.restore:
-            return self.restore_weights()
+            return self.restore_weights(dataset, evaluation_set)
 
         self.logger.info(
             "Loaded training dataset",
-            extra={"context": {"transactions": self.data.transactions}}
+            extra={"context": {"transactions": dataset.train_set.transactions}}
         )
-        training_dataloader = self.model.get_training_dataloader(self.model_config.batch_size)
 
+        training_dataloader = self.model.get_training_dataloader(self.model_config.batch_size)
         if not isinstance(training_dataloader, DataLoader):
             self.model_config.meta.verbose = False
 
-        for it in self.iterate(self.model_config.epochs):
+        for it in self.iterate():
             self.logger.debug(
                 "Starting iteration",
                 extra={"context": {"iteration": it + 1, "epochs": self.model_config.epochs}}
             )
+
             start = time.perf_counter()
             loss = self._train_epoch(it, training_dataloader)
             end = time.perf_counter()
+
             try:
                 train_loss = float(loss)
             except (TypeError, ValueError):
@@ -140,32 +138,36 @@ class AbstractTrainer(ABC):
                 self._epoch_train_history.append(
                     {"epoch": int(epoch_number), "train_loss": train_loss}
                 )
+
             self.logger.debug(
                 "Completed iteration",
                 extra={"context": {"iteration": it + 1, "duration_sec": end - start}}
             )
-            if not (it + 1) % self.model_config.meta.validation_rate:
-                self.evaluate(it, loss)
 
-        return self.get_report()
+            if not (it + 1) % self.model_config.meta.validation_rate and validate:
+                self.logger.debug(f'Epoch {(it + 1)}/{self.model_config.epochs} loss {loss:.5f}')
+                self._losses.append(loss)
+                self.evaluate(dataset, it, evaluation_set)
 
-    def evaluate(self, it=0, loss=0):
-        recs = self.get_recs(self.evaluator.get_needed_recommendations())
-        result_dict = self.evaluator.eval(recs)
+        if validate:
+            result_dict = self._val_results[self.get_best_arg()]
+            return self.get_report(result_dict, evaluation_set)
+        else:
+            return {}
 
-        self._losses.append(loss)
+    def evaluate(self, dataset, it=None, evaluation_set="test"):
+        if self.model_config.eval_batch_size is None:
+            self.model_config.eval_batch_size = self.model_config.batch_size
 
-        self._results.append(result_dict)
+        dataloader = dataset.get_eval_dataloader(self.model_config.eval_batch_size)
+        k = self.evaluator.get_needed_recommendations()
 
-        # if it is not None:
-        self.logger.debug(f'Epoch {(it + 1)}/{self.model_config.epochs} loss {loss:.5f}')
-        # else:
-        #    self.logger.info(f'Finished')
+        recs = get_recommendations(self.model, dataloader, dataset, k)
+        result_dict = self.evaluator.eval(recs, dataset, evaluation_set)
 
         if self.model_config.meta.save_recs:
             self.logger.info(f"Writing recommendations at: {self.config.path_output_rec_result}")
-            # if it is not None:
-            writer.write_recommendations(
+            self.writer.write_recommendations(
                 recommendations=recs[1],
                 save_folder=self.config.path_output_rec_result,
                 model_name=self.name,
@@ -175,125 +177,56 @@ class AbstractTrainer(ABC):
                 sep=self.model_config.meta.rec_writer.sep,
                 ext=self.model_config.meta.rec_writer.ext
             )
-            # else:
-            #    store_recommendation(recs[1], os.path.abspath(
-            #        os.sep.join([self._config.path_output_rec_result, f"{self.name}.tsv"])))
 
-        epoch_number = int(self._trend_epoch_for_iteration(it)) if it is not None else None
-        val_metric = result_dict[self._val_k]["val_results"][self._val_metric]
-        if self._val_metric.upper() in {"MSE", "RMSE", "MAE"}:
-            val_loss = float(val_metric)
-        else:
-            val_loss = 1.0 - float(val_metric)
-        self._validation_history.append(
-            {
-                "epoch": epoch_number,
-                "val_metric": float(val_metric),
-                "val_loss": val_loss,
-            }
-        )
+        if it is not None:
+            self._val_results.append(result_dict)
 
-        if (len(self._results) - 1) == self.get_best_arg():
-            # if it is not None:
-            self.model_config.best_iteration = it + 1
-            best_val = val_metric
+            epoch_number = int(self._trend_epoch_for_iteration(it))
 
-            self.best_metric_value = best_val
-            self.logger.info(
-                "Recorded best validation result",
-                extra={"context": {"metric": self._val_metric, "value": best_val, "iteration": it + 1}}
+            val_metric = result_dict[self._val_k]["val_results"][self._val_metric]
+            if self._val_metric.upper() in {"MSE", "RMSE", "MAE"}:
+                val_loss = float(val_metric)
+            else:
+                val_loss = 1.0 - float(val_metric)
+
+            self._validation_history.append(
+                {
+                    "epoch": epoch_number,
+                    "val_metric": float(val_metric),
+                    "val_loss": val_loss,
+                }
             )
-            if self.model_config.meta.save_weights:
-                writer.write_model(
-                    obj=self.model.get_model_state(),
-                    save_folder=self.config.path_output_rec_weight,
-                    model_name=self.name,
-                    ext=self.model_config.meta.model_writer.ext
+
+            if (len(self._val_results) - 1) == self.get_best_arg():
+                self.model_config.best_iteration = it + 1
+                self._best_metric_value = val_metric
+
+                self.logger.info(
+                    "Recorded best validation result",
+                    extra={"context": {"metric": self._val_metric, "value": val_metric, "iteration": it + 1}}
                 )
 
-    def get_recs(self, k: int = 100):
-        preds_test, preds_val = {}, {}
-        dataloader = self.data.eval_dataloader(self.model_config.eval_batch_size)
+                if self.model_config.meta.save_weights:
+                    self.writer.write_model(
+                        obj=self.model.get_model_state(),
+                        save_folder=self.config.path_output_rec_weight,
+                        model_name=self.name,
+                        ext=self.model_config.meta.model_writer.ext
+                    )
 
-        iter_data = tqdm(
-            dataloader,
-            desc="Collecting",
-            total=len(dataloader),
-            leave=False
-        )
+            return True
 
-        for users, val_items, test_items in iter_data:
-            # Test
-            recs_test = self._compute_batch_recs(k=k, user_indices=users, item_indices=test_items)
+        return self.get_report(result_dict, evaluation_set)
 
-            # Validation
-            if val_items is not None:
-                recs_val = self._compute_batch_recs(k=k, user_indices=users, item_indices=val_items)
-            else:
-                recs_val = recs_test
-
-            preds_test.update(recs_test)
-            preds_val.update(recs_val)
-
-        return preds_val, preds_test
-
-    def _compute_batch_recs(self, k, user_indices, item_indices=None):
-        """Common logic for computing top-k recommendations."""
-        if item_indices is not None:
-            preds = self.model.predict_sampled(user_indices, item_indices)
-            mask = item_indices == -1
-        else:
-            preds = self.model.predict_full(user_indices)
-            eval_batch = self.data.sp_i_train_ratings[user_indices.tolist()]
-            mask = eval_batch.nonzero()
-
-        v, i = self._get_top_k(preds, k, mask, item_indices)
-        recs_dict = self._get_recs_dict(v, i, user_indices)
-
-        return recs_dict
-
-    def _get_recs_dict(self, values, item_indices, user_indices):
-        if not item_indices.size:
-            return {}
-        pr_users, pr_items = self.data.get_inverse_mappings()
-        mapped_items = np.array(pr_items)[item_indices]
-        mat = [[*zip(item, val)] for item, val in zip(mapped_items, values)]
-        proc_batch = dict(zip([pr_users[u_i] for u_i in user_indices], mat))
-        return proc_batch
-
-    def _get_top_k(self, users_recs, k, mask, item_indices=None):
-        device = users_recs.device
-        if item_indices is not None and item_indices.device != device:
-            item_indices = item_indices.to(device)
-        # if isinstance(mask, tuple):
-        #     mask = (
-        #         torch.as_tensor(mask[0], device=device),
-        #         torch.as_tensor(mask[1], device=device),
-        #     )
-        if isinstance(mask, np.ndarray):
-            mask = torch.as_tensor(mask, device=device)
-        elif isinstance(mask, torch.Tensor) and mask.device != device:
-            mask = mask.to(device)
-
-        users_recs[mask] = -torch.inf
-
-        k = min(k, users_recs.shape[1])
-        v, i = torch.topk(users_recs, k=k, sorted=True)
-
-        if item_indices is not None:
-            i = item_indices.gather(1, i)
-
-        return v.detach().cpu().numpy(), i.detach().cpu().numpy()
-
-    def restore_weights(self):
+    def restore_weights(self, dataset, evaluation_set):
         try:
-            weights = reader.read_model(
+            weights = self.reader.read_model(
                 read_folder=self.config.path_output_rec_weight,
                 model_name=self.name,
                 ext=self.model_config.meta.model_reader.ext
             )
             self.model.set_model_state(weights)
-            self.evaluate()
+            self.evaluate(dataset, evaluation_set=evaluation_set)
             return True
         except Exception as ex:
             raise Exception(f"Error in model restoring operation! {ex}")
@@ -302,44 +235,35 @@ class AbstractTrainer(ABC):
         if self.model_config.meta.optimize_internal_loss:
             return min(self._losses)
         else:
-            return -max([r[self._val_k]["val_results"][self._val_metric] for r in self._results])
+            return -max([r[self._val_k]["val_results"][self._val_metric] for r in self._val_results])
 
     def get_params(self):
         return self.model_config.model_dump()
-
-    def get_results(self):
-        return self._results[self.get_best_arg()]
 
     def get_best_arg(self):
         if self.model_config.meta.optimize_internal_loss:
             val_results = np.argmin(self._losses)
         else:
             val_results = np.argmax(
-                [r[self._val_k]["val_results"][self._val_metric] for r in self._results])
+                [r[self._val_k]["val_results"][self._val_metric] for r in self._val_results]
+            )
         return val_results
 
-    def get_report(self):
-        results = self.get_results()
+    def get_report(self, results, evaluation_set="test"):
         return {
             "name": self.name,
             "params": self.get_params(),
-            "val_results": {
-                k: result_dict["val_results"] for k, result_dict in results.items()
+            f"{evaluation_set}_results": {
+                k: result_dict[f"{evaluation_set}_results"] for k, result_dict in results.items()
             },
-            "val_statistical_results": {
-                k: result_dict["val_statistical_results"] for k, result_dict in results.items()
-            },
-            "test_results": {
-                k: result_dict["test_results"] for k, result_dict in results.items()
-            },
-            "test_statistical_results": {
-                k: result_dict["test_statistical_results"] for k, result_dict in results.items()
+            f"{evaluation_set}_statistical_results": {
+                k: result_dict[f"{evaluation_set}_statistical_results"] for k, result_dict in results.items()
             }
         }
 
-    def iterate(self, epochs):
-        for iteration in range(epochs):
-            stop, reasons = self._early_stopping.stop(self._losses[:], self._results)
+    def iterate(self):
+        for iteration in range(self.model_config.epochs):
+            stop, reasons = self._early_stopping.stop(self._losses[:], self._val_results)
             if stop:
                 self.logger.info(f"Met Early Stopping conditions: {reasons}")
                 break
@@ -360,9 +284,9 @@ class AbstractTrainer(ABC):
     #    return original_str
 
 
-class Trainer(AbstractTrainer):
-    def __init__(self, data, config, params, model_class):
-        super().__init__(data, config, params, model_class)
+class BaseTrainer(AbstractTrainer):
+    def __init__(self, config, model, *args, **kwargs):
+        super().__init__(config, model, *args, **kwargs)
 
     def _train_epoch(self, it, dataloader, *args):
         total_loss = 0.0
@@ -386,9 +310,9 @@ class Trainer(AbstractTrainer):
         return (total_loss / steps) if steps else 0.0
 
 
-class TraditionalTrainer(Trainer):
-    def __init__(self, data, config, params, model_class):
-        super().__init__(data, config, params, model_class)
+class TraditionalTrainer(BaseTrainer):
+    def __init__(self, config, model, *args, **kwargs):
+        super().__init__(config, model, *args, **kwargs)
         self.model_config.epochs = 1
 
     def _train_epoch(self, *args):
@@ -400,8 +324,8 @@ class TraditionalTrainer(Trainer):
 
 
 class GeneralTrainer(AbstractTrainer):
-    def __init__(self, data, config, params, model_class):
-        super().__init__(data, config, params, model_class)
+    def __init__(self, config, model, *args, **kwargs):
+        super().__init__(config, model, *args, **kwargs)
         self.optimizer = self.model.optimizer
         torch.manual_seed(self.config.random_seed)
 
@@ -427,6 +351,6 @@ class GeneralTrainer(AbstractTrainer):
         return (total_loss / steps) if steps else 0.0
 
     @torch.no_grad()
-    def evaluate(self, it=0, loss=0):
+    def evaluate(self, dataset, it=None, evaluation_set="test"):
         self.model.eval()
-        super().evaluate(it, loss)
+        return super().evaluate(dataset, it, evaluation_set)

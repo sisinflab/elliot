@@ -7,8 +7,10 @@ It proceeds from a user-wise computation, and average the values over the users.
 import math
 
 from elliot.evaluation.metrics.base_metric import BaseMetric
+from elliot.utils.registry import metric_registry
 
 
+@metric_registry.register()
 class ShannonEntropy(BaseMetric):
     r"""
     Shannon Entropy
@@ -42,14 +44,6 @@ class ShannonEntropy(BaseMetric):
         self._item_weights = {}
         self._free_norm = 0
         self._ln2 = math.log(2.0)
-
-    @staticmethod
-    def name():
-        """
-        Metric Name Getter
-        :return: returns the public name of the metric
-        """
-        return "SEntropy"
 
     def __user_se(self, user_recommendations, cutoff):
         """

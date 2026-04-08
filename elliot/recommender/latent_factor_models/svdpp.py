@@ -7,11 +7,12 @@ Module description:
 import torch
 from torch import nn
 
-from elliot.dataset.samplers import CustomPointWiseSparseSampler
 from elliot.recommender.base_recommender import GeneralRecommender
 from elliot.recommender.init import xavier_uniform_init
+from elliot.utils.registry import model_registry
 
 
+@model_registry.register()
 class SVDpp(GeneralRecommender):
     # Model hyperparameters
     factors: int = 10
@@ -19,8 +20,8 @@ class SVDpp(GeneralRecommender):
     lambda_weights: float = 0.1
     lambda_bias: float = 0.001
 
-    def __init__(self, data, params, seed, logger):
-        super(SVDpp, self).__init__(data, params, seed, logger)
+    def __init__(self, params, interactions, seed, *args, **kwargs):
+        super(SVDpp, self).__init__(params, interactions, seed, *args, **kwargs)
 
         # Embeddings
         self.user_mf_embedding = nn.Embedding(self._num_users, self.factors, dtype=torch.float32)
@@ -44,7 +45,7 @@ class SVDpp(GeneralRecommender):
         self.to(self._device)
 
     def get_training_dataloader(self, batch_size):
-        dataloader = self._data.training_dataloader(CustomPointWiseSparseSampler, batch_size, self._seed)
+        dataloader = self._interactions.get_dataloader("CustomPointWiseSparseSampler", batch_size, self._seed)
         return dataloader
 
     def forward(self, user, item):
@@ -78,49 +79,43 @@ class SVDpp(GeneralRecommender):
 
         return loss
 
-    def predict_full(self, user_indices):
-        # Retrieve embeddings
+    def predict(self, user_indices, item_indices=None):
         user_e_all = self.user_mf_embedding.weight
         item_e_all = self.item_mf_embedding.weight
         user_b_all = self.user_bias_embedding.weight
         item_b_all = self.item_bias_embedding.weight
 
         # Select only the embeddings in the current batch
-        u_embeddings_batch = user_e_all[user_indices]
-        u_bias_batch = user_b_all[user_indices]
+        user_embeddings = user_e_all[user_indices]
+        user_bias = user_b_all[user_indices]
 
         # Compute predictions
         puyj = self._compute_user_representation(user_indices)
 
-        predictions = torch.matmul(
-            (puyj + u_embeddings_batch), item_e_all.T
-        ) + u_bias_batch + item_b_all.T + self.bias_
-
-        return predictions.to(self._device)
-
-    def predict_sampled(self, user_indices, item_indices):
-        # Retrieve embeddings
-        u_embeddings_batch = self.user_mf_embedding(user_indices)
-        i_embeddings_candidate = self.item_mf_embedding(item_indices.clamp(min=0))
-        u_bias_batch = self.user_bias_embedding(user_indices)
-        i_bias_candidate = self.item_bias_embedding(item_indices.clamp(min=0))
-
-        # Compute predictions
-        puyj = self._compute_user_representation(user_indices)
+        if item_indices is None:
+            item_embeddings = item_e_all
+            item_bias = item_b_all.T
+            einsum_string = "be,ie->bi"
+        else:
+            item_indices = item_indices.clamp(min=0)
+            item_embeddings = item_e_all[item_indices]
+            item_bias = item_b_all[item_indices].squeeze(-1)
+            einsum_string = "be,bse->bs"
 
         predictions = (
             torch.einsum(
-                "bi,bji->bj", (puyj + u_embeddings_batch), i_embeddings_candidate
-            ) +
-            u_bias_batch +
-            i_bias_candidate.squeeze(-1)
+                einsum_string, (puyj + user_embeddings), item_embeddings
+            )
+            + user_bias
+            + item_bias
+            + self.bias_
         )
 
-        return predictions.to(self._device)
+        return predictions
 
     def _compute_user_representation(self, users):
         item_y_all = self.item_y_embedding.weight
-        offsets, indices, _ = self._data.sp_i_train_tensor[users].csr()
+        offsets, indices, _ = self._interactions.sparse_tensor[users].csr()
 
         puyj = nn.functional.embedding_bag(
             input=indices,

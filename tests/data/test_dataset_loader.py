@@ -15,8 +15,8 @@ def load_data(config_dict):
         "experiment": {**config_dict}
     }
     config = build_namespace(config_path=current_path, config_data=config_data)
-    dataset_loader = DataSetLoader(config=config)
-    return dataset_loader.interactions_df
+    loader = DataSetLoader(config=config)
+    return loader.dataframe
 
 
 class TestDataSetLoader:
@@ -33,8 +33,10 @@ class TestDataSetLoader:
 
         df = load_data(config)
 
-        assert df[0][1].shape[0] == 5
-        assert df[0][0][0][0].shape[0] == 45
+        folds, train, test = df[0]
+        assert folds == []
+        assert train.shape[0] == 45
+        assert test.shape[0] == 5
 
     def test_fixed_with_validation(self):
         config = {
@@ -48,10 +50,12 @@ class TestDataSetLoader:
 
         df = load_data(config)
 
-        assert df[0][1].shape[0] == 5
-        assert df[0][0][0][0].shape[0] == 40
-        assert df[0][0][0][1].shape[0] == 5
+        folds, train, test = df[0]
+        assert folds[0][0].shape[0] == 40
+        assert folds[0][1].shape[0] == 5
         assert len(df[0][0]) == 1
+        assert train is None
+        assert test.shape[0] == 5
 
     def test_hierarchy(self):
         config = {
@@ -64,14 +68,18 @@ class TestDataSetLoader:
 
         df = load_data(config)
 
-        assert df[0][1].shape[0] == 5
-        assert df[0][0][0][0].shape[0] == 40
-        assert df[0][0][0][1].shape[0] == 5
-        assert df[0][0][1][0].shape[0] == 40
-        assert df[0][0][1][1].shape[0] == 5
+        folds, train, test = df[0]
+        assert folds[0][0].shape[0] == 40
+        assert folds[0][1].shape[0] == 5
+        assert folds[1][0].shape[0] == 40
+        assert folds[1][1].shape[0] == 5
+        assert train.shape[0] == 45
+        assert test.shape[0] == 5
 
-        assert df[1][1].shape[0] == 5
-        assert df[1][0][0][0].shape[0] == 45
+        folds, train, test = df[1]
+        assert folds == []
+        assert train.shape[0] == 45
+        assert test.shape[0] == 5
 
     def test_dataset(self):
         config = {

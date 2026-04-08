@@ -4,12 +4,12 @@ It proceeds from a user-wise computation, and average the values over the users.
 """
 
 
-import operator
-
 import numpy as np
 from elliot.evaluation.metrics.base_metric import BaseMetric
+from elliot.utils.registry import metric_registry
 
 
+@metric_registry.register()
 class APLT(BaseMetric):
     r"""
     Average percentage of long tail items
@@ -50,14 +50,6 @@ class APLT(BaseMetric):
             if pop_cache and getattr(pop_cache, "long_tail_set", None) is not None
             else set(self._evaluation_objects.pop.get_long_tail())
         )
-
-    @staticmethod
-    def name():
-        """
-        Metric Name Getter
-        :return: returns the public name of the metric
-        """
-        return "APLT"
 
     @staticmethod
     def __user_aplt(user_recommendations, cutoff, long_tail):

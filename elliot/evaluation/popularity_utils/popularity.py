@@ -11,19 +11,19 @@ import typing as t
 
 
 class Popularity(object):
-    def __init__(self, data, pop_ratio=0.8):
-        self._data = data
+    def __init__(self, dataset, pop_ratio=0.8):
+        self._data = dataset
         self._pop_items = {}
         self._sorted_pop_items = {}
         self._short_head = []
         self._long_tail = []
         self._pop_ratio = pop_ratio
-        _, self._inv_i_map = data.get_inverse_mappings()
+        _, self._inv_i_map = self._data.get_inverse_mappings()
 
     def get_pop_items(self):
         if not self._pop_items:
             self._pop_items = {self._inv_i_map[p]: pop for p, pop in
-                               enumerate(self._data.sp_i_train.astype(bool).sum(axis=0).tolist()[0])}
+                               enumerate(self._data.train_set.sparse.astype(bool).sum(axis=0).tolist()[0])}
         return self._pop_items
 
     def get_sorted_pop_items(self):
@@ -35,7 +35,7 @@ class Popularity(object):
     def get_short_head(self):
         if not self._short_head:
             self.get_sorted_pop_items()
-            short_head_limit = self._data.transactions * self._pop_ratio
+            short_head_limit = self._data.train_set.transactions * self._pop_ratio
             self._short_head = []
             for i, pop in self._sorted_pop_items.items():
                 self._short_head.append(i)
@@ -53,4 +53,3 @@ class Popularity(object):
 
     def get_custom_pop_obj(self, pop_ratio=.8):
         return Popularity(self._data, pop_ratio)
-

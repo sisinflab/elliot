@@ -8,11 +8,13 @@ import numpy as np
 import torch
 from tqdm import tqdm
 
-from elliot.recommender.base_recommender import Recommender
+from elliot.recommender.base_recommender import BaseRecommender
 from elliot.recommender.init import normal_init
+from elliot.utils.registry import model_registry
 
 
-class NonNegMF(Recommender):
+@model_registry.register()
+class NonNegMF(BaseRecommender):
     """
     Non-Negative Matrix Factorization
 
@@ -43,11 +45,11 @@ class NonNegMF(Recommender):
     learning_rate: float = 0.001
     lambda_weights: float = 0.1
 
-    def __init__(self, data, params, seed, logger):
-        super().__init__(data, params, seed, logger)
+    def __init__(self, params, interactions, seed, *args, **kwargs):
+        super().__init__(params, interactions, seed, *args, **kwargs)
 
-        self._i_train = self._data.get_train_dict(private=True)
-        self._global_mean = np.mean(self._data.sp_i_train_ratings)
+        self._i_train = self._interactions.get_dict(private=True)
+        self._global_mean = np.mean(self._interactions.sparse_ratings)
 
         # Embeddings
         self._user_factors = np.empty((self._num_users, self.factors), dtype=np.float32)
@@ -116,7 +118,7 @@ class NonNegMF(Recommender):
         )
 
         # Update item factors
-        I_train_T = self._data.sp_i_train.tocsc()
+        I_train_T = self._interactions.sparse.tocsc()
         n_ratings_item = np.diff(I_train_T.indptr)
         self._item_factors *= item_num / (
             item_denom + n_ratings_item[:, None] * self.lambda_weights * self._item_factors
@@ -124,44 +126,31 @@ class NonNegMF(Recommender):
 
         return 0
 
-    def predict_full(self, user_indices):
+    def predict(self, user_indices, item_indices=None):
         user_indices = user_indices.numpy()
 
-        # Retrieve embeddings
-        u_embeddings_batch = self._user_factors[user_indices]
-        i_embeddings_all = self._item_factors
-        u_bias_batch = self._user_bias[user_indices]
-        i_bias_all = self._item_bias
+        # Select only the embeddings in the current batch
+        user_embeddings = self._user_factors[user_indices]
+        user_bias = self._user_bias[user_indices]
 
         # Compute predictions
-        predictions = (
-            u_embeddings_batch @ i_embeddings_all.T +
-            u_bias_batch[:, None] +
-            i_bias_all[None, :] +
-            self._global_mean
-        )
+        if item_indices is None:
+            item_embeddings = self._item_factors
+            item_bias = self._item_bias[None, :]
+            einsum_string = "be,ie->bi"
+        else:
+            item_indices = item_indices.clamp(min=0).numpy()
+            item_embeddings = self._item_factors[item_indices]
+            item_bias = self._item_bias[item_indices]
+            einsum_string = "be,bse->bs"
 
-        predictions = torch.from_numpy(predictions)
-        return predictions
-
-    def predict_sampled(self, user_indices, item_indices):
-        user_indices = user_indices.numpy()
-        item_indices = item_indices.clamp(min=0).numpy()
-
-        # Retrieve embeddings
-        u_embeddings_batch = self._user_factors[user_indices]
-        i_embeddings_candidate = self._item_factors[item_indices]
-        u_bias_batch = self._user_bias[user_indices]
-        i_bias_candidate = self._item_bias[item_indices]
-
-        # Compute predictions
         predictions = (
             np.einsum(
-                "bi,bji->bj", u_embeddings_batch, i_embeddings_candidate
-            ) +
-            u_bias_batch[:, None] +
-            i_bias_candidate +
-            self._global_mean
+                einsum_string, user_embeddings, item_embeddings
+            )
+            + user_bias[:, None]
+            + item_bias
+            + self._global_mean
         )
 
         predictions = torch.from_numpy(predictions)

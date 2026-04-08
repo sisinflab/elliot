@@ -10,12 +10,13 @@ import torch_geometric
 from torch import nn
 from torch_sparse import SparseTensor
 
-from elliot.dataset.samplers import PairWiseSampler
 from elliot.recommender.base_recommender import GraphBasedRecommender
 from elliot.recommender.init import xavier_normal_init
 from elliot.recommender.layers import SparseDropout, NGCFLayer
+from elliot.utils.registry import model_registry
 
 
+@model_registry.register()
 class NGCF(GraphBasedRecommender):
     """
     Neural Graph Collaborative Filtering
@@ -61,8 +62,8 @@ class NGCF(GraphBasedRecommender):
     learning_rate: float = 0.0005
     lambda_weights: float = 0.01
 
-    def __init__(self, data, params, seed, logger):
-        super(NGCF, self).__init__(data, params, seed, logger)
+    def __init__(self, params, interactions, seed, *args, **kwargs):
+        super(NGCF, self).__init__(params, interactions, seed, *args, **kwargs)
 
         # Initialize the hidden dimensions
         self.weight_size_list = [self.factors] * (self.n_layers + 1)
@@ -100,7 +101,7 @@ class NGCF(GraphBasedRecommender):
         self.to(self._device)
 
     def get_training_dataloader(self, batch_size):
-        dataloader = self._data.training_dataloader(PairWiseSampler, batch_size, self._seed)
+        dataloader = self._interactions.get_dataloader("PairWiseSampler", batch_size, self._seed)
         return dataloader
 
     def forward(self):
@@ -155,31 +156,24 @@ class NGCF(GraphBasedRecommender):
 
         return loss
 
-    def predict_full(self, user_indices):
-        user_e_all, item_e_all = self.forward()
+    def predict(self, user_indices, item_indices=None):
+        user_e_all, item_e_all = self.propagate_embeddings()
 
         # Select only the embeddings in the current batch
-        u_embeddings_batch = user_e_all[user_indices]
+        user_embeddings = user_e_all[user_indices]
 
         # Compute predictions
-        predictions = torch.matmul(u_embeddings_batch, item_e_all.T)
+        if item_indices is None:
+            item_embeddings = item_e_all
+            einsum_string = "be,ie->bi"
+        else:
+            item_embeddings = item_e_all[item_indices.clamp(min=0)]
+            einsum_string = "be,bse->bs"
 
-        return predictions.to(self._device)
-
-    def predict_sampled(self, user_indices, item_indices):
-        user_e_all, item_e_all = self.forward()
-
-        # Select only the embeddings in the current batch
-        # and the candidate items
-        u_embeddings_batch = user_e_all[user_indices]
-        i_embeddings_candidate = item_e_all[item_indices.clamp(min=0)]
-
-        # Compute predictions
         predictions = torch.einsum(
-            "bi,bji->bj", u_embeddings_batch, i_embeddings_candidate
+            einsum_string, user_embeddings, item_embeddings
         )
-
-        return predictions.to(self._device)
+        return predictions
 
     def get_adj_mat(self):
         A = super().get_adj_mat()

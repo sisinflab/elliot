@@ -23,13 +23,13 @@ STAT_TESTS = {
     StatTest.WILCOXON_TEST: WilcoxonTest
 }
 
-writer = Writer()
-
 
 class ResultHandler:
     results_config: ResultsConfig
 
     def __init__(self, config: ExperimentConfig):
+        self.writer = Writer()
+
         self.results_config = config.results
         self.output_folder = config.path_output_rec_performance
         self.paired_ttest = config.evaluation.paired_ttest
@@ -135,7 +135,7 @@ class ResultHandler:
         for k in values.keys():
             results[k] = {name: entry[k] for name, entry in results_dict.items()}
 
-        writer.write_results(
+        self.writer.write_results(
             results=results,
             save_folder=output,
             file_name=f"_{key}{self._suffix}",
@@ -151,7 +151,7 @@ class ResultHandler:
             for name, entry in self.results.items() if _EVAL_TIME in entry
         }
 
-        writer.write_times(
+        self.writer.write_times(
             data=data,
             save_folder=output,
             file_name=self._suffix,
@@ -167,7 +167,7 @@ class ResultHandler:
         trials = self._normalize(self.trials)
 
         if "json" in self.results_config.trials_formats:
-            writer.write_trials(
+            self.writer.write_trials(
                 trials=trials,
                 save_folder=output,
                 file_name=self._suffix,
@@ -185,16 +185,14 @@ class ResultHandler:
                         "loss": entry.get("loss"),
                         "status": entry.get("status"),
                         "val_metric": entry.get("val_metric"),
-                        "test_metric": entry.get("test_metric"),
                         "time": self._to_json(entry.get("time")),
                         "objective": self._to_json(entry.get("objective")),
                         "params": self._to_json(entry.get("params")),
-                        "val_results": self._to_json(entry.get("val_results")),
-                        "test_results": self._to_json(entry.get("test_results")),
+                        "val_results": self._to_json(entry.get("val_results"))
                     })
                 trials_dict[model_name] = rows
 
-            writer.write_trials(
+            self.writer.write_trials(
                 trials=trials_dict,
                 save_folder=output,
                 file_name=self._suffix,
@@ -221,7 +219,7 @@ class ResultHandler:
                 "configuration": {key: value for key, value in params.items() if key != "meta"},
             }]
 
-        writer.write_params(
+        self.writer.write_params(
             params=models,
             save_folder=output,
             file_name=self._suffix,
@@ -254,7 +252,7 @@ class ResultHandler:
                         results_list.append((j, i, metric_name, p_value))
             results[k] = results_list
 
-        writer.write_statistical_results(
+        self.writer.write_statistical_results(
             results=results,
             save_folder=output,
             file_name=self._suffix,

@@ -1,4 +1,4 @@
-from typing import List, Any, Optional, Union, ClassVar, get_origin, get_args
+from typing import List, Any, Optional, Union, ClassVar, get_origin, get_args, Set, Callable
 from logging import LoggerAdapter
 from pydantic import BaseModel, ConfigDict, model_validator, field_validator
 from pydantic_core.core_schema import ValidationInfo
@@ -18,7 +18,7 @@ class BaseConfig(BaseModel):
         logger (ClassVar[LoggerAdapter]): A logging instance. Defaults to `get_logger("__main__")`.
     """
 
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(extra="allow", strict=False)
     warn_on_extra_fields: ClassVar[bool] = False
     logger: ClassVar[LoggerAdapter] = get_logger("__main__")
 
@@ -114,3 +114,43 @@ def normalize_ext(ext: str) -> str:
     if not ext.startswith("."):
         ext = f".{ext}"
     return ext
+
+
+def build_fields_from_annotations(
+    cls: object,
+    exclude: Set[str] = {},
+    field_fn: Callable = None,
+) -> dict:
+    """Build Pydantic field definitions from class annotations.
+
+    Args:
+        cls (object): The class from which keeping the annotations.
+        exclude (Set[str]): The fields to exclude from the annotations.
+        field_fn (Callable): The function to customize the field type.
+
+    Returns:
+        dict: The extracted fields' dict.
+    """
+    fields = {}
+
+    for name, hint in cls.__annotations__.items():
+        # Skip attributes in the 'exclude' set
+        if name in exclude:
+            continue
+
+        # Get default value
+        default = getattr(cls, name, "__MISSING__")
+
+        field_type = field_fn(hint) if field_fn is not None else hint
+        fields[name] = (field_type, default) if default != "__MISSING__" else field_type
+
+    return fields
+
+
+def get_default_value(model_cls, field_name) -> Any:
+    f = model_cls.model_fields[field_name]
+    if f.default_factory is not None:
+        return f.default_factory()
+    if f.default is not None:
+        return f.default
+    return None

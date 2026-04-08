@@ -1,31 +1,21 @@
 """
 Variational AutoEncoder for Collaborative Filtering (PyTorch, GeneralRecommender).
+
 """
 
 
 import numpy as np
 import torch
 from torch import nn
-from torch.utils.data import DataLoader, Dataset
 import torch.nn.functional as F
 
 from elliot.recommender.base_recommender import GeneralRecommender
 from elliot.recommender.autoencoders.layers import VariationalAutoEncoder
 from elliot.recommender.init import xavier_normal_init
+from elliot.utils.registry import model_registry
 
 
-class _AutoEncoderDataset(Dataset):
-    def __init__(self, sp_matrix):
-        self._mat = sp_matrix.tocsr()
-
-    def __len__(self):
-        return self._mat.shape[0]
-
-    def __getitem__(self, idx):
-        row = self._mat[idx].toarray().astype(np.float32).squeeze(0)
-        return torch.from_numpy(row)
-
-
+@model_registry.register()
 class MultiVAE(GeneralRecommender):
     r"""
     Variational Autoencoders for Collaborative Filtering
@@ -56,17 +46,19 @@ class MultiVAE(GeneralRecommender):
           dropout_pkeep: 1
     """
 
+    # Model hyperparameters
     intermediate_dim: int = 600
     latent_dim: int = 200
     reg_lambda: float = 0.01
     lr: float = 0.001
     dropout_pkeep: float = 1.0
-    def __init__(self, data, params, seed, logger):
-        super().__init__(data, params, seed, logger)
+
+    def __init__(self, params, interactions, seed, *args, **kwargs):
+        super().__init__(params, interactions, seed, *args, **kwargs)
 
         dropout_rate = max(0.0, 1.0 - self.dropout_pkeep)
 
-        self._train_matrix = self._data.sp_i_train
+        self._train_matrix = self._interactions.sparse
         self._autoencoder = VariationalAutoEncoder(
             original_dim=self._num_items,
             intermediate_dim=self.intermediate_dim,
@@ -85,8 +77,10 @@ class MultiVAE(GeneralRecommender):
         self.to(self._device)
 
     def get_training_dataloader(self, batch_size):
-        dataset = _AutoEncoderDataset(self._train_matrix)
-        return DataLoader(dataset, batch_size=batch_size, shuffle=True)
+        dataloader = self._interactions.get_dataloader(
+            "SparseSampler", batch_size, self._seed, sparse=self._train_matrix
+        )
+        return dataloader
 
     def train_step(self, batch, *args):
         batch = batch.to(self._device)
@@ -106,24 +100,16 @@ class MultiVAE(GeneralRecommender):
         loss = neg_ll + anneal * kl + self.reg_lambda * self._l2_penalty()
         return loss
 
-    def predict_full(self, user_indices):
+    def predict(self, user_indices, item_indices=None):
         inputs = self._get_user_interactions(user_indices)
         logits, _, _ = self._autoencoder(inputs)
-        return F.log_softmax(logits, dim=1)
+        predictions = F.log_softmax(logits, dim=1)
 
-    def predict_sampled(self, user_indices, item_indices):
-        full_scores = self.predict_full(user_indices)
-        return full_scores.gather(1, item_indices.clamp(min=0))
+        if item_indices is None:
+            return predictions
 
-    def get_model_state(self):
-        return {
-            "model_state_dict": self.state_dict(),
-            "optimizer_state_dict": self.optimizer.state_dict(),
-        }
-
-    def set_model_state(self, checkpoint):
-        self.load_state_dict(checkpoint["model_state_dict"])
-        self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+        predictions =  predictions.gather(1, item_indices.clamp(min=0))
+        return predictions
 
     def _get_user_interactions(self, user_indices):
         rows = self._train_matrix[user_indices.cpu().numpy()].toarray().astype(np.float32)

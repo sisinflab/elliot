@@ -8,7 +8,7 @@ __version__ = '0.3.1'
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, Field, model_validator, create_model
 
-from elliot.namespace.common import BaseConfig
+from elliot.namespace.common import BaseConfig, build_fields_from_annotations
 from elliot.namespace.data_config import DataConfig
 from elliot.namespace.evaluation_config import EvaluationConfig
 from elliot.namespace.models_config import RecommenderConfig, MODEL_FIELD
@@ -17,10 +17,11 @@ from elliot.namespace.prefiltering_config import PreFilteringConfig
 from elliot.namespace.results_config import ResultsConfig
 from elliot.namespace.splitting_config import SplittingConfig
 from elliot.namespace.wandb_config import WandBConfig
-from elliot.utils import get_model, split_metric
+from elliot.utils import split_metric, import_submodules
 from elliot.utils.folder import set_config_folder, parent_dir, path_joiner, path_resolver, file_ext
 from elliot.utils.hydra_config import load_config
 from elliot.utils.read import Reader
+from elliot.utils.registry import model_registry
 
 reader = Reader()
 
@@ -88,7 +89,10 @@ class ExperimentConfig(BaseConfig):
         Returns:
             ExperimentConfig: The object itself with resolved paths.
         """
-        excluded = {"reader", "writer", "version"}
+        excluded = {
+            "reader", "rec_reader", "model_reader",
+            "writer", "rec_writer", "model_writer", "version"
+        }
 
         def _resolve(obj: Any) -> Any:
             if isinstance(obj, str):
@@ -133,6 +137,10 @@ class ExperimentConfig(BaseConfig):
         Returns:
             ExperimentConfig: The object itself with instantiated model configs.
         """
+        # Import all the models and the samplers to make sure they are registered
+        if self.models:
+            import_submodules("elliot.recommender")
+            import_submodules("elliot.dataset.samplers")
 
         # Handle 'RecommendationFolder'...
         if "RecommendationFolder" in self.models:
@@ -142,9 +150,27 @@ class ExperimentConfig(BaseConfig):
 
         # ...and all the other models
         for model_name, model_data in self.models.items():
-            cls = get_model(model_name, self)
+            is_proxy = model_name.startswith("Proxy")
+            if is_proxy:
+                cls_name = "ProxyRecommender"
+                field_fn = None
+            else:
+                cls_name = model_name
+                field_fn = MODEL_FIELD
 
-            fields = self._build_fields_from_annotations(cls)
+            # If the model is not registered, skip it...
+            if cls_name not in model_registry.all():
+                self.logger.warning(
+                    f"The model {cls_name} is not registered in the model registry. "
+                    f"Therefore, it will not be loaded and it will not be available for the experiment. "
+                    f"Check the configuration file."
+                )
+                continue
+
+            # ...otherwise, load it
+            cls = model_registry.get_class(cls_name)
+
+            fields = build_fields_from_annotations(cls, field_fn=field_fn)
 
             # Build recommender config dynamically
             model_config = create_model(
@@ -193,45 +219,23 @@ class ExperimentConfig(BaseConfig):
         if folder_path is None:
             raise AttributeError(f"{recommender_name} meta-model must expose the `folder` field.")
 
+        rec_reader = model_data.get("rec_reader", {})
+
         files = reader.read_folder(
             folder=folder_path,
-            patterns=model_data.get("patterns"),
-            ext=model_data.get("ext")
+            patterns=rec_reader.get("patterns"),
+            ext=rec_reader.get("ext")
         )
 
         # Create one 'ProxyRecommender' configuration for each file
         for i, file_ in enumerate(files):
-            single_data = {k: v for k, v in model_data.items() if k != "folder"}
+            single_data = {k: v for k, v in model_data.items() if k != "folder" and k != "rec_reader"}
             single_data["path"] = file_
-            single_data.setdefault("reader", {})["ext"] = file_ext(file_)
+            single_data["meta"] = {"rec_reader": {"ext": file_ext(file_)}}
             self.models[f"ProxyRecommender{i+1}"] = single_data
 
         # Remove 'RecommendationFolder' entry
         self.models.pop(recommender_name)
-
-    def _build_fields_from_annotations(self, cls: object) -> dict:
-        """Build Pydantic field definitions from class annotations.
-
-        Args:
-            cls (object): The class from which keeping the annotations.
-
-        Returns:
-            dict: The extracted fields' dict.
-        """
-        fields = {}
-
-        for name, hint in cls.__annotations__.items():
-            # Skip 'type' attribute
-            # (used only to pick the right trainer)
-            if name == "type":
-                continue
-
-            # Get default value
-            default = getattr(cls, name)
-
-            fields[name] = (MODEL_FIELD(hint), default)
-
-        return fields
 
     def _check_metric(self, metric: str, default: str) -> str:
         """Check and validate a metric name and cutoff value combination.
@@ -280,6 +284,9 @@ def build_namespace(
         ExperimentConfig: Fully initialized experiment configuration.
     """
     set_config_folder(parent_dir(config_path))
+
+    # Import external folder to register all the custom components
+    # import_submodules("external")
 
     if config_data is not None:
         config = config_data

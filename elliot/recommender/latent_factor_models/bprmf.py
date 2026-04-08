@@ -8,12 +8,13 @@ import numpy as np
 import torch
 from scipy.special import expit
 
-from elliot.dataset.samplers import PairWiseSampler
-from elliot.recommender.base_recommender import Recommender
+from elliot.recommender.base_recommender import BaseRecommender
 from elliot.recommender.init import normal_init, xavier_uniform_init
+from elliot.utils.registry import model_registry
 
 
-class BPRMF(Recommender):
+@model_registry.register()
+class BPRMF(BaseRecommender):
     # Model hyperparameters
     factors: int = 10
     learning_rate: float = 0.05
@@ -22,8 +23,8 @@ class BPRMF(Recommender):
     lambda_pos_i: float = 0.0025
     lambda_neg_i: float = 0.00025
 
-    def __init__(self, data, params, seed, logger):
-        super().__init__(data, params, seed, logger)
+    def __init__(self, params, interactions, seed, *args, **kwargs):
+        super().__init__(params, interactions, seed, *args, **kwargs)
 
         # Embeddings
         self._user_factors = np.empty((self._num_users, self.factors), dtype=np.float32)
@@ -42,7 +43,7 @@ class BPRMF(Recommender):
         self.params_to_save = ['_user_bias', '_item_bias', '_user_factors', '_item_factors']
 
     def get_training_dataloader(self, batch_size):
-        dataloader = self._data.training_dataloader(PairWiseSampler, batch_size, self._seed)
+        dataloader = self._interactions.get_dataloader("PairWiseSampler", batch_size, self._seed)
         return dataloader
 
     def train_step(self, batch, *args):
@@ -95,40 +96,29 @@ class BPRMF(Recommender):
 
         return batch_loss / float(len(users))
 
-    def predict_full(self, user_indices):
+    def predict(self, user_indices, item_indices=None):
         user_indices = user_indices.numpy()
 
-        u_embeddings_batch = self._user_factors[user_indices]
-        i_embeddings_all = self._item_factors
-        u_bias_batch = self._user_bias[user_indices]
-        i_bias_all = self._item_bias
+        user_embeddings = self._user_factors[user_indices]
+        user_bias = self._user_bias[user_indices]
 
-        predictions = (
-            u_embeddings_batch @ i_embeddings_all.T +
-            u_bias_batch[:, None] +
-            i_bias_all[None, :] +
-            self._global_bias
-        )
-
-        predictions = torch.from_numpy(predictions)
-        return predictions
-
-    def predict_sampled(self, user_indices, item_indices):
-        user_indices = user_indices.numpy()
-        item_indices = item_indices.clamp(min=0).numpy()
-
-        u_embeddings_batch = self._user_factors[user_indices]
-        i_embeddings_candidate = self._item_factors[item_indices]
-        u_bias_batch = self._user_bias[user_indices]
-        i_bias_candidate = self._item_bias[item_indices]
+        if item_indices is None:
+            item_embeddings = self._item_factors
+            item_bias = self._item_bias[None, :]
+            einsum_string = "be,ie->bi"
+        else:
+            item_indices = item_indices.clamp(min=0).numpy()
+            item_embeddings = self._item_factors[item_indices]
+            item_bias = self._item_bias[item_indices]
+            einsum_string = "be,bse->bs"
 
         predictions = (
             np.einsum(
-                "bi,bji->bj", u_embeddings_batch, i_embeddings_candidate
-            ) +
-            u_bias_batch[:, None] +
-            i_bias_candidate +
-            self._global_bias
+                einsum_string, user_embeddings, item_embeddings
+            )
+            + user_bias[:, None]
+            + item_bias
+            + self._global_bias
         )
 
         predictions = torch.from_numpy(predictions)

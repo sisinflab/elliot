@@ -4,6 +4,7 @@ Module description:
 """
 
 
+from .base_sampler import AbstractSampler
 from .pointwise import (
     CustomPointWiseSparseSampler,
     PointWisePosNegRatioRatingsSampler,

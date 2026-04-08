@@ -10,11 +10,16 @@ from elliot.dataset import DataSet
 from elliot.hyperoptimization.engine import HyperOptEngine
 from elliot.hyperoptimization.model_coordinator import ModelCoordinator
 from elliot.namespace import RecommenderConfig, ExperimentConfig
+from elliot.recommender import AbstractRecommender
+from elliot.utils import get_trainer
+from elliot.utils.registry import model_registry
 
 
 @dataclass(frozen=True)
 class RunOutcome:
-    best_eval: dict
+    best_model: AbstractRecommender
+    best_params: Optional[dict]
+    results: dict
     trials: Optional[object]
     all_trial_results: list
 
@@ -44,55 +49,112 @@ def requires_hyperopt(model_config: RecommenderConfig) -> bool:
 
 
 def run_hyperopt(
-    data_test: List[DataSet],
+    val_data: List[DataSet],
+    main_data: DataSet,
     config: ExperimentConfig,
     model_config: RecommenderConfig,
     model_name: str,
     test_fold_index: int
 ) -> RunOutcome:
-    if not requires_hyperopt(model_config):
-        return run_single(
-            data_test=data_test,
-            config=config,
-            model_config=model_config,
-            model_name=model_name,
-            test_fold_index=test_fold_index,
-        )
 
     rstate = HyperoptRandomState(seed=config.random_seed)
     engine = HyperOptEngine(rstate=rstate)
 
     model_config.prepare_fields_for_search()
 
-    coordinator = ModelCoordinator(data_test, config, model_config, model_name, test_fold_index)
+    coordinator = ModelCoordinator(
+        val_data,
+        main_data,
+        config,
+        model_config,
+        model_name,
+        test_fold_index
+    )
 
     tuning = engine.optimize(
         coordinator=coordinator,
         model_config=model_config
     )
 
-    params = tuning.best_params if tuning.best_trial is not None else None
-    best_eval = coordinator.evaluate(params)
+    results = tuning.best_trial["result"] if tuning.best_trial is not None else {}
+    best_params = tuning.best_params if tuning.best_trial is not None else None
+
+    best_model = tuning.best_model
+    if best_model is None:
+        best_model = coordinator.train(best_params)
 
     return RunOutcome(
-        best_eval=best_eval,
+        best_model=best_model,
+        best_params=best_params,
+        results=results,
         trials=tuning.trials,
         all_trial_results=tuning.trials.results,
     )
 
 
 def run_single(
-    data_test: List[DataSet],
+    val_data: List[DataSet],
+    main_data: DataSet,
     config: ExperimentConfig,
     model_config: RecommenderConfig,
     model_name: str,
     test_fold_index: int
 ) -> RunOutcome:
-    coordinator = ModelCoordinator(data_test, config, model_config, model_name, test_fold_index)
-    best_eval = coordinator.single()
+
+    coordinator = ModelCoordinator(
+        val_data,
+        main_data,
+        config,
+        model_config,
+        model_name,
+        test_fold_index
+    )
+
+    results = coordinator.single()
+    best_params = results["params"]
+
+    best_model = results.pop("best_model", None)
+    if best_model is None:
+        best_model = coordinator.train(best_params)
 
     return RunOutcome(
-        best_eval=best_eval,
+        best_model=best_model,
+        best_params=best_params,
+        results=results,
         trials=None,
-        all_trial_results=[],
+        all_trial_results=[]
     )
+
+
+def run_proxy(model_config, main_data, config):
+    model = model_registry.get(
+        name="ProxyRecommender",
+        params=model_config,
+        interactions=main_data.train_set,
+        seed=config.random_seed
+    )
+
+    params = model_config.model_dump()
+
+    results = {
+        "name": model.name,
+        "params": params,
+        "loss": None
+    }
+
+    return RunOutcome(
+        best_model=model,
+        best_params=params,
+        results=results,
+        trials=None,
+        all_trial_results=[]
+    )
+
+
+def run_evaluation(main_data, config, model):
+    trainer = get_trainer(model)(
+        config=config,
+        model=model
+    )
+
+    return trainer.evaluate(main_data)

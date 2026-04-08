@@ -7,8 +7,10 @@ It proceeds from a user-wise computation, and average the values over the users.
 import numpy as np
 
 from elliot.evaluation.metrics.base_metric import BaseMetric
+from elliot.utils.registry import metric_registry
 
 
+@metric_registry.register()
 class PopREO(BaseMetric):
     r"""
     Popularity-based Ranking-based Equal Opportunity
@@ -53,18 +55,10 @@ class PopREO(BaseMetric):
         self._relevance = self._evaluation_objects.relevance.binary_relevance
         self._short_head = set(self._evaluation_objects.pop.get_short_head())
         self._long_tail = set(self._evaluation_objects.pop.get_long_tail())
-        self._train = self._evaluation_objects.data.get_train_dict()
+        self._train = self._evaluation_objects.train_data.get_dict()
         self._train_sets = {u: set(u_train.keys()) for u, u_train in self._train.items()}
         self._num = []
         self._den = []
-
-    @staticmethod
-    def name():
-        """
-        Metric Name Getter
-        :return: returns the public name of the metric
-        """
-        return "PopREO"
 
     def __user_pop_reo(self, user_recommendations, cutoff, long_tail, short_head, u_train, user_relevant_items):
         """

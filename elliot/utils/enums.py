@@ -24,6 +24,18 @@ class SplittingStrategy(Enum):
     RAND_SUB_SMP = 'random_subsampling'
 
 
+class AlignmentMode(Enum):
+    DROP = "drop"      # intersect with train (current behavior)
+    PAD = "pad"        # add UNK/zero rows for missing users/items
+    IMPUTE = "impute"  # fill missing with statistics/learned defaults
+
+
+class Materialization(Enum):
+    LAZY = "lazy"
+    MEMORY = "memory"
+    MMAP = "mmap"
+
+
 class NegativeSamplingStrategy(Enum):
     RANDOM = 'random'
     FIXED = 'fixed'

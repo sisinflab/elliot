@@ -7,9 +7,10 @@ It proceeds from a user-wise computation, and average the AUC values over the us
 import numpy as np
 
 from elliot.evaluation.metrics.base_metric import BaseMetric
-from elliot.utils import logging
+from elliot.utils.registry import metric_registry
 
 
+@metric_registry.register()
 class GAUC(BaseMetric):
     r"""
     Group Area Under the Curve
@@ -45,6 +46,8 @@ class GAUC(BaseMetric):
         simple_metrics: [GAUC]
     """
 
+    needs_full_recommendations = True
+
     def __init__(self, recommendations, config, params, eval_objects):
         """
         Constructor
@@ -57,14 +60,6 @@ class GAUC(BaseMetric):
         self._cutoff = self._evaluation_objects.cutoff
         self._relevance = self._evaluation_objects.relevance.binary_relevance
         self._num_items = self._evaluation_objects.num_items
-
-    @staticmethod
-    def name():
-        """
-        Metric Name Getter
-        :return: returns the public name of the metric
-        """
-        return "GAUC"
 
     @staticmethod
     def __user_gauc(user_recommendations, user_relevant_items, num_items, train_size):
@@ -86,8 +81,15 @@ class GAUC(BaseMetric):
         """
 
         return np.average(
-            [GAUC.__user_gauc(u_r, self._relevance.get_user_rel(u), self._num_items, len(self._evaluation_objects.data.get_train_dict()[u]))
-             for u, u_r in self._recommendations.items() if len(self._relevance.get_user_rel(u))]
+            [
+                GAUC.__user_gauc(
+                    u_r,
+                    self._relevance.get_user_rel(u),
+                    self._num_items,
+                    len(self._evaluation_objects.train_data.get_dict()[u])
+                )
+                for u, u_r in self._recommendations.items() if len(self._relevance.get_user_rel(u))
+            ]
         )
 
     def eval_user_metric(self):
@@ -95,13 +97,12 @@ class GAUC(BaseMetric):
         Evaluation function
         :return: the overall averaged value of AUC per user
         """
-        return {u: GAUC.__user_gauc(u_r, self._relevance.get_user_rel(u), self._num_items, len(self._evaluation_objects.data.get_train_dict()[u]))
-             for u, u_r in self._recommendations.items() if len(self._relevance.get_user_rel(u))}
-
-
-    @staticmethod
-    def needs_full_recommendations():
-        _logger = logging.get_logger("Evaluator")
-        _logger.warn("\n*** WARNING: Group AUC metric requires full length recommendations")
-        return True
-
+        return {
+            u: GAUC.__user_gauc(
+                u_r,
+                self._relevance.get_user_rel(u),
+                self._num_items,
+                len(self._evaluation_objects.train_data.get_dict()[u])
+            )
+            for u, u_r in self._recommendations.items() if len(self._relevance.get_user_rel(u))
+        }

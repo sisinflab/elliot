@@ -11,8 +11,10 @@ from tqdm import tqdm
 from sklearn.preprocessing import normalize
 
 from elliot.recommender.base_recommender import TraditionalRecommender
+from elliot.utils.registry import model_registry
 
 
+@model_registry.register()
 class RP3beta(TraditionalRecommender):
     # Model hyperparameters
     neighborhood: int = 10
@@ -20,11 +22,11 @@ class RP3beta(TraditionalRecommender):
     beta: float = 0.6
     normalize_similarity: bool = False
 
-    def __init__(self, data, params, seed, logger):
-        super().__init__(data, params, seed, logger)
+    def __init__(self, params, interactions, seed, *args, **kwargs):
+        super().__init__(params, interactions, seed, *args, **kwargs)
 
         if self.neighborhood == -1:
-            self.neighborhood = self._data.num_items
+            self.neighborhood = self._interactions.dims[1]
 
     def initialize(self):
         # Step 1: Normalize user-item matrix
@@ -138,15 +140,13 @@ class RP3beta(TraditionalRecommender):
             np.array(vals_list)
         )
 
-    def predict_full(self, user_indices):
+    def predict(self, user_indices, item_indices=None):
         predictions = self._train[user_indices.numpy()] @ self.similarity_matrix
 
         predictions = torch.from_numpy(predictions.toarray())
-        return predictions
 
-    def predict_sampled(self, user_indices, item_indices):
-        predictions = self._train[user_indices.numpy()] @ self.similarity_matrix
+        if item_indices is None:
+            return predictions
 
-        predictions = torch.from_numpy(predictions.toarray())
         predictions = predictions.gather(1, item_indices.clamp(min=0))
         return predictions

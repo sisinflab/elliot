@@ -11,8 +11,10 @@ from scipy import sparse as sp
 from sklearn.utils.extmath import randomized_svd
 
 from elliot.recommender.base_recommender import TraditionalRecommender
+from elliot.utils.registry import model_registry
 
 
+@model_registry.register()
 class PureSVD(TraditionalRecommender):
     """
     PureSVD
@@ -38,8 +40,8 @@ class PureSVD(TraditionalRecommender):
     # Model hyperparameters
     factors: int = 10
 
-    def __init__(self, data, params, seed, logger):
-        super().__init__(data, params, seed, logger)
+    def __init__(self, params, interactions, seed, *args, **kwargs):
+        super().__init__(params, interactions, seed, *args, **kwargs)
 
         self.user_vec, self.item_vec = None, None
         self.params_to_save = ['user_vec', 'item_vec']
@@ -48,7 +50,7 @@ class PureSVD(TraditionalRecommender):
         t = tqdm()
         t.set_description("Computing")
 
-        U, sigma, Vt = randomized_svd(self._data.sp_i_train,
+        U, sigma, Vt = randomized_svd(self._interactions.sparse,
                                       n_components=self.factors,
                                       random_state=self._seed)
         s_Vt = sp.diags(sigma) * Vt
@@ -58,21 +60,20 @@ class PureSVD(TraditionalRecommender):
         self.user_vec = U
         self.item_vec = s_Vt.T
 
-    def predict_full(self, user_indices):
-        u_embeddings_batch = self.user_vec[user_indices.numpy()]
-        i_embeddings_all = self.item_vec
+    def predict(self, user_indices, item_indices=None):
+        # Select only the embeddings in the current batch
+        user_embeddings = self.user_vec[user_indices.numpy()]
 
-        predictions =  u_embeddings_batch @ i_embeddings_all.T
-
-        predictions = torch.from_numpy(predictions)
-        return predictions
-
-    def predict_sampled(self, user_indices, item_indices):
-        u_embeddings_batch = self.user_vec[user_indices.numpy()]
-        i_embeddings_candidate = self.item_vec[item_indices.clamp(min=0).numpy()]
+        # Compute predictions
+        if item_indices is None:
+            item_embeddings = self.item_vec
+            einsum_string = "be,ie->bi"
+        else:
+            item_embeddings = self.item_vec[item_indices.clamp(min=0).numpy()]
+            einsum_string = "be,bse->bs"
 
         predictions = np.einsum(
-            "bi,bji->bj", u_embeddings_batch, i_embeddings_candidate
+            einsum_string, user_embeddings, item_embeddings
         )
 
         predictions = torch.from_numpy(predictions)

@@ -6,8 +6,10 @@ It proceeds from a user-wise computation, and average the values over the users.
 
 import numpy as np
 from elliot.evaluation.metrics.base_metric import BaseMetric
+from elliot.utils.registry import metric_registry
 
 
+@metric_registry.register()
 class ARP(BaseMetric):
     r"""
     Average Recommendation Popularity
@@ -41,14 +43,6 @@ class ARP(BaseMetric):
         super().__init__(recommendations, config, params, eval_objects)
         self._cutoff = self._evaluation_objects.cutoff
         self._pop_items = self._evaluation_objects.pop.get_pop_items()
-
-    @staticmethod
-    def name():
-        """
-        Metric Name Getter
-        :return: returns the public name of the metric
-        """
-        return "ARP"
 
     @staticmethod
     def __user_arp(user_recommendations, cutoff, pop_items):

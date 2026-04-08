@@ -6,8 +6,10 @@ It proceeds from a user-wise computation, and average the values over the users.
 
 import numpy as np
 from elliot.evaluation.metrics.base_metric import BaseMetric
+from elliot.utils.registry import metric_registry
 
 
+@metric_registry.register()
 class F1(BaseMetric):
     r"""
     F-Measure
@@ -40,14 +42,6 @@ class F1(BaseMetric):
         self._relevance = self._evaluation_objects.relevance.binary_relevance
         self._beta = 1 # F-score is the Sørensen-Dice (DSC) coefficient with beta equal to 1
         self._squared_beta = self._beta**2
-
-    @staticmethod
-    def name():
-        """
-        Metric Name Getter
-        :return: returns the public name of the metric
-        """
-        return "F1"
 
     @staticmethod
     def __user_f1(user_recommendations, cutoff, user_relevant_items, squared_beta):

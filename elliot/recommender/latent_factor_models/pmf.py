@@ -9,12 +9,13 @@ Mnih, Andriy, and Russ R. Salakhutdinov. "Probabilistic matrix factorization." A
 import torch
 from torch import nn
 
-from elliot.dataset.samplers import PointWisePosNegSampler
 from elliot.recommender.base_recommender import GeneralRecommender
 from elliot.recommender.init import xavier_normal_init
 from elliot.recommender.layers import GaussianNoise
+from elliot.utils.registry import model_registry
 
 
+@model_registry.register()
 class PMF(GeneralRecommender):
     """
     Probabilistic Matrix Factorization
@@ -49,8 +50,8 @@ class PMF(GeneralRecommender):
     lambda_weights: float = 0.0025
     gaussian_variance: float = 0.1
 
-    def __init__(self, data, params, seed, logger):
-        super(PMF, self).__init__(data, params, seed, logger)
+    def __init__(self, params, interactions, seed, *args, **kwargs):
+        super(PMF, self).__init__(params, interactions, seed, *args, **kwargs)
 
         # Embeddings
         self.user_mf_embedding = nn.Embedding(self._num_users, self.factors, dtype=torch.float32)
@@ -71,7 +72,7 @@ class PMF(GeneralRecommender):
         self.to(self._device)
 
     def get_training_dataloader(self, batch_size):
-        dataloader = self._data.training_dataloader(PointWisePosNegSampler, batch_size, self._seed)
+        dataloader = self._interactions.get_dataloader("PointWisePosNegSampler", batch_size, self._seed)
         return dataloader
 
     def forward(self, user, item):
@@ -92,28 +93,24 @@ class PMF(GeneralRecommender):
 
         return loss
 
-    def predict_full(self, user_indices):
-        # Retrieve embeddings
+    def predict(self, user_indices, item_indices=None):
         user_e_all = self.user_mf_embedding.weight
         item_e_all = self.item_mf_embedding.weight
 
         # Select only the embeddings in the current batch
-        u_embeddings_batch = user_e_all[user_indices]
-
-        predictions = torch.matmul(u_embeddings_batch, item_e_all.T)
-        predictions = self.sigmoid(predictions)
-
-        return predictions.to(self._device)
-
-    def predict_sampled(self, user_indices, item_indices):
-        # Retrieve embeddings
-        u_embeddings_batch = self.user_mf_embedding(user_indices)
-        i_embeddings_candidate = self.item_mf_embedding(item_indices.clamp(min=0))
+        user_embeddings = user_e_all[user_indices]
 
         # Compute predictions
+        if item_indices is None:
+            item_embeddings = item_e_all
+            einsum_string = "be,ie->bi"
+        else:
+            item_embeddings = item_e_all[item_indices.clamp(min=0)]
+            einsum_string = "be,bse->bs"
+
         predictions = torch.einsum(
-            "bi,bji->bj", u_embeddings_batch, i_embeddings_candidate
+            einsum_string, user_embeddings, item_embeddings
         )
         predictions = self.sigmoid(predictions)
 
-        return predictions.to(self._device)
+        return predictions

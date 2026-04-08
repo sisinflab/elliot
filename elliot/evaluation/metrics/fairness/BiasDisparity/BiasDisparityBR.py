@@ -11,7 +11,10 @@ from collections import Counter
 
 from elliot.evaluation.metrics.base_metric import BaseMetric
 from elliot.evaluation.metrics.metrics_utils import ProxyMetric
+from elliot.utils.registry import metric_registry
 
+
+@metric_registry.register()
 class BiasDisparityBR(BaseMetric):
     r"""
     Bias Disparity - Bias Recommendations
@@ -75,6 +78,7 @@ class BiasDisparityBR(BaseMetric):
 
         self.process()
 
+    @property
     def name(self):
         """
         Metric Name Getter
@@ -125,4 +129,3 @@ class BiasDisparityBR(BaseMetric):
 
     def get(self):
         return self._metric_objs_list
-

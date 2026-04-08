@@ -5,10 +5,12 @@ It proceeds from a user-wise computation, and average the values over the users.
 
 
 import numpy as np
-import typing as t
+
 from elliot.evaluation.metrics.base_metric import BaseMetric
+from elliot.utils.registry import metric_registry
 
 
+@metric_registry.register()
 class HR(BaseMetric):
     r"""
     Hit Rate
@@ -31,7 +33,7 @@ class HR(BaseMetric):
 
         simple_metrics: [HR]
     """
-    def __init__(self, recommendations: t.Dict[int, t.List[t.Tuple[int, float]]], config, params, eval_objects):
+    def __init__(self, recommendations, config, params, eval_objects):
         """
         Constructor
         :param recommendations: list of recommendations in the form {user: [(item1,value1),...]}
@@ -42,14 +44,6 @@ class HR(BaseMetric):
         super().__init__(recommendations, config, params, eval_objects)
         self._cutoff = self._evaluation_objects.cutoff
         self._relevance = self._evaluation_objects.relevance.binary_relevance
-
-    @staticmethod
-    def name():
-        """
-        Metric Name Getter
-        :return: returns the public name of the metric
-        """
-        return "HR"
 
     @staticmethod
     def __user_HR(user_recommendations, cutoff, user_relevant_items):

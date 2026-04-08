@@ -14,7 +14,7 @@ import numpy as np
 
 from elliot.dataset import DataSetLoader, build_mock_dataset
 from elliot.namespace import build_namespace, ExperimentConfig
-from elliot.hyperoptimization import run_hyperopt, run_single, requires_hyperopt
+from elliot.hyperoptimization import run_hyperopt, run_single, run_proxy, run_evaluation, requires_hyperopt
 from elliot.result_handler import ResultHandler, attach_test_fold_stats
 from elliot.utils import logging as logging_project
 from elliot.utils import set_device
@@ -63,8 +63,17 @@ def run_experiment(config_path: str = "", config_overrides: Optional[List[str]] 
     try:
         logger.info("Start experiment")
 
-        dataset_loader = DataSetLoader(config=config)
-        data_test_list = dataset_loader.build()
+        # Callback on experiment start
+
+        loader = DataSetLoader(config=config)
+
+        # Callback on data loading and filtering
+
+        val_data, main_data = loader.build()
+
+        # Callback on dataset creation
+
+        loader.prepare_dataset(val_data, main_data)
 
         res_handler = ResultHandler(config=config)
 
@@ -77,52 +86,69 @@ def run_experiment(config_path: str = "", config_overrides: Optional[List[str]] 
             all_trials[model_name] = []
 
             try:
-                for test_fold_index, data_test in enumerate(data_test_list):
+                # Callback on train/test start
+
+                for test_fold_index, (val, main) in enumerate(zip(val_data, main_data)):
                     logging_project.prepare_logger(model_name)
 
                     is_proxy = model_name.startswith("ProxyRecommender")
-                    use_hyperopt = (not is_proxy) and requires_hyperopt(model_config)
+                    use_hyperopt = requires_hyperopt(model_config)
 
-                    if is_proxy:
-                        logger.info(f"Evaluation begun for {model_name}\n")
-                        outcome = run_single(
-                            data_test=data_test,
-                            config=config,
-                            model_config=model_config,
-                            model_name=model_name,
-                            test_fold_index=test_fold_index
-                        )
-                        logger.info(f"Evaluation ended for {model_name}")
-                    elif use_hyperopt:
+                    if use_hyperopt:
                         logger.info(f"Tuning begun for {model_name}\n")
                         outcome = run_hyperopt(
-                            data_test=data_test,
+                            val_data=val,
+                            main_data=main,
                             config=config,
                             model_config=model_config,
                             model_name=model_name,
                             test_fold_index=test_fold_index
                         )
                         logger.info(f"Tuning ended for {model_name}")
+
+                    elif is_proxy:
+                        outcome = run_proxy(
+                            model_config=model_config,
+                            main_data=main,
+                            config=config
+                        )
+
                     else:
                         logger.info(f"Training begun for {model_name}\n")
                         outcome = run_single(
-                            data_test=data_test,
+                            val_data=val,
+                            main_data=main,
                             config=config,
                             model_config=model_config,
                             model_name=model_name,
                             test_fold_index=test_fold_index
                         )
                         logger.info(f"Training ended for {model_name}")
-                    best_eval = outcome.best_eval
+
+                    # Callback on training complete
+
+                    logger.info(f"Evaluation begun for {model_name}\n")
+                    model = outcome.best_model
+                    eval_results = run_evaluation(
+                        main_data=main,
+                        config=config,
+                        model=model
+                    )
+                    logger.info(f"Evaluation ended for {model_name}")
+
+                    # Callback on evaluation complete
+
+                    results = outcome.results
+                    results.update(eval_results)
 
                     ############################################
-                    best_model_loss = best_eval["loss"]
-                    best_model_params = best_eval["params"]
-                    best_model_results = best_eval["test_results"]
+                    best_model_loss = results["loss"]
+                    best_model_params = results["params"]
+                    best_model_results = results["test_results"]
                     ############################################
 
                     # aggiunta a lista performance test
-                    test_results.append(best_eval)
+                    test_results.append(results)
 
                     if outcome.trials is not None:
                         test_trials.append(outcome.all_trial_results)
@@ -131,6 +157,8 @@ def run_experiment(config_path: str = "", config_overrides: Optional[List[str]] 
                     logger.info(f"Loss:\t{best_model_loss}")
                     logger.info(f"Best Model params:\t{best_model_params}")
                     logger.info(f"Best Model results:\t{best_model_results}")
+
+                # Callback on train/test complete
 
                 # Migliore sui test, aggiunta a performance totali
                 min_val = np.argmin([i["loss"] for i in test_results])
@@ -148,6 +176,8 @@ def run_experiment(config_path: str = "", config_overrides: Optional[List[str]] 
                     all_trials[model_name] = all_trials[model_name][min_val]
             finally:
                 wandb_logger.finish_model_run(logger)
+
+        # Callback on experiment complete
 
         res_handler.save_outputs()
         wandb_logger.log_summary_table(config, logger)
@@ -168,7 +198,7 @@ def run_experiment(config_path: str = "", config_overrides: Optional[List[str]] 
 
 
 def config_test(config: ExperimentConfig):
-    logging_project.init(config.path_logger_config, config.path_log_folder)
+    logging_project.init()
     logger = logging_project.get_logger("__main__")
 
     _configure_torch_device(config, logger)

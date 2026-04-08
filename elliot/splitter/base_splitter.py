@@ -8,8 +8,6 @@ from elliot.utils.enums import SplittingStrategy
 from elliot.utils.write import Writer
 from elliot.utils import logging as elog
 
-writer = Writer()
-
 
 class Splitter:
     """The Splitter class is responsible for performing various dataset splitting strategies,
@@ -64,7 +62,7 @@ class Splitter:
 
     def __init__(self, data: pd.DataFrame, splitting_config: SplittingConfig, random_seed: int = 42):
         self.logger = elog.get_logger(self.__class__.__name__, seed=random_seed)
-        writer.logger = self.logger
+        self.writer = Writer(self.logger)
 
         self.data = data
         self.splitting_config = splitting_config
@@ -73,19 +71,23 @@ class Splitter:
 
     def process_splitting(
         self
-    ) -> List[Tuple[List[Tuple[pd.DataFrame, pd.DataFrame]], pd.DataFrame]]:
+    ) -> List[Tuple[List[Tuple[pd.DataFrame, pd.DataFrame]], pd.DataFrame, pd.DataFrame]]:
         """Execute the configured splitting strategy (Train/Test or Train/Validation/Test).
 
         Returns:
-            List[Tuple[Union[pd.DataFrame, List[Tuple[pd.DataFrame, pd.DataFrame]]], pd.DataFrame]]:
-                A list of (train, test) or ((train, val), test) tuples.
+            List[Tuple[List[Tuple[pd.DataFrame, pd.DataFrame]], pd.DataFrame, pd.DataFrame]]:
+                A list of ([(train, val), ...], train, test) tuples.
         """
 
         tuple_list = self.handle_hierarchy(self.data, self.splitting_config.test_splitting)
 
         if self.splitting_config.validation_splitting is not None:
             tuple_list = [
-                (self.handle_hierarchy(train, self.splitting_config.validation_splitting), test)
+                (
+                    val_list := self.handle_hierarchy(train, self.splitting_config.validation_splitting),
+                    train if len(val_list) > 1 else None,
+                    test
+                )
                 for train, test in tuple_list
             ]
             self.logger.info(
@@ -93,14 +95,14 @@ class Splitter:
                 extra={"context": {"strategy": "train_val_test", "folds": len(tuple_list)}}
             )
         else:
-            tuple_list = [([(train, None)], test) for train, test in tuple_list]
+            tuple_list = [([], train, test) for train, test in tuple_list]
             self.logger.info(
                 "Completed data split",
                 extra={"context": {"strategy": "train_test", "folds": len(tuple_list)}}
             )
 
         if self.splitting_config.save_on_disk:
-            writer.write_tabular_split(
+            self.writer.write_tabular_split(
                 fold_dataset=tuple_list,
                 save_folder=self.splitting_config.save_folder,
                 header=self.splitting_config.writer.header,

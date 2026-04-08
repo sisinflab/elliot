@@ -4,67 +4,55 @@ Module description:
 """
 
 
-from typing import Tuple
+from typing import Tuple, Dict, Union, Optional
 from types import SimpleNamespace
 
 import pandas as pd
-from scipy.sparse import csr_matrix
-
 import copy
-import numpy as np
 import logging as pylog
-from collections import defaultdict
-from functools import cached_property
 from tqdm import tqdm
 
 import torch
 from torch.utils.data import Dataset, DataLoader
 from torch.nn.utils.rnn import pad_sequence
-from torch_sparse import SparseTensor
 
-from elliot.dataset.samplers.base_sampler import build_dataset
+from elliot.dataset.interactions import Interactions
 from elliot.dataset.fusion.fuser import FeatureFuser
 from elliot.negative_sampling import NegativeSampler
 from elliot.utils import logging
 
 
 class NegEvalDataset(Dataset):
-    def __init__(self, num_users, sampler, val_pos_items, test_pos_items, leave_one_out=False):
+    def __init__(self, num_users, sampler, eval_pos_items, evaluation_set="test", leave_one_out=False):
         self.num_users = num_users
         self.leave_one_out = leave_one_out
+        self._evaluation_set = evaluation_set
 
-        val_neg_items, test_neg_items = sampler.sample()
+        eval_neg_items = sampler.sample()
 
-        self.val_items = self._add_indices(val_neg_items, val_pos_items, validation=True)
-        self.test_items = self._add_indices(test_neg_items, test_pos_items)
+        self.eval_items = self._add_indices(eval_neg_items, eval_pos_items)
 
-    def _add_indices(self, neg, pos, validation=False):
+    def _add_indices(self, neg, pos):
         """Add test or validation samples to the sampled negatives."""
         if not neg:
             return None
 
-        total = len(neg)
         final_items = []
-        i = 0
-        text = "validation" if validation else "test"
+        iter_data = tqdm(
+            total=len(neg),
+            desc=f"Adding {self._evaluation_set} items to sampled negatives",
+            leave=False,
+        )
 
-        with tqdm(total=total, desc=f"Adding {text} items to sampled negatives", leave=False) as t:
-            while i < len(neg):
-                neg_u = neg[i]
-
+        with iter_data as t:
+            for neg_u, pos_u in zip(neg, pos):
                 if not neg_u:
                     pos_u = []
                 elif self.leave_one_out:
-                    pos_u = [pos[i][-1]] if pos[i] else []
-                else:
-                    pos_u = pos[i]
+                    pos_u = [pos_u[-1]] if pos_u else []
 
                 final_items.append(torch.tensor(neg_u + pos_u))
-
-                # Manual garbage collection
-                del neg[i], pos[i]
-
-                t.update()
+                t.update(1)
 
         return final_items
 
@@ -72,34 +60,24 @@ class NegEvalDataset(Dataset):
         return self.num_users
 
     def __getitem__(self, idx):
-        test_items = self.test_items[idx]
-        val_items = self.val_items[idx] if self.val_items is not None else None
-        return idx, val_items, test_items
+        return idx, self.eval_items[idx]
 
     @staticmethod
     def collate_fn(batch):
-        user_indices, val_negatives, test_negatives = zip(*batch)
+        user_indices, item_indices = zip(*batch)
 
         # User indices will be a list of ints, so we convert it
         user_indices = torch.tensor(list(user_indices))
 
         # We use the pad_sequence utility to pad item indices
-        # in order to have all tensor of the same size
-        test_neg_padded = pad_sequence(
-            test_negatives,
+        # in order to have all tensors of the same size
+        item_indices = pad_sequence(
+            item_indices,
             batch_first=True,
             padding_value=-1,
         )
-        val_neg_padded = None
 
-        if val_negatives[0] is not None:
-            val_neg_padded = pad_sequence(
-                val_negatives,
-                batch_first=True,
-                padding_value=-1,
-            )
-
-        return user_indices, val_neg_padded, test_neg_padded
+        return user_indices, item_indices
 
 
 class FullEvalDataset(Dataset):
@@ -114,16 +92,28 @@ class FullEvalDataset(Dataset):
 
     @staticmethod
     def collate_fn(batch):
-        return torch.tensor(batch), None, None
+        return torch.tensor(batch), None
 
 
 class DataSet:
     """
     Load train and test dataset
     """
-    inter_dataframe: Tuple[pd.DataFrame, ...]
+    train_set: Interactions
+    eval_set: Interactions
+    side_information: Dict[str, SimpleNamespace]
 
-    def __init__(self, config, data_tuple, side_information_data, *args, **kwargs):
+    def __init__(
+        self,
+        config,
+        train_data,
+        eval_data,
+        side_info_data,
+        evaluation_set: str = "test",
+        fold_index: Tuple[int, Optional[int]] = (0, None),
+        *args,
+        **kwargs
+    ):
         """
         Constructor of DataSet
         :param path_train_data: relative path for train file
@@ -135,232 +125,212 @@ class DataSet:
         self.config = config
         self.args = args
         self.kwargs = kwargs
-        self.inter_dataframe = data_tuple
-        self.cold_items = set()
-        self.cold_users = set()
 
-        self._handle_train_set(side_information_data)
-        self._handle_val_test_sets()
+        self.fold_index = fold_index
 
-        self._cached_dataloaders = {}
+        self._evaluation_set = evaluation_set
+
+        self._handle_train_set(train_data, side_info_data)
+        self._handle_eval_set(eval_data)
+
+        self._cached_datasets = {}
         self._eval_cache_key = None
 
-    def _handle_train_set(self, side_information_data):
-        train_df, _, _ = self.inter_dataframe
-        self._train_dict = self._dataframe_to_dict(train_df)
+    def _handle_train_set(
+        self,
+        train_data: Union[pd.DataFrame, Interactions],
+        side_info_data
+    ):
+        if isinstance(train_data, pd.DataFrame):
+            self._users = (
+                train_data["userId"]
+                .drop_duplicates()
+                .sort_values()
+                .tolist()
+            )
+            self._items = (
+                train_data["itemId"]
+                .drop_duplicates()
+                .sort_values()
+                .tolist()
+            )
+        else:
+            self._users, self._items = train_data.get_users_items()
+
+        self._p_users = list(range(len(self._users)))
+        self._p_items = list(range(len(self._items)))
+
+        self._u_map = {user: k for k, user in zip(self._p_users, self._users)}
+        self._i_map = {item: k for k, item in zip(self._p_items, self._items)}
 
         if self.config.align_side_with_train:
-            self.side_information = self._align_with_training(side_information_data)
+            side_objs = self._align_with_training(side_info_data)
         else:
-            self.side_information = side_information_data
+            side_objs = side_info_data
 
-        self._users, self._items = self._get_users_and_items()
-        self.num_users = len(self._users)
-        self.num_items = len(self._items)
-
-        self.transactions = sum(len(v) for v in self._train_dict.values())
-
-        sparsity = 1 - (self.transactions / (self.num_users * self.num_items))
-        self.logger.info(
-            f"Statistics\t"
-            f"Users:\t{self.num_users}\t"
-            f"Items:\t{self.num_items}\t"
-            f"Transactions:\t{self.transactions}\t"
-            f"Sparsity:\t{sparsity}"
-        )
-
-        self._i_users = list(range(self.num_users))
-        self._i_items = list(range(self.num_items))
-
-        self._u_map = {user: k for k, user in zip(self._i_users, self._users)}
-        self._i_map = {item: k for k, item in zip(self._i_items, self._items)}
-
-        self._i_train_dict = self._build_mapped_dict(self._train_dict)
-
-        rows, cols, data = self._get_triples()
-        self.sp_i_train_ratings = csr_matrix(
-            (data, (rows, cols)), dtype=float, shape=(self.num_users, self.num_items)
-        )
+        self.side_information = {k: v.create_namespace() for k, v in side_objs.items()}
 
         if self.side_information:
             self._annotate_side_information()
             self._log_side_information()
             self.fuser = FeatureFuser(self.side_information)
         else:
-            self.side_information = None
+            # self.side_information = None
             self.fuser = None
 
-    def _handle_val_test_sets(self):
-        _, val_df, test_df = self.inter_dataframe
+        if isinstance(train_data, pd.DataFrame):
+            self.train_set = Interactions(
+                dataframe=train_data,
+                name="train",
+                u_map=self._u_map,
+                i_map=self._i_map,
+                side_info_ns=self.side_information
+            )
 
-        self._test_dict = self._dataframe_to_dict(test_df)
-        self._val_dict = (
-            self._dataframe_to_dict(val_df, val=True)
-            if val_df is not None else None
-        )
+            num_users, num_items = self.train_set.dims
+            transactions = self.train_set.transactions
+            sparsity = 1 - (transactions / (num_users * num_items))
 
-        self._i_test_dict = self._build_mapped_dict(self._test_dict)
-        self._i_val_dict = self._build_mapped_dict(self._val_dict)
-
-    def _dataframe_to_dict(self, data, val=False, skip_cold_users_items=True):
-        """Conversion to Dictionary"""
-        ratings_dict = defaultdict(dict)
-        users, items, ratings = data["userId"], data["itemId"], data["rating"]
-
-        u_map = getattr(self, "_u_map", None)
-        i_map = getattr(self, "_i_map", None)
-
-        text = 'training' if u_map is None else ('validation' if val else 'test')
-
-        iter_df = tqdm(
-            zip(users, items, ratings),
-            total=len(users),
-            desc=f"Building ratings dict for {text}",
-            leave=False
-        )
-
-        for user, item, rating in iter_df:
-            if skip_cold_users_items:
-                # Cold user?
-                if u_map is not None and user not in u_map:
-                    self.cold_users.add(user)
-                    # And cold item?
-                    if i_map is not None and item not in i_map:
-                        self.cold_items.add(item)
-                    continue
-
-                # Cold item?
-                if i_map is not None and item not in i_map:
-                    self.cold_items.add(item)
-                    continue
-
-            # Register rating, if not cold
-            ratings_dict[user][item] = rating
-
-        return dict(ratings_dict)
-
-    def _build_mapped_dict(self, public_dict):
-        private_dict = {}
-        if public_dict is None:
-            return None
-
-        for user, items in public_dict.items():
-            mapped_user = self._u_map.get(user)
-
-            new_items = {}
-            for i, v in items.items():
-                mapped_item = self._i_map.get(i)
-                new_items[mapped_item] = v
-
-            private_dict[mapped_user] = new_items
-
-        return private_dict
-
-    def _get_users_and_items(self, private=False):
-        ratings_dict = self._train_dict if not private else self._i_train_dict
-
-        users = list(ratings_dict.keys())
-        item_set = set()
-
-        for user_ratings in ratings_dict.values():
-            item_set.update(user_ratings.keys())
-
-        items = sorted(list(item_set))
-
-        return users, items
-
-    def _get_triples(self):
-        users, items, ratings = [], [], []
-        for u, item_list in self._i_train_dict.items():
-            for i, r in item_list.items():
-                users.append(u)
-                items.append(i)
-                ratings.append(r)
-        return users, items, ratings
-
-    def training_dataloader(self, sampler_cls, batch_size, seed=42, **kwargs):
-        if kwargs.get('transactions') is not None:
-            transactions = kwargs.pop('transactions')
+            self.logger.info(
+                f"Statistics\t"
+                f"Users:\t{num_users}\t"
+                f"Items:\t{num_items}\t"
+                f"Transactions:\t{transactions}\t"
+                f"Sparsity:\t{sparsity}"
+            )
         else:
-            transactions = self.transactions
+            self.train_set = train_data
 
-        cache_key = sampler_cls.__name__
-        if (cache_key not in self._cached_dataloaders or
-            len(self._cached_dataloaders[cache_key]) != transactions):
+    def _handle_eval_set(self, eval_data):
+        self.eval_set = Interactions(
+            dataframe=eval_data,
+            name=self._evaluation_set,
+            u_map=self._u_map,
+            i_map=self._i_map,
+            side_info_ns=self.side_information
+        )
 
-            users, items = self.get_users_items(private=True)
+    def _align_with_training(self, side_information_data):
+        """Alignment with training"""
 
-            sampler = sampler_cls(
-                train_dict=self.get_train_dict(private=True),
-                transactions=transactions,
-                users=users,
-                items=items,
-                n_users=self.num_users,
-                n_items=self.num_items,
-                seed=seed,
-                **kwargs
+        def equal(a, b, c):
+            return len(a) == len(b) == len(c)
+
+        side_objs = copy.deepcopy(side_information_data)
+
+        users, items = self._users.copy(), self._items.copy()
+        users_items = []
+
+        for v in side_objs.values():
+            users_items.append(v.get_mapped())
+
+        while True:
+            condition = True
+            new_users = users
+            new_items = items
+            for us_, is_ in users_items:
+                temp_users = new_users & us_
+                temp_items = new_items & is_
+                condition &= equal(new_users, us_, temp_users)
+                condition &= equal(new_items, is_, temp_items)
+                new_users = temp_users
+                new_items = temp_items
+            if condition:
+                break
+            else:
+                users = new_users
+                items = new_items
+                new_users_items = []
+                for v in side_objs.values():
+                    v.filter(users, items)
+                    new_users_items.append(v.get_mapped())
+                users_items = new_users_items
+
+        return side_objs
+
+    def _annotate_side_information(self):
+        """
+        Attach useful mappings to side-information namespaces so CB/Hybrid models
+        can consume them without re-building public/private mappings.
+        """
+        for _, side_ns in self.side_information.__dict__.items():
+            mapped_users, mapped_items = side_ns.object.get_mapped()
+            setattr(side_ns, "user_mapping", self._u_map)
+            setattr(side_ns, "item_mapping", self._i_map)
+            setattr(side_ns, "mapped_users", {u: self._u_map[u] for u in mapped_users if u in self._u_map})
+            setattr(side_ns, "mapped_items", {i: self._i_map[i] for i in mapped_items if i in self._i_map})
+            # setattr(side_ns, "num_users", self.num_users)
+            # setattr(side_ns, "num_items", self.num_items)
+            # Alignment strategy and materialization hints from loader
+            setattr(side_ns, "alignment_mode", getattr(side_ns.object, "_alignment_mode", None))
+            setattr(side_ns, "materialization", getattr(side_ns.object, "_materialization", None))
+
+    def _log_side_information(self):
+        for name, side_ns in self.side_information.__dict__.items():
+            mapped_users, mapped_items = side_ns.object.get_mapped()
+            missing_users = len(set(self.train_set.get_dict().keys()) - set(mapped_users))
+            missing_items = len(set(self._i_map.keys()) - set(mapped_items))
+            self.logger.info(
+                "Side information aligned",
+                extra={
+                    "context": {
+                        "source": name,
+                        "users_in_side": len(mapped_users),
+                        "items_in_side": len(mapped_items),
+                        "missing_users_vs_train": missing_users,
+                        "missing_items_vs_train": missing_items,
+                        "alignment_mode": getattr(side_ns, "alignment_mode", None),
+                        "materialization": getattr(side_ns, "materialization", None),
+                    }
+                },
             )
 
-            dataset = build_dataset(sampler)
-
-            self._cached_dataloaders[cache_key] = DataLoader(
-                dataset,
-                batch_size=batch_size,
-                collate_fn=getattr(sampler, 'collate_fn', None),
-                shuffle=True
-            )
-
-        return self._cached_dataloaders[cache_key]
-
-    def eval_dataloader(self, batch_size):
+    def get_eval_dataloader(self, batch_size=1024):
         cache_key = self._eval_cache_key
 
         if cache_key is None:
+            num_users, num_items = self.train_set.dims
+
             if self.config.negative_sampling is not None:
-                train, val, test = self.get_positive_items()
+                train_pos = self.train_set.get_positive_items()
+                eval_pos = self.eval_set.get_positive_items()
 
                 sampler = NegativeSampler(
                     neg_sampling_config=self.config.negative_sampling,
                     mappings=self.get_mappings(),
                     inv_mappings=self.get_inverse_mappings(),
-                    num_users=self.num_users,
-                    num_items=self.num_items,
-                    pos_items=(train, val, test)
+                    num_users=num_users,
+                    num_items=num_items,
+                    train_pos_items=train_pos,
+                    eval_pos_items=eval_pos,
+                    evaluation_set=self._evaluation_set,
+                    fold_index=self.fold_index
                 )
 
                 eval_dataset = NegEvalDataset(
-                    num_users=self.num_users,
+                    num_users=num_users,
                     sampler=sampler,
-                    val_pos_items=val,
-                    test_pos_items=test,
+                    eval_pos_items=eval_pos,
+                    evaluation_set=self._evaluation_set,
                     leave_one_out=self.config.negative_sampling.leave_one_out
                 )
                 cache_key = "neg"
             else:
-                eval_dataset = FullEvalDataset(num_users=self.num_users)
+                eval_dataset = FullEvalDataset(num_users=num_users)
                 cache_key = "full"
 
-            self._cached_dataloaders[cache_key] = DataLoader(
-                eval_dataset,
-                batch_size=batch_size,
-                collate_fn=eval_dataset.collate_fn,
-                shuffle=False
-            )
-
+            self._cached_datasets[cache_key] = eval_dataset
             self._eval_cache_key = cache_key
 
-        return self._cached_dataloaders[cache_key]
+        dataset = self._cached_datasets[cache_key]
+        dataloader = DataLoader(
+            dataset,
+            batch_size=batch_size,
+            collate_fn=dataset.collate_fn,
+            shuffle=False
+        )
 
-    @cached_property
-    def sp_i_train(self):
-        return self.sp_i_train_ratings.astype(bool).astype('float32')
-
-    @cached_property
-    def sp_i_train_tensor(self):
-        coo = self.sp_i_train.tocoo()
-        row = torch.tensor(coo.row, dtype=torch.long)
-        col = torch.tensor(coo.col, dtype=torch.long)
-        return SparseTensor(row=row, col=col, sparse_sizes=coo.shape)
+        return dataloader
 
     def get_mappings(self):
         return self._u_map, self._i_map
@@ -369,54 +339,7 @@ class DataSet:
         return self._users, self._items
 
     def get_users_items(self, private=False):
-        return (self._users, self._items) if not private else (self._i_users, self._i_items)
-
-    def get_train_dict(self, private=False):
-        return self._train_dict if not private else self._i_train_dict
-
-    def get_test_dict(self, private=False):
-        return self._test_dict if not private else self._i_test_dict
-
-    def get_val_dict(self, private=False):
-        return self._val_dict if not private else self._i_val_dict
-
-    def get_positive_items(self):
-        users = sorted(list(self._i_train_dict.keys()))
-
-        train, val, test = [], [], []
-
-        # Local cache to speed up computation
-        train_dict = self._i_train_dict
-        test_dict = self._i_test_dict
-        val_dict = self._i_val_dict
-
-        has_val = val_dict is not None
-
-        for u in users:
-            # Train
-            items_train = train_dict.get(u, ())
-            train_set = list(set(items_train))
-            train.append(list(train_set))
-
-            # Test
-            items_test = test_dict.get(u, ())
-            test_set = list(set(items_test))
-            test.append(list(test_set))
-
-            # Val
-            if has_val:
-                items_val = val_dict.get(u, ())
-                val_set = set(items_val)
-                val.append(list(val_set))
-
-        return train, val, test
-
-    def build_items_neighbour(self):
-        row, col = self.sp_i_train.nonzero()
-        edge_index = np.array([row, col])
-        iu_dict = {i: edge_index[0, iu].tolist() for i, iu in
-                   enumerate(list((edge_index[1] == i).nonzero()[0] for i in self._items))}
-        return iu_dict
+        return (self._users, self._items) if not private else (self._p_users, self._p_items)
 
     """def _build_sparse(self, dict, users, items):
         rows_cols = [(u, i) for u, items in dict.items() for i in items.keys()]
@@ -454,82 +377,3 @@ class DataSet:
     #@cached_property
     #def sp_i_train_ratings(self):
     #    return SparseBuilder.build_sparse_ratings(self.i_train_dict, self.users, self.items)
-
-    def _align_with_training(self, side_information_data):
-        """Alignment with training"""
-
-        def equal(a, b, c):
-            return len(a) == len(b) == len(c)
-
-        users = set(self._train_dict.keys())
-        items = set({k for a in self._train_dict.values() for k in a.keys()})
-        users_items = []
-        side_objs = []
-        for k, v in side_information_data.__dict__.items():
-            new_v = copy.deepcopy(v)
-            users_items.append(new_v.object.get_mapped())
-            side_objs.append(new_v)
-        while True:
-            condition = True
-            new_users = users
-            new_items = items
-            for us_, is_ in users_items:
-                temp_users = new_users & us_
-                temp_items = new_items & is_
-                condition &= equal(new_users, us_, temp_users)
-                condition &= equal(new_items, is_, temp_items)
-                new_users = temp_users
-                new_items = temp_items
-            if condition:
-                break
-            else:
-                users = new_users
-                items = new_items
-                new_users_items = []
-                for v in side_objs:
-                    v.object.filter(users, items)
-                    new_users_items.append(v.object.get_mapped())
-                users_items = new_users_items
-        ns = SimpleNamespace()
-        for side_obj in side_objs:
-            side_ns = side_obj.object.create_namespace()
-            name = side_ns.__name__
-            setattr(ns, name, side_ns)
-        return ns
-
-    def _annotate_side_information(self):
-        """
-        Attach useful mappings to side-information namespaces so CB/Hybrid models
-        can consume them without re-building public/private mappings.
-        """
-        for _, side_ns in self.side_information.__dict__.items():
-            mapped_users, mapped_items = side_ns.object.get_mapped()
-            setattr(side_ns, "user_mapping", self._u_map)
-            setattr(side_ns, "item_mapping", self._i_map)
-            setattr(side_ns, "mapped_users", {u: self._u_map[u] for u in mapped_users if u in self._u_map})
-            setattr(side_ns, "mapped_items", {i: self._i_map[i] for i in mapped_items if i in self._i_map})
-            setattr(side_ns, "num_users", self.num_users)
-            setattr(side_ns, "num_items", self.num_items)
-            # Alignment strategy and materialization hints from loader
-            setattr(side_ns, "alignment_mode", getattr(side_ns.object, "_alignment_mode", None))
-            setattr(side_ns, "materialization", getattr(side_ns.object, "_materialization", None))
-
-    def _log_side_information(self):
-        for name, side_ns in self.side_information.__dict__.items():
-            mapped_users, mapped_items = side_ns.object.get_mapped()
-            missing_users = len(set(self._train_dict.keys()) - set(mapped_users))
-            missing_items = len(set(self._i_map.keys()) - set(mapped_items))
-            self.logger.info(
-                "Side information aligned",
-                extra={
-                    "context": {
-                        "source": name,
-                        "users_in_side": len(mapped_users),
-                        "items_in_side": len(mapped_items),
-                        "missing_users_vs_train": missing_users,
-                        "missing_items_vs_train": missing_items,
-                        "alignment_mode": getattr(side_ns, "alignment_mode", None),
-                        "materialization": getattr(side_ns, "materialization", None),
-                    }
-                },
-            )

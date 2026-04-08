@@ -5,7 +5,7 @@ import torch
 from types import SimpleNamespace
 
 from elliot.namespace import RecommenderConfig
-from elliot.recommender.base_trainer import AbstractTrainer, GeneralTrainer, Trainer
+from elliot.recommender.base_trainer import AbstractTrainer, GeneralTrainer, BaseTrainer
 
 
 class _DummyModel:
@@ -45,11 +45,11 @@ def _make_config(batch_size=1):
 
 
 def test_trainer_epoch_loss_is_mean():
-    trainer = Trainer.__new__(Trainer)
+    trainer = BaseTrainer.__new__(BaseTrainer)
     trainer.model = _DummyModel([1.0, 2.0, 3.0])
     trainer.model_config = _make_config()
 
-    loss = Trainer._train_epoch(trainer, it=0, dataloader=[0, 1, 2])
+    loss = BaseTrainer._train_epoch(trainer, it=0, dataloader=[0, 1, 2])
 
     assert loss == pytest.approx(2.0)
 
@@ -65,34 +65,43 @@ def test_general_trainer_epoch_loss_is_mean():
     assert loss == pytest.approx(3.0)
 
 
+class _DummyDataset:
+    def __init__(self):
+        self.train_set = SimpleNamespace(transactions=1)
+
+
 class _DummyTrainer(AbstractTrainer):
     def __init__(self):
         # Do not call AbstractTrainer.__init__ (too heavy for unit test)
-        self.data = SimpleNamespace(transactions=1)
         self.model_config = _make_config()
         self.logger = logging.getLogger("dummy-trainer")
         self.model = SimpleNamespace(
-            transactions=1,
             get_training_dataloader=lambda batch_size: [0],
         )
+
         self.last_loss = None
 
-    def iterate(self, epochs):
-        return range(epochs)
+    def iterate(self):
+        return range(self.model_config.epochs)
 
     def _train_epoch(self, it, dataloader, *args):
         return 5.0
 
-    def evaluate(self, it=0, loss=0):
-        self.last_loss = loss
+    def evaluate(self, dataset, it=None, evaluation_set="test"):
+        self.last_loss = self._losses[-1]
+        self._val_results.append({})
 
-    def get_report(self):
+    def get_report(self, results, evaluation_set="test"):
         return {}
+
+    def get_best_arg(self):
+        return 0
 
 
 def test_train_passes_epoch_loss_to_evaluate():
     trainer = _DummyTrainer()
-    trainer.train()
+    dataset = _DummyDataset()
+    trainer.train(dataset)
 
     assert trainer.last_loss == pytest.approx(5.0)
 

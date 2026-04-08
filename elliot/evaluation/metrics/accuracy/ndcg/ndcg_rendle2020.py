@@ -4,13 +4,14 @@ It proceeds from a user-wise computation, and average the values over the users.
 """
 
 
-import typing as t
-
+from typing import List
 import numpy as np
 
 from elliot.evaluation.metrics.base_metric import BaseMetric
+from elliot.utils.registry import metric_registry
 
 
+@metric_registry.register()
 class nDCGRendle2020(BaseMetric):
     r"""
     normalized Discounted Cumulative Gain
@@ -56,15 +57,7 @@ class nDCGRendle2020(BaseMetric):
         self._relevance = self._evaluation_objects.relevance.binary_relevance
         self._rel_threshold = self._evaluation_objects.relevance._rel_threshold
 
-    @staticmethod
-    def name():
-        """
-        Metric Name Getter
-        :return: returns the public name of the metric
-        """
-        return "nDCGRendle2020"
-
-    def __user_ndcg(self, user_recommendations: t.List, user, cutoff: int):
+    def __user_ndcg(self, user_recommendations: List, user, cutoff: int):
         """
         Per User normalized Discounted Cumulative Gain
         :param user_recommendations: list of user recommendation in the form [(item1,value1),...]

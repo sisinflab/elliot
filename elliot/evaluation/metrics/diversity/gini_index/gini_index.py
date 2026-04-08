@@ -6,8 +6,10 @@ It proceeds from a user-wise computation, and average the values over the users.
 
 import numpy as np
 from elliot.evaluation.metrics.base_metric import BaseMetric
+from elliot.utils.registry import metric_registry
 
 
+@metric_registry.register()
 class GiniIndex(BaseMetric):
     r"""
     Gini Index
@@ -41,14 +43,6 @@ class GiniIndex(BaseMetric):
         self._num_items = self._evaluation_objects.num_items
         self._item_count = {}
         self._free_norm = 0
-
-    @staticmethod
-    def name():
-        """
-        Metric Name Getter
-        :return: returns the public name of the metric
-        """
-        return "Gini"
 
     def __user_gini(self, user_recommendations, cutoff):
         """

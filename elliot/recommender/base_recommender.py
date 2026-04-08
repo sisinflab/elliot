@@ -1,4 +1,7 @@
+import inspect
 import random
+import logging as pylog
+from typing import Tuple, Optional
 
 import numpy as np
 import torch
@@ -9,29 +12,40 @@ from abc import ABC, abstractmethod
 
 from elliot.namespace import RecommenderConfig
 from elliot.recommender.init import zeros_init
-from elliot.utils import get_device
+from elliot.utils import get_device, logging
 from elliot.utils.enums import ModelType
+from elliot.utils.read import Reader
+from elliot.utils.write import Writer
 
 
 class AbstractRecommender(ABC):
     type: ModelType
 
-    def __init__(self, data, params, seed, logger):
-        self._data = data
+    def __init__(self, params, interactions, seed, *args, **kwargs):
+        self._interactions = interactions
         self._seed = seed
-        self._users, self._items = data.get_users_items()
-        self._num_items = data.num_items
-        self._num_users = data.num_users
-        self.transactions = data.transactions
-        self.logger = logger
+        self._users, self._items = interactions.get_users_items()
+        self._num_users, self._num_items = interactions.dims
+        self.transactions = interactions.transactions
+
+        package_name = inspect.getmodule(self.__class__).__package__
+        cls_name = self.__class__.__name__
+        rec_name = f"external.{cls_name}" if "external" in package_name else cls_name
+        self.logger = logging.get_logger_model(rec_name, pylog.DEBUG)
+
+        self.reader = Reader(self.logger)
+        self.writer = Writer(self.logger)
+
+        self.model_config = params
         self.params_list = []
-        self.params_to_save = []
 
         self.set_seed(seed)
         self.set_params(params)
 
         if hasattr(self, '_loader') or hasattr(self, '_loaders'):
             self.set_side_info()
+
+        self.model_config.name = self.name
 
     @property
     def name(self):
@@ -62,12 +76,10 @@ class AbstractRecommender(ABC):
                 self.logger.info(f"Parameter '{name}' set to {val}")
                 self.params_list.append(name)
 
-        self.params_to_save = self.params_list.copy()
-
     def set_side_info(self, loader=None, mod=None):
         name = f"_side{('_' + mod) if mod else ''}"
         loader_name = loader if loader else self._loader
-        loader_obj = getattr(self._data.side_information, loader_name)
+        loader_obj = getattr(self._interactions.side_information, loader_name)
         setattr(self, name, loader_obj)
 
     def get_training_dataloader(self, batch_size):
@@ -79,11 +91,7 @@ class AbstractRecommender(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def predict_full(self, user_indices):
-        raise NotImplementedError()
-
-    @abstractmethod
-    def predict_sampled(self, user_indices, item_indices):
+    def predict(self, user_indices, item_indices=None):
         raise NotImplementedError()
 
     @abstractmethod
@@ -95,13 +103,14 @@ class AbstractRecommender(ABC):
         raise NotImplementedError()
 
 
-class Recommender(AbstractRecommender):
+class BaseRecommender(AbstractRecommender):
     type = ModelType.BASE
 
-    def __init__(self, data, params, seed, logger):
-        super().__init__(data, params, seed, logger)
+    def __init__(self, params, interactions, seed, *args, **kwargs):
+        super().__init__(params, interactions, seed, *args, **kwargs)
         self.modules = []
         self.bias = []
+        self.params_to_save = []
 
     def set_seed(self, seed: int):
         random.seed(seed)
@@ -123,14 +132,14 @@ class Recommender(AbstractRecommender):
                 setattr(self, k, v)
 
 
-class TraditionalRecommender(Recommender):
+class TraditionalRecommender(BaseRecommender):
     type = ModelType.TRADITIONAL
 
-    def __init__(self, data, params, seed, logger):
-        super().__init__(data, params, seed, logger)
+    def __init__(self, params, interactions, seed, *args, **kwargs):
+        super().__init__(params, interactions, seed, *args, **kwargs)
         self.similarity_matrix = None
-        self._train = data.sp_i_train_ratings
-        self._implicit_train = data.sp_i_train
+        self._train = self._interactions.sparse_ratings
+        self._implicit_train = self._interactions.sparse
 
     def train_step(self, *args):
         pass
@@ -143,8 +152,8 @@ class TraditionalRecommender(Recommender):
 class GeneralRecommender(nn.Module, AbstractRecommender):
     type = ModelType.GENERAL
 
-    def __init__(self, data, params, seed, logger):
-        AbstractRecommender.__init__(self, data, params, seed, logger)
+    def __init__(self, params, interactions, seed, *args, **kwargs):
+        AbstractRecommender.__init__(self, params, interactions, seed, *args, **kwargs)
         super(GeneralRecommender, self).__init__()
         self.bias = []
         self._device = get_device()
@@ -181,8 +190,44 @@ class GeneralRecommender(nn.Module, AbstractRecommender):
 
 
 class GraphBasedRecommender(GeneralRecommender):
-    def __init__(self, data, params, seed, logger):
-        super().__init__(data, params, seed, logger)
+    # Cache storage
+    _cached_user_emb: Optional[Tensor] = None
+    _cached_item_emb: Optional[Tensor] = None
+
+    def __init__(self, params, interactions, seed, *args, **kwargs):
+        super().__init__(params, interactions, seed, *args, **kwargs)
+
+    def train(self, mode=True):
+        """Override train mode to empty the cache when switching to training."""
+        super().train(mode)
+
+        if mode:
+            # We are in training mode, embeddings will change. Empty the cache
+            self._cached_user_emb = None
+            self._cached_item_emb = None
+
+    def propagate_embeddings(self) -> Tuple[Tensor, Tensor]:
+        """Retrieve the propagate user and item embeddings.
+
+        Subsequent calls will return the cached values, speeding up the
+        evaluation process.
+
+        Returns:
+            Tuple[Tensor, Tensor]: (User Embeddings, Item Embeddings)
+        """
+        # Safety check
+        if self.training:
+            return self.forward()
+
+        # Check if values are cached
+        if self._cached_user_emb is None or self._cached_item_emb is None:
+            with torch.no_grad():
+                # Unpack the forward
+                ret = self.forward()
+                self._cached_user_emb = ret[0]
+                self._cached_item_emb = ret[1]
+
+        return self._cached_user_emb, self._cached_item_emb
 
     def get_adj_mat(self) -> SparseTensor:
         """Get the normalized interaction matrix of users and items.
@@ -191,7 +236,7 @@ class GraphBasedRecommender(GeneralRecommender):
             SparseTensor: The sparse adjacency matrix.
         """
         # Extract user and items nodes
-        row, col = self._data.sp_i_train.nonzero()
+        row, col = self._interactions.sparse.nonzero()
         user_nodes = row
         item_nodes = col + self._num_users
 

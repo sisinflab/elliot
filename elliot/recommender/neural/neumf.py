@@ -8,12 +8,13 @@ from typing import Tuple
 import torch
 from torch import nn
 
-from elliot.dataset.samplers import MFPointWisePosNegSampler
 from elliot.recommender.init import normal_init
 from elliot.recommender.base_recommender import GeneralRecommender
 from elliot.recommender.layers import MLP
+from elliot.utils.registry import model_registry
 
 
+@model_registry.register()
 class NeuMF(GeneralRecommender):
     """
     Neural Collaborative Filtering
@@ -61,8 +62,8 @@ class NeuMF(GeneralRecommender):
     m: int = 0
     batch_eval_items: int = 256
 
-    def __init__(self, data, params, seed, logger):
-        super(NeuMF, self).__init__(data, params, seed, logger)
+    def __init__(self, params, interactions, seed, *args, **kwargs):
+        super(NeuMF, self).__init__(params, interactions, seed, *args, **kwargs)
 
         # MF embeddings
         self.user_mf_embedding = nn.Embedding(self._num_users, self.embed_mf_size, dtype=torch.float32)
@@ -97,7 +98,9 @@ class NeuMF(GeneralRecommender):
         self.to(self._device)
 
     def get_training_dataloader(self, batch_size):
-        dataloader = self._data.training_dataloader(MFPointWisePosNegSampler, batch_size, self._seed, m=self.m)
+        dataloader = self._interactions.get_dataloader(
+            "MFPointWisePosNegSampler", batch_size, self._seed, m=self.m
+        )
         return dataloader
 
     def forward(self, user, item):
@@ -131,42 +134,42 @@ class NeuMF(GeneralRecommender):
 
         return loss
 
-    def predict_full(self, user_indices):
-        batch_size = len(user_indices)
-        preds = []
+    def predict(self, user_indices, item_indices=None):
+        batch_size = user_indices.size(0)
 
-        for s in range(0, self._num_items, self.batch_eval_items):
-            e = min(s + self.batch_eval_items, self._num_items)
-            items_block = torch.arange(s, e)
+        if item_indices is None:
+            preds = []
 
-            # Expand user_indices and items_block to create all user-item pairs
-            # within this block.
-            users_block = (
-                user_indices.unsqueeze(1).expand(-1, e - s).reshape(-1)
-            )
-            items_block_expanded = (
-                items_block.unsqueeze(0).expand(batch_size, -1).reshape(-1)
-            )
+            for s in range(0, self._num_items, self.batch_eval_items):
+                e = min(s + self.batch_eval_items, self._num_items)
+                items_block = torch.arange(s, e)
 
-            preds_block = self.sigmoid(self.forward(users_block, items_block_expanded))
-            preds.append(preds_block.view(batch_size, e - s))
+                # Expand user_indices and items_block to create all user-item pairs
+                # within this block.
+                users_block = (
+                    user_indices.unsqueeze(1).expand(-1, e - s).reshape(-1)
+                )
+                items_block_expanded = (
+                    items_block.unsqueeze(0).expand(batch_size, -1).reshape(-1)
+                )
 
-        predictions = torch.cat(preds, dim=1)
+                preds_block = self.forward(users_block, items_block_expanded)
+                preds.append(preds_block.view(batch_size, e - s))
 
-        return predictions.to(self._device)
+            predictions = torch.cat(preds, dim=1)
 
-    def predict_sampled(self, user_indices, item_indices):
-        batch_size, pad_seq = item_indices.size()
+        else:
+            pad_seq = item_indices.size(1)
 
-        # Prepare user and item indices for forward pass
-        users_expanded = user_indices.unsqueeze(1).expand(-1, pad_seq).reshape(-1)
-        items_expanded = item_indices.clamp(min=0).reshape(-1)
+            # Prepare user and item indices for forward pass
+            users_expanded = user_indices.unsqueeze(1).expand(-1, pad_seq).reshape(-1)
+            items_expanded = item_indices.clamp(min=0).reshape(-1)
 
-        # Compute predictions using the forward pass
-        predictions_flat = self.forward(users_expanded, items_expanded)
-        predictions = predictions_flat.view(batch_size, pad_seq)
+            # Compute predictions using the forward pass
+            predictions_flat = self.forward(users_expanded, items_expanded)
+            predictions = predictions_flat.view(batch_size, pad_seq)
 
         # Apply sigmoid to get scores between 0 and 1
         predictions = self.sigmoid(predictions)
 
-        return predictions.to(self._device)
+        return predictions

@@ -3,6 +3,7 @@ from sklearn.preprocessing import normalize
 
 from elliot.recommender.base_recommender import TraditionalRecommender
 from elliot.recommender.knn.similarity import Similarity
+from elliot.utils.registry import model_registry
 
 
 class KNN(TraditionalRecommender):
@@ -15,8 +16,8 @@ class KNN(TraditionalRecommender):
     beta: float
     normalize_similarity: bool
 
-    def __init__(self, data, params, seed, logger, transpose):
-        super().__init__(data, params, seed, logger)
+    def __init__(self, params, interactions, seed, transpose, *args, **kwargs):
+        super().__init__(params, interactions, seed, *args, **kwargs)
 
         self._URM = self._implicit_train if self.implicit else self._train
         train_data = self._URM if not transpose else self._URM.T
@@ -41,6 +42,7 @@ class KNN(TraditionalRecommender):
             self.similarity_matrix = normalize(self.similarity_matrix, norm="l1", axis=1)
 
 
+@model_registry.register()
 class ItemKNN(KNN):
     # Model hyperparameters
     neighborhood: int = 40
@@ -51,23 +53,22 @@ class ItemKNN(KNN):
     beta: float = 1.0
     normalize_similarity: bool = False
 
-    def __init__(self, data, params, seed, logger):
-        super().__init__(data, params, seed, logger, transpose=True)
+    def __init__(self, params, interactions, seed, *args, **kwargs):
+        super().__init__(params, interactions, seed, *args, **kwargs, transpose=True)
 
-    def predict_full(self, user_indices):
+    def predict(self, user_indices, item_indices=None):
         predictions = self._URM[user_indices.numpy()] @ self.similarity_matrix
 
         predictions = torch.from_numpy(predictions.toarray())
-        return predictions
 
-    def predict_sampled(self, user_indices, item_indices):
-        predictions = self._URM[user_indices.numpy()] @ self.similarity_matrix
+        if item_indices is None:
+            return predictions
 
-        predictions = torch.from_numpy(predictions.toarray())
         predictions = predictions.gather(1, item_indices.clamp(min=0))
         return predictions
 
 
+@model_registry.register()
 class UserKNN(KNN):
     # Model hyperparameters
     neighborhood: int = 40
@@ -78,18 +79,16 @@ class UserKNN(KNN):
     beta: float = 1.0
     normalize_similarity: bool = False
 
-    def __init__(self, data, params, seed, logger):
-        super().__init__(data, params, seed, logger, transpose=False)
+    def __init__(self, params, interactions, seed, *args, **kwargs):
+        super().__init__(params, interactions, seed, *args, **kwargs, transpose=False)
 
-    def predict_full(self, user_indices):
+    def predict(self, user_indices, item_indices=None):
         predictions = self.similarity_matrix[user_indices.numpy()] @ self._URM
 
         predictions = torch.from_numpy(predictions.toarray())
-        return predictions
 
-    def predict_sampled(self, user_indices, item_indices):
-        predictions = self.similarity_matrix[user_indices.numpy()] @ self._URM
+        if item_indices is None:
+            return predictions
 
-        predictions = torch.from_numpy(predictions.toarray())
         predictions = predictions.gather(1, item_indices.clamp(min=0))
         return predictions

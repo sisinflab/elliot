@@ -5,8 +5,10 @@ It proceeds from a user-wise computation, and average the values over the users.
 
 
 from elliot.evaluation.metrics.base_metric import BaseMetric
+from elliot.utils.registry import metric_registry
 
 
+@metric_registry.register()
 class SRecall(BaseMetric):
     r"""
     Subtopic Recall
@@ -37,16 +39,8 @@ class SRecall(BaseMetric):
         self._cutoff = self._evaluation_objects.cutoff
         self._relevance = self._evaluation_objects.relevance.binary_relevance
         self._feature_map = SRecall._load_attribute_file(additional_data["feature_data"])
-        _, items = eval_objects.data.get_users_items()
+        _, items = self._evaluation_objects.train_data.get_users_items()
         self._total_features = len({topic for item in items for topic in self._feature_map.get(item, [])})
-
-    @staticmethod
-    def name():
-        """
-        Metric Name Getter
-        :return: returns the public name of the metric
-        """
-        return "SRecall"
 
     @staticmethod
     def __user_srecall(user_recommendations, cutoff, user_relevant_items, feature_map, total_features):

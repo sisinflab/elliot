@@ -5,8 +5,10 @@ It proceeds from a user-wise computation, and average the values over the users.
 
 
 from elliot.evaluation.metrics.base_metric import BaseMetric
+from elliot.utils.registry import metric_registry
 
 
+@metric_registry.register()
 class ExtendedEPC(BaseMetric):
     r"""
     Extended EPC
@@ -41,14 +43,6 @@ class ExtendedEPC(BaseMetric):
         else:
             self._relevance = self._evaluation_objects.relevance.binary_relevance
 
-    @staticmethod
-    def name():
-        """
-        Metric Name Getter
-        :return: returns the public name of the metric
-        """
-        return "ExtendedEPC"
-
     def __user_EPC(self, user_recommendations, user, cutoff):
         """
         Per User Expected Popularity Complement
@@ -80,11 +74,11 @@ class ExtendedEPC(BaseMetric):
     #     """
     #
     #     item_count = {}
-    #     for u_h in self._evaluation_objects.data.get_train_dict().values():
+    #     for u_h in self._evaluation_objects.train_data.get_dict().values():
     #         for i in u_h.keys():
     #             item_count[i] = item_count.get(i, 0) + 1
     #
-    #     num_users = len(self._evaluation_objects.data.get_train_dict())
+    #     num_users = len(self._evaluation_objects.train_data.get_dict())
     #     self._item_novelty_dict = {i: 1 - (v / num_users) for i, v in item_count.items()}
     #
     #     a = [self.__user_EPC(u_r, u, self._cutoff)
@@ -101,10 +95,10 @@ class ExtendedEPC(BaseMetric):
             self._item_novelty_dict = pop_cache.item_novelty_epc
         else:
             item_count = {}
-            for user_hist in self._evaluation_objects.data.get_train_dict().values():
+            for user_hist in self._evaluation_objects.train_data.get_dict().values():
                 for item in user_hist.keys():
                     item_count[item] = item_count.get(item, 0) + 1
-            num_users = len(self._evaluation_objects.data.get_train_dict())
+            num_users = len(self._evaluation_objects.train_data.get_dict())
             self._item_novelty_dict = {
                 item: 1 - (count / num_users)
                 for item, count in item_count.items()

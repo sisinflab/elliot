@@ -7,8 +7,10 @@ It proceeds from a user-wise computation, and average the values over the users.
 import numpy as np
 import pandas as pd
 from elliot.evaluation.metrics.base_metric import BaseMetric
+from elliot.utils.registry import metric_registry
 
 
+@metric_registry.register()
 class UserMADrating(BaseMetric):
     r"""
     User MAD Rating-based
@@ -55,6 +57,7 @@ class UserMADrating(BaseMetric):
         self._sum = np.zeros(self._n_clusters)
         self._n_users = np.zeros(self._n_clusters)
 
+    @property
     def name(self):
         """
         Metric Name Getter
@@ -93,7 +96,3 @@ class UserMADrating(BaseMetric):
             for j in range(i+1,self._n_clusters):
                 differences.append(abs(avg[i] - avg[j]))
         return np.average(differences)
-
-    def get(self):
-        return [self]
-

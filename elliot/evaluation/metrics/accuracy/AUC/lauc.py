@@ -6,9 +6,10 @@ It proceeds from a user-wise computation, and average the values over the users.
 
 import numpy as np
 from elliot.evaluation.metrics.base_metric import BaseMetric
-from elliot.utils import logging
-import logging as pylog
+from elliot.utils.registry import metric_registry
 
+
+@metric_registry.register()
 class LAUC(BaseMetric):
     r"""
     Limited Area Under the Curve
@@ -38,18 +39,9 @@ class LAUC(BaseMetric):
         :param eval_objects: list of objects that may be useful for the computation of the different metrics
         """
         super().__init__(recommendations, config, params, eval_objects)
-        self.logger = logging.get_logger("Evaluator",  pylog.CRITICAL if config.config_test else pylog.DEBUG)
         self._cutoff = self._evaluation_objects.cutoff
         self._relevance = self._evaluation_objects.relevance.binary_relevance
         self._num_items = self._evaluation_objects.num_items
-
-    @staticmethod
-    def name():
-        """
-        Metric Name Getter
-        :return: returns the public name of the metric
-        """
-        return "LAUC"
 
     @staticmethod
     def __user_auc_at_k(user_recommendations, cutoff, user_relevant_items, num_items, train_size):
@@ -80,6 +72,14 @@ class LAUC(BaseMetric):
         Evaluation function
         :return: the overall averaged value of LAUC per user
         """
-        return {u: LAUC.__user_auc_at_k(u_r, self._cutoff, self._relevance.get_user_rel(u), self._num_items, len(self._evaluation_objects.data.get_train_dict()[u]))
-             for u, u_r in self._recommendations.items() if len(self._relevance.get_user_rel(u))}
+        return {
+            u: LAUC.__user_auc_at_k(
+                u_r,
+                self._cutoff,
+                self._relevance.get_user_rel(u),
+                self._num_items,
+                len(self._evaluation_objects.train_data.get_dict()[u])
+            )
+            for u, u_r in self._recommendations.items() if len(self._relevance.get_user_rel(u))
+        }
 

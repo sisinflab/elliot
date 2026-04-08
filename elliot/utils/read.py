@@ -2,7 +2,7 @@
 Module description:
 
 """
-
+import json
 from typing import List, Tuple, Dict, Any, Callable, Optional, Union
 from ast import literal_eval
 from logging import LoggerAdapter
@@ -165,7 +165,7 @@ class Reader:
         read_folder: str,
         hierarchical: bool = False,
         **kwargs: Any
-    ) -> List[Tuple[List[Tuple[pd.DataFrame, pd.DataFrame]], pd.DataFrame]]:
+    ) -> List[Tuple[List[Tuple[pd.DataFrame, pd.DataFrame]], pd.DataFrame, pd.DataFrame]]:
         """Read tabular data splits from a specified folder,
         supporting both classic and hierarchical split structures.
 
@@ -177,9 +177,9 @@ class Reader:
             **kwargs (Any): Additional keyword arguments passed to `read_folder` and `read_tabular` methods.
 
         Returns:
-            List[Tuple[List[Tuple[pd.DataFrame, pd.DataFrame]], pd.DataFrame]]:
-                A list of tuples where each tuple contains a list of train/validation
-                DataFrame pairs and a test DataFrame.
+            List[Tuple[List[Tuple[pd.DataFrame, pd.DataFrame]], pd.DataFrame, pd.DataFrame]]:
+                A list of tuples where each tuple contains an optional list of train/validation
+                DataFrame pairs, a train DataFrame, and a test DataFrame.
         """
 
         def get_file_path(folder, name):
@@ -197,9 +197,16 @@ class Reader:
 
             train_df = self.read_tabular(train_path, **kwargs)
             test_df = self.read_tabular(test_path, **kwargs)
-            val_df = self.read_tabular(val_path, **kwargs) if val_path is not None else None
 
-            tuple_list = [([(train_df, val_df)], test_df)]
+            if val_path is not None:
+                val_df = self.read_tabular(val_path, **kwargs)
+                folds = [(train_df, val_df)]
+                original_train_df = None
+            else:
+                folds = []
+                original_train_df = train_df
+
+            tuple_list = [(folds, original_train_df, test_df)]
 
         # Case 2: hierarchical split
         else:
@@ -213,6 +220,7 @@ class Reader:
 
                 val_dirs = [p for p in list_dir(test_folder_path) if is_dir(p)]
                 val_list = []
+                original_train_df = None
 
                 # Validation fold level
                 for val_folder_path in val_dirs:
@@ -224,23 +232,63 @@ class Reader:
 
                     val_list.append((train_df, val_df))
 
+                if val_list:
+                    train_df, val_df = val_list[0]
+                    if len(val_list) > 1:
+                        original_train_df = pd.concat([train_df, val_df], ignore_index=True)
+
                 # Load only train dataset if validation folds are missing
-                if not val_list:
+                else:
                     train_path = get_file_path(test_folder_path, "train")
+                    original_train_df = self.read_tabular(train_path, **kwargs)
 
-                    train_df = self.read_tabular(train_path, **kwargs)
-
-                    val_list.append((train_df, None))
-
-                tuple_list.append((val_list, test_df))
+                tuple_list.append((val_list, original_train_df, test_df))
 
         return tuple_list
+
+    def read_mapping(
+        self,
+        path: str,
+        sep: str = "\t",
+        dtype: str = "str",
+        remove_duplicates: bool = True,
+        callback_fn: Optional[Callable] = None,
+        **kwargs: Any,
+    ) -> Dict[Any, List[Any]]:
+
+        DTYPES = {"int": int, "float": float, "str": str}
+        dtype = DTYPES[dtype]
+
+        mapping = {}
+
+        with open(path) as file:
+            for raw in file:
+                parts = raw.rstrip("\n").split(sep)
+
+                head = parts[0]
+                if isinstance(head, str):
+                    head = literal_eval(head)
+                if isinstance(head, list):
+                    head = head[0]
+
+                identifier = dtype(head)
+                mapping[identifier] = [dtype(x) for x in parts[1:]]
+
+                if remove_duplicates:
+                    mapping[identifier] = list(set(mapping[identifier]))
+
+        self.logger.info(f"Loaded: {path}")
+
+        if callback_fn is not None:
+            mapping = callback_fn(mapping, **kwargs)
+
+        return mapping
 
     def read_negatives(
         self,
         read_folder: str,
         sep: str = "\t",
-        scope: str = "test",
+        fold_index: Tuple[int, Optional[int]] = (0, None),
         **kwargs: Any
     ) -> Dict[str, List[str]]:
         """Read negative samples from a specified folder and return them as a dictionary.
@@ -248,7 +296,7 @@ class Reader:
         Args:
             read_folder (str): Path to the folder containing the negative samples file.
             sep (str): Field separator used in the input file. Defaults to "\\t".
-            scope (str): Scope name to construct the file name. Defaults to "test".
+            fold_index (Tuple[int, Optional[int]]): Tuple containing the complete fold index.
             **kwargs (Any): Additional keyword arguments passed to the `read_folder` method.
 
         Returns:
@@ -260,7 +308,10 @@ class Reader:
         """
         files = self.read_folder(read_folder, **kwargs)
         by_name = {file_name(p): p for p in files}
-        path = by_name.get(f"{scope}_negative")
+
+        suffix = f"_val{fold_index[1] + 1}" if fold_index[1] is not None else ""
+        name = f"test{fold_index[0] + 1}{suffix}_negative"
+        path = by_name.get(name)
 
         neg = {}
 
@@ -307,6 +358,26 @@ class Reader:
 
         return model
 
+    def read_json(
+        self,
+        path: str,
+        **kwargs: Any
+    ) -> Any:
+        """Read and parse data from a JSON file.
+
+        Args:
+            path (str): Path to the JSON file.
+            **kwargs (Any): Additional keyword arguments.
+
+        Returns:
+            Any: The loaded and parsed JSON data.
+        """
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        self.logger.info(f"Loaded: {path}")
+
+        return data
 
 # def read_csv(filename):
 #     """

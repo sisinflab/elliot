@@ -1,4 +1,4 @@
-from typing import Tuple, List
+from typing import Tuple, List, Optional
 import bisect
 import random
 import numpy as np
@@ -8,9 +8,6 @@ from elliot.namespace import NegativeSamplingConfig
 from elliot.utils.enums import NegativeSamplingStrategy
 from elliot.utils.read import Reader
 from elliot.utils.write import Writer
-
-reader = Reader()
-writer = Writer()
 
 
 def _zero_intervals(n_cols, nnz_sorted):
@@ -39,12 +36,14 @@ class NegativeSampler:
     Args:
         neg_sampling_config (NegativeSamplingConfig): Configuration object containing negative sampling parameters.
         mappings (Tuple[dict, dict]): User and item mappings from public ids to internal indices.
-        inv_mappings (Tuple[np.ndarray, np.ndarray]): Inverse mappings from internal indices
+        inv_mappings (Tuple[List[str], List[str]]): Inverse mappings from internal indices
             to public user and item ids.
         num_users (int): Total number of users.
         num_items (int): Total number of items.
-        pos_items (Tuple[List[List[int]], List[List[int]], List[List[int]]]):
-            Positive item indices per user for train, validation, and test splits.
+        train_pos_items (List[int]): Positive item indices per user in the training set.
+        eval_pos_items (List[int]): Positive item indices per user in the evaluation set.
+        evaluation_set (str): Evaluation set name. Defaults to "test".
+        fold_index (Tuple[int, Optional[int]]): Tuple containing the complete fold index.
         random_seed (int): Random seed for reproducibility. Defaults to 42.
 
     To configure the negative sampling, include the appropriate
@@ -57,6 +56,7 @@ class NegativeSampler:
         num_negatives: 5
         save_folder: this/is/the/path
         read_folder: this/is/the/path
+        leave_one_out: True|False
     """
 
     neg_sampling_config: NegativeSamplingConfig
@@ -65,13 +65,20 @@ class NegativeSampler:
         self,
         neg_sampling_config: NegativeSamplingConfig,
         mappings: Tuple[dict, dict],
-        inv_mappings: Tuple[np.ndarray, np.ndarray],
+        inv_mappings: Tuple[List[str], List[str]],
         num_users: int,
         num_items: int,
-        pos_items: Tuple[List[List[int]], List[List[int]], List[List[int]]],
+        train_pos_items: List[List[int]],
+        eval_pos_items: List[List[int]],
+        evaluation_set: str = "test",
+        fold_index: Tuple[int, Optional[int]] = (0, None),
         random_seed: int = 42
     ):
+        self.reader = Reader()
+        self.writer = Writer()
+
         self.neg_sampling_config = neg_sampling_config
+        self.fold_index = fold_index
 
         self._u_map, self._i_map = mappings
         self._inv_u_map, self._inv_i_map = inv_mappings
@@ -79,72 +86,49 @@ class NegativeSampler:
         self._num_users = num_users
         self._num_items = num_items
 
-        train, val, test = pos_items
-        self.merged_pos_items = self._merge_positives(train, val, test)
-        self.add_val = len(val) > 0
+        self.merged_pos_items = self._merge_positives(train_pos_items, eval_pos_items)
+        self._evaluation_set = evaluation_set
 
         np.random.seed(random_seed)
         random.seed(random_seed)
 
     def _merge_positives(
         self,
-        train: List[List[int]],
-        val: List[List[int]],
-        test: List[List[int]]
+        train_pos: List[List[int]],
+        eval_pos: List[List[int]]
     ) -> List[List[int]]:
         """Merge positive interactions across data splits for each user.
 
         Args:
-            train (List[List[int]]): Positive item indices per user in the training split.
-            val (List[List[int]]): Positive item indices per user in the validation split.
-            test (List[List[int]]): Positive item indices per user in the test split.
+            train_pos (List[List[int]]): Positive item indices per user in the training set.
+            eval_pos (List[List[int]]): Positive item indices per user in the evaluation set.
 
         Returns:
             List[List[int]]: List of merged unique positive item indices per user.
         """
         all_items_list = []
 
-        iterables = (train, val, test) if val else (train, test)
-
-        for items in zip(*iterables):
+        for items in zip(train_pos, eval_pos):
             all_items = set().union(*items)
             all_items_list.append(list(all_items))
 
         return all_items_list
 
-    def sample(self) -> Tuple[List[List[int]], List[List[int]]]:
-        """Generate negative samples for validation and test splits.
-
-        Returns:
-            Tuple[List[List[int]], List[List[int]]]: Negative item indices per user
-                for validation and test.
-        """
-        val_negative_items = self.process_sampling(validation=True) if self.add_val else []
-        test_negative_items = self.process_sampling(validation=False)
-
-        return val_negative_items, test_negative_items
-
-    def process_sampling(self, validation: bool = False) -> List[List[int]]:
+    def sample(self) -> List[List[int]]:
         """Run negative sampling according to the configured strategy.
-
-        Args:
-            validation (bool): Whether to generate negatives for validation or test. Defaults to False.
 
         Returns:
             List[List[int]]: Negative item indices per user.
         """
         if self.neg_sampling_config.strategy == NegativeSamplingStrategy.RANDOM:
-            neg = self.random_strategy(validation)
+            neg = self.random_strategy()
         else:
-            neg = self.fixed_strategy(validation)
+            neg = self.fixed_strategy()
 
         return neg
 
-    def random_strategy(self, validation: bool = False) -> List[List[int]]:
+    def random_strategy(self) -> List[List[int]]:
         """Sample negative items uniformly at random for each user.
-
-        Args:
-            validation (bool): Whether to generate negatives for validation or test. Defaults to False.
 
         Returns:
             List[List[int]]: Randomly sampled negative item indices per user.
@@ -155,12 +139,12 @@ class NegativeSampler:
         iter_data = tqdm(
             data,
             total=len(data),
-            desc=f"Sampling negatives for {"test" if not validation else "validation"}",
+            desc=f"Sampling negatives for {self._evaluation_set}",
             leave=False
         )
 
         for i, u_indices in enumerate(iter_data):
-            # Compute candidates number
+            # Compute the number of candidates
             candidate_negatives_count = self._num_items - len(u_indices)
 
             # Randomly sample negatives...
@@ -177,7 +161,7 @@ class NegativeSampler:
 
         # Optionally save negatives to file
         if self.neg_sampling_config.save_on_disk:
-            self._save_to_file(neg, validation=validation)
+            self._save_to_file(neg)
 
         return neg
 
@@ -220,12 +204,11 @@ class NegativeSampler:
 
         return list(sampled)
 
-    def _save_to_file(self, neg: List[List[int]], validation: bool = False):
+    def _save_to_file(self, neg: List[List[int]]):
         """Save negative samples to disk using public ids.
 
         Args:
             neg (List[List[int]]): Negative item indices per user (private ids).
-            validation (bool): Whether the negatives belong to validation or test split. Defaults to False.
         """
         neg_dict = {}
 
@@ -236,27 +219,24 @@ class NegativeSampler:
             neg_dict[user_id] = mapped_items
 
         # Write to file
-        writer.write_negatives(
+        self.writer.write_negatives(
             neg_dict=neg_dict,
             save_folder=self.neg_sampling_config.save_folder,
-            scope="val" if validation else "test",
+            fold_index=self.fold_index,
             sep=self.neg_sampling_config.writer.sep,
             ext=self.neg_sampling_config.writer.ext,
         )
 
-    def fixed_strategy(self, validation: bool = False) -> List[List[int]]:
+    def fixed_strategy(self) -> List[List[int]]:
         """Load precomputed negative samples from disk.
-
-        Args:
-            validation (bool): Whether to load validation or test negatives. Defaults to False.
 
         Returns:
             List[List[int]]: Negative item indices per user mapped to private ids.
         """
         # Read from file
-        neg_dict = reader.read_negatives(
+        neg_dict = self.reader.read_negatives(
             read_folder=self.neg_sampling_config.read_folder,
-            scope="val" if validation else "test",
+            fold_index=self.fold_index,
             sep=self.neg_sampling_config.reader.sep,
             ext=self.neg_sampling_config.reader.ext,
         )
@@ -265,7 +245,7 @@ class NegativeSampler:
 
         iter_data = tqdm(
             neg_dict.items(),
-            desc=f"Loading negatives for {"test" if not validation else "validation"}",
+            desc=f"Loading negatives for {self._evaluation_set}",
             leave=False
         )
 
