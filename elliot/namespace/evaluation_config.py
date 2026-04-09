@@ -51,8 +51,8 @@ class EvaluationConfig(BaseConfig):
         """
         import_submodules("elliot.evaluation.metrics")
 
-        self._validate_metric_list(self.simple_metrics)
-        self._validate_metric_list(self.complex_metrics, lambda m: m["name"])
+        self.simple_metrics = self._validate_metric_list(self.simple_metrics)
+        self.complex_metrics = self._validate_metric_list(self.complex_metrics, lambda m: m["name"])
 
         return self
 

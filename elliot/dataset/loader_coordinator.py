@@ -361,28 +361,27 @@ class DataSetLoader:
                 fold.get_eval_dataloader()
 
 
-def build_mock_dataset(config) -> List[List[DataSet]]:
+def build_mock_dataset(config) -> Tuple[List[List[DataSet]], List[DataSet]]:
     names = ["userId", "itemId", "rating"]
     np.random.seed(config.random_seed)
 
-    train_set = np.hstack((
+    train = np.hstack((
         np.random.randint(0, 5 * 20, size=(5 * 20, 2)),
         np.random.randint(0, 2, size=(5 * 20, 1))
     ))
-    test_set = np.hstack((
+    test = np.hstack((
         np.random.randint(0, 5 * 20, size=(5 * 20, 2)),
         np.random.randint(0, 2, size=(5 * 20, 1))
     ))
 
-    train_set = pd.DataFrame(np.array(train_set), columns=names)
-    test_set = pd.DataFrame(np.array(test_set), columns=names)
+    train = pd.DataFrame(np.array(train), columns=names)
+    test = pd.DataFrame(np.array(test), columns=names)
 
-    data_list = [[
-        DataSet(
-            config=config,
-            data_tuple=(train_set, None, test_set),
-            side_information_data=SimpleNamespace()
-        )
-    ]]
+    test_data_object = DataSet(
+        config=config,
+        train_data=train,
+        eval_data=test,
+        side_info_data={}
+    )
 
-    return data_list
+    return [[test_data_object]], [test_data_object]

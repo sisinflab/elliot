@@ -19,7 +19,8 @@ from elliot.result_handler import ResultHandler, attach_test_fold_stats
 from elliot.utils import logging as logging_project
 from elliot.utils import set_device
 from elliot.utils import wandb_logger
-
+from elliot.utils.callback import CallbackManager
+from elliot.utils.registry import callback_registry
 
 print(u'''
 
@@ -60,18 +61,31 @@ def run_experiment(config_path: str = "", config_overrides: Optional[List[str]] 
         raise Exception(
             'Version mismatch! In different versions of Elliot the results may slightly change due to progressive improvement!')
 
+    # Load callbacks
+    cb_manager = CallbackManager(callbacks=callback_registry.get_all())
+
     try:
         logger.info("Start experiment")
 
+        # NOTE: to be discussed
         # Callback on experiment start
 
         loader = DataSetLoader(config=config)
 
         # Callback on data loading and filtering
+        cb_manager.trigger(
+            event_name="on_data_loading_and_filtering",
+            data=loader.dataframe
+        )
 
         val_data, main_data = loader.build()
 
         # Callback on dataset creation
+        cb_manager.trigger(
+            event_name="on_dataset_creation",
+            val_dataset=val_data,
+            main_dataset=main_data
+        )
 
         loader.prepare_dataset(val_data, main_data)
 
@@ -86,7 +100,12 @@ def run_experiment(config_path: str = "", config_overrides: Optional[List[str]] 
             all_trials[model_name] = []
 
             try:
-                # Callback on train/test start
+                # Callback on model start
+                cb_manager.trigger(
+                    event_name="on_model_start",
+                    model_name=model_name,
+                    model_config=model_config
+                )
 
                 for test_fold_index, (val, main) in enumerate(zip(val_data, main_data)):
                     logging_project.prepare_logger(model_name)
@@ -125,10 +144,17 @@ def run_experiment(config_path: str = "", config_overrides: Optional[List[str]] 
                         )
                         logger.info(f"Training ended for {model_name}")
 
+                    model = outcome.best_model
+                    results = outcome.results
+
                     # Callback on training complete
+                    cb_manager.trigger(
+                        event_name="on_training_complete",
+                        model=model,
+                        results=results
+                    )
 
                     logger.info(f"Evaluation begun for {model_name}\n")
-                    model = outcome.best_model
                     eval_results = run_evaluation(
                         main_data=main,
                         config=config,
@@ -137,8 +163,12 @@ def run_experiment(config_path: str = "", config_overrides: Optional[List[str]] 
                     logger.info(f"Evaluation ended for {model_name}")
 
                     # Callback on evaluation complete
+                    cb_manager.trigger(
+                        event_name="on_evaluation_complete",
+                        model=model,
+                        results=eval_results
+                    )
 
-                    results = outcome.results
                     results.update(eval_results)
 
                     ############################################
@@ -158,7 +188,13 @@ def run_experiment(config_path: str = "", config_overrides: Optional[List[str]] 
                     logger.info(f"Best Model params:\t{best_model_params}")
                     logger.info(f"Best Model results:\t{best_model_results}")
 
-                # Callback on train/test complete
+                # Callback on model complete
+                cb_manager.trigger(
+                    event_name="on_model_complete",
+                    model_name=model_name,
+                    results=test_results,
+                    trials=test_trials
+                )
 
                 # Migliore sui test, aggiunta a performance totali
                 min_val = np.argmin([i["loss"] for i in test_results])
@@ -174,17 +210,21 @@ def run_experiment(config_path: str = "", config_overrides: Optional[List[str]] 
                 if test_trials:
                     res_handler.add_trials(test_trials[min_val], name=model_name)
                     all_trials[model_name] = all_trials[model_name][min_val]
+
             finally:
                 wandb_logger.finish_model_run(logger)
 
+        # NOTE: to be discussed
         # Callback on experiment complete
 
         res_handler.save_outputs()
         wandb_logger.log_summary_table(config, logger)
 
         logger.info("End experiment")
+
     finally:
         wandb_logger.finish(logger)
+
     # TODO: check before to push only this feature!
     # logger.info("Start Post-Hoc scripts")
 
@@ -205,7 +245,7 @@ def config_test(config: ExperimentConfig):
 
     logger.info("Start config test")
 
-    data_test_list = build_mock_dataset(config)
+    val_data, main_data = build_mock_dataset(config)
 
     res_handler = ResultHandler(config=config)
 
@@ -213,40 +253,60 @@ def config_test(config: ExperimentConfig):
         test_results = []
         test_trials = []
 
-        for test_fold_index, data_test in enumerate(data_test_list):
+        for test_fold_index, (val, main) in enumerate(zip(val_data, main_data)):
             model_config_mock = copy.deepcopy(model_config)
             model_config_mock.meta.verbose = False
             model_config_mock.meta.save_recs = False
             model_config_mock.meta.save_weights = False
 
             is_proxy = model_name.startswith("ProxyRecommender")
-            use_hyperopt = (not is_proxy) and requires_hyperopt(model_config_mock)
+            use_hyperopt = requires_hyperopt(model_config_mock)
 
             if use_hyperopt:
                 outcome = run_hyperopt(
-                    data_test=data_test,
+                    val_data=val,
+                    main_data=main,
                     config=config,
                     model_config=model_config_mock,
                     model_name=model_name,
                     test_fold_index=test_fold_index
+                )
+            elif is_proxy:
+                outcome = run_proxy(
+                    model_config=model_config_mock,
+                    main_data=main,
+                    config=config
                 )
             else:
                 outcome = run_single(
-                    data_test=data_test,
+                    val_data=val,
+                    main_data=main,
                     config=config,
                     model_config=model_config_mock,
                     model_name=model_name,
                     test_fold_index=test_fold_index
                 )
 
-            test_results.append(outcome.best_eval)
+            model = outcome.best_model
+            results = outcome.results
+
+            eval_results = run_evaluation(
+                main_data=main,
+                config=config,
+                model=model
+            )
+
+            results.update(eval_results)
+
+            test_results.append(results)
             if outcome.trials is not None:
-                test_trials.append(outcome.trials)
+                test_trials.append(outcome.all_trial_results)
 
         min_val = np.argmin([i["loss"] for i in test_results])
 
-        res_handler.add_oneshot_recommender(**test_results[min_val])
-        res_handler.add_trials(test_trials[min_val])
+        if test_trials:
+            res_handler.add_oneshot_recommender(**test_results[min_val])
+            res_handler.add_trials(test_trials[min_val])
 
     logger.info("End config test without issues")
     config.config_test = False

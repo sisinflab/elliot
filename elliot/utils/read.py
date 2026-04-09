@@ -165,7 +165,7 @@ class Reader:
         read_folder: str,
         hierarchical: bool = False,
         **kwargs: Any
-    ) -> List[Tuple[List[Tuple[pd.DataFrame, pd.DataFrame]], pd.DataFrame, pd.DataFrame]]:
+    ) -> List[Tuple[List[Tuple[pd.DataFrame, pd.DataFrame]], Optional[pd.DataFrame], pd.DataFrame]]:
         """Read tabular data splits from a specified folder,
         supporting both classic and hierarchical split structures.
 
@@ -177,7 +177,7 @@ class Reader:
             **kwargs (Any): Additional keyword arguments passed to `read_folder` and `read_tabular` methods.
 
         Returns:
-            List[Tuple[List[Tuple[pd.DataFrame, pd.DataFrame]], pd.DataFrame, pd.DataFrame]]:
+            List[Tuple[List[Tuple[pd.DataFrame, pd.DataFrame]], Optional[pd.DataFrame], pd.DataFrame]]:
                 A list of tuples where each tuple contains an optional list of train/validation
                 DataFrame pairs, a train DataFrame, and a test DataFrame.
         """

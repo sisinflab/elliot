@@ -285,7 +285,7 @@ def build_namespace(
     """
     set_config_folder(parent_dir(config_path))
 
-    # Import external folder to register all the custom components
+    # Import external folder to register all the custom components and callbacks
     # import_submodules("external")
 
     if config_data is not None:
