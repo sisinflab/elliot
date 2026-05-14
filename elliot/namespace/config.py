@@ -116,17 +116,17 @@ class ExperimentConfig(BaseConfig):
     def handle_evaluation_metrics_and_cutoffs(self) -> "ExperimentConfig":
         """Adjust evaluation metrics and cutoff values after model validation.
 
+        If no simple metrics are specified, the metric list will be set to ["nDCG"].
+
         Returns:
             ExperimentConfig: The object itself with modified evaluation settings.
         """
         cutoff_k = self.evaluation.cutoffs or [self.top_k]
         self.evaluation.cutoffs = cutoff_k
 
-        first_metric = (
-            self.evaluation.simple_metrics[0]
-            if self.evaluation.simple_metrics else ""
-        )
-        self.results.default_metric = first_metric + "@" + str(cutoff_k[0])
+        metrics = self.evaluation.simple_metrics
+        self.evaluation.simple_metrics = metrics or ["nDCG"]
+        self.results.default_metric = self.evaluation.simple_metrics[0] + "@" + str(cutoff_k[0])
 
         return self
 

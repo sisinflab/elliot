@@ -4,7 +4,7 @@ from elliot.namespace import build_namespace
 from elliot.utils.enums import SearchSpace, DataLoadingStrategy, SplittingStrategy, NegativeSamplingStrategy
 from elliot.utils.folder import path_joiner, path_absolute, parent_dir
 
-from tests.utils import test_path
+from tests.params import test_path
 
 config_path = path_joiner(test_path, "configs", "test.yml")
 

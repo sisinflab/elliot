@@ -163,9 +163,6 @@ class CallbackRegistry(Generic[CallbackT]):
             nonlocal name
             key = name or cls.__name__
 
-            if key in self._registry:
-                raise ValueError(f"{key} already registered in {self.registry_name}")
-
             # Attach metadata to class
             for k, v in kwargs.items():
                 setattr(cls, k, v)

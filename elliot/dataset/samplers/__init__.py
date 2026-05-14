@@ -4,7 +4,7 @@ Module description:
 """
 
 
-from .base_sampler import AbstractSampler
+from .base_sampler import AbstractSampler, TraditionalSampler, PipelineSampler
 from .pointwise import (
     CustomPointWiseSparseSampler,
     PointWisePosNegRatioRatingsSampler,

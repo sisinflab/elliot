@@ -6,7 +6,7 @@ from elliot.namespace import build_namespace
 from elliot.utils.folder import path_joiner, check_path, parent_dir
 
 from tests.params import params_neg_sampling_fail as p
-from tests.utils import dataset_path
+from tests.params import dataset_path
 
 current_path = path_joiner(__file__)
 
