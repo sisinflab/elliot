@@ -6,7 +6,19 @@ from elliot.utils.folder import parent_dir, path_joiner
 
 test_path = parent_dir(__file__)
 data_folder = path_joiner(test_path, "data", "{0}")
-dataset_path = path_joiner(data_folder, "dataset.tsv")
+dataset_path = lambda file_name=None: path_joiner(data_folder, f"{file_name or "dataset"}.tsv")
+
+config_path = path_joiner(test_path, "configs", "test.yml")
+
+reader_folder = path_joiner(test_path, "utils", "reader")
+reader_path = lambda file_name=None, ext="tsv", folder=None: (
+    path_joiner(reader_folder, folder or f"{file_name}.{ext}")
+)
+
+writer_folder = path_joiner(test_path, "utils", "writer")
+writer_path = lambda file_name=None, ext="tsv", folder=None: (
+    path_joiner(writer_folder, folder or f"{file_name}.{ext}")
+)
 
 
 # def time_single_test(func):
@@ -45,16 +57,25 @@ def generate_param_combinations(key_list, values, base=None):
 
 params_dataset_loader_fail = {
     "invalid_fixed": generate_param_combinations(
-        ["data_folder"],
-        {"data_folder": ["non/existent/path", 3, None]}
+        [("data_folder", "sequential")],
+        {
+            "data_folder": ["non/existent/path", 3, None],
+            "sequential": [True, "invalid"]
+        }
     ),
     "invalid_dataset": generate_param_combinations(
-        ["dataset_path"],
-        {"dataset_path": ["non/existent/path", [3], None]}
+        [("dataset_path", "sequential")],
+        {
+            "dataset_path": ["non/existent/path", [3], None],
+            "sequential": [True, "invalid"]
+        }
     ),
     "invalid_strategy": generate_param_combinations(
-        ["strategy"],
-        {"strategy": ["invalid", 3, None]}
+        [("strategy", "sequential")],
+        {
+            "strategy": ["invalid", 3, None],
+            "sequential": [True, "invalid"]
+        }
     )
 }
 
@@ -104,6 +125,14 @@ params_splitting_fail = {
         {"test_ratio": [0.0, 2.5, [3], None]}
     ),
     "invalid_temporal_holdout_leave_n_out": generate_param_combinations(
+        ["leave_n_out"],
+        {"leave_n_out": [300, -3, "invalid", None]}
+    ),
+    "invalid_random_holdout_test_ratio": generate_param_combinations(
+        ["test_ratio"],
+        {"test_ratio": [0.0, 2.5, [3], None]}
+    ),
+    "invalid_random_holdout_leave_n_out": generate_param_combinations(
         ["leave_n_out"],
         {"leave_n_out": [300, -3, "invalid", None]}
     ),

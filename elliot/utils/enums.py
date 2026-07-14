@@ -20,6 +20,7 @@ class PreFilteringStrategy(Enum):
 class SplittingStrategy(Enum):
     FIXED_TS = 'fixed_timestamp'
     TEMP_HOLDOUT = 'temporal_holdout'
+    RAND_HOLDOUT = 'random_holdout'
     RAND_CV = 'random_cross_validation'
     RAND_SUB_SMP = 'random_subsampling'
 

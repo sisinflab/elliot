@@ -18,6 +18,7 @@ pyvenv.cfg
 pip-selfcheck.json
 
 .idea
+.vscode
 # End of https://www.toptal.com/developers/gitignore/api/venv
 
 **/results/
@@ -30,6 +31,7 @@ pip-selfcheck.json
 /local_sample_main.py
 /tests/configs
 /tests/elliot_root
+**/writer/
 
 .Python
 build/

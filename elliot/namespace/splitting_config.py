@@ -1,8 +1,8 @@
-from typing import Optional
+from typing import Any, Optional
 from pydantic import Field, model_validator
 
 from elliot.namespace.common import BaseConfig
-from elliot.namespace.write_config import TabularWriterConfig
+from elliot.namespace.write_config import TabularWriterConfig, SequenceWriterConfig
 from elliot.utils.enums import SplittingStrategy
 from elliot.utils.folder import path_joiner
 
@@ -45,6 +45,11 @@ class SplittingSingleConfig(BaseConfig):
                     raise AttributeError(f"At least one among `test_ratio` and `leave_n_out` must be provided "
                                          f"with '{self.strategy.value}' strategy.")
 
+            case SplittingStrategy.RAND_HOLDOUT:
+                if self.test_ratio is None and self.leave_n_out is None:
+                    raise AttributeError(f"At least one among `test_ratio` and `leave_n_out` must be provided "
+                                         f"with '{self.strategy.value}' strategy.")
+
             case SplittingStrategy.RAND_SUB_SMP:
                 if self.test_ratio is None and self.leave_n_out is None:
                     raise AttributeError(f"At least one among `test_ratio` and `leave_n_out` must be provided "
@@ -65,14 +70,22 @@ class SplittingConfig(BaseConfig):
     Attributes:
         save_on_disk (bool): Whether to save split data to disk. Defaults to False.
         save_folder (str): Path to the folder where splits files will be saved (if `save_on_disk` is True).
+        sequential (bool): Whether to save split as sequential or interactions data. Defaults to False.
         test_splitting (SplittingSingleConfig): Test splitting configuration.
         validation_splitting (SplittingSingleConfig, optional): Validation splitting configuration.
             Defaults to None.
-        writer (TabularWriterConfig): Writing configuration.
+        writer (Any): Writing configuration.
     """
 
     save_on_disk: bool = False
     save_folder: str = path_joiner("..", "data", "{0}", "splitting")
+    sequential: bool = False
     test_splitting: SplittingSingleConfig
     validation_splitting: Optional[SplittingSingleConfig] = None
-    writer: TabularWriterConfig = Field(default_factory=TabularWriterConfig, exclude=True)
+    writer: Any = Field(default={}, exclude=True)
+
+    @model_validator(mode="after")
+    def build_writer_config(self) -> "SplittingConfig":
+        reader_cls = TabularWriterConfig if not self.sequential else SequenceWriterConfig
+        self.writer = reader_cls(**self.writer)
+        return self

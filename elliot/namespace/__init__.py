@@ -11,8 +11,19 @@ from .evaluation_config import EvaluationConfig
 from .models_config import RecommenderConfig, MetaConfig, EarlyStoppingConfig
 from .negative_sampling_config import NegativeSamplingConfig
 from .prefiltering_config import PreFilteringConfig
-from .read_config import BaseReaderConfig, TabularReaderConfig, InteractionsReaderConfig, ModelReaderConfig
+from .read_config import (
+    BaseReaderConfig,
+    TabularReaderConfig,
+    InteractionsReaderConfig,
+    SequenceReaderConfig,
+    ModelReaderConfig,
+)
 from .results_config import ResultsConfig
-from .write_config import BaseWriterConfig, TabularWriterConfig, ModelWriterConfig
+from .write_config import (
+    BaseWriterConfig,
+    TabularWriterConfig,
+    SequenceWriterConfig,
+    ModelWriterConfig
+)
 from .splitting_config import SplittingConfig, SplittingSingleConfig
 from .wandb_config import WandBConfig

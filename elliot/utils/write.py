@@ -97,11 +97,147 @@ class Writer:
         if callback_fn is not None:
             callback_fn(df, **kwargs)
 
+    def write_sequence_tabular(
+        self,
+        data: pd.DataFrame,
+        path: str,
+        format: str = "wide",
+        header: Union[bool, List[str]] = False,
+        columns: Optional[List[str]] = None,
+        sequence_sep: str = " ",
+        sep: str = "\t",
+        callback_fn: Optional[Callable] = None,
+        **kwargs: Any
+    ):
+        """Write a long-format interaction DataFrame back to disk as a sequential file.
+
+        Two on-disk layouts are supported through the `format` argument, mirroring
+        `Reader.read_sequence_tabular`:
+
+        - "wide": one ragged, `sep`-separated line per session, holding the user identifier
+            followed by its ordered item sequence (e.g. "u0\\titem1\\titem2\\titem3").
+        - "inline": one row per session with the user identifier, the sequence serialized
+            as a single `sequence_sep`-joined string, and (if `timestamp_col` is present)
+            the earliest timestamp found in the session.
+
+        When `data` carries a `sessionId` column (see `DataSetLoader`'s session
+        segmentation), one line/row is written per (user, session) instead of collapsing
+        a user's whole history into a single one, so the session boundaries are preserved
+        across a save/reload round trip. Without a `sessionId` column, a user's entire
+        history is written as a single session, as before.
+
+        Args:
+            data (pd.DataFrame): Long-format DataFrame with one row per (user, item)
+                interaction, holding at least `user_col` and `item_col`.
+            path (str): Path to the output file.
+            format (str): Layout of the output file, either "wide" or "inline". Defaults to "wide".
+            header (Union[bool, List[str]]): Whether to write a header row in the output file. Defaults to False.
+                If a list of strings is given, it is assumed to be aliases for the column names.
+            columns (List[str], optional): List of column names to select. Defaults to None.
+            sequence_sep (str): Separator used inside the serialized sequence string. Only
+                used when `format` is "inline". Defaults to " ".
+            sep (str, optional): Column/token separator used in the output file. Defaults to "\\t".
+            callback_fn (Callable, optional): Function to call after writing the file. Defaults to None.
+            **kwargs (Any): Additional keyword arguments passed to the `callback_fn` function.
+
+        Raises:
+            ValueError: If `format` is not one of "wide" or "inline".
+        """
+        if format not in ("wide", "inline"):
+            raise ValueError(f"Unsupported format '{format}'. Expected 'wide' or 'inline'.")
+
+        user_col = "userId"
+        session_col = "sessionId"
+        sequence_col = "sequence"
+        timestamp_col = "timestamp"
+
+        has_timestamp = timestamp_col in data.columns
+        has_session = session_col in data.columns
+
+        # Group by user (and session, if present) to rebuild one sequence per group
+        group_keys = [user_col, session_col] if has_session else [user_col]
+        
+        # Preserve chronological order within each group before collapsing to a sequence
+        sort_keys = group_keys + ([timestamp_col] if has_timestamp else [])
+        data = data.sort_values(sort_keys, kind="stable")
+
+        # Collapse each group into an ordered item list (and earliest timestamp, if available)
+        agg = {"itemId": list}
+        if has_timestamp:
+            agg[timestamp_col] = "first"
+        grouped = data.groupby(group_keys, sort=False).agg(agg).reset_index()
+
+        # Determine which columns to keep, honoring an explicit `columns` selection
+        cols_to_use = [sequence_col]
+        if columns is None:
+            cols_to_use.insert(0, user_col)
+            if has_timestamp:
+                cols_to_use.append(timestamp_col)
+        else:
+            if user_col in columns:
+                cols_to_use.insert(0, user_col)
+            if has_timestamp and timestamp_col in columns:
+                cols_to_use.append(timestamp_col)
+
+        # Case "wide": one ragged, sep-separated line per session
+        if format == "wide":
+            # Serialize each session as the user identifier followed by its ordered items
+            lines = [
+                sep.join([str(user)] + [str(item) for item in items])
+                for user, items in zip(grouped[user_col], grouped["itemId"])
+            ]
+
+            # Check whether the header should be written
+            if header:
+                if isinstance(header, list) and len(header) != len(cols_to_use):
+                    self.logger.warning(
+                        "`header` length does not match `data` selected columns count. Saving with no header."
+                    )
+                else:
+                    header_line = sep.join(str(h) for h in (header if isinstance(header, list) else cols_to_use))
+                    lines = [header_line] + lines
+
+            # Write the ragged lines directly since row lengths vary
+            with open(path, "w", encoding="utf-8") as handle:
+                handle.write("\n".join(lines))
+                if lines:
+                    handle.write("\n")
+
+        # Case "inline": one row per session with the sequence serialized as a string
+        else:
+            # Serialize each session's item list into a single sequence_sep-joined string
+            rows = {
+                user_col: list(grouped[user_col]),
+                sequence_col: [sequence_sep.join(str(item) for item in items) for items in grouped["itemId"]],
+            }
+            if has_timestamp:
+                rows[timestamp_col] = list(grouped[timestamp_col])
+
+            df = pd.DataFrame(rows)
+            
+            # Select only the requested columns, in order
+            df = df[cols_to_use]
+
+            # Check whether the header should be written
+            if isinstance(header, list) and len(header) != len(df.columns):
+                self.logger.warning(
+                    "`header` length does not match `data` selected columns count. Saving with no header."
+                )
+                header = False
+
+            df.to_csv(path, sep=sep, index=False, header=header)
+
+        self.logger.info(f"Saved: {path}")
+
+        if callback_fn is not None:
+            callback_fn(data, **kwargs)
+
     def write_tabular_split(
         self,
         fold_dataset: List[Tuple[List[Tuple[pd.DataFrame, pd.DataFrame]], pd.DataFrame, pd.DataFrame]],
         save_folder: str,
         ext: str = ".tsv",
+        sequential: bool = False,
         **kwargs: Any
     ):
         """Write tabular dataset splits in a structured manner.
@@ -112,8 +248,13 @@ class Writer:
                 a train DataFrame, and a test DataFrame.
             save_folder (str): Path to the folder where the datasets will be saved.
             ext (str): File extension for the output files. Defaults to ".tsv".
-            **kwargs: Additional keyword arguments passed to the `write_tabular` method.
+            sequential (bool, optional): Whether each split file stores sequential interaction
+                data (see `write_sequence_tabular`) instead of plain tabular data. Defaults to False.
+            **kwargs: Additional keyword arguments passed to `write_tabular` (or `write_sequence_tabular`
+                if `sequential` is True).
         """
+        write_fn = self.write_sequence_tabular if sequential else self.write_tabular
+
         check_dir(save_folder, replace=True)
 
         # Test fold level
@@ -122,7 +263,7 @@ class Writer:
             check_dir(test_folder_path, replace=True)
 
             test_file_path = path_joiner(test_folder_path, f"test{ext}")
-            self.write_tabular(data=test, path=test_file_path, **kwargs)
+            write_fn(data=test, path=test_file_path, **kwargs)
 
             # Validation fold level
             for j, (train, val) in enumerate(folds):
@@ -133,13 +274,13 @@ class Writer:
                 val_file_path = path_joiner(val_folder_path, f"val{ext}")
                 train_file_path = path_joiner(val_folder_path, f"train{ext}")
 
-                self.write_tabular(data=val, path=val_file_path, **kwargs)
-                self.write_tabular(data=train, path=train_file_path, **kwargs)
+                write_fn(data=val, path=val_file_path, **kwargs)
+                write_fn(data=train, path=train_file_path, **kwargs)
 
             if not folds:
                 # Save only train dataset if val dataset is missing
                 train_file_path = path_joiner(test_folder_path, f"train{ext}")
-                self.write_tabular(data=original_train, path=train_file_path, **kwargs)
+                write_fn(data=original_train, path=train_file_path, **kwargs)
 
     def write_negatives(
         self,

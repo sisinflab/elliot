@@ -9,24 +9,26 @@ from tests.params import params_splitting_fail as p, dataset_path
 current_path = path_joiner(__file__)
 
 
-def load_and_split_data(config_dict):
+def load_and_split_data(config_dict, file_name=None, seq=False):
     config_data = {
         "experiment": {
-            "dataset": "splitting_strategies",
+            "dataset": "splitter",
             "data_config": {
                 "strategy": "dataset",
-                "dataset_path": dataset_path,
+                "dataset_path": dataset_path(file_name),
+                "sequential": seq,
                 "reader": {"header": True}
             },
-            "splitting": {
-                **config_dict
-            }
+            "splitting": config_dict
         }
     }
     config = build_namespace(config_path=current_path, config_data=config_data)
     loader = DataSetLoader(config=config)
     val_data, main_data = loader.build()
     return val_data, main_data
+
+def load_and_split_sequence_data(config_dict):
+    return load_and_split_data(config_dict, "sequence", True)
 
 
 class TestSplitter:
@@ -45,12 +47,46 @@ class TestSplitter:
         train = train_test[0].train_set.dataframe
         test = train_test[0].eval_set.dataframe
         assert not train.empty and not test.empty
+        assert len(test) == 3
         assert len(train) + len(test) == 30
 
     def test_temporal_holdout_leave_n_out(self):
         config = {
             "test_splitting": {
                 "strategy": "temporal_holdout",
+                "leave_n_out": 3
+            }
+        }
+
+        _, train_test = load_and_split_data(config)
+
+        assert len(train_test) == 1
+        train = train_test[0].train_set.dataframe
+        test = train_test[0].eval_set.dataframe
+        assert not train.empty and not test.empty
+        assert all(test.groupby('userId').size() <= 3)
+
+    def test_random_holdout_test_ratio(self):
+        config = {
+            "test_splitting": {
+                "strategy": "random_holdout",
+                "test_ratio": 0.1
+            }
+        }
+
+        _, train_test = load_and_split_data(config)
+
+        assert len(train_test) == 1
+        train = train_test[0].train_set.dataframe
+        test = train_test[0].eval_set.dataframe
+        assert not train.empty and not test.empty
+        assert len(test) == 3
+        assert len(train) + len(test) == 30
+
+    def test_random_holdout_leave_n_out(self):
+        config = {
+            "test_splitting": {
+                "strategy": "random_holdout",
                 "leave_n_out": 3
             }
         }
@@ -120,7 +156,7 @@ class TestSplitter:
         config = {
             "test_splitting": {
                 "strategy": "fixed_timestamp",
-                "timestamp": 7
+                "timestamp": 21600
             }
         }
 
@@ -130,8 +166,8 @@ class TestSplitter:
         train = train_test[0].train_set.dataframe
         test = train_test[0].eval_set.dataframe
         assert not train.empty and not test.empty
-        assert all(test["timestamp"] >= 7)
-        assert all(train["timestamp"] < 7)
+        assert all(test["timestamp"] >= 21600)
+        assert all(train["timestamp"] < 21600)
 
     def test_best_timestamp(self):
         config = {
@@ -151,13 +187,13 @@ class TestSplitter:
         assert train['timestamp'].max() < test['timestamp'].min()
 
     def test_saving_on_disk(self):
-        save_folder = "./splitting_strategies/splitting"
+        save_folder = "./splitter/splitting"
         config = {
             "save_on_disk": True,
             "save_folder": save_folder,
             "test_splitting": {
                 "strategy": "fixed_timestamp",
-                "timestamp": 8
+                "timestamp": 25200
             }
         }
 
@@ -196,6 +232,59 @@ class TestSplitter:
             assert not train.empty and not test.empty
 
 
+class TestSequenceSplitter:
+
+    def test_temporal_holdout_leave_n_out(self):
+        config = {
+            "test_splitting": {
+                "strategy": "temporal_holdout",
+                "leave_n_out": 1
+            }
+        }
+
+        _, train_test = load_and_split_sequence_data(config)
+
+        assert len(train_test) == 1
+        train = train_test[0].train_set.dataframe
+        test = train_test[0].eval_set.dataframe
+        assert len(train) + len(test) == 15
+        assert list(test["itemId"]) == ["4", "5", "7", "8", "6", "7"]
+
+    def test_dropping_users_with_a_single_session(self):
+        config = {
+            "test_splitting": {
+                "strategy": "temporal_holdout",
+                "leave_n_out": 1
+            }
+        }
+
+        _, train_test = load_and_split_data(config, "dropping_users")
+
+        train = train_test[0].train_set.dataframe
+        test = train_test[0].eval_set.dataframe
+
+        assert "2" not in set(train["userId"]) | set(test["userId"])
+        assert list(test["itemId"]) == ["4", "5", "6"]
+        assert list(train["itemId"]) == ["1", "2", "3"]
+
+    def test_never_splitting_sessions(self):
+        config = {
+            "test_splitting": {
+                "strategy": "random_cross_validation",
+                "folds": 2
+            }
+        }
+
+        _, train_test = load_and_split_sequence_data(config)
+
+        for fold in train_test:
+            train = fold.train_set.dataframe
+            test = fold.eval_set.dataframe
+            train_sessions = set(zip(train["userId"], train["sessionId"]))
+            test_sessions = set(zip(test["userId"], test["sessionId"]))
+            assert not (train_sessions & test_sessions)
+
+
 class TestSplitterFailures:
 
     @pytest.mark.parametrize("params", p["invalid_temporal_holdout_test_ratio"])
@@ -215,6 +304,30 @@ class TestSplitterFailures:
         config = {
             "test_splitting": {
                 "strategy": "temporal_holdout",
+                **params
+            }
+        }
+
+        with pytest.raises((ValueError, AttributeError)):
+            load_and_split_data(config)
+
+    @pytest.mark.parametrize("params", p["invalid_random_holdout_test_ratio"])
+    def test_invalid_or_missing_params_random_holdout_test_ratio(self, params):
+        config = {
+            "test_splitting": {
+                "strategy": "random_holdout",
+                **params
+            }
+        }
+
+        with pytest.raises((ValueError, AttributeError)):
+            load_and_split_data(config)
+
+    @pytest.mark.parametrize("params", p["invalid_random_holdout_leave_n_out"])
+    def test_invalid_or_missing_params_random_holdout_leave_n_out(self, params):
+        config = {
+            "test_splitting": {
+                "strategy": "random_holdout",
                 **params
             }
         }
@@ -321,6 +434,17 @@ class TestSplitterFailures:
 
         with pytest.raises(ValueError):
             load_and_split_data(config)
+
+    def test_fixed_timestamp_rejected(self):
+        config = {
+            "test_splitting": {
+                "strategy": "fixed_timestamp",
+                "timestamp": 2
+            }
+        }
+
+        with pytest.raises(ValueError):
+            load_and_split_sequence_data(config)
 
 
 if __name__ == '__main__':

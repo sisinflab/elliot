@@ -9,12 +9,15 @@ from tests.params import params_dataset_loader_fail as p, data_folder, dataset_p
 current_path = path_joiner(__file__)
 
 
-def load_data(config_dict):
+def get_loader(config_dict):
     config_data = {
-        "experiment": {**config_dict}
+        "experiment": config_dict
     }
     config = build_namespace(config_path=current_path, config_data=config_data)
-    loader = DataSetLoader(config=config)
+    return DataSetLoader(config=config)
+
+def load_data(config_dict):
+    loader = get_loader(config_dict)
     return loader.dataframe
 
 
@@ -85,8 +88,87 @@ class TestDataSetLoader:
             "dataset": "dataset_strategy",
             "data_config": {
                 "strategy": "dataset",
-                "dataset_path": dataset_path,
+                "dataset_path": dataset_path(),
                 "reader": {"header": True}
+            }
+        }
+
+        df = load_data(config)
+
+        assert df.shape[0] == 50
+
+    def test_fixed_sequential(self):
+        config = {
+            "dataset": "fixed_strategy_sequential",
+            "data_config": {
+                "strategy": "fixed",
+                "data_folder": data_folder,
+                "sequential": True,
+                "reader": {"format": "inline"}
+            }
+        }
+
+        df = load_data(config)
+
+        folds, train, test = df[0]
+        assert folds == []
+        assert train.shape[0] == 45
+        assert test.shape[0] == 5
+
+    def test_fixed_with_validation_sequential(self):
+        config = {
+            "dataset": "fixed_strategy_with_validation_sequential",
+            "data_config": {
+                "strategy": "fixed",
+                "data_folder": data_folder,
+                "sequential": True,
+                "reader": {"format": "inline"}
+            }
+        }
+
+        df = load_data(config)
+
+        folds, train, test = df[0]
+        assert folds[0][0].shape[0] == 40
+        assert folds[0][1].shape[0] == 5
+        assert len(df[0][0]) == 1
+        assert train is None
+        assert test.shape[0] == 5
+
+    def test_hierarchy_sequential(self):
+        config = {
+            "dataset": "hierarchy_strategy_sequential",
+            "data_config": {
+                "strategy": "hierarchy",
+                "data_folder": data_folder,
+                "sequential": True,
+                "reader": {"format": "inline"}
+            }
+        }
+
+        df = load_data(config)
+
+        folds, train, test = df[0]
+        assert folds[0][0].shape[0] == 40
+        assert folds[0][1].shape[0] == 5
+        assert folds[1][0].shape[0] == 40
+        assert folds[1][1].shape[0] == 5
+        assert train.shape[0] == 45
+        assert test.shape[0] == 5
+
+        folds, train, test = df[1]
+        assert folds == []
+        assert train.shape[0] == 45
+        assert test.shape[0] == 5
+
+    def test_dataset_sequential(self):
+        config = {
+            "dataset": "dataset_strategy_sequential",
+            "data_config": {
+                "strategy": "dataset",
+                "dataset_path": dataset_path(),
+                "sequential": True,
+                "reader": {"format": "inline"}
             }
         }
 
@@ -96,10 +178,10 @@ class TestDataSetLoader:
 
     def test_filter_nan(self):
         config = {
-            "dataset": "filter_nan",
+            "dataset": "dataset_loader",
             "data_config": {
                 "strategy": "dataset",
-                "dataset_path": dataset_path,
+                "dataset_path": dataset_path("filter_nan"),
                 "reader": {"header": True}
             }
         }
@@ -120,6 +202,7 @@ class TestDataSetLoaderFailures:
             "data_config": {
                 "strategy": "fixed",
                 **({"data_folder": params["data_folder"]} if params["data_folder"] is not None else {}),
+                "sequential": params["sequential"]
             }
         }
 
@@ -133,6 +216,7 @@ class TestDataSetLoaderFailures:
             "data_config": {
                 "strategy": "dataset",
                 **({"dataset_path": params["dataset_path"]} if params["dataset_path"] is not None else {}),
+                "sequential": params["sequential"]
             }
         }
 
@@ -145,7 +229,8 @@ class TestDataSetLoaderFailures:
             "dataset": "dataset_strategy",
             "data_config": {
                 **({"strategy": params["strategy"]} if params["strategy"] is not None else {}),
-                "dataset_path": dataset_path
+                "dataset_path": dataset_path(),
+                "sequential": params["sequential"]
             }
         }
 
@@ -154,16 +239,156 @@ class TestDataSetLoaderFailures:
 
     def test_missing_required_column(self):
         config = {
-            "dataset": "missing_required_column",
+            "dataset": "dataset_loader",
             "data_config": {
                 "strategy": "dataset",
-                "dataset_path": dataset_path,
+                "dataset_path": dataset_path("missing_required_column"),
                 "reader": {"header": True}
             }
         }
 
         with pytest.raises(KeyError):
             load_data(config)
+
+
+class TestSequenceProcessing:
+
+    def test_wide_synthesizes_order_key(self):
+        config = {
+            "dataset": "dataset_loader",
+            "data_config": {
+                "strategy": "dataset",
+                "dataset_path": dataset_path("sequence_wide"),
+                "sequential": True,
+                "reader": {"header": False}
+            }
+        }
+
+        loader = get_loader(config)
+        df = loader.dataframe
+
+        assert loader.has_real_timestamps is False
+        assert df.shape[0] == 12
+        assert list(df.columns) == ["userId", "itemId", "sessionId", "timestamp", "rating"]
+        assert (df["rating"] == 1.0).all()
+
+        u1 = df[df["userId"] == "1"].sort_values("timestamp")
+        assert list(u1["itemId"]) == ["1", "2", "3", "4", "5"]
+        assert list(u1["timestamp"]) == [0, 1, 2, 3, 4]
+        assert list(u1["sessionId"]) == [0, 0, 0, 0, 0]
+
+    def test_inline_with_real_timestamp(self):
+        config = {
+            "dataset": "dataset_loader",
+            "data_config": {
+                "strategy": "dataset",
+                "dataset_path": dataset_path("sequence_inline"),
+                "sequential": True,
+                "reader": {"format": "inline"}
+            }
+        }
+
+        loader = get_loader(config)
+        df = loader.dataframe
+
+        assert loader.has_real_timestamps is True
+        assert df.shape[0] == 12
+        u1 = df[df["userId"] == "1"]
+        u2 = df[df["userId"] == "2"]
+        u3 = df[df["userId"] == "3"]
+        assert not u1.empty and not u2.empty
+        assert (u1["timestamp"] == 10).all()
+        assert (u2["timestamp"] == 20).all()
+        assert (u3["timestamp"] == 30).all()
+
+    def test_inline_without_timestamp(self):
+        config = {
+            "dataset": "dataset_loader",
+            "data_config": {
+                "strategy": "dataset",
+                "dataset_path": dataset_path("sequence_inline_no_timestamp"),
+                "sequential": True,
+                "reader": {"format": "inline"}
+            }
+        }
+
+        loader = get_loader(config)
+        df = loader.dataframe
+
+        assert loader.has_real_timestamps is False
+        u1 = df[df["userId"] == "1"].sort_values("timestamp")
+        assert list(u1["itemId"]) == ["1", "2", "3", "4", "5"]
+        assert list(u1["timestamp"]) == [0, 1, 2, 3, 4]
+
+    def test_rating_always_implicit(self):
+        config = {
+            "dataset": "dataset_loader",
+            "binarize": False,
+            "data_config": {
+                "strategy": "dataset",
+                "dataset_path": dataset_path("sequence_wide"),
+                "sequential": True,
+                "reader": {"header": False}
+            }
+        }
+
+        df = load_data(config)
+
+        assert (df["rating"] == 1.0).all()
+
+    def test_multi_row_user(self):
+        config = {
+            "dataset": "dataset_loader",
+            "data_config": {
+                "strategy": "dataset",
+                "dataset_path": dataset_path("multi_row_user"),
+                "sequential": True,
+                "reader": {"header": False}
+            }
+        }
+
+        df = load_data(config)
+
+        u1 = df[df["userId"] == "1"].sort_values("timestamp")
+        assert list(u1["sessionId"]) == [0, 0, 0, 1, 1]
+
+    def test_interactions_with_real_timestamp_segments_sessions(self):
+        config = {
+            "dataset": "dataset_loader",
+            "data_config": {
+                "strategy": "dataset",
+                "dataset_path": dataset_path("session_gap"),
+                "reader": {"header": True}
+            }
+        }
+
+        loader = get_loader(config)
+        df = loader.dataframe
+
+        assert loader.has_real_timestamps is True
+
+        u1 = df[df["userId"] == "1"].sort_values("timestamp")
+        assert list(u1["sessionId"]) == [0, 0, 0, 1, 1, 1]
+
+        u2 = df[df["userId"] == "2"]
+        assert u2["sessionId"].nunique() == 1
+
+    def test_interactions_without_timestamp_get_no_session_column(self):
+        config = {
+            "dataset": "dataset_loader",
+            "data_config": {
+                "strategy": "dataset",
+                "dataset_path": dataset_path("no_timestamp_column"),
+                "reader": {"header": True}
+            }
+        }
+
+        loader = get_loader(config)
+        df = loader.dataframe
+
+        assert loader.has_real_timestamps is False
+        assert "sessionId" not in df.columns
+        assert "timestamp" in df.columns
 
 
 if __name__ == '__main__':

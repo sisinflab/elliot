@@ -1,6 +1,4 @@
-from typing import List, Union, Dict, Tuple
-from types import SimpleNamespace
-import importlib
+from typing import List, Union, Dict, Tuple, Iterable
 import numpy as np
 import pandas as pd
 
@@ -19,7 +17,8 @@ class DataSetLoader:
     """The DataSetLoader class is responsible for loading and preparing datasets for training,
     validation, and testing.
 
-    It supports multiple loading strategies and integrates optional pre-filtering and side information loading.
+    It supports multiple loading strategies, handles both interactions and sequential data
+    and integrates optional pre-filtering and side information loading.
     The final output is a list of `DataSet` objects, ready to be consumed by the recommendation pipeline.
 
     Args:
@@ -39,6 +38,7 @@ class DataSetLoader:
 
       data_config:
         strategy: dataset|fixed|hierarchy
+        sequential: True|False
         data_folder: this/is/the/path
         dataset_path: this/is/the/path
       binarize: True|False
@@ -55,6 +55,10 @@ class DataSetLoader:
     dataframe: Union[list, pd.DataFrame]
     side_information: Dict[str, AbstractLoader]
 
+    # Inactivity threshold (in seconds) marking the start of a new session when
+    # segmenting non-sequential interactions that carry a real timestamp.
+    SESSION_GAP_SECONDS = 1800
+
     def __init__(self, config: ExperimentConfig):
         self.logger = logging.get_logger(self.__class__.__name__)
         self.reader = Reader(self.logger)
@@ -69,57 +73,88 @@ class DataSetLoader:
         if self.config.config_test:
             return
 
-        self._load_ratings()
+        self.has_real_timestamps = True
+
+        self._load_interactions()
         self._load_side_information()
         self._preprocess_data()
 
-    def _load_ratings(self):
+    def _load_interactions(self):
         """Load user-item interaction data according to the selected strategy."""
         reader_config = self.data_config.reader
+        sequential = self.data_config.sequential
+
+        read_kwargs = dict(
+            header=reader_config.header,
+            columns=reader_config.column_names(),
+            datatypes=reader_config.column_dtypes(),
+            sep=reader_config.sep,
+        )
+        if sequential:
+            read_kwargs.update(
+                format=reader_config.format,
+                sequence_sep=reader_config.sequence_sep,
+                track_source_rows=True,
+            )
+
+        callback_fn = self._rename_cols_and_binarize_sequence if sequential else self._rename_cols_and_binarize
 
         match self.data_config.strategy:
 
             case DataLoadingStrategy.FIXED:
                 self.dataframe = self.reader.read_tabular_split(
                     read_folder=self.data_config.data_folder,
-                    header=reader_config.header,
-                    columns=reader_config.column_names(),
-                    datatypes=reader_config.column_dtypes(),
-                    sep=reader_config.sep,
+                    sequential=sequential,
                     ext=reader_config.ext,
-                    callback_fn=self._rename_cols_and_binarize
+                    callback_fn=callback_fn,
+                    **read_kwargs
                 )
 
             case DataLoadingStrategy.HIERARCHY:
                 self.dataframe = self.reader.read_tabular_split(
                     read_folder=self.data_config.data_folder,
                     hierarchical=True,
-                    header=reader_config.header,
-                    columns=reader_config.column_names(),
-                    datatypes=reader_config.column_dtypes(),
-                    sep=reader_config.sep,
+                    sequential=sequential,
                     ext=reader_config.ext,
-                    callback_fn=self._rename_cols_and_binarize
+                    callback_fn=callback_fn,
+                    **read_kwargs
                 )
 
             case DataLoadingStrategy.DATASET:
-                self.dataframe = self.reader.read_tabular(
+                read_fn = self.reader.read_sequence_tabular if sequential else self.reader.read_tabular
+                self.dataframe = read_fn(
                     path=self.data_config.dataset_path,
-                    header=reader_config.header,
-                    columns=reader_config.column_names(),
-                    datatypes=reader_config.column_dtypes(),
-                    sep=reader_config.sep,
-                    callback_fn=self._rename_cols_and_binarize
+                    callback_fn=callback_fn,
+                    **read_kwargs
                 )
 
         self._clean(self._filter_nan_and_duplicates)
 
+    @staticmethod
+    def _resolve_current_names(
+        requested: List[Union[str, int]],
+        data_columns: Iterable
+    ) -> List[Union[str, int]]:
+        """Resolve requested column identifiers against the columns actually present
+        in a DataFrame. Positional (int) identifiers are replaced, in order, with the
+        corresponding column label found in `data_columns`, since a column selected
+        positionally may not keep its original integer label (e.g. when the source
+        file has a header). Name-based identifiers are left untouched.
+
+        Args:
+            requested (List[Union[str, int]]): The originally requested column identifiers,
+                in the order they are expected to appear in `data_columns`.
+            data_columns (Iterable): The columns of the DataFrame produced by the reader.
+
+        Returns:
+            List[Union[str, int]]: The resolved column identifiers.
+        """
+        col_iter = iter(data_columns)
+        return [next(col_iter) if isinstance(c, int) else c for c in requested]
+
     def _rename_cols_and_binarize(self, data, **kwargs):
         names = ["userId", "itemId", "rating", "timestamp"]
-        current_names = self.data_config.reader.column_names()
-
-        col_iter = iter(data.columns)
-        current_names = [next(col_iter) if isinstance(c, int) else c for c in current_names]
+        current_names = self._resolve_current_names(self.data_config.reader.column_names(), data.columns)
 
         col_mapping = {c: names[i] for i, c in enumerate(current_names) if c in data.columns}
 
@@ -130,8 +165,58 @@ class DataSetLoader:
         if any(c not in data.columns for c in ("userId", "itemId")):
             raise KeyError("Missing some required columns: 'userId' or 'itemId'.")
 
+        if "timestamp" not in data.columns:
+            # No real timestamp is available: fall back to each interaction's position
+            # within its user's history as a synthetic order key, mirroring the sequential
+            # loader, so order-aware splitting strategies keep working on relative order alone.
+            data["timestamp"] = data.groupby("userId").cumcount()
+            self.has_real_timestamps = False
+
         if self.config.binarize == True or "rating" not in data.columns:
             data["rating"] = 1.0
+
+        return data
+
+    def _rename_cols_and_binarize_sequence(self, data, **kwargs):
+        reader_config = self.data_config.reader
+        columns = reader_config.columns
+
+        requested = [columns.user_id_col]
+        if reader_config.format == "inline" and columns.timestamp_col is not None:
+            requested.append(columns.timestamp_col)
+
+        names = ["userId", "timestamp"]
+        current_names = self._resolve_current_names(requested, data.columns)
+
+        col_mapping = {c: names[i] for i, c in enumerate(current_names) if c in data.columns}
+
+        data = data.rename(columns=col_mapping)
+
+        if "_sourceRow" in data.columns:
+            # Each raw source row is a distinct session for its user: number sessions
+            # 0, 1, 2, ... per user, in the order they appear in the source file.
+            data["sessionId"] = data.groupby("userId")["_sourceRow"].transform(
+                lambda s: pd.factorize(s)[0]
+            )
+
+        cols_to_use = ["userId", "itemId"] + (["timestamp"] if "timestamp" in data.columns else [])
+        if "sessionId" in data.columns:
+            cols_to_use.append("sessionId")
+        data = data[cols_to_use]
+
+        if any(c not in data.columns for c in ("userId", "itemId")):
+            raise KeyError("Missing some required columns: 'userId' or 'itemId'.")
+
+        if "timestamp" not in data.columns:
+            # No real timestamp is available (e.g. "wide" format, or "inline" without a
+            # configured timestamp column): fall back to each item's position within its
+            # user's sequence as a synthetic order key, so order-aware splitting strategies
+            # (temporal_hold_out, temporal_leave_n_out) keep working on positional order alone.
+            data["timestamp"] = data.groupby("userId").cumcount()
+            self.has_real_timestamps = False
+
+        # Sequential data carries no explicit feedback: always treat it as implicit.
+        data["rating"] = 1.0
 
         return data
 
@@ -194,6 +279,27 @@ class DataSetLoader:
         if self.data_config.strategy == DataLoadingStrategy.DATASET:
             prefilter = PreFilter(self.dataframe, self.config.prefiltering)
             self.dataframe = prefilter.filter()
+
+            if not self.data_config.sequential and self.has_real_timestamps:
+                self.dataframe = self._segment_sessions_by_time_gap(self.dataframe)
+
+    def _segment_sessions_by_time_gap(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Assign a `sessionId` to each interaction, starting a new session for a user
+        whenever the gap since their previous interaction exceeds `SESSION_GAP_SECONDS`.
+
+        Args:
+            df (pd.DataFrame): Interaction data with real, cross-user-comparable timestamps.
+
+        Returns:
+            pd.DataFrame: The same data, with an added `sessionId` column.
+        """
+        ordered = df.sort_values(["userId", "timestamp"], kind="stable")
+        is_new_session = ordered.groupby("userId")["timestamp"].diff() > self.SESSION_GAP_SECONDS
+        session_id = is_new_session.groupby(ordered["userId"]).cumsum()
+
+        df = df.copy()
+        df["sessionId"] = session_id
+        return df
 
     def _intersect_users_items(self):
         """Align users/items with side information based on alignment mode:
@@ -281,12 +387,39 @@ class DataSetLoader:
                 },
             )
 
+    def _drop_single_session_users(self):
+        """Drop users left with fewer than two sessions, since a session-aware split
+        can never carve both a train and a test portion out of a single session.
+        No-op when the data carries no `sessionId` (e.g. non-sequential data without
+        real timestamps, where splitting is not session-aware).
+        """
+        df = self.dataframe
+        if "sessionId" not in df.columns:
+            return
+
+        session_counts = df.groupby("userId")["sessionId"].nunique()
+        valid_users = session_counts[session_counts >= 2].index
+        dropped = len(session_counts) - len(valid_users)
+
+        if dropped:
+            self.logger.info(
+                "Dropping users with fewer than two sessions",
+                extra={"context": {"dropped_users": dropped}}
+            )
+            self.dataframe = df[df["userId"].isin(valid_users)].reset_index(drop=True)
+
     def build(self) -> Tuple[List[List[DataSet]], List[DataSet]]:
         if self.data_config.strategy != DataLoadingStrategy.DATASET:
             tuple_list = self.dataframe
         else:
+            self._drop_single_session_users()
             self.logger.info("There will be the splitting")
-            splitter = Splitter(self.dataframe, self.config.splitting, self.config.random_seed)
+            splitter = Splitter(
+                self.dataframe,
+                self.config.splitting,
+                self.config.random_seed,
+                has_real_timestamps=self.has_real_timestamps
+            )
             tuple_list = splitter.process_splitting()
 
         if len(tuple_list) > 1:

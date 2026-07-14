@@ -23,6 +23,10 @@ class Splitter:
         splitting_config (SplittingConfig): Object containing configuration
             for the desired splitting strategy.
         random_seed (int): Random seed, for reproducibility; default is 42.
+        has_real_timestamps (bool): Whether 'timestamp' holds real, cross-user-comparable
+            timestamps rather than a synthetic per-user order key (e.g. for sequence data
+            loaded without real timestamps, see `DataConfig.has_real_timestamps`).
+            Defaults to True.
 
     Supported splitting strategies:
 
@@ -41,6 +45,7 @@ class Splitter:
       splitting:
         save_on_disk: True|False
         save_folder: path/to/folder
+        sequential: True|False
         test_splitting:
           strategy: fixed_timestamp|temporal_hold_out|random_subsampling|random_cross_validation
           timestamp: best|1609786061
@@ -56,16 +61,26 @@ class Splitter:
 
     Notes:
         Splitting is required and will be applied only if `data_config.strategy` is set to 'dataset'.
+        When `data` carries a `sessionId` column, every splitting strategy operates at session
+        granularity: a whole session is always assigned to the same side of a split, never divided
+        between train and test (or train and validation).
     """
 
     splitting_config: SplittingConfig
 
-    def __init__(self, data: pd.DataFrame, splitting_config: SplittingConfig, random_seed: int = 42):
+    def __init__(
+        self,
+        data: pd.DataFrame,
+        splitting_config: SplittingConfig,
+        random_seed: int = 42,
+        has_real_timestamps: bool = True
+    ):
         self.logger = elog.get_logger(self.__class__.__name__, seed=random_seed)
         self.writer = Writer(self.logger)
 
         self.data = data
         self.splitting_config = splitting_config
+        self.has_real_timestamps = has_real_timestamps
 
         np.random.seed(random_seed)
 
@@ -102,13 +117,20 @@ class Splitter:
             )
 
         if self.splitting_config.save_on_disk:
+            sequence_kwargs = {
+                "format": self.splitting_config.writer.format,
+                "sequence_sep": self.splitting_config.writer.sequence_sep
+            } if self.splitting_config.sequential else {}
+
             self.writer.write_tabular_split(
                 fold_dataset=tuple_list,
                 save_folder=self.splitting_config.save_folder,
                 header=self.splitting_config.writer.header,
                 columns=self.splitting_config.writer.columns,
                 sep=self.splitting_config.writer.sep,
-                ext=self.splitting_config.writer.ext
+                ext=self.splitting_config.writer.ext,
+                sequential=self.splitting_config.sequential,
+                **sequence_kwargs
             )
 
         return tuple_list
@@ -130,14 +152,24 @@ class Splitter:
         data = data.reset_index(drop=True)
         tuple_list = []
 
+        use_sessions = "sessionId" in data.columns
+        working = self._build_session_proxy(data) if use_sessions else data
+
         match cfg.strategy:
             case SplittingStrategy.FIXED_TS:
+                if not self.has_real_timestamps:
+                    raise ValueError(
+                        f"'{cfg.strategy.value}' splitting requires real, cross-user-comparable "
+                        f"timestamps, but the loaded data only carries a synthetic per-user ordering key "
+                        f"(e.g. sequence data without real timestamps). "
+                        f"Use 'temporal_holdout' instead, as it relies on each user's own order."
+                    )
                 if cfg.timestamp is not None:
-                    self._check_timestamp_range(data, cfg.timestamp)
-                    tuple_list = self.splitting_passed_timestamp(data, cfg.timestamp)
+                    self._check_timestamp_range(working, cfg.timestamp)
+                    tuple_list = self.splitting_passed_timestamp(working, cfg.timestamp)
                 else:
                     tuple_list = self.splitting_best_timestamp(
-                        data,
+                        working,
                         cfg.min_below,
                         cfg.min_over
                     )
@@ -145,35 +177,93 @@ class Splitter:
             case SplittingStrategy.TEMP_HOLDOUT:
                 if cfg.test_ratio is not None:
                     tuple_list = self.splitting_temporal_holdout(
-                        data,
+                        working,
                         cfg.test_ratio
                     )
                 else:
-                    self._check_leave_n_out_range(data, cfg.leave_n_out)
+                    self._check_leave_n_out_range(working, cfg.leave_n_out)
                     tuple_list = self.splitting_temporal_leave_n_out(
-                        data,
+                        working,
+                        cfg.leave_n_out
+                    )
+
+            case SplittingStrategy.RAND_HOLDOUT:
+                if cfg.test_ratio is not None:
+                    tuple_list = self.splitting_random_subsampling_k_folds(
+                        working,
+                        1,
+                        cfg.test_ratio
+                    )
+                else:
+                    self._check_leave_n_out_range(working, cfg.leave_n_out)
+                    tuple_list = self.splitting_random_subsampling_k_folds_leave_n_out(
+                        working,
+                        1,
                         cfg.leave_n_out
                     )
 
             case SplittingStrategy.RAND_SUB_SMP:
                 if cfg.test_ratio is not None:
                     tuple_list = self.splitting_random_subsampling_k_folds(
-                        data,
+                        working,
                         cfg.folds,
                         cfg.test_ratio
                     )
                 else:
-                    self._check_leave_n_out_range(data, cfg.leave_n_out)
+                    self._check_leave_n_out_range(working, cfg.leave_n_out)
                     tuple_list = self.splitting_random_subsampling_k_folds_leave_n_out(
-                        data,
+                        working,
                         cfg.folds,
                         cfg.leave_n_out
                     )
 
             case SplittingStrategy.RAND_CV:
-                tuple_list = self.splitting_k_folds(data, cfg.folds)
+                tuple_list = self.splitting_k_folds(working, cfg.folds)
+
+        if use_sessions:
+            tuple_list = [self._expand_sessions(data, train_p, test_p) for train_p, test_p in tuple_list]
 
         return tuple_list
+
+    @staticmethod
+    def _build_session_proxy(data: pd.DataFrame) -> pd.DataFrame:
+        """Collapse interaction-level data into one row per (userId, sessionId), using
+        each session's earliest timestamp as its representative order key. Running a
+        splitting strategy on this proxy makes it operate on whole sessions instead of
+        individual interactions.
+
+        Args:
+            data (pd.DataFrame): Interaction-level data with a `sessionId` column.
+
+        Returns:
+            pd.DataFrame: One row per (userId, sessionId), with the session's minimum timestamp.
+        """
+        return data.groupby(["userId", "sessionId"], as_index=False)["timestamp"].min()
+
+    @staticmethod
+    def _expand_sessions(
+        data: pd.DataFrame,
+        train_proxy: pd.DataFrame,
+        test_proxy: pd.DataFrame
+    ) -> Tuple[pd.DataFrame, pd.DataFrame]:
+        """Map a (train, test) split computed at session granularity back onto the
+        original interaction-level data, so a whole session always lands on the same side.
+
+        Args:
+            data (pd.DataFrame): The original interaction-level data.
+            train_proxy (pd.DataFrame): Session-level rows assigned to train.
+            test_proxy (pd.DataFrame): Session-level rows assigned to test.
+
+        Returns:
+            Tuple[pd.DataFrame, pd.DataFrame]: The (train, test) interaction-level data.
+        """
+        test_keys = set(zip(test_proxy["userId"], test_proxy["sessionId"]))
+        row_keys = pd.Series(list(zip(data["userId"], data["sessionId"])), index=data.index)
+        is_test = row_keys.isin(test_keys)
+
+        test = data[is_test].reset_index(drop=True)
+        train = data[~is_test].reset_index(drop=True)
+        return train, test
 
     def splitting_temporal_holdout(
         self,

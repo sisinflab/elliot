@@ -6,12 +6,9 @@ from elliot.dataset.samplers import PipelineSampler
 from elliot.evaluation.metrics import BaseMetric
 from elliot.namespace import build_namespace
 from elliot.recommender import BaseRecommender
-from elliot.utils.folder import path_joiner
 from elliot.utils.registry import side_info_registry, sampler_registry, metric_registry, model_registry
 
-from tests.params import test_path
-
-config_path = path_joiner(test_path, "configs", "test.yml")
+from tests.params import config_path
 
 
 _experiment_config = {

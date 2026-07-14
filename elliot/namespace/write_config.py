@@ -1,4 +1,4 @@
-from typing import List, Optional, Union
+from typing import List, Optional, Union, Literal
 from pydantic import field_validator
 
 from elliot.namespace.common import BaseConfig, normalize_ext
@@ -43,6 +43,19 @@ class TabularWriterConfig(BaseWriterConfig):
     columns: Optional[List[Union[str, int]]] = None
     sep: str = "\t"
     ext: str = ".tsv"
+
+
+class SequenceWriterConfig(TabularWriterConfig):
+    """Sequential interaction data writer configuration.
+
+    Attributes:
+        format (str): Layout of the output file, either 'wide' or 'inline'. Defaults to 'wide'.
+        sequence_sep (str): Separator to use inside the serialized sequence string. Only used
+            when `format` is 'inline'. Defaults to ' '.
+    """
+
+    format: Literal["wide", "inline"] = "wide"
+    sequence_sep: str = " "
 
 
 class ModelWriterConfig(BaseWriterConfig):

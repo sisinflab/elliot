@@ -116,3 +116,9 @@ def file_name(
     path: Union[str, PathLike[str]],
 ) -> str:
     return str(Path(path).stem)
+
+
+def file_full_name(
+    path: Union[str, PathLike[str]],
+) -> str:
+    return str(Path(path).name)

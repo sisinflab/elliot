@@ -7,6 +7,7 @@ from typing import List, Tuple, Dict, Any, Callable, Optional, Union
 from ast import literal_eval
 from logging import LoggerAdapter
 import fnmatch
+import csv
 import torch
 import pandas as pd
 import configparser
@@ -14,7 +15,7 @@ import numpy as np
 import os
 from types import SimpleNamespace
 
-from elliot.utils.folder import path_joiner, list_dir, is_dir, is_file, file_ext, file_name
+from elliot.utils.folder import list_dir, is_dir, is_file, file_ext, file_name
 from elliot.utils.logging import get_logger
 
 
@@ -128,6 +129,163 @@ class Reader:
 
         return df
 
+    def read_sequence_tabular(
+        self,
+        path: str,
+        format: str = "wide",
+        header: bool = True,
+        columns: Optional[List[Union[str, int]]] = None,
+        datatypes: Dict[Union[str, int], str] = {},
+        sequence_sep: str = " ",
+        sep: str = "\t",
+        callback_fn: Optional[Callable] = None,
+        track_source_rows: bool = True,
+        **kwargs: Any,
+    ) -> pd.DataFrame:
+        """Read sequential interaction data from a file and return it as a long-format
+        pandas DataFrame with one row per (user, item) interaction, handling variations
+        in columns and data types.
+
+        Two on-disk layouts are supported through the `format` argument:
+
+        - "wide": each row holds a ragged, `sep`-separated sequence where the first
+            token is the user identifier and the remaining tokens are the interacted
+            items (e.g. "u0\\titem1\\titem2\\titem3"). Only the first entry of `columns`
+            is used, to name the user column.
+        - "inline": each row holds a user identifier plus a single column containing
+            the whole interaction sequence serialized as a string
+            (e.g. "70,\\"495 1631 2317\\""), with the selected columns interpreted,
+            in order, as [user, sequence, timestamp (optional), *metadata (optional)].
+
+        A given user identifier may span several rows in the source file, each one
+        representing a distinct session for that user.
+
+        Args:
+            path (str): Path to the file containing the sequential data.
+            format (str): Layout of the input file, either "wide" or "inline". Defaults to "wide".
+            header (bool): Whether the input file contains a header row. Defaults to True.
+            columns (List[Union[str, int]], optional): List of column names or indices
+                to select. Defaults to None.
+            datatypes (Dict[Union[str, int], str], optional): Mapping of column names or indices
+                to data types. Defaults to {}.
+            sequence_sep (str): Separator used inside the sequence string. Only used when
+                `format` is "inline". Defaults to " ".
+            sep (str, optional): Column/token separator used in the input file. Defaults to "\\t".
+            callback_fn (Callable, optional): Function to apply to the resulting DataFrame
+                before returning. Defaults to None.
+            track_source_rows (bool): If True, add a "_sourceRow" column recording, for
+                every exploded item, the position of the raw source row (i.e. session) it
+                came from. Defaults to False.
+            **kwargs (Any): Additional keyword arguments passed to the `callback_fn` function.
+
+        Returns:
+            pd.DataFrame: A long-format pandas DataFrame with one row per (user, itemId)
+                interaction, plus timestamp/meta columns when available and `format`
+                is "inline".
+
+        Raises:
+            ValueError: If `format` is not one of "wide" or "inline".
+        """
+        item_col = "itemId"
+
+        # Case "inline": one row per session, sequence serialized as a string
+        if format == "inline":
+            data = self.read_tabular(path, header=header, columns=columns, datatypes=datatypes, sep=sep)
+            result_cols = list(data.columns)
+
+            # Not enough columns to identify the user and the sequence
+            if len(result_cols) < 2:
+                self.logger.warning(
+                    "The user or sequence column was not found. Returning an empty DataFrame."
+                )
+                user_col = columns[0] if columns and isinstance(columns[0], str) else "userId"
+                return pd.DataFrame(columns=[user_col, item_col])
+
+            # Interpret columns, in order, as [user, sequence, timestamp (optional), *metadata (optional)]
+            user_col, sequence_col = result_cols[0], result_cols[1]
+            timestamp_col = result_cols[2] if len(result_cols) > 2 else None
+            meta_cols = result_cols[3:]
+
+            cols_to_keep = [user_col, sequence_col]
+            if timestamp_col is not None:
+                cols_to_keep.append(timestamp_col)
+            cols_to_keep.extend(meta_cols)
+
+            # Drop rows with missing values before exploding the sequence
+            data = data[cols_to_keep].dropna()
+
+            # Record the source row (session) for every exploded item
+            if track_source_rows:
+                data["_sourceRow"] = np.arange(len(data))
+            
+            # Split the serialized sequence into individual item tokens
+            data[item_col] = data[sequence_col].astype(str).str.split(sequence_sep)
+            
+            # One row per (user, item) interaction
+            data = data.explode(item_col)
+            
+            # Drop the now-redundant serialized sequence column
+            data = data.drop(columns=[sequence_col])
+            data[item_col] = data[item_col].str.strip()
+            
+            # Remove empty tokens produced by trailing separators
+            df = data[data[item_col] != ""].reset_index(drop=True)
+
+        # Case "wide": ragged, sep-separated line per session
+        elif format == "wide":
+            user_col = columns[0] if columns else 0
+
+            # Determine header row index for pandas
+            header_row = 0 if header else None
+
+            # Read line-by-line to preserve the ragged rows as raw sep-separated tokens
+            raw = pd.read_csv(
+                path,
+                sep="\0",
+                header=header_row,
+                names=["_raw"],
+                quoting=csv.QUOTE_NONE,
+            )
+
+            if raw.empty:
+                self.logger.warning(
+                    "The data file is empty. Returning an empty DataFrame."
+                )
+                return pd.DataFrame(columns=[user_col, item_col])
+
+            # Split each line into tokens: the first is the user identifier, the rest are items
+            tokens = raw["_raw"].str.split(sep)
+            data = pd.DataFrame({
+                user_col: tokens.str[0].str.strip(),
+                item_col: tokens.str[1:],
+            })
+            
+            # Record the source row (session) for every exploded item
+            if track_source_rows:
+                data["_sourceRow"] = np.arange(len(data))
+            
+            # One row per (user, item) interaction
+            data = data.explode(item_col).dropna(subset=[item_col])
+            data[item_col] = data[item_col].astype(str).str.strip()
+            
+            # Remove empty tokens produced by trailing separators
+            df = data[data[item_col] != ""].reset_index(drop=True)
+
+            self.logger.info(f"Loaded: {path}")
+
+        else:
+            raise ValueError(f"Unsupported format '{format}'. Expected 'wide' or 'inline'.")
+
+        # Apply datatypes if provided
+        if datatypes:
+            dtype_to_use = {c: d for c, d in datatypes.items() if c in df.columns}
+            df = df.astype(dtype_to_use)
+
+        if callback_fn is not None:
+            df = callback_fn(df, **kwargs)
+
+        return df
+
     def read_folder(
         self,
         folder: str,
@@ -164,6 +322,7 @@ class Reader:
         self,
         read_folder: str,
         hierarchical: bool = False,
+        sequential: bool = False,
         **kwargs: Any
     ) -> List[Tuple[List[Tuple[pd.DataFrame, pd.DataFrame]], Optional[pd.DataFrame], pd.DataFrame]]:
         """Read tabular data splits from a specified folder,
@@ -174,13 +333,17 @@ class Reader:
                 for hierarchical splits.
             hierarchical (bool, optional): Whether the data follows a hierarchical
                 split structure. Defaults to False.
-            **kwargs (Any): Additional keyword arguments passed to `read_folder` and `read_tabular` methods.
+            sequential (bool, optional): Whether each split file stores sequential interaction
+                data (see `read_sequence_tabular`) instead of plain tabular data. Defaults to False.
+            **kwargs (Any): Additional keyword arguments passed to `read_folder` and to
+                `read_sequence_tabular` (if `sequential` is True) or `read_tabular` (otherwise).
 
         Returns:
             List[Tuple[List[Tuple[pd.DataFrame, pd.DataFrame]], Optional[pd.DataFrame], pd.DataFrame]]:
                 A list of tuples where each tuple contains an optional list of train/validation
                 DataFrame pairs, a train DataFrame, and a test DataFrame.
         """
+        read_fn = self.read_sequence_tabular if sequential else self.read_tabular
 
         def get_file_path(folder, name):
             files = self.read_folder(folder, **kwargs)
@@ -195,11 +358,11 @@ class Reader:
             test_path = get_file_path(read_folder, "test")
             val_path = get_file_path(read_folder, "val")
 
-            train_df = self.read_tabular(train_path, **kwargs)
-            test_df = self.read_tabular(test_path, **kwargs)
+            train_df = read_fn(train_path, **kwargs)
+            test_df = read_fn(test_path, **kwargs)
 
             if val_path is not None:
-                val_df = self.read_tabular(val_path, **kwargs)
+                val_df = read_fn(val_path, **kwargs)
                 folds = [(train_df, val_df)]
                 original_train_df = None
             else:
@@ -216,7 +379,7 @@ class Reader:
             for test_folder_path in test_dirs:
                 test_path = get_file_path(test_folder_path, "test")
 
-                test_df = self.read_tabular(test_path, **kwargs)
+                test_df = read_fn(test_path, **kwargs)
 
                 val_dirs = [p for p in list_dir(test_folder_path) if is_dir(p)]
                 val_list = []
@@ -227,8 +390,8 @@ class Reader:
                     train_path = get_file_path(val_folder_path, "train")
                     val_path = get_file_path(val_folder_path, "val")
 
-                    train_df = self.read_tabular(train_path, **kwargs)
-                    val_df = self.read_tabular(val_path, **kwargs)
+                    train_df = read_fn(train_path, **kwargs)
+                    val_df = read_fn(val_path, **kwargs)
 
                     val_list.append((train_df, val_df))
 
@@ -240,7 +403,7 @@ class Reader:
                 # Load only train dataset if validation folds are missing
                 else:
                     train_path = get_file_path(test_folder_path, "train")
-                    original_train_df = self.read_tabular(train_path, **kwargs)
+                    original_train_df = read_fn(train_path, **kwargs)
 
                 tuple_list.append((val_list, original_train_df, test_df))
 

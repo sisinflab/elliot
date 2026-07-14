@@ -28,7 +28,7 @@ def _load_data(config_dict):
             "dataset": "dataloader",
             "data_config": {
                 "strategy": "dataset",
-                "dataset_path": dataset_path,
+                "dataset_path": dataset_path(),
                 "reader": {"header": True}
             },
             "splitting": {
