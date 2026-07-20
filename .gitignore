@@ -24,6 +24,7 @@ pip-selfcheck.json
 **/results/
 /data/*
 **/splitting/
+!elliot/dataset/splitting
 **/negative/
 /share/
 **/__pycache__/**

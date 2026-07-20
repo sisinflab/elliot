@@ -90,6 +90,8 @@ class Evaluator(object):
     def _init_state(self, dataset):
         self._data = dataset
         self._eval_users = self._load_eval_users()
+        self._session_only = dataset.session_only_evaluation
+        self._session_owner_map = dataset.eval_sessions.owner_map if self._session_only else None
         self._pop = Popularity(dataset)
         self._pop_cache = self._build_popularity_cache()
         self._initialized = True
@@ -101,9 +103,24 @@ class Evaluator(object):
         if dataset is None:
             raise ValueError("Argument `dataset` cannot be None")
 
-        eval_data = self._apply_eval_user_filter(self._data.eval_set.get_dict())
-        if self._eval_users is not None:
-            eval_data = self._apply_eval_user_filter(eval_data)
+        real_eval_dict = self._data.eval_set.get_dict()
+        if self._session_only:
+            # SESSION_ONLY eval: each session-row's ground truth is only that
+            # session's own masked (last) item, never another session of the
+            # same user, so metrics reflect a genuine leave-last-item-out
+            # prediction before being averaged back to the user
+            # (see `_aggregate_sessions_to_users`).
+            sessions = self._data.eval_sessions
+            eval_data = {
+                row_id: {item: real_eval_dict.get(owner_user, {}).get(item)}
+                for row_id, owner_user, item in zip(
+                    sessions.row_public_ids, sessions.owner_public_ids, sessions.target_public_ids
+                )
+            }
+        else:
+            eval_data = real_eval_dict
+
+        eval_data = self._apply_eval_user_filter(eval_data)
 
         eval_obj = self._build_eval_object(eval_data)
 
@@ -269,12 +286,32 @@ class Evaluator(object):
     def _apply_eval_user_filter(self, eval_dict):
         if not self._eval_users:
             return eval_dict
-        filtered = {u: items for u, items in eval_dict.items() if u in self._eval_users}
+        if self._session_only:
+            filtered = {
+                row_id: items for row_id, items in eval_dict.items()
+                if self._session_owner_map.get(row_id) in self._eval_users
+            }
+        else:
+            filtered = {u: items for u, items in eval_dict.items() if u in self._eval_users}
         self.logger.info(
             "Evaluation user filter applied",
             extra={"context": {"users": len(self._eval_users)}}
         )
         return filtered
+
+    def _aggregate_sessions_to_users(self, per_entity_values):
+        """Group per-(virtual session-row) metric values by their real owning
+        user and average within each user, so the final scalar (and any
+        per-user statistical results) are computed per user, not per session."""
+        if not per_entity_values:
+            return per_entity_values
+
+        grouped = {}
+        for row_id, value in per_entity_values.items():
+            owner = self._session_owner_map.get(row_id, row_id)
+            grouped.setdefault(owner, []).append(value)
+
+        return {owner: float(np.mean(values)) for owner, values in grouped.items()}
 
     @staticmethod
     def _cast_user_id(token, target_type):
@@ -294,6 +331,7 @@ class Evaluator(object):
 
         results = {}
         statistical_results = {}
+        session_mode = self._session_only
 
         remaining_metric_names = list(self._metrics)
         accelerated_metric_names = []
@@ -317,12 +355,24 @@ class Evaluator(object):
                         relevance_threshold=self._rel_threshold,
                         metric_names=accelerated_metric_names,
                         device=self._accelerate_device or str(get_device()),
-                        return_user_metrics=bool(self._paired_ttest),
+                        return_user_metrics=bool(self._paired_ttest) or session_mode,
                     )
 
-                    results.update(accel.results)
-                    if self._paired_ttest:
-                        statistical_results.update(accel.user_results)
+                    if session_mode:
+                        # accel.results/user_results are per session-row here;
+                        # re-derive the reported scalar from the per-user mean
+                        # of per-session values, not the flat per-row mean.
+                        for metric_name in accelerated_metric_names:
+                            per_user = self._aggregate_sessions_to_users(accel.user_results[metric_name])
+                            results[metric_name] = (
+                                float(np.mean(list(per_user.values()))) if per_user else float("nan")
+                            )
+                            if self._paired_ttest:
+                                statistical_results[metric_name] = per_user
+                    else:
+                        results.update(accel.results)
+                        if self._paired_ttest:
+                            statistical_results.update(accel.user_results)
 
                     self.logger.info(
                         "Accelerated simple metrics enabled",
@@ -359,9 +409,17 @@ class Evaluator(object):
             metric_name = metric_object.name
             user_metric = None
 
-            if self._paired_ttest and isinstance(metric_object, StatisticalMetric):
+            if (self._paired_ttest or session_mode) and isinstance(metric_object, StatisticalMetric):
                 user_metric = metric_object.eval_user_metric()
-                statistical_results[metric_name] = user_metric
+
+                if session_mode:
+                    # Per-session values first, then averaged within each real
+                    # user, so both the reported scalar and the statistical
+                    # (paired-test) breakdown are computed per user.
+                    user_metric = self._aggregate_sessions_to_users(user_metric)
+
+                if self._paired_ttest:
+                    statistical_results[metric_name] = user_metric
 
             if user_metric is not None and metric_object.__class__.eval is BaseMetric.eval:
                 metric_values = list(user_metric.values())
@@ -369,7 +427,10 @@ class Evaluator(object):
             else:
                 results[metric_name] = metric_object.eval()
 
-        if accelerated_metric_names and self._should_verify_accelerated():
+        if accelerated_metric_names and not session_mode and self._should_verify_accelerated():
+            # The accelerated-vs-legacy cross-check compares flat per-row
+            # means; it doesn't apply once session-rows are aggregated to
+            # per-user values first, so it's skipped in session mode.
             self._verify_accelerated_results(
                 accelerated_metric_names=accelerated_metric_names,
                 recommendations=recommendations,

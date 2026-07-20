@@ -3,20 +3,17 @@ Module description:
 
 """
 
-
-import concurrent.futures as c
 import logging as pylog
 import os
 import typing as t
-from ast import literal_eval
 from types import SimpleNamespace
 
 import numpy as np
 import pandas as pd
 import scipy.sparse as sp
 
-from elliot.prefiltering.standard_prefilters import PreFilter
-from elliot.splitter.base_splitter import Splitter
+from elliot.dataset.prefiltering import PreFilter
+from elliot.dataset.splitting import Splitter
 from elliot.utils import logging
 
 """

@@ -3,7 +3,7 @@ from pydantic import Field, model_validator, create_model
 
 from elliot.namespace.common import BaseConfig, build_fields_from_annotations
 from elliot.namespace.read_config import InteractionsReaderConfig, GeneralReaderConfig, SequenceReaderConfig
-from elliot.utils.enums import DataLoadingStrategy
+from elliot.utils.enums import DataLoadingStrategy, SessionStrategy
 from elliot.utils.registry import side_info_registry
 from elliot.utils import import_submodules
 
@@ -28,6 +28,12 @@ class DataConfig(BaseConfig):
         data_folder (str, optional): Path to the folder containing dataset files.
         dataset_path (str, optional): Path to the dataset file.
         sequential (bool): Whether to load sequential or interactions data. Defaults to False.
+        session_strategy (SessionStrategy): Whether to segment interactions into sessions
+            (SESSION_ONLY) or keep each user's whole history as a single flat sequence (FLAT).
+            Segmenting requires dropping users left with fewer than two sessions, which can shrink
+            some datasets substantially, so it's opt-in. Defaults to FLAT, and is always forced to
+            SESSION_ONLY when `sequential` is True, since sequential data is already organized in
+            per-row sessions.
         reader (Any): Reading configuration.
         side_information(List[Any]): List of side-info configurations. Defaults to [].
     """
@@ -36,8 +42,21 @@ class DataConfig(BaseConfig):
     data_folder: Optional[str] = None
     dataset_path: Optional[str] = None
     sequential: bool = False
+    session_strategy: SessionStrategy = SessionStrategy.FLAT
     reader: Any = Field(default={}, exclude=True)
     side_information: List[Any] = []
+
+    @model_validator(mode="after")
+    def resolve_session_strategy(self) -> "DataConfig":
+        """Force SESSION_ONLY when reading sequential data, since each row of a
+        sequential source file is already a distinct session.
+
+        Returns:
+            DataConfig: The object itself.
+        """
+        if self.sequential:
+            self.session_strategy = SessionStrategy.SESSION_ONLY
+        return self
 
     @model_validator(mode="after")
     def build_reader_config(self):

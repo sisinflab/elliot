@@ -4,7 +4,12 @@ Module description:
 """
 
 
-from .base_sampler import AbstractSampler, TraditionalSampler, PipelineSampler
+from .base_sampler import (
+    AbstractSampler,
+    TraditionalSampler,
+    PipelineSampler,
+    SessionSampler
+)
 from .pointwise import (
     CustomPointWiseSparseSampler,
     PointWisePosNegRatioRatingsSampler,
@@ -18,3 +23,9 @@ from .pairwise import (
     MFPairWiseSampler
 )
 from .custom import SparseSampler
+from .sequential import (
+    SequentialSampler,
+    SameTargetSequentialSampler,
+    SlidingWindowSampler,
+    ClozeSampler
+)

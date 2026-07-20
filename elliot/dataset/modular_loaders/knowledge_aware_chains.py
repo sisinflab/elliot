@@ -14,8 +14,8 @@ from types import SimpleNamespace
 import logging as pylog
 
 from elliot.utils import logging
-from elliot.splitter.base_splitter import Splitter
-from elliot.prefiltering.standard_prefilters import PreFilter
+from elliot.dataset.splitting import Splitter
+from elliot.dataset.prefiltering import PreFilter
 
 """
 [(train_0,test_0)]

@@ -4,10 +4,10 @@ import pandas as pd
 
 from elliot.namespace import ExperimentConfig, DataConfig
 from elliot.dataset.modular_loaders.abstract_loader import AbstractLoader
-from elliot.splitter.base_splitter import Splitter
-from elliot.prefiltering.standard_prefilters import PreFilter
+from elliot.dataset.splitting import Splitter
+from elliot.dataset.prefiltering import PreFilter
 from elliot.dataset.dataset import DataSet
-from elliot.utils.enums import DataLoadingStrategy, AlignmentMode
+from elliot.utils.enums import DataLoadingStrategy, AlignmentMode, SessionStrategy
 from elliot.utils.read import Reader
 from elliot.utils import logging
 from elliot.utils.registry import side_info_registry
@@ -39,6 +39,7 @@ class DataSetLoader:
       data_config:
         strategy: dataset|fixed|hierarchy
         sequential: True|False
+        session_strategy: flat|session_only
         data_folder: this/is/the/path
         dataset_path: this/is/the/path
       binarize: True|False
@@ -75,11 +76,11 @@ class DataSetLoader:
 
         self.has_real_timestamps = True
 
-        self._load_interactions()
+        self._load_main_data()
         self._load_side_information()
         self._preprocess_data()
 
-    def _load_interactions(self):
+    def _load_main_data(self):
         """Load user-item interaction data according to the selected strategy."""
         reader_config = self.data_config.reader
         sequential = self.data_config.sequential
@@ -280,12 +281,21 @@ class DataSetLoader:
             prefilter = PreFilter(self.dataframe, self.config.prefiltering)
             self.dataframe = prefilter.filter()
 
-            if not self.data_config.sequential and self.has_real_timestamps:
+            should_segment = (
+                self.data_config.session_strategy == SessionStrategy.SESSION_ONLY
+                and not self.data_config.sequential
+                and self.has_real_timestamps
+            )
+            if should_segment:
                 self.dataframe = self._segment_sessions_by_time_gap(self.dataframe)
 
     def _segment_sessions_by_time_gap(self, df: pd.DataFrame) -> pd.DataFrame:
         """Assign a `sessionId` to each interaction, starting a new session for a user
         whenever the gap since their previous interaction exceeds `SESSION_GAP_SECONDS`.
+        Only called when `data_config.session_strategy` is SESSION_ONLY: segmenting
+        forces `_drop_single_session_users` to later drop every user left with fewer
+        than two sessions, which can shrink some datasets substantially, so it's opt-in
+        rather than automatic for every dataset with real timestamps.
 
         Args:
             df (pd.DataFrame): Interaction data with real, cross-user-comparable timestamps.
@@ -390,8 +400,9 @@ class DataSetLoader:
     def _drop_single_session_users(self):
         """Drop users left with fewer than two sessions, since a session-aware split
         can never carve both a train and a test portion out of a single session.
-        No-op when the data carries no `sessionId` (e.g. non-sequential data without
-        real timestamps, where splitting is not session-aware).
+        No-op when the data carries no `sessionId`, i.e. whenever `data_config.session_strategy`
+        is FLAT (segmentation was skipped) or, for non-sequential data, when there is no real
+        timestamp to segment on.
         """
         df = self.dataframe
         if "sessionId" not in df.columns:

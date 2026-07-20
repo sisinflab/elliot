@@ -17,8 +17,8 @@ import pandas as pd
 import scipy.sparse as sp
 from PIL import Image
 
-from elliot.prefiltering.standard_prefilters import PreFilter
-from elliot.splitter.base_splitter import Splitter
+from elliot.dataset.prefiltering import PreFilter
+from elliot.dataset.splitting import Splitter
 from elliot.utils import logging
 
 """

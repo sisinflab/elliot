@@ -2,6 +2,7 @@ import pytest
 
 from elliot.dataset import DataSetLoader
 from elliot.namespace import build_namespace
+from elliot.utils.enums import SessionStrategy
 from elliot.utils.folder import path_joiner
 
 from tests.params import params_dataset_loader_fail as p, data_folder, dataset_path
@@ -96,6 +97,35 @@ class TestDataSetLoader:
         df = load_data(config)
 
         assert df.shape[0] == 50
+
+    def test_session_strategy_defaults_to_flat(self):
+        config = {
+            "dataset": "dataset_strategy",
+            "data_config": {
+                "strategy": "dataset",
+                "dataset_path": dataset_path(),
+                "reader": {"header": True}
+            }
+        }
+
+        loader = get_loader(config)
+
+        assert loader.data_config.session_strategy == SessionStrategy.FLAT
+
+    def test_session_strategy_explicit_session_only(self):
+        config = {
+            "dataset": "dataset_strategy",
+            "data_config": {
+                "strategy": "dataset",
+                "dataset_path": dataset_path(),
+                "session_strategy": "session_only",
+                "reader": {"header": True}
+            }
+        }
+
+        loader = get_loader(config)
+
+        assert loader.data_config.session_strategy == SessionStrategy.SESSION_ONLY
 
     def test_fixed_sequential(self):
         config = {
@@ -253,6 +283,24 @@ class TestDataSetLoaderFailures:
 
 class TestSequenceProcessing:
 
+    def test_sequential_forces_session_only(self):
+        config = {
+            "dataset": "dataset_loader",
+            "data_config": {
+                "strategy": "dataset",
+                "dataset_path": dataset_path("sequence_wide"),
+                "sequential": True,
+                # Explicitly requesting FLAT must still be overridden, since
+                # sequential source rows are already organized in sessions.
+                "session_strategy": "flat",
+                "reader": {"header": False}
+            }
+        }
+
+        loader = get_loader(config)
+
+        assert loader.data_config.session_strategy == SessionStrategy.SESSION_ONLY
+
     def test_wide_synthesizes_order_key(self):
         config = {
             "dataset": "dataset_loader",
@@ -358,6 +406,7 @@ class TestSequenceProcessing:
             "data_config": {
                 "strategy": "dataset",
                 "dataset_path": dataset_path("session_gap"),
+                "session_strategy": "session_only",
                 "reader": {"header": True}
             }
         }
@@ -372,6 +421,22 @@ class TestSequenceProcessing:
 
         u2 = df[df["userId"] == "2"]
         assert u2["sessionId"].nunique() == 1
+
+    def test_interactions_with_real_timestamp_default_to_flat(self):
+        config = {
+            "dataset": "dataset_loader",
+            "data_config": {
+                "strategy": "dataset",
+                "dataset_path": dataset_path("session_gap"),
+                "reader": {"header": True}
+            }
+        }
+
+        loader = get_loader(config)
+        df = loader.dataframe
+
+        assert loader.has_real_timestamps is True
+        assert "sessionId" not in df.columns
 
     def test_interactions_without_timestamp_get_no_session_column(self):
         config = {

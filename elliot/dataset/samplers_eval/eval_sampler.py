@@ -2,6 +2,9 @@ from typing import Tuple, List, Optional
 import bisect
 import random
 import numpy as np
+import torch
+from torch.utils.data import Dataset
+from torch.nn.utils.rnn import pad_sequence
 from tqdm import tqdm
 
 from elliot.namespace import NegativeSamplingConfig
@@ -258,3 +261,76 @@ class NegativeSampler:
             neg[row] = [self._i_map[i] for i in neg_list if i in self._i_map]
 
         return neg
+
+
+class NegEvalDataset(Dataset):
+    def __init__(self, num_users, sampler, eval_pos_items, evaluation_set="test", leave_one_out=False):
+        self.num_users = num_users
+        self.leave_one_out = leave_one_out
+        self._evaluation_set = evaluation_set
+
+        eval_neg_items = sampler.sample()
+
+        self.eval_items = self._add_indices(eval_neg_items, eval_pos_items)
+
+    def _add_indices(self, neg, pos):
+        """Add test or validation samples to the sampled negatives."""
+        if not neg:
+            return None
+
+        final_items = []
+        iter_data = tqdm(
+            total=len(neg),
+            desc=f"Adding {self._evaluation_set} items to sampled negatives",
+            leave=False,
+        )
+
+        with iter_data as t:
+            for neg_u, pos_u in zip(neg, pos):
+                if not neg_u:
+                    pos_u = []
+                elif self.leave_one_out:
+                    pos_u = [pos_u[-1]] if pos_u else []
+
+                final_items.append(torch.tensor(neg_u + pos_u))
+                t.update(1)
+
+        return final_items
+
+    def __len__(self):
+        return self.num_users
+
+    def __getitem__(self, idx):
+        return idx, self.eval_items[idx]
+
+    @staticmethod
+    def collate_fn(batch):
+        user_indices, item_indices = zip(*batch)
+
+        # User indices will be a list of ints, so we convert it
+        user_indices = torch.tensor(list(user_indices))
+
+        # We use the pad_sequence utility to pad item indices
+        # in order to have all tensors of the same size
+        item_indices = pad_sequence(
+            item_indices,
+            batch_first=True,
+            padding_value=-1,
+        )
+
+        return user_indices, item_indices
+
+
+class FullEvalDataset(Dataset):
+    def __init__(self, num_users):
+        self.num_users = num_users
+
+    def __len__(self):
+        return self.num_users
+
+    def __getitem__(self, idx):
+        return idx
+
+    @staticmethod
+    def collate_fn(batch):
+        return torch.tensor(batch), None

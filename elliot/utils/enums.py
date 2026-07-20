@@ -45,6 +45,12 @@ class NegativeSamplingStrategy(Enum):
 class SamplerType(Enum):
     TRADITIONAL = 1
     PIPELINE = 2
+    SEQUENTIAL = 3
+
+
+class SessionStrategy(Enum):
+    FLAT = "flat"
+    SESSION_ONLY = "session_only"
 
 
 class ModelType(Enum):

@@ -4,95 +4,20 @@ Module description:
 """
 
 
-from typing import Tuple, Dict, Union, Optional
+from typing import Tuple, Dict, Optional
 from types import SimpleNamespace
 
 import pandas as pd
 import copy
 import logging as pylog
-from tqdm import tqdm
-
-import torch
 from torch.utils.data import Dataset, DataLoader
-from torch.nn.utils.rnn import pad_sequence
 
 from elliot.dataset.interactions import Interactions
+from elliot.dataset.sessions import Sessions, EvalSessions
 from elliot.dataset.fusion.fuser import FeatureFuser
-from elliot.negative_sampling import NegativeSampler
+from elliot.dataset.samplers_eval import NegativeSampler, NegEvalDataset, FullEvalDataset
 from elliot.utils import logging
-
-
-class NegEvalDataset(Dataset):
-    def __init__(self, num_users, sampler, eval_pos_items, evaluation_set="test", leave_one_out=False):
-        self.num_users = num_users
-        self.leave_one_out = leave_one_out
-        self._evaluation_set = evaluation_set
-
-        eval_neg_items = sampler.sample()
-
-        self.eval_items = self._add_indices(eval_neg_items, eval_pos_items)
-
-    def _add_indices(self, neg, pos):
-        """Add test or validation samples to the sampled negatives."""
-        if not neg:
-            return None
-
-        final_items = []
-        iter_data = tqdm(
-            total=len(neg),
-            desc=f"Adding {self._evaluation_set} items to sampled negatives",
-            leave=False,
-        )
-
-        with iter_data as t:
-            for neg_u, pos_u in zip(neg, pos):
-                if not neg_u:
-                    pos_u = []
-                elif self.leave_one_out:
-                    pos_u = [pos_u[-1]] if pos_u else []
-
-                final_items.append(torch.tensor(neg_u + pos_u))
-                t.update(1)
-
-        return final_items
-
-    def __len__(self):
-        return self.num_users
-
-    def __getitem__(self, idx):
-        return idx, self.eval_items[idx]
-
-    @staticmethod
-    def collate_fn(batch):
-        user_indices, item_indices = zip(*batch)
-
-        # User indices will be a list of ints, so we convert it
-        user_indices = torch.tensor(list(user_indices))
-
-        # We use the pad_sequence utility to pad item indices
-        # in order to have all tensors of the same size
-        item_indices = pad_sequence(
-            item_indices,
-            batch_first=True,
-            padding_value=-1,
-        )
-
-        return user_indices, item_indices
-
-
-class FullEvalDataset(Dataset):
-    def __init__(self, num_users):
-        self.num_users = num_users
-
-    def __len__(self):
-        return self.num_users
-
-    def __getitem__(self, idx):
-        return idx
-
-    @staticmethod
-    def collate_fn(batch):
-        return torch.tensor(batch), None
+from elliot.utils.enums import SessionStrategy
 
 
 class DataSet:
@@ -101,6 +26,8 @@ class DataSet:
     """
     train_set: Interactions
     eval_set: Interactions
+    train_sessions: Sessions
+    eval_sessions: Optional[EvalSessions]
     side_information: Dict[str, SimpleNamespace]
 
     def __init__(
@@ -130,17 +57,10 @@ class DataSet:
 
         self._evaluation_set = evaluation_set
 
-        self._handle_train_set(train_data, side_info_data)
-        self._handle_eval_set(eval_data)
-
         self._cached_datasets = {}
         self._eval_cache_key = None
+        self._session_eval_cache_key = None
 
-    def _handle_train_set(
-        self,
-        train_data: Union[pd.DataFrame, Interactions],
-        side_info_data
-    ):
         if isinstance(train_data, pd.DataFrame):
             self._users = (
                 train_data["userId"]
@@ -201,13 +121,33 @@ class DataSet:
         else:
             self.train_set = train_data
 
-    def _handle_eval_set(self, eval_data):
         self.eval_set = Interactions(
             dataframe=eval_data,
             name=self._evaluation_set,
             u_map=self._u_map,
             i_map=self._i_map,
             side_info_ns=self.side_information
+        )
+
+        self.train_sessions = Sessions(
+            dataframe=self.train_set.dataframe,
+            name="train",
+            u_map=self._u_map,
+            i_map=self._i_map,
+            side_info_ns=self.side_information,
+            sparse=self.train_set.sparse_ratings
+        )
+
+        self.eval_sessions = None
+        self.session_only_evaluation = False
+
+    def _build_eval_sessions(self):
+        self.eval_sessions = EvalSessions(
+            dataframe=self.eval_set.dataframe,
+            u_map=self._u_map,
+            i_map=self._i_map,
+            inv_mappings=self.get_inverse_mappings(),
+            n_items=self.train_set.dims[1]
         )
 
     def _align_with_training(self, side_information_data):
@@ -285,52 +225,115 @@ class DataSet:
                 },
             )
 
-    def get_eval_dataloader(self, batch_size=1024):
-        cache_key = self._eval_cache_key
+    def get_eval_dataloader(
+        self,
+        batch_size: int = 1024,
+        session_strategy: Optional[SessionStrategy] = None
+    ) -> DataLoader:
+        requested_session = session_strategy == SessionStrategy.SESSION_ONLY
+        dataset_has_sessions = self.config.data_config.session_strategy == SessionStrategy.SESSION_ONLY
 
-        if cache_key is None:
-            num_users, num_items = self.train_set.dims
+        if requested_session and not dataset_has_sessions:
+            self.logger.warning(
+                "Model requested SESSION_ONLY evaluation, but this dataset was loaded with the "
+                "FLAT session strategy (no session segmentation was performed); "
+                "falling back to FLAT evaluation."
+            )
+            requested_session = False
 
-            if self.config.negative_sampling is not None:
-                train_pos = self.train_set.get_positive_items()
-                eval_pos = self.eval_set.get_positive_items()
+        is_session = requested_session
+        self.session_only_evaluation = is_session
 
-                sampler = NegativeSampler(
-                    neg_sampling_config=self.config.negative_sampling,
-                    mappings=self.get_mappings(),
-                    inv_mappings=self.get_inverse_mappings(),
-                    num_users=num_users,
-                    num_items=num_items,
-                    train_pos_items=train_pos,
-                    eval_pos_items=eval_pos,
-                    evaluation_set=self._evaluation_set,
-                    fold_index=self.fold_index
-                )
+        cache_key = (
+            "session_neg" if is_session and self.config.negative_sampling is not None else
+            "session_full" if is_session else
+            "neg" if self.config.negative_sampling is not None else
+            "full"
+        )
 
-                eval_dataset = NegEvalDataset(
-                    num_users=num_users,
-                    sampler=sampler,
-                    eval_pos_items=eval_pos,
-                    evaluation_set=self._evaluation_set,
-                    leave_one_out=self.config.negative_sampling.leave_one_out
-                )
-                cache_key = "neg"
-            else:
-                eval_dataset = FullEvalDataset(num_users=num_users)
-                cache_key = "full"
-
-            self._cached_datasets[cache_key] = eval_dataset
-            self._eval_cache_key = cache_key
+        if cache_key not in self._cached_datasets:
+            dataset = self._build_eval_dataset()
+            self._cached_datasets[cache_key] = dataset
 
         dataset = self._cached_datasets[cache_key]
+
         dataloader = DataLoader(
             dataset,
             batch_size=batch_size,
             collate_fn=dataset.collate_fn,
-            shuffle=False
+            shuffle=False,
         )
 
         return dataloader
+
+    def _build_eval_dataset(self) -> Dataset:
+        if self.session_only_evaluation:
+            if self.eval_sessions is None:
+                self._build_eval_sessions()
+
+            sessions = self.eval_sessions
+            owner = sessions.owner_users
+
+            train_pos_per_user = self.train_set.get_positive_items()
+            eval_pos_per_user = self.eval_set.get_positive_items()
+
+            train_pos = [train_pos_per_user[u] for u in owner]
+            # Negatives must never be an item the user has interacted with in
+            # *any* of their eval sessions, not just this row's own session,
+            # so exclusion uses the owning user's full eval-set aggregate.
+            neg_exclusion_pos = [eval_pos_per_user[u] for u in owner]
+            # The ground-truth positive for a session-only row is only that
+            # session's own masked (last) item, never another session of the
+            # same user.
+            eval_pos = [[int(t)] for t in sessions.target_items]
+
+            _, public_items = self.get_inverse_mappings()
+            row_public_ids = sessions.row_public_ids
+
+            num_users = sessions.n_sessions
+
+            mappings = (
+                {row_id: idx for idx, row_id in enumerate(row_public_ids)},
+                self._i_map,
+            )
+            inv_mappings = (row_public_ids, public_items)
+
+        else:
+            num_users, num_items = self.train_set.dims
+            train_pos = self.train_set.get_positive_items()
+            eval_pos = self.eval_set.get_positive_items()
+            neg_exclusion_pos = eval_pos
+
+            mappings = self.get_mappings()
+            inv_mappings = self.get_inverse_mappings()
+
+        num_items = self.train_set.dims[1]
+
+        if self.config.negative_sampling is not None:
+            sampler = NegativeSampler(
+                neg_sampling_config=self.config.negative_sampling,
+                mappings=mappings,
+                inv_mappings=inv_mappings,
+                num_users=num_users,
+                num_items=num_items,
+                train_pos_items=train_pos,
+                eval_pos_items=neg_exclusion_pos,
+                evaluation_set=self._evaluation_set,
+                fold_index=self.fold_index,
+            )
+
+            eval_dataset = NegEvalDataset(
+                num_users=num_users,
+                sampler=sampler,
+                eval_pos_items=eval_pos,
+                evaluation_set=self._evaluation_set,
+                leave_one_out=self.config.negative_sampling.leave_one_out,
+            )
+
+        else:
+            eval_dataset = FullEvalDataset(num_users=num_users)
+
+        return eval_dataset
 
     def get_mappings(self):
         return self._u_map, self._i_map

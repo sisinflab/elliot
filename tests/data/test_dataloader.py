@@ -6,30 +6,26 @@ from elliot.namespace import build_namespace
 from elliot.utils.folder import path_joiner, check_path, parent_dir
 
 from tests.params import params_neg_sampling_fail as p
-from tests.params import dataset_path
+from tests.params import data_folder, dataset_path
 
 current_path = path_joiner(__file__)
 
 
-def training_dataloader(config_dict, sampler_name, batch_size, **kwargs):
-    val_data, _ = _load_data(config_dict)
-    dataloader = val_data.train_set.get_dataloader(sampler_name, batch_size=batch_size, **kwargs)
-    return dataloader
-
-def eval_dataloader(config_dict, batch_size):
+def eval_data(config_dict={}, **kwargs):
     val_data, main_data = _load_data(config_dict)
-    val_dataloader = val_data.get_eval_dataloader(batch_size=batch_size)
-    test_dataloader = main_data.get_eval_dataloader(batch_size=batch_size)
-    return val_dataloader, test_dataloader
+    val_dataloader = val_data.get_eval_dataloader(**kwargs)
+    test_dataloader = main_data.get_eval_dataloader(**kwargs)
+    return val_dataloader, test_dataloader, val_data, main_data
 
-def _load_data(config_dict):
+def _load_data(config_dict={}):
     config_data = {
         "experiment": {
             "dataset": "dataloader",
             "data_config": {
                 "strategy": "dataset",
+                "data_folder": data_folder,
                 "dataset_path": dataset_path(),
-                "reader": {"header": True}
+                "reader": {"header": True},
             },
             "splitting": {
                 "test_splitting": {
@@ -72,7 +68,7 @@ class TestEvalDataloader:
             }
         }
 
-        val_dataloader, test_dataloader = eval_dataloader(config, batch_size=2)
+        val_dataloader, test_dataloader, _, _ = eval_data(config, batch_size=2)
 
         train_val_positives = (
             np.array(range(0, 40)), np.array(0), np.array(list(range(0, 5)) + list(range(10, 50)))
@@ -105,7 +101,7 @@ class TestEvalDataloader:
             }
         }
 
-        val_dataloader, test_dataloader = eval_dataloader(config, batch_size=2)
+        val_dataloader, test_dataloader, _, _ = eval_data(config, batch_size=2)
 
         val_negatives = (
             np.array(range(40, 45)), np.array(range(1, 6)), np.array([])
@@ -141,7 +137,7 @@ class TestEvalDataloader:
             }
         }
 
-        eval_dataloader(config, batch_size=2)
+        eval_data(config, batch_size=2)
 
         val_path = path_joiner(parent_dir(current_path), save_folder, "test1_val1_negative.tsv")
         test_path = path_joiner(parent_dir(current_path), save_folder, "test1_negative.tsv")
@@ -164,7 +160,7 @@ class TestEvalDataloaderFailures:
         }
 
         with pytest.raises(ValueError):
-            eval_dataloader(config, batch_size=2)
+            eval_data(config, batch_size=2)
 
     def test_invalid_save_folder_neg_random(self):
         config = {
@@ -177,7 +173,7 @@ class TestEvalDataloaderFailures:
         }
 
         with pytest.raises(ValueError):
-            eval_dataloader(config, batch_size=2)
+            eval_data(config, batch_size=2)
 
     @pytest.mark.parametrize("params", p["invalid_neg_fixed"])
     def test_invalid_or_missing_params_neg_fixed(self, params):
@@ -193,7 +189,7 @@ class TestEvalDataloaderFailures:
         }
 
         with pytest.raises((FileNotFoundError, ValueError, AttributeError)):
-            eval_dataloader(config, batch_size=2)
+            eval_data(config, batch_size=2)
 
     @pytest.mark.parametrize("params", p["invalid_strategy"])
     def test_invalid_or_missing_strategy(self, params):
@@ -205,7 +201,7 @@ class TestEvalDataloaderFailures:
         }
 
         with pytest.raises(ValueError):
-            eval_dataloader(config, batch_size=2)
+            eval_data(config, batch_size=2)
 
 
 if __name__ == "__main__":

@@ -57,24 +57,27 @@ def generate_param_combinations(key_list, values, base=None):
 
 params_dataset_loader_fail = {
     "invalid_fixed": generate_param_combinations(
-        [("data_folder", "sequential")],
+        [("data_folder", "sequential", "session_strategy")],
         {
             "data_folder": ["non/existent/path", 3, None],
-            "sequential": [True, "invalid"]
+            "sequential": [True, "invalid"],
+            "session_strategy": ["flat", "invalid"]
         }
     ),
     "invalid_dataset": generate_param_combinations(
-        [("dataset_path", "sequential")],
+        [("dataset_path", "sequential", "session_strategy")],
         {
             "dataset_path": ["non/existent/path", [3], None],
-            "sequential": [True, "invalid"]
+            "sequential": [True, "invalid"],
+            "session_strategy": ["flat", "invalid"]
         }
     ),
     "invalid_strategy": generate_param_combinations(
-        [("strategy", "sequential")],
+        [("strategy", "sequential", "session_strategy")],
         {
             "strategy": ["invalid", 3, None],
-            "sequential": [True, "invalid"]
+            "sequential": [True, "invalid"],
+            "session_strategy": ["flat", "invalid"]
         }
     )
 }

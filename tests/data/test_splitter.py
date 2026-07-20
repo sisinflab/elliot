@@ -9,7 +9,7 @@ from tests.params import params_splitting_fail as p, dataset_path
 current_path = path_joiner(__file__)
 
 
-def load_and_split_data(config_dict, file_name=None, seq=False):
+def load_and_split_data(config_dict, file_name=None, seq=False, session_strategy=None):
     config_data = {
         "experiment": {
             "dataset": "splitter",
@@ -17,6 +17,7 @@ def load_and_split_data(config_dict, file_name=None, seq=False):
                 "strategy": "dataset",
                 "dataset_path": dataset_path(file_name),
                 "sequential": seq,
+                **({"session_strategy": session_strategy} if session_strategy is not None else {}),
                 "reader": {"header": True}
             },
             "splitting": config_dict
@@ -258,7 +259,7 @@ class TestSequenceSplitter:
             }
         }
 
-        _, train_test = load_and_split_data(config, "dropping_users")
+        _, train_test = load_and_split_data(config, "dropping_users", session_strategy="session_only")
 
         train = train_test[0].train_set.dataframe
         test = train_test[0].eval_set.dataframe
@@ -266,6 +267,23 @@ class TestSequenceSplitter:
         assert "2" not in set(train["userId"]) | set(test["userId"])
         assert list(test["itemId"]) == ["4", "5", "6"]
         assert list(train["itemId"]) == ["1", "2", "3"]
+
+    def test_flat_strategy_keeps_single_session_users(self):
+        """With the default FLAT session strategy no segmentation happens at all,
+        so there is no notion of a "single session" user to drop: every user survives."""
+        config = {
+            "test_splitting": {
+                "strategy": "temporal_holdout",
+                "leave_n_out": 1
+            }
+        }
+
+        _, train_test = load_and_split_data(config, "dropping_users")
+
+        train = train_test[0].train_set.dataframe
+        test = train_test[0].eval_set.dataframe
+
+        assert set(train["userId"]) | set(test["userId"]) == {"1", "2"}
 
     def test_never_splitting_sessions(self):
         config = {

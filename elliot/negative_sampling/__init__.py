@@ -1,1 +1,0 @@
-from elliot.negative_sampling.negative_sampling import NegativeSampler
