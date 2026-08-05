@@ -8,6 +8,8 @@ from typing import Tuple
 import torch
 from torch import nn
 
+from elliot.dataset import Interactions
+from elliot.namespace import RecommenderConfig
 from elliot.recommender.init import normal_init
 from elliot.recommender.base_recommender import GeneralRecommender
 from elliot.recommender.layers import MLP
@@ -62,8 +64,15 @@ class NeuMF(GeneralRecommender):
     m: int = 0
     batch_eval_items: int = 256
 
-    def __init__(self, params, interactions, seed, *args, **kwargs):
-        super(NeuMF, self).__init__(params, interactions, seed, *args, **kwargs)
+    def __init__(
+        self,
+        params: RecommenderConfig,
+        seed: int,
+        interactions: Interactions,
+        *args,
+        **kwargs
+    ):
+        super().__init__(params, seed, interactions, *args, **kwargs)
 
         # MF embeddings
         self.user_mf_embedding = nn.Embedding(self._num_users, self.embed_mf_size, dtype=torch.float32)
@@ -91,17 +100,17 @@ class NeuMF(GeneralRecommender):
         self.loss = nn.BCEWithLogitsLoss()
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
 
+        # Sampler configuration
+        self.sampler_config = {
+            "name": "MFPointWisePosNegSampler",
+            "m": self.m
+        }
+
         # Init embedding weights
         self.apply(normal_init, mean=0.0, std=0.01)
 
         # Move to device
         self.to(self._device)
-
-    def get_training_dataloader(self, batch_size):
-        dataloader = self._interactions.get_dataloader(
-            "MFPointWisePosNegSampler", batch_size, self._seed, m=self.m
-        )
-        return dataloader
 
     def forward(self, user, item):
         user_mf_e = self.user_mf_embedding(user)
@@ -134,7 +143,7 @@ class NeuMF(GeneralRecommender):
 
         return loss
 
-    def predict(self, user_indices, item_indices=None):
+    def predict(self, user_indices, item_indices=None, **kwargs):
         batch_size = user_indices.size(0)
 
         if item_indices is None:

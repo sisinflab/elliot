@@ -68,8 +68,8 @@ class CustomMetric(BaseMetric):
 class CustomRecommender(BaseRecommender):
     custom_param: float
 
-    def __init__(self, params, interactions, seed, *args, **kwargs):
-        super().__init__(params, interactions, seed, *args, **kwargs)
+    def __init__(self, params, seed, interactions, *args, **kwargs):
+        super().__init__(params, seed, interactions, *args, **kwargs)
 
     def train_step(self, batch, *args):
         pass

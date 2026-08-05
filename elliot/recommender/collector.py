@@ -2,6 +2,8 @@ import torch
 import numpy as np
 from tqdm import tqdm
 
+from elliot.recommender.base_recommender import SequentialRecommender
+
 
 def get_recommendations(
     model,
@@ -26,7 +28,23 @@ def get_recommendations(
     )
 
     for users, eval_items in iter_data:
-        recs = model.predict(users, eval_items)
+        predict_kwargs = {"user_indices": users}
+
+        if eval_items is not None:
+            predict_kwargs["item_indices"] = eval_items
+
+        if isinstance(model, SequentialRecommender):
+            if dataset.session_only_evaluation:
+                # `users` holds row indices (one per eval session); the model
+                # must never hold its own reference to eval-only data, so the
+                # input sequence is built here from `EvalSessions` and handed in.
+                user_seq, seq_len = dataset.eval_sessions.get_eval_context(users, model.max_seq_len)
+            else:
+                user_seq, seq_len = dataset.train_sessions.get_history(users, model.max_seq_len)
+            predict_kwargs["user_seq"] = user_seq
+            predict_kwargs["seq_len"] = seq_len
+
+        recs = model.predict(**predict_kwargs)
 
         if eval_items is not None:
             mask = eval_items == -1

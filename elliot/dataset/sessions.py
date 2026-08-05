@@ -138,9 +138,7 @@ class Sessions:
         return dataloader
 
     def get_history(self, user_indices, max_seq_len):
-        """FLAT-mode eval helper: padded whole-train-history sequences for a
-        batch of (private) user indices, for a sequential model's own
-        `predict()` to consume directly."""
+        """Padded whole-train-history sequences for a batch of (private) user indices, plus lengths."""
         seqs, lens = [], []
 
         for u in user_indices:

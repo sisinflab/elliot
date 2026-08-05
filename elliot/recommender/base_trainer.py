@@ -115,7 +115,9 @@ class AbstractTrainer(ABC):
             extra={"context": {"transactions": dataset.train_set.transactions}}
         )
 
-        training_dataloader = self.model.get_training_dataloader(self.model_config.batch_size)
+        training_dataloader = self.model.get_training_dataloader(
+            batch_size=self.model_config.batch_size
+        )
         if not isinstance(training_dataloader, DataLoader):
             self.model_config.meta.verbose = False
 
@@ -159,7 +161,10 @@ class AbstractTrainer(ABC):
         if self.model_config.eval_batch_size is None:
             self.model_config.eval_batch_size = self.model_config.batch_size
 
-        dataloader = dataset.get_eval_dataloader(self.model_config.eval_batch_size)
+        dataloader = dataset.get_eval_dataloader(
+            batch_size=self.model_config.eval_batch_size,
+            session_strategy=self.model_config.meta.session_strategy
+        )
         k = self.evaluator.get_needed_recommendations()
 
         recs = get_recommendations(self.model, dataloader, dataset, k)

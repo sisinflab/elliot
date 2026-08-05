@@ -10,6 +10,8 @@ import torch_geometric
 from torch import nn
 from torch_sparse import SparseTensor
 
+from elliot.dataset import Interactions
+from elliot.namespace import RecommenderConfig
 from elliot.recommender.base_recommender import GraphBasedRecommender
 from elliot.recommender.init import xavier_normal_init
 from elliot.recommender.layers import SparseDropout, NGCFLayer
@@ -62,8 +64,15 @@ class NGCF(GraphBasedRecommender):
     learning_rate: float = 0.0005
     lambda_weights: float = 0.01
 
-    def __init__(self, params, interactions, seed, *args, **kwargs):
-        super(NGCF, self).__init__(params, interactions, seed, *args, **kwargs)
+    def __init__(
+        self,
+        params: RecommenderConfig,
+        seed: int,
+        interactions: Interactions,
+        *args,
+        **kwargs
+    ):
+        super(NGCF, self).__init__(params, seed, interactions, *args, **kwargs)
 
         # Initialize the hidden dimensions
         self.weight_size_list = [self.factors] * (self.n_layers + 1)
@@ -90,19 +99,20 @@ class NGCF(GraphBasedRecommender):
             "x, edge_index", propagation_network_list
         )
 
-        # Init embedding weights
-        self.apply(xavier_normal_init)
-
         # Loss and optimizer
         self.log_sigmoid = nn.LogSigmoid()
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
 
+        # Sampler configuration
+        self.sampler_config = {
+            "name": "PairWiseSampler"
+        }
+
+        # Init embedding weights
+        self.apply(xavier_normal_init)
+
         # Move to device
         self.to(self._device)
-
-    def get_training_dataloader(self, batch_size):
-        dataloader = self._interactions.get_dataloader("PairWiseSampler", batch_size, self._seed)
-        return dataloader
 
     def forward(self):
         ego_embeddings = self.get_ego_embeddings(self.Gu, self.Gi)
@@ -156,7 +166,7 @@ class NGCF(GraphBasedRecommender):
 
         return loss
 
-    def predict(self, user_indices, item_indices=None):
+    def predict(self, user_indices, item_indices=None, **kwargs):
         user_e_all, item_e_all = self.propagate_embeddings()
 
         # Select only the embeddings in the current batch

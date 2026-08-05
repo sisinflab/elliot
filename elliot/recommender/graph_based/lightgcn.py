@@ -3,6 +3,8 @@ import torch_geometric
 from torch import nn
 from torch_geometric.nn import LGConv
 
+from elliot.dataset import Interactions
+from elliot.namespace import RecommenderConfig
 from elliot.recommender.base_recommender import GraphBasedRecommender
 from elliot.recommender.init import xavier_normal_init
 from elliot.utils.registry import model_registry
@@ -45,8 +47,15 @@ class LightGCN(GraphBasedRecommender):
     learning_rate: float = 0.0005
     lambda_weights: float = 0.01
 
-    def __init__(self, params, interactions, seed, *args, **kwargs):
-        super(LightGCN, self).__init__(params, interactions, seed, *args, **kwargs)
+    def __init__(
+        self,
+        params: RecommenderConfig,
+        seed: int,
+        interactions: Interactions,
+        *args,
+        **kwargs
+    ):
+        super(LightGCN, self).__init__(params, seed, interactions, *args, **kwargs)
 
         # Embeddings
         self.Gu = nn.Embedding(self._num_users, self.factors, dtype=torch.float32)
@@ -70,15 +79,16 @@ class LightGCN(GraphBasedRecommender):
         self.softplus = nn.functional.softplus
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
 
+        # Sampler configuration
+        self.sampler_config = {
+            "name": "PairWiseSampler"
+        }
+
         # Init embedding weights
         self.apply(xavier_normal_init)
 
         # Move to device
         self.to(self._device)
-
-    def get_training_dataloader(self, batch_size):
-        dataloader = self._interactions.get_dataloader("PairWiseSampler", batch_size, self._seed)
-        return dataloader
 
     def forward(self):
         ego_embeddings = self.get_ego_embeddings(self.Gu, self.Gi)
@@ -126,7 +136,7 @@ class LightGCN(GraphBasedRecommender):
 
         return loss
 
-    def predict(self, user_indices, item_indices=None):
+    def predict(self, user_indices, item_indices=None, **kwargs):
         user_e_all, item_e_all = self.propagate_embeddings()
 
         # Select only the embeddings in the current batch

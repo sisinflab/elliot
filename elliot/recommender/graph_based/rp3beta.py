@@ -10,6 +10,8 @@ import torch
 from tqdm import tqdm
 from sklearn.preprocessing import normalize
 
+from elliot.dataset import Interactions
+from elliot.namespace import RecommenderConfig
 from elliot.recommender.base_recommender import TraditionalRecommender
 from elliot.utils.registry import model_registry
 
@@ -22,8 +24,15 @@ class RP3beta(TraditionalRecommender):
     beta: float = 0.6
     normalize_similarity: bool = False
 
-    def __init__(self, params, interactions, seed, *args, **kwargs):
-        super().__init__(params, interactions, seed, *args, **kwargs)
+    def __init__(
+        self,
+        params: RecommenderConfig,
+        seed: int,
+        interactions: Interactions,
+        *args,
+        **kwargs
+    ):
+        super().__init__(params, seed, interactions, *args, **kwargs)
 
         if self.neighborhood == -1:
             self.neighborhood = self._interactions.dims[1]
@@ -140,7 +149,7 @@ class RP3beta(TraditionalRecommender):
             np.array(vals_list)
         )
 
-    def predict(self, user_indices, item_indices=None):
+    def predict(self, user_indices, item_indices=None, **kwargs):
         predictions = self._train[user_indices.numpy()] @ self.similarity_matrix
 
         predictions = torch.from_numpy(predictions.toarray())

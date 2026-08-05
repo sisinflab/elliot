@@ -10,6 +10,8 @@ import torch
 from sklearn.utils.extmath import safe_sparse_dot
 from tqdm import tqdm
 
+from elliot.dataset import Interactions
+from elliot.namespace import RecommenderConfig
 from elliot.recommender.base_recommender import TraditionalRecommender
 from elliot.utils.registry import model_registry
 
@@ -19,8 +21,15 @@ class EASER(TraditionalRecommender):
     # Model hyperparameters
     l2_norm: float = 1000
 
-    def __init__(self, params, interactions, seed, *args, **kwargs):
-        super().__init__(params, interactions, seed, *args, **kwargs)
+    def __init__(
+        self,
+        params: RecommenderConfig,
+        seed: int,
+        interactions: Interactions,
+        *args,
+        **kwargs
+    ):
+        super().__init__(params, seed, interactions, *args, **kwargs)
 
     def initialize(self):
         t = tqdm()
@@ -42,7 +51,7 @@ class EASER(TraditionalRecommender):
 
         self.similarity_matrix = similarity_matrix
 
-    def predict(self, user_indices, item_indices=None):
+    def predict(self, user_indices, item_indices=None, **kwargs):
         predictions = self._train[user_indices.numpy()] @ self.similarity_matrix
 
         predictions = torch.from_numpy(predictions)

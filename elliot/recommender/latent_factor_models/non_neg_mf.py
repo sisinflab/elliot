@@ -8,6 +8,8 @@ import numpy as np
 import torch
 from tqdm import tqdm
 
+from elliot.dataset import Interactions
+from elliot.namespace import RecommenderConfig
 from elliot.recommender.base_recommender import BaseRecommender
 from elliot.recommender.init import normal_init
 from elliot.utils.registry import model_registry
@@ -45,8 +47,15 @@ class NonNegMF(BaseRecommender):
     learning_rate: float = 0.001
     lambda_weights: float = 0.1
 
-    def __init__(self, params, interactions, seed, *args, **kwargs):
-        super().__init__(params, interactions, seed, *args, **kwargs)
+    def __init__(
+        self,
+        params: RecommenderConfig,
+        seed: int,
+        interactions: Interactions,
+        *args,
+        **kwargs
+    ):
+        super().__init__(params, seed, interactions, *args, **kwargs)
 
         self._i_train = self._interactions.get_dict(private=True)
         self._global_mean = np.mean(self._interactions.sparse_ratings)
@@ -126,7 +135,7 @@ class NonNegMF(BaseRecommender):
 
         return 0
 
-    def predict(self, user_indices, item_indices=None):
+    def predict(self, user_indices, item_indices=None, **kwargs):
         user_indices = user_indices.numpy()
 
         # Select only the embeddings in the current batch

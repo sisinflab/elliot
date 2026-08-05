@@ -1,6 +1,8 @@
 import torch
 from sklearn.preprocessing import normalize
 
+from elliot.dataset import Interactions
+from elliot.namespace import RecommenderConfig
 from elliot.recommender.base_recommender import TraditionalRecommender
 from elliot.recommender.knn.similarity import Similarity
 from elliot.utils.registry import model_registry
@@ -16,8 +18,16 @@ class KNN(TraditionalRecommender):
     beta: float
     normalize_similarity: bool
 
-    def __init__(self, params, interactions, seed, transpose, *args, **kwargs):
-        super().__init__(params, interactions, seed, *args, **kwargs)
+    def __init__(
+        self,
+        params: RecommenderConfig,
+        seed: int,
+        interactions: Interactions,
+        transpose: bool,
+        *args,
+        **kwargs
+    ):
+        super().__init__(params, seed, interactions, *args, **kwargs)
 
         self._URM = self._implicit_train if self.implicit else self._train
         train_data = self._URM if not transpose else self._URM.T
@@ -53,10 +63,17 @@ class ItemKNN(KNN):
     beta: float = 1.0
     normalize_similarity: bool = False
 
-    def __init__(self, params, interactions, seed, *args, **kwargs):
-        super().__init__(params, interactions, seed, *args, **kwargs, transpose=True)
+    def __init__(
+        self,
+        params: RecommenderConfig,
+        seed: int,
+        interactions: Interactions,
+        *args,
+        **kwargs
+    ):
+        super().__init__(params, seed, interactions, *args, **kwargs, transpose=True)
 
-    def predict(self, user_indices, item_indices=None):
+    def predict(self, user_indices, item_indices=None, **kwargs):
         predictions = self._URM[user_indices.numpy()] @ self.similarity_matrix
 
         predictions = torch.from_numpy(predictions.toarray())
@@ -79,10 +96,17 @@ class UserKNN(KNN):
     beta: float = 1.0
     normalize_similarity: bool = False
 
-    def __init__(self, params, interactions, seed, *args, **kwargs):
-        super().__init__(params, interactions, seed, *args, **kwargs, transpose=False)
+    def __init__(
+        self,
+        params: RecommenderConfig,
+        seed: int,
+        interactions: Interactions,
+        *args,
+        **kwargs
+    ):
+        super().__init__(params, seed, interactions, *args, **kwargs, transpose=False)
 
-    def predict(self, user_indices, item_indices=None):
+    def predict(self, user_indices, item_indices=None, **kwargs):
         predictions = self.similarity_matrix[user_indices.numpy()] @ self._URM
 
         predictions = torch.from_numpy(predictions.toarray())

@@ -43,9 +43,9 @@ class _FakeSessionDataset(_FakeDataset):
 
 
 class _FakeModel:
-    def predict(self, users, eval_items):
+    def predict(self, user_indices, *args, item_indices=None, **kwargs):
         # i3 always scores highest, i1/i2 lower - only masking should ever exclude them
-        n = len(users)
+        n = len(user_indices)
         return torch.tensor([[0.1, 0.2, 0.9]] * n)
 
 
@@ -111,10 +111,10 @@ class TestFullEval:
 
 
 class _FakeNegSamplingModel:
-    def predict(self, users, eval_items):
+    def predict(self, user_indices, *args, item_indices=None, **kwargs):
         # candidate slot 1 always scores highest, slot 0 next; padded slots
         # would score highest of all but must be masked out via eval_items == -1
-        n = len(users)
+        n = len(user_indices)
         return torch.tensor([[0.5, 0.9, 5.0]] * n)
 
 

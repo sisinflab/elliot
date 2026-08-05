@@ -7,6 +7,8 @@ Module description:
 import numpy as np
 import torch
 
+from elliot.dataset import Interactions
+from elliot.namespace import RecommenderConfig
 from elliot.recommender.base_recommender import BaseRecommender
 from elliot.recommender.init import normal_init
 from elliot.utils.registry import model_registry
@@ -50,8 +52,15 @@ class AbstractMF2020(BaseRecommender):
     lambda_weights: float
     m: int
 
-    def __init__(self, params, interactions, seed, *args, **kwargs):
-        super().__init__(params, interactions, seed, *args, **kwargs)
+    def __init__(
+        self,
+        params: RecommenderConfig,
+        seed: int,
+        interactions: Interactions,
+        *args,
+        **kwargs
+    ):
+        super().__init__(params, seed, interactions, *args, **kwargs)
 
         # Embeddings
         self._user_factors = np.empty((self._num_users, self.factors), dtype=np.float32)
@@ -64,6 +73,12 @@ class AbstractMF2020(BaseRecommender):
 
         self.transactions = self._interactions.transactions * (self.m + 1)
 
+        # Sampler configuration
+        self.sampler_config = {
+            "name": "MFPointWisePosNegSampler",
+            "m": self.m
+        }
+
         # Init embedding weights
         self.modules = [self._user_factors, self._item_factors, self._user_bias, self._item_bias]
         self.bias = [self._user_bias, self._item_bias]
@@ -71,13 +86,7 @@ class AbstractMF2020(BaseRecommender):
 
         self.params_to_save = ['_global_bias', '_user_bias', '_item_bias', '_user_factor', '_item_factor']
 
-    def get_training_dataloader(self, batch_size):
-        dataloader = self._interactions.get_dataloader(
-            "MFPointWisePosNegSampler", batch_size, self._seed, m=self.m
-        )
-        return dataloader
-
-    def predict(self, user_indices, item_indices=None):
+    def predict(self, user_indices, item_indices=None, **kwargs):
         user_indices = user_indices.numpy()
 
         # Select only the embeddings in the current batch
@@ -116,8 +125,15 @@ class MF2020(AbstractMF2020):
     lambda_weights: float = 0.0
     m: int = 0
 
-    def __init__(self, params, interactions, seed, *args, **kwargs):
-        super().__init__(params, interactions, seed, *args, **kwargs)
+    def __init__(
+        self,
+        params: RecommenderConfig,
+        seed: int,
+        interactions: Interactions,
+        *args,
+        **kwargs
+    ):
+        super().__init__(params, seed, interactions, *args, **kwargs)
 
     def train_step(self, batch, *args):
         batch = [x.numpy() for x in batch]
@@ -162,8 +178,15 @@ class MF2020Batch(AbstractMF2020):
     lambda_weights: float = 0.0
     m: int = 0
 
-    def __init__(self, params, interactions, seed, *args, **kwargs):
-        super().__init__(params, interactions, seed, *args, **kwargs)
+    def __init__(
+        self,
+        params: RecommenderConfig,
+        seed: int,
+        interactions: Interactions,
+        *args,
+        **kwargs
+    ):
+        super().__init__(params, seed, interactions, *args, **kwargs)
 
     def train_step(self, batch, *args):
         u_idx, i_idx, rating = tuple(x.numpy() for x in batch)

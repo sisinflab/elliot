@@ -8,6 +8,8 @@ import numpy as np
 import torch
 from scipy.special import expit
 
+from elliot.dataset import Interactions
+from elliot.namespace import RecommenderConfig
 from elliot.recommender.base_recommender import BaseRecommender
 from elliot.recommender.init import normal_init, xavier_uniform_init
 from elliot.utils.registry import model_registry
@@ -23,8 +25,15 @@ class BPRMF(BaseRecommender):
     lambda_pos_i: float = 0.0025
     lambda_neg_i: float = 0.00025
 
-    def __init__(self, params, interactions, seed, *args, **kwargs):
-        super().__init__(params, interactions, seed, *args, **kwargs)
+    def __init__(
+        self,
+        params: RecommenderConfig,
+        seed: int,
+        interactions: Interactions,
+        *args,
+        **kwargs
+    ):
+        super().__init__(params, seed, interactions, *args, **kwargs)
 
         # Embeddings
         self._user_factors = np.empty((self._num_users, self.factors), dtype=np.float32)
@@ -35,16 +44,17 @@ class BPRMF(BaseRecommender):
         # Global bias
         self._global_bias = 0
 
+        # Sampler configuration
+        self.sampler_config = {
+            "name": "PairWiseSampler"
+        }
+
         # Init embedding weights
         self.modules = [self._user_factors, self._item_factors, self._user_bias, self._item_bias]
         self.bias = [self._user_bias, self._item_bias]
         self.apply(xavier_uniform_init)
 
         self.params_to_save = ['_user_bias', '_item_bias', '_user_factors', '_item_factors']
-
-    def get_training_dataloader(self, batch_size):
-        dataloader = self._interactions.get_dataloader("PairWiseSampler", batch_size, self._seed)
-        return dataloader
 
     def train_step(self, batch, *args):
         users, pos_items, neg_items = [b.numpy() for b in batch]
@@ -96,7 +106,7 @@ class BPRMF(BaseRecommender):
 
         return batch_loss / float(len(users))
 
-    def predict(self, user_indices, item_indices=None):
+    def predict(self, user_indices, item_indices=None, **kwargs):
         user_indices = user_indices.numpy()
 
         user_embeddings = self._user_factors[user_indices]

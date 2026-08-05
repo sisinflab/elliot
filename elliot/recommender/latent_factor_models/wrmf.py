@@ -8,6 +8,8 @@ import numpy as np
 import torch
 from tqdm import tqdm
 
+from elliot.dataset import Interactions
+from elliot.namespace import RecommenderConfig
 from elliot.recommender.base_recommender import BaseRecommender
 from elliot.recommender.init import normal_init
 from elliot.utils.registry import model_registry
@@ -45,8 +47,15 @@ class WRMF(BaseRecommender):
     lambda_weights: float = 0.1
     alpha: float = 1.0
 
-    def __init__(self, params, interactions, seed, *args, **kwargs):
-        super().__init__(params, interactions, seed, *args, **kwargs)
+    def __init__(
+        self,
+        params: RecommenderConfig,
+        seed: int,
+        interactions: Interactions,
+        *args,
+        **kwargs
+    ):
+        super().__init__(params, seed, interactions, *args, **kwargs)
 
         self.C = self.alpha * self._interactions.sparse
 
@@ -100,7 +109,7 @@ class WRMF(BaseRecommender):
 
         return 0
 
-    def predict(self, user_indices, item_indices=None):
+    def predict(self, user_indices, item_indices=None, **kwargs):
         predictions = self.X[user_indices.numpy()] @ self.Y.T
 
         predictions = torch.from_numpy(predictions)

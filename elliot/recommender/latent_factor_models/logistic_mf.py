@@ -7,6 +7,8 @@ Module description:
 import torch
 from torch import nn
 
+from elliot.dataset import Interactions
+from elliot.namespace import RecommenderConfig
 from elliot.recommender.base_recommender import GeneralRecommender
 from elliot.recommender.init import xavier_uniform_init
 from elliot.utils.registry import model_registry
@@ -47,8 +49,15 @@ class LogisticMF(GeneralRecommender):
     lambda_weights: float = 0.1
     alpha: float = 0.5
 
-    def __init__(self, params, interactions, seed, *args, **kwargs):
-        super(LogisticMF, self).__init__(params, interactions, seed, *args, **kwargs)
+    def __init__(
+        self,
+        params: RecommenderConfig,
+        seed: int,
+        interactions: Interactions,
+        *args,
+        **kwargs
+    ):
+        super(LogisticMF, self).__init__(params, seed, interactions, *args, **kwargs)
 
         # Embeddings
         self.Gu = nn.Embedding(self._num_users, self.factors, dtype=torch.float32)
@@ -62,18 +71,18 @@ class LogisticMF(GeneralRecommender):
 
         self.transactions = self._interactions.transactions * 2
 
+        # Sampler configuration
+        self.sampler_config = {
+            "name": "PointWisePosNegSampler",
+            "transactions": self.transactions
+        }
+
         # Init embedding weights
         self.bias = [self.Bu, self.Bi]
         self.apply(xavier_uniform_init)
 
         # Move to device
         self.to(self._device)
-
-    def get_training_dataloader(self, batch_size):
-        dataloader = self._interactions.get_dataloader(
-            "PointWisePosNegSampler", batch_size, self._seed, transactions=self.transactions
-        )
-        return dataloader
 
     def forward(self, user, item):
         user_e = self.Gu(user)
@@ -101,7 +110,7 @@ class LogisticMF(GeneralRecommender):
 
         return loss, inputs
 
-    def predict(self, user_indices, item_indices=None):
+    def predict(self, user_indices, item_indices=None, **kwargs):
         user_e_all = self.Gu.weight
         item_e_all = self.Gi.weight
         user_b_all = self.Bu.weight

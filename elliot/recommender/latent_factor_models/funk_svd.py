@@ -7,6 +7,8 @@ Module description:
 import torch
 from torch import nn
 
+from elliot.dataset import Interactions
+from elliot.namespace import RecommenderConfig
 from elliot.recommender.base_recommender import GeneralRecommender
 from elliot.recommender.init import xavier_uniform_init
 from elliot.utils.registry import model_registry
@@ -20,8 +22,15 @@ class FunkSVD(GeneralRecommender):
     lambda_weights: float = 0.1
     lambda_bias: float = 0.001
 
-    def __init__(self, params, interactions, seed, *args, **kwargs):
-        super(FunkSVD, self).__init__(params, interactions, seed, *args, **kwargs)
+    def __init__(
+        self,
+        params: RecommenderConfig,
+        seed: int,
+        interactions: Interactions,
+        *args,
+        **kwargs
+    ):
+        super(FunkSVD, self).__init__(params, seed, interactions, *args, **kwargs)
 
         # Embeddings
         self.user_mf_embedding = nn.Embedding(self._num_users, self.factors, dtype=torch.float32)
@@ -33,16 +42,17 @@ class FunkSVD(GeneralRecommender):
         self.loss = nn.MSELoss()
         self.optimizer = torch.optim.SGD(self.parameters(), lr=self.learning_rate)
 
+        # Sampler configuration
+        self.sampler_config = {
+            "name": "PointWisePosNegSampler"
+        }
+
         # Init embedding weights
         self.bias = [self.user_bias_embedding, self.item_bias_embedding]
         self.apply(xavier_uniform_init)
 
         # Move to device
         self.to(self._device)
-
-    def get_training_dataloader(self, batch_size):
-        dataloader = self._interactions.get_dataloader("PointWisePosNegSampler", batch_size, self._seed)
-        return dataloader
 
     def forward(self, user, item):
         u = self.user_mf_embedding(user)
@@ -71,7 +81,7 @@ class FunkSVD(GeneralRecommender):
 
         return loss
 
-    def predict(self, user_indices, item_indices=None):
+    def predict(self, user_indices, item_indices=None, **kwargs):
         user_e_all = self.user_mf_embedding.weight
         item_e_all = self.item_mf_embedding.weight
         user_b_all = self.user_bias_embedding.weight

@@ -9,6 +9,8 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 
+from elliot.dataset import Interactions
+from elliot.namespace import RecommenderConfig
 from elliot.recommender.base_recommender import GeneralRecommender
 from elliot.recommender.autoencoders.layers import VariationalAutoEncoder
 from elliot.recommender.init import xavier_normal_init
@@ -53,8 +55,15 @@ class MultiVAE(GeneralRecommender):
     lr: float = 0.001
     dropout_pkeep: float = 1.0
 
-    def __init__(self, params, interactions, seed, *args, **kwargs):
-        super().__init__(params, interactions, seed, *args, **kwargs)
+    def __init__(
+        self,
+        params: RecommenderConfig,
+        seed: int,
+        interactions: Interactions,
+        *args,
+        **kwargs
+    ):
+        super().__init__(params, seed, interactions, *args, **kwargs)
 
         dropout_rate = max(0.0, 1.0 - self.dropout_pkeep)
 
@@ -73,14 +82,13 @@ class MultiVAE(GeneralRecommender):
         self._total_anneal_steps = 200000
         self._anneal_cap = 0.2
 
+        self.sampler_config = {
+            "name": "SparseSampler",
+            "sparse": self._train_matrix
+        }
+
         self.apply(xavier_normal_init)
         self.to(self._device)
-
-    def get_training_dataloader(self, batch_size):
-        dataloader = self._interactions.get_dataloader(
-            "SparseSampler", batch_size, self._seed, sparse=self._train_matrix
-        )
-        return dataloader
 
     def train_step(self, batch, *args):
         batch = batch.to(self._device)
@@ -100,7 +108,7 @@ class MultiVAE(GeneralRecommender):
         loss = neg_ll + anneal * kl + self.reg_lambda * self._l2_penalty()
         return loss
 
-    def predict(self, user_indices, item_indices=None):
+    def predict(self, user_indices, item_indices=None, **kwargs):
         inputs = self._get_user_interactions(user_indices)
         logits, _, _ = self._autoencoder(inputs)
         predictions = F.log_softmax(logits, dim=1)

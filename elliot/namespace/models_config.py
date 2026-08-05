@@ -6,7 +6,7 @@ from pydantic_core.core_schema import ValidationInfo
 from elliot.namespace.common import BaseConfig, check_type
 from elliot.namespace.read_config import InteractionsReaderConfig, ModelReaderConfig
 from elliot.namespace.write_config import TabularWriterConfig, ModelWriterConfig
-from elliot.utils.enums import SearchSpace, OptimizationAlgorithm
+from elliot.utils.enums import SearchSpace, OptimizationAlgorithm, SessionStrategy
 
 MODEL_FIELD = lambda t: Union[t, List[Union[str, t]]]
 
@@ -26,6 +26,7 @@ class MetaConfig(BaseConfig):
         optimize_internal_loss (bool): Whether to optimize the internal loss. Defaults to False.
         hyper_max_evals (int, optional): Maximum number of hyperparameter evaluations.
         hyper_opt_alg (OptimizationAlgorithm): Hyperparameter optimization algorithm. Defaults to "tpe".
+        session_strategy (SessionStrategy): Strategy for session training and evaluation. Defaults to "flat".
         model_reader (ModelReaderConfig): Model reading configuration.
         model_writer (ModelWriterConfig): Model writing configuration.
         rec_reader (InteractionsReaderConfig): Recommendation reading configuration.
@@ -42,6 +43,7 @@ class MetaConfig(BaseConfig):
     optimize_internal_loss: bool = False
     hyper_max_evals: Optional[int] = None
     hyper_opt_alg: OptimizationAlgorithm = OptimizationAlgorithm.TPE
+    session_strategy: SessionStrategy = SessionStrategy.FLAT
     model_reader: ModelReaderConfig = Field(default_factory=ModelReaderConfig, exclude=True)
     model_writer: ModelWriterConfig = Field(default_factory=ModelWriterConfig, exclude=True)
     rec_reader: InteractionsReaderConfig = Field(default_factory=InteractionsReaderConfig, exclude=True)

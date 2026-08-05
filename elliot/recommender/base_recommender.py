@@ -1,7 +1,7 @@
 import inspect
 import random
 import logging as pylog
-from typing import Tuple, Optional
+from typing import Tuple, Optional, no_type_check
 
 import numpy as np
 import torch
@@ -10,18 +10,28 @@ from torch import nn, Tensor
 from torch_sparse import SparseTensor
 from abc import ABC, abstractmethod
 
+from elliot.dataset import Interactions, Sessions
 from elliot.namespace import RecommenderConfig
 from elliot.recommender.init import zeros_init
 from elliot.utils import get_device, logging
-from elliot.utils.enums import ModelType
+from elliot.utils.enums import ModelType, SamplerType
+from elliot.utils.registry import sampler_registry
 from elliot.utils.read import Reader
 from elliot.utils.write import Writer
 
 
 class AbstractRecommender(ABC):
     type: ModelType
+    sampler_config: dict = {}
 
-    def __init__(self, params, interactions, seed, *args, **kwargs):
+    def __init__(
+        self,
+        params: RecommenderConfig,
+        seed: int,
+        interactions: Interactions,
+        *args,
+        **kwargs
+    ):
         self._interactions = interactions
         self._seed = seed
         self._users, self._items = interactions.get_users_items()
@@ -82,18 +92,6 @@ class AbstractRecommender(ABC):
         loader_obj = getattr(self._interactions.side_information, loader_name)
         setattr(self, name, loader_obj)
 
-    def get_training_dataloader(self, batch_size):
-        for _ in range(1):
-            yield None
-
-    @abstractmethod
-    def train_step(self, batch, *args):
-        raise NotImplementedError()
-
-    @abstractmethod
-    def predict(self, user_indices, item_indices=None):
-        raise NotImplementedError()
-
     @abstractmethod
     def get_model_state(self):
         raise NotImplementedError()
@@ -102,12 +100,50 @@ class AbstractRecommender(ABC):
     def set_model_state(self, checkpoint):
         raise NotImplementedError()
 
+    @abstractmethod
+    def get_training_dataloader(self, batch_size):
+        raise NotImplementedError()
+
+    @abstractmethod
+    def train_step(self, batch, *args):
+        raise NotImplementedError()
+
+    @no_type_check
+    @abstractmethod
+    def predict(self, *args, item_indices=None, **kwargs):
+        raise NotImplementedError()
+
+    def _check_sampler(self, allowed_types):
+        try:
+            sampler_name = self.sampler_config.pop("name")
+        except KeyError:
+            raise ValueError(
+                f"Sampler name is not specified for {self.__class__.__name__}. "
+                f"Please provide a valid 'name' field in the sampler configuration."
+            )
+        sampler_class = sampler_registry.get_class(sampler_name)
+        if not isinstance(allowed_types, tuple):
+            allowed_types = (allowed_types,)
+        if sampler_class.type not in allowed_types:
+            raise ValueError(
+                f"Sampler '{sampler_name}' is not compatible with {self.__class__.__name__}. "
+                f"Please use a sampler of type {'or '.join([t.name for t in allowed_types])}."
+            )
+        return sampler_name
+
 
 class BaseRecommender(AbstractRecommender):
     type = ModelType.BASE
 
-    def __init__(self, params, interactions, seed, *args, **kwargs):
-        super().__init__(params, interactions, seed, *args, **kwargs)
+    def __init__(
+        self,
+        params: RecommenderConfig,
+        seed: int,
+        interactions: Interactions,
+        *args,
+        **kwargs
+    ):
+        super().__init__(params, seed, interactions, *args, **kwargs)
         self.modules = []
         self.bias = []
         self.params_to_save = []
@@ -131,15 +167,46 @@ class BaseRecommender(AbstractRecommender):
             if k in self.params_to_save:
                 setattr(self, k, v)
 
+    def get_training_dataloader(self, batch_size):
+        if self.sampler_config:
+            sampler_name = self._check_sampler(
+                allowed_types=(SamplerType.TRADITIONAL, SamplerType.PIPELINE)
+            )
+            dataloader = self._interactions.get_dataloader(
+                sampler_name=sampler_name,
+                batch_size=batch_size,
+                seed=self._seed,
+                **self.sampler_config
+            )
+            return dataloader
+        else:
+            for _ in range(1):
+                yield None
+
+    @abstractmethod
+    def predict(self, user_indices, item_indices=None, **kwargs):
+        raise NotImplementedError()
+
 
 class TraditionalRecommender(BaseRecommender):
     type = ModelType.TRADITIONAL
 
-    def __init__(self, params, interactions, seed, *args, **kwargs):
-        super().__init__(params, interactions, seed, *args, **kwargs)
+    def __init__(
+        self,
+        params: RecommenderConfig,
+        seed: int,
+        interactions: Interactions,
+        *args,
+        **kwargs
+    ):
+        super().__init__(params, seed, interactions, *args, **kwargs)
         self.similarity_matrix = None
         self._train = self._interactions.sparse_ratings
         self._implicit_train = self._interactions.sparse
+
+    def get_training_dataloader(self, batch_size):
+        for _ in range(1):
+            yield None
 
     def train_step(self, *args):
         pass
@@ -152,8 +219,15 @@ class TraditionalRecommender(BaseRecommender):
 class GeneralRecommender(nn.Module, AbstractRecommender):
     type = ModelType.GENERAL
 
-    def __init__(self, params, interactions, seed, *args, **kwargs):
-        AbstractRecommender.__init__(self, params, interactions, seed, *args, **kwargs)
+    def __init__(
+        self,
+        params: RecommenderConfig,
+        seed: int,
+        interactions: Interactions,
+        *args,
+        **kwargs
+    ):
+        AbstractRecommender.__init__(self, params, seed, interactions, *args, **kwargs)
         super(GeneralRecommender, self).__init__()
         self.bias = []
         self._device = get_device()
@@ -188,14 +262,37 @@ class GeneralRecommender(nn.Module, AbstractRecommender):
         self.load_state_dict(checkpoint["model_state_dict"])
         self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
 
+    def get_training_dataloader(self, batch_size):
+        sampler_name = self._check_sampler(
+            allowed_types=(SamplerType.TRADITIONAL, SamplerType.PIPELINE)
+        )
+        dataloader = self._interactions.get_dataloader(
+            sampler_name=sampler_name,
+            batch_size=batch_size,
+            seed=self._seed,
+            **self.sampler_config
+        )
+        return dataloader
+
+    @abstractmethod
+    def predict(self, user_indices, item_indices=None, **kwargs):
+        raise NotImplementedError()
+
 
 class GraphBasedRecommender(GeneralRecommender):
     # Cache storage
     _cached_user_emb: Optional[Tensor] = None
     _cached_item_emb: Optional[Tensor] = None
 
-    def __init__(self, params, interactions, seed, *args, **kwargs):
-        super().__init__(params, interactions, seed, *args, **kwargs)
+    def __init__(
+        self,
+        params: RecommenderConfig,
+        seed: int,
+        interactions: Interactions,
+        *args,
+        **kwargs
+    ):
+        super().__init__(params, seed, interactions, *args, **kwargs)
 
     def train(self, mode=True):
         """Override train mode to empty the cache when switching to training."""
@@ -277,3 +374,38 @@ class GraphBasedRecommender(GeneralRecommender):
         item_embeddings = item_embedding.weight
         ego_embeddings = torch.cat([user_embeddings, item_embeddings], dim=0)
         return ego_embeddings
+
+
+class SequentialRecommender(GeneralRecommender):
+    """Base class for sequential/session-based models."""
+    max_seq_len: int
+
+    def __init__(
+        self,
+        params: RecommenderConfig,
+        seed: int,
+        interactions: Interactions,
+        sessions: Sessions,
+        *args,
+        **kwargs
+    ):
+        super().__init__(params, seed, interactions, *args, **kwargs)
+        self._sessions = sessions
+        self._session_strategy = params.meta.session_strategy
+
+    def get_training_dataloader(self, batch_size):
+        sampler_name = self._check_sampler(
+            allowed_types=SamplerType.SEQUENTIAL
+        )
+        dataloader = self._sessions.get_dataloader(
+            sampler_name=sampler_name,
+            batch_size=batch_size,
+            seed=self._seed,
+            session_strategy=self._session_strategy,
+            **self.sampler_config
+        )
+        return dataloader
+
+    @abstractmethod
+    def predict(self, user_seq, seq_len, item_indices=None, *args, **kwargs):
+        raise NotImplementedError()

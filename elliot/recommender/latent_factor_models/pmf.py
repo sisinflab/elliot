@@ -9,6 +9,8 @@ Mnih, Andriy, and Russ R. Salakhutdinov. "Probabilistic matrix factorization." A
 import torch
 from torch import nn
 
+from elliot.dataset import Interactions
+from elliot.namespace import RecommenderConfig
 from elliot.recommender.base_recommender import GeneralRecommender
 from elliot.recommender.init import xavier_normal_init
 from elliot.recommender.layers import GaussianNoise
@@ -50,8 +52,15 @@ class PMF(GeneralRecommender):
     lambda_weights: float = 0.0025
     gaussian_variance: float = 0.1
 
-    def __init__(self, params, interactions, seed, *args, **kwargs):
-        super(PMF, self).__init__(params, interactions, seed, *args, **kwargs)
+    def __init__(
+        self,
+        params: RecommenderConfig,
+        seed: int,
+        interactions: Interactions,
+        *args,
+        **kwargs
+    ):
+        super(PMF, self).__init__(params, seed, interactions, *args, **kwargs)
 
         # Embeddings
         self.user_mf_embedding = nn.Embedding(self._num_users, self.factors, dtype=torch.float32)
@@ -65,15 +74,16 @@ class PMF(GeneralRecommender):
         self.loss = nn.MSELoss()
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
 
+        # Sampler configuration
+        self.sampler_config = {
+            "name": "PointWisePosNegSampler"
+        }
+
         # Init embedding weights
         self.apply(xavier_normal_init)
 
         # Move to device
         self.to(self._device)
-
-    def get_training_dataloader(self, batch_size):
-        dataloader = self._interactions.get_dataloader("PointWisePosNegSampler", batch_size, self._seed)
-        return dataloader
 
     def forward(self, user, item):
         user_mf_e = self.user_mf_embedding(user)
@@ -93,7 +103,7 @@ class PMF(GeneralRecommender):
 
         return loss
 
-    def predict(self, user_indices, item_indices=None):
+    def predict(self, user_indices, item_indices=None, **kwargs):
         user_e_all = self.user_mf_embedding.weight
         item_e_all = self.item_mf_embedding.weight
 

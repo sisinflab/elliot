@@ -10,6 +10,8 @@ from tqdm import tqdm
 from scipy import sparse as sp
 from sklearn.utils.extmath import randomized_svd
 
+from elliot.dataset import Interactions
+from elliot.namespace import RecommenderConfig
 from elliot.recommender.base_recommender import TraditionalRecommender
 from elliot.utils.registry import model_registry
 
@@ -40,9 +42,16 @@ class PureSVD(TraditionalRecommender):
     # Model hyperparameters
     factors: int = 10
 
-    def __init__(self, params, interactions, seed, *args, **kwargs):
-        super().__init__(params, interactions, seed, *args, **kwargs)
-
+    def __init__(
+        self,
+        params: RecommenderConfig,
+        seed: int,
+        interactions: Interactions,
+        *args,
+        **kwargs
+    ):
+        super().__init__(params, seed, interactions, *args, **kwargs)
+    
         self.user_vec, self.item_vec = None, None
         self.params_to_save = ['user_vec', 'item_vec']
 
@@ -60,7 +69,7 @@ class PureSVD(TraditionalRecommender):
         self.user_vec = U
         self.item_vec = s_Vt.T
 
-    def predict(self, user_indices, item_indices=None):
+    def predict(self, user_indices, item_indices=None, **kwargs):
         # Select only the embeddings in the current batch
         user_embeddings = self.user_vec[user_indices.numpy()]
 
