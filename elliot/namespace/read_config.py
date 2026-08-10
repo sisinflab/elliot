@@ -42,10 +42,12 @@ class BaseReaderConfig(BaseConfig):
     Attributes:
         ext (List[str], optional): List of valid file extensions for reading. Defaults to None.
         patterns (str, optional): Filename patterns to match (e.g., "*.tsv"). Defaults to None.
+        encoding (str, optional): File encoding. Defaults to None (using the platform default).
     """
 
     ext: Optional[List[str]] = None
     patterns: Optional[str] = None
+    encoding: Optional[str] = None
 
     @field_validator("ext", mode="after")
     @classmethod
@@ -226,6 +228,16 @@ class SequenceReaderConfig(TabularReaderConfig):
         }
 
 
+class JSONReaderConfig(BaseReaderConfig):
+    """JSON data reader configuration.
+
+    Attributes:
+        ext (List[str]): List of valid file extensions for reading. Defaults to [".json"].
+    """
+
+    ext: List[str] = [".json"]
+
+
 class ModelReaderConfig(BaseReaderConfig):
     """Model reader configuration.
 
@@ -251,11 +263,12 @@ class GeneralReaderConfig(TabularReaderConfig, ModelReaderConfig, NumpyReaderCon
 
     Attributes:
         ext (List[str]): List of valid file extensions for reading.
-            Defaults to [".tsv", ".csv", ".pt", ".pth", ".npy"].
+            Defaults to [".tsv", ".csv", ".json", ".pt", ".pth", ".npy"].
     """
 
     ext: List[str] = (
         list(get_default_value(TabularReaderConfig, "ext") or []) +
+        list(get_default_value(JSONReaderConfig, "ext") or []) +
         list(get_default_value(ModelReaderConfig, "ext") or []) +
         list(get_default_value(NumpyReaderConfig, "ext") or [])
     )

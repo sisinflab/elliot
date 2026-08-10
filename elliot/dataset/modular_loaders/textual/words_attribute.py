@@ -1,84 +1,131 @@
-import typing as t
+from typing import Dict, Any, Optional
 import numpy as np
-import json
-from types import SimpleNamespace
 
 from elliot.dataset.modular_loaders.abstract_loader import AbstractLoader
+from elliot.dataset.modular_loaders.build import public_id_map
+from elliot.dataset.modular_loaders.formats import EmbeddingPayload, Payload, TextPayload
+from elliot.utils.enums import AlignmentMode, Materialization
+from elliot.utils.registry import side_info_registry
 
 
+@side_info_registry.register(
+    provides="item_features",
+    format="text",
+    alignment=AlignmentMode.PAD,
+    materialization=Materialization.MMAP
+)
 class WordsTextualAttributes(AbstractLoader):
-    def __init__(self, users: t.Set, items: t.Set, ns: SimpleNamespace, logger: object):
-        self.logger = logger
-        self.users_vocabulary_features_path = getattr(ns, "users_vocabulary_features", None)
-        self.items_vocabulary_features_path = getattr(ns, "items_vocabulary_features", None)
-        self.users_tokens_path = getattr(ns, "users_tokens", None)
-        self.items_tokens_path = getattr(ns, "items_tokens", None)
-        self.pos_users_path = getattr(ns, "pos_users", None)
-        self.pos_items_path = getattr(ns, "pos_items", None)
+    """Tokenized text plus a shared vocabulary/token embedding table for users and/or
+    items. `"tokens"` merges user *and* item ids into one `id_map` (see `load()`), and
+    `"*_vocab_embeddings"` is indexed by vocabulary token, not by any user/item id --
+    a model consuming this loader must do its own user/item-id translation.
+    """
 
-        self.item_mapping = {}
-        self.user_mapping = {}
-        self.word_feature_shape = None
-        self.users_word_features = None
-        self.items_word_features = None
-        self.users_tokens = None
-        self.items_tokens = None
-        self.pos_users = None
-        self.pos_items = None
+    users_vocabulary_features: str
+    items_vocabulary_features: str
+    users_tokens: str
+    items_tokens: str
+    pos_users: Optional[str] = None
+    pos_items: Optional[str] = None
 
-        inner_users, inner_items = self.check_interactions_in_folder()
+    def __init__(self, **params):
+        super().__init__(**params)
 
-        self.users = users & inner_users
-        self.items = items & inner_items
+        # Initializing variables
+        self._users_tokens_data: Dict[int, Any] = {}
+        self._items_tokens_data: Dict[int, Any] = {}
+        self._word_feature_shape: int = 0
+        self._pos_users_data: Dict[int, Any] = {}
+        self._pos_items_data: Dict[int, Any] = {}
+        self._item_mapping: Dict[int, int] = {}
+        self._user_mapping: Dict[int, int] = {}
 
-    def get_mapped(self) -> t.Tuple[t.Set[int], t.Set[int]]:
-        return self.users, self.items
+        self._users_tokens_data = {
+            int(k): v for k, v in self.reader.read_json(self.users_tokens).items()
+        }
+        self._items_tokens_data = {
+            int(k): v for k, v in self.reader.read_json(self.items_tokens).items()
+        }
 
-    def filter(self, users: t.Set[int], items: t.Set[int]):
+        # Shape-sniff via a memory-mapped read: avoids pulling the whole
+        # (potentially large) vocabulary embedding matrix into memory just to
+        # discover the id domain -- the full array is only materialized in load().
+        self._word_feature_shape = self.reader.peek_npy_shape(
+            path=self.users_vocabulary_features
+        )[-1]
+
+        if self.pos_users is not None and self.pos_items is not None:
+            self._pos_users_data = {
+                int(k): v for k, v in self.reader.read_json(self.pos_users).items()
+            }
+            self._pos_items_data = {
+                int(k): v for k, v in self.reader.read_json(self.pos_items).items()
+            }
+
+        users = set(self._users_tokens_data.keys())
+        items = set(self._items_tokens_data.keys())
+
+        if users:
+            self._user_mapping = public_id_map(users)
+        if items:
+            self._item_mapping = public_id_map(items)
+
         self.users = self.users & users
         self.items = self.items & items
 
-    def create_namespace(self) -> SimpleNamespace:
-        ns = SimpleNamespace()
-        ns.__name__ = "WordsTextualAttributes"
-        ns.object = self
-        ns.users_vocabulary_features_path = self.users_vocabulary_features_path
-        ns.items_vocabulary_featutes_path = self.items_vocabulary_features_path
-        ns.users_tokens_path = self.users_tokens_path
-        ns.items_tokens_path = self.items_tokens_path
+    def load(self) -> Dict[str, Payload]:
+        """Return the tokenized text (`TextPayload`, cheap -- already resident from the
+        id-discovery pass in `__init__`) plus the shared vocabulary/token embedding
+        table(s) (`EmbeddingPayload`, shaped by `self.materialization` via
+        `_vocab_payload`).
+        """
+        payloads: Dict[str, Payload] = {}
 
-        ns.user_mapping = self.user_mapping
-        ns.item_mapping = self.item_mapping
+        if self._users_tokens_data or self._items_tokens_data:
+            tokens = {}
+            if self._users_tokens_data:
+                tokens.update(self._users_tokens_data)
+            if self._items_tokens_data:
+                tokens.update(self._items_tokens_data)
+            id_map = {}
+            id_map.update(self._user_mapping)
+            id_map.update(self._item_mapping)
+            payloads["tokens"] = TextPayload(
+                tokens=tokens,
+                id_map=id_map,
+                vocab_size=self._word_feature_shape,
+            )
 
-        ns.word_feature_shape = self.word_feature_shape
+        if self.users_vocabulary_features:
+            payloads["users_vocab_embeddings"] = self._vocab_payload(self.users_vocabulary_features)
 
-        return ns
+        if self.items_vocabulary_features:
+            payloads["items_vocab_embeddings"] = self._vocab_payload(self.items_vocabulary_features)
 
-    def check_interactions_in_folder(self) -> (t.Set[int], t.Set[int]):
-        users = set()
-        items = set()
-        if self.users_vocabulary_features_path and self.items_vocabulary_features_path and self.users_tokens_path and self.items_tokens_path:
-            with open(self.users_tokens_path, "r") as f:
-                self.users_tokens = json.load(f)
-                self.users_tokens = {int(k): v for k, v in self.users_tokens.items()}
-            with open(self.items_tokens_path, "r") as f:
-                self.items_tokens = json.load(f)
-                self.items_tokens = {int(k): v for k, v in self.items_tokens.items()}
-            users = users.union(list(self.users_tokens.keys()))
-            items = items.union(list(self.items_tokens.keys()))
-            self.users_word_features = np.load(self.users_vocabulary_features_path)
-            self.items_word_features = np.load(self.items_vocabulary_features_path)
-            self.word_feature_shape = self.users_word_features.shape[-1]
-        if self.pos_users_path and self.pos_items_path:
-            with open(self.pos_users_path, "r") as f:
-                self.pos_users = json.load(f)
-                self.pos_users = {int(k): v for k, v in self.pos_users.items()}
-            with open(self.pos_items_path, "r") as f:
-                self.pos_items = json.load(f)
-                self.pos_items = {int(k): v for k, v in self.pos_items.items()}
-        if users:
-            self.user_mapping = {user: val for val, user in enumerate(users)}
-        if items:
-            self.item_mapping = {item: val for val, item in enumerate(items)}
+        return payloads
 
-        return users, items
+    def _vocab_payload(self, path: str) -> EmbeddingPayload:
+        """Build the `EmbeddingPayload` for one shared vocabulary/token embedding
+        table, honoring `self.materialization`. Unlike the per-item `.npy`-folder
+        loaders, there is exactly *one* file here (not one per row), so `LAZY` and
+        `MMAP` both have to read it via a memory-mapped `numpy.load` -- re-reading the
+        whole (potentially large) table from scratch for every single row, as plain
+        `LAZY` does in the per-file case, would be pathological here. They differ
+        instead in what they hand back: `MMAP` exposes the memory-mapped table
+        directly as `dense` (bulk/whole-matrix access, still page-cached rather than
+        copied into RAM), while `LAZY` only exposes a `row_loader` over that same
+        memory-mapped table, matching the row-at-a-time access contract every other
+        `LAZY` loader in this codebase uses. `MEMORY` is the only one that actually
+        copies the table into a fresh in-memory array.
+        """
+        if self.materialization == Materialization.MEMORY:
+            dense = self.reader.read_npy(path)
+            return EmbeddingPayload(dense=dense, shape=dense.shape)
+
+        memmap = self.reader.read_npy(path, mmap_mode="r")
+        if self.materialization == Materialization.LAZY:
+            def row_loader(row_idx, _arr=memmap):
+                return np.asarray(_arr[row_idx])
+            return EmbeddingPayload(row_loader=row_loader, shape=memmap.shape)
+
+        return EmbeddingPayload(dense=memmap, shape=memmap.shape)

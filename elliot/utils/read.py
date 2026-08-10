@@ -2,18 +2,15 @@
 Module description:
 
 """
-import json
-from typing import List, Tuple, Dict, Any, Callable, Optional, Union
+from typing import List, Tuple, Dict, Any, Callable, Optional, Set, Union
 from ast import literal_eval
 from logging import LoggerAdapter
 import fnmatch
 import csv
+import json
 import torch
 import pandas as pd
-import configparser
 import numpy as np
-import os
-from types import SimpleNamespace
 
 from elliot.utils.folder import list_dir, is_dir, is_file, file_ext, file_name
 from elliot.utils.logging import get_logger
@@ -36,11 +33,15 @@ class Reader:
         columns: Optional[List[Union[str, int]]] = None,
         datatypes: Dict[Union[str, int], str] = {},
         sep: str = "\t",
+        encoding: Optional[str] = None,
+        pandas_kwargs: Optional[Dict[str, Any]] = None,
         callback_fn: Optional[Callable] = None,
         **kwargs: Any,
     ) -> pd.DataFrame:
         """Read tabular data from a file and return it as a pandas DataFrame,
-        handling variations in columns and data types.
+        handling variations in columns and data types. This is the single entry point
+        for reading a DataFrame off disk in this module -- every other DataFrame reader
+        here (`read_sequence_tabular`, `read_triples`) delegates to it.
 
         Args:
             path (str): Path to the file containing the tabular data.
@@ -50,6 +51,9 @@ class Reader:
             datatypes (Dict[Union[str, int], str], optional): Mapping of column names or indices
                 to data types. Defaults to {}.
             sep (str, optional): Column separator used in the input file. Defaults to "\\t".
+            encoding (str, optional): File encoding. Defaults to None (using the platform default).
+            pandas_kwargs (Dict[str, Any], optional): Extra keyword arguments forwarded as-is
+                to `pandas.read_csv` (e.g. `compression`, `dtype`, `names`, `quoting`). Defaults to None.
             callback_fn (Callable, optional): Function to apply to the resulting DataFrame
                 before returning. Defaults to None.
             **kwargs (Any): Additional keyword arguments passed to the `callback_fn` function.
@@ -61,7 +65,7 @@ class Reader:
             # Determine header row index for pandas
             header_row = 0 if header else None
 
-            data = pd.read_csv(path, sep=sep, header=header_row)
+            data = pd.read_csv(path, sep=sep, header=header_row, encoding=encoding, **(pandas_kwargs or {}))
         except pd.errors.EmptyDataError:
             self.logger.warning(
                 "The data file is empty. Returning an empty DataFrame."
@@ -138,6 +142,7 @@ class Reader:
         datatypes: Dict[Union[str, int], str] = {},
         sequence_sep: str = " ",
         sep: str = "\t",
+        encoding: Optional[str] = None,
         callback_fn: Optional[Callable] = None,
         track_source_rows: bool = True,
         **kwargs: Any,
@@ -171,6 +176,7 @@ class Reader:
             sequence_sep (str): Separator used inside the sequence string. Only used when
                 `format` is "inline". Defaults to " ".
             sep (str, optional): Column/token separator used in the input file. Defaults to "\\t".
+            encoding (str, optional): File encoding. Defaults to None (using the platform default).
             callback_fn (Callable, optional): Function to apply to the resulting DataFrame
                 before returning. Defaults to None.
             track_source_rows (bool): If True, add a "_sourceRow" column recording, for
@@ -190,7 +196,14 @@ class Reader:
 
         # Case "inline": one row per session, sequence serialized as a string
         if format == "inline":
-            data = self.read_tabular(path, header=header, columns=columns, datatypes=datatypes, sep=sep)
+            data = self.read_tabular(
+                path,
+                header=header,
+                columns=columns,
+                datatypes=datatypes,
+                sep=sep,
+                encoding=encoding
+            )
             result_cols = list(data.columns)
 
             # Not enough columns to identify the user and the sequence
@@ -235,16 +248,13 @@ class Reader:
         elif format == "wide":
             user_col = columns[0] if columns else 0
 
-            # Determine header row index for pandas
-            header_row = 0 if header else None
-
             # Read line-by-line to preserve the ragged rows as raw sep-separated tokens
-            raw = pd.read_csv(
+            raw = self.read_tabular(
                 path,
+                header=header,
                 sep="\0",
-                header=header_row,
-                names=["_raw"],
-                quoting=csv.QUOTE_NONE,
+                encoding=encoding,
+                pandas_kwargs={"names": ["_raw"], "quoting": csv.QUOTE_NONE},
             )
 
             if raw.empty:
@@ -270,8 +280,6 @@ class Reader:
             
             # Remove empty tokens produced by trailing separators
             df = data[data[item_col] != ""].reset_index(drop=True)
-
-            self.logger.info(f"Loaded: {path}")
 
         else:
             raise ValueError(f"Unsupported format '{format}'. Expected 'wide' or 'inline'.")
@@ -409,41 +417,75 @@ class Reader:
 
         return tuple_list
 
-    def read_mapping(
+    def read_lines(
         self,
         path: str,
-        sep: str = "\t",
-        dtype: str = "str",
-        remove_duplicates: bool = True,
-        callback_fn: Optional[Callable] = None,
-        **kwargs: Any,
-    ) -> Dict[Any, List[Any]]:
+        encoding: Optional[str] = None,
+        parse_fn: Optional[Callable[[str], Any]] = None,
+        skip_fn: Optional[Callable[[str], bool]] = None
+    ) -> List[Any]:
+        """Read a file into a list, one entry per non-skipped line, factoring out the
+        open/iterate/log boilerplate shared by every line-based list reader in this
+        module (`read_property_list`, `read_triples_as_tuples`).
 
-        DTYPES = {"int": int, "float": float, "str": str}
-        dtype = DTYPES[dtype]
+        Args:
+            path (str): Path to the file.
+            encoding (str, optional): File encoding. Defaults to None (using the platform default).
+            parse_fn (Callable[[str], Any], optional): Turns a raw (newline-stripped) line
+                into the entry to collect. Defaults to `None`, keeping the raw line.
+            skip_fn (Callable[[str], bool], optional): If it returns `True` for a line, that
+                line is skipped. Defaults to `None`, keeping every line.
 
-        mapping = {}
+        Returns:
+            List[Any]: The parsed entries, in file order.
+        """
+        items = []
 
-        with open(path) as file:
+        with open(path, encoding=encoding) as file:
             for raw in file:
-                parts = raw.rstrip("\n").split(sep)
-
-                head = parts[0]
-                if isinstance(head, str):
-                    head = literal_eval(head)
-                if isinstance(head, list):
-                    head = head[0]
-
-                identifier = dtype(head)
-                mapping[identifier] = [dtype(x) for x in parts[1:]]
-
-                if remove_duplicates:
-                    mapping[identifier] = list(set(mapping[identifier]))
+                line = raw.rstrip("\n")
+                if skip_fn is not None and skip_fn(line):
+                    continue
+                items.append(parse_fn(line) if parse_fn is not None else line)
 
         self.logger.info(f"Loaded: {path}")
 
-        if callback_fn is not None:
-            mapping = callback_fn(mapping, **kwargs)
+        return items
+
+    def read_key_value_lines(
+        self,
+        path: str,
+        sep: str = "\t",
+        encoding: Optional[str] = None,
+        key_fn: Callable[[str], Any] = str,
+        value_fn: Optional[Callable[[List[str]], Any]] = None
+    ) -> Dict[Any, Any]:
+        """Read `key<sep>rest...`-style lines into a `dict[key] -> value`, factoring out
+        the open/iterate/split/log boilerplate shared by every line-based mapping reader
+        in this module (`read_mapping`, `read_negatives`, `read_id_mapping`,
+        `read_feature_name_patterns`) -- only `key_fn`/`value_fn` differ per format.
+
+        Args:
+            path (str): Path to the mapping file.
+            sep (str, optional): Column separator. Defaults to "\\t".
+            encoding (str, optional): File encoding. Defaults to None (using the platform default).
+            key_fn (Callable[[str], Any]): Turns the first token of a line into the dict key.
+                Defaults to `str`.
+            value_fn (Callable[[List[str]], Any], optional): Turns the remaining tokens of a
+                line into the dict value. Defaults to `None`, keeping the raw token list.
+
+        Returns:
+            Dict[Any, Any]: The `key -> value` mapping, in file order.
+        """
+        mapping = {}
+
+        with open(path, encoding=encoding) as file:
+            for raw in file:
+                parts = raw.rstrip("\n").split(sep)
+                key = key_fn(parts[0])
+                mapping[key] = value_fn(parts[1:]) if value_fn is not None else parts[1:]
+
+        self.logger.info(f"Loaded: {path}")
 
         return mapping
 
@@ -451,6 +493,7 @@ class Reader:
         self,
         read_folder: str,
         sep: str = "\t",
+        encoding: Optional[str] = None,
         fold_index: Tuple[int, Optional[int]] = (0, None),
         **kwargs: Any
     ) -> Dict[str, List[str]]:
@@ -459,6 +502,7 @@ class Reader:
         Args:
             read_folder (str): Path to the folder containing the negative samples file.
             sep (str): Field separator used in the input file. Defaults to "\\t".
+            encoding (str, optional): File encoding. Defaults to None (using the platform default).
             fold_index (Tuple[int, Optional[int]]): Tuple containing the complete fold index.
             **kwargs (Any): Additional keyword arguments passed to the `read_folder` method.
 
@@ -476,17 +520,13 @@ class Reader:
         name = f"test{fold_index[0] + 1}{suffix}_negative"
         path = by_name.get(name)
 
-        neg = {}
-
-        with open(path) as file:
-            for line in file:
-                line = line.rstrip("\n").split(sep)
-                user_id = str(literal_eval(line[0])[0])
-                neg[user_id] = [i for i in line[1:]]
-
-        self.logger.info(f"Loaded: {path}")
-
-        return neg
+        return self.read_key_value_lines(
+            path,
+            sep=sep,
+            encoding=encoding,
+            key_fn=lambda head: str(literal_eval(head)[0]),
+            value_fn=list,
+        )
 
     def read_model(
         self,
@@ -524,119 +564,151 @@ class Reader:
     def read_json(
         self,
         path: str,
-        **kwargs: Any
+        encoding: Optional[str] = None
     ) -> Any:
         """Read and parse data from a JSON file.
 
         Args:
             path (str): Path to the JSON file.
-            **kwargs (Any): Additional keyword arguments.
+            encoding (str, optional): File encoding. Defaults to None (using the platform default).
 
         Returns:
             Any: The loaded and parsed JSON data.
         """
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, "r", encoding=encoding) as f:
             data = json.load(f)
 
         self.logger.info(f"Loaded: {path}")
 
         return data
 
-# def read_csv(filename):
-#     """
-#     Args:
-#         filename (str): csv file path
-#     Return:
-#          A pandas dataframe.
-#     """
-#     df = pd.read_csv(filename, index_col=False)
-#     return df
-#
-#
-# def read_np(filename):
-#     """
-#     Args:
-#         filename (str): filename of numpy to load
-#     Return:
-#         The loaded numpy.
-#     """
-#     return np.load(filename)
-#
-#
-# def read_imagenet_classes_txt(filename):
-#     """
-#     Args:
-#         filename (str): txt file path
-#     Return:
-#          A list with 1000 imagenet classes as strings.
-#     """
-#     with open(filename) as f:
-#         idx2label = eval(f.read())
-#
-#     return idx2label
-#
-#
-# def read_config(sections_fields):
-#     """
-#     Args:
-#         sections_fields (list): list of fields to retrieve from configuration file
-#     Return:
-#          A list of configuration values.
-#     """
-#     config = configparser.ConfigParser()
-#     config.read('./config/configs.ini')
-#     configs = []
-#     for s, f in sections_fields:
-#         configs.append(config[s][f])
-#     return configs
-#
-#
-# def read_multi_config():
-#     """
-#     It reads a config file that contains the configuration parameters for the recommendation systems.
-#
-#     Return:
-#          A list of configuration settings.
-#     """
-#     config = configparser.ConfigParser()
-#     config.read('./config/multi.ini')
-#     configs = []
-#     for section in config.sections():
-#         single_config = SimpleNamespace()
-#         single_config.name = section
-#         for field, value in config.items(section):
-#             single_config.field = value
-#         configs.append(single_config)
-#     return configs
-#
-#
-#
-# def find_checkpoint(dir, restore_epochs, epochs, rec, best=0):
-#     """
-#     :param dir: directory of the model where we start from the reading.
-#     :param restore_epochs: epoch from which we start from.
-#     :param epochs: epochs from which we restore (0 means that we have best)
-#     :param rec: recommender model
-#     :param best: 0 No Best - 1 Search for the Best
-#     :return:
-#     """
-#     if best:
-#         for r, d, f in os.walk(dir):
-#             for file in f:
-#                 if 'best-weights-'.format(restore_epochs) in file:
-#                     return dir + file.split('.')[0]
-#         return ''
-#
-#     if rec == "apr" and restore_epochs < epochs:
-#         # We have to restore from an execution of bprmf
-#         dir_stored_models = os.walk('/'.join(dir.split('/')[:-2]))
-#         for dir_stored_model in dir_stored_models:
-#             if 'bprmf' in dir_stored_model[0]:
-#                 dir = dir_stored_model[0] + '/'
-#                 break
-#
-#     for r, d, f in os.walk(dir):
-#         for file in f:
-#             if 'weights-{0}-'.format(restore_epochs) in file:
-#                 return dir + file.split('.')[0]
-#     return ''
+    def read_triples(
+        self,
+        path: str,
+        sep: str = "\t",
+        encoding: Optional[str] = None,
+    ) -> pd.DataFrame:
+        """Read `(subject, predicate, object)` KG triples from a headerless tabular file
+        into a string-typed `DataFrame`.
+
+        A `.tar.gz`/`.tar.bz2`/`.tar.xz` suffix is treated as a plain gzip/bz2/xz
+        -compressed file (not an actual tar archive) -- the naming convention some KG
+        dumps use for a compressed `.tsv` -- and decompressed accordingly.
+
+        Args:
+            path (str): Path to the triples file.
+            sep (str, optional): Column separator. Defaults to "\\t".
+            encoding (str, optional): File encoding. Defaults to None (using the platform default).
+
+        Returns:
+            pd.DataFrame: The triples, with columns `["uri", "predicate", "object"]`.
+        """
+        compression = None
+        if path.endswith("tar.gz"):
+            compression = "gzip"
+        elif path.endswith("tar.bz2"):
+            compression = "bz2"
+        elif path.endswith("tar.xz"):
+            compression = "xz"
+
+        columns = ['uri', 'predicate', 'object']
+
+        return self.read_tabular(
+            path,
+            header=False,
+            sep=sep,
+            columns=columns,
+            datatypes={c: str for c in columns},
+            encoding=encoding,
+            pandas_kwargs={"compression": compression, "dtype": {i: str for i in range(len(columns))}},
+        )
+
+    def read_triples_as_tuples(
+        self,
+        path: str,
+        encoding: Optional[str] = None
+    ) -> List[Tuple[str, str, str]]:
+        """Read whitespace- or tab-separated RDF triples as `(subject, predicate,
+        object)` string tuples, one line per triple (`.tsv` files split on tab;
+        everything else on any whitespace) -- the layout used by KG-completion-style
+        train/dev/test files.
+
+        Args:
+            path (str): Path to the triples file.
+            encoding (str, optional): File encoding. Defaults to None (using the platform default).
+
+        Returns:
+            List[Tuple[str, str, str]]: The triples, in file order.
+        """
+        ext = file_ext(path).lower()
+
+        def parse_triple(line):
+            s, p, o = line.split("\t") if ext == ".tsv" else line.split()
+            return s.strip(), p.strip(), o.strip()
+
+        return self.read_lines(
+            path,
+            encoding=encoding,
+            parse_fn=parse_triple,
+            skip_fn=lambda line: not line.strip()
+        )
+
+    def read_npy(self, path: str, mmap_mode: Optional[str] = None) -> np.ndarray:
+        """Load a single `.npy` file.
+
+        With `mmap_mode=None` (the default), the file is fully read into a fresh
+        in-memory array -- what `Materialization.LAZY`/`MEMORY` callers want: a plain,
+        writable `ndarray` with no lingering open file handle. With `mmap_mode="r"`
+        (what `Materialization.MMAP` callers pass), the array is memory-mapped instead:
+        `numpy` pages its data in from disk on access rather than copying it all in
+        upfront here, and repeated reads of the same file benefit from the OS page
+        cache instead of re-reading from disk every time -- at the cost of a read-only
+        array backed by an open file handle for as long as it's referenced.
+
+        Args:
+            path (str): Path to the `.npy` file.
+            mmap_mode (str, optional): Forwarded to `numpy.load`'s `mmap_mode`. `None`
+                (default) reads the file fully; `"r"` memory-maps it read-only.
+
+        Returns:
+            np.ndarray: The loaded (or memory-mapped) array.
+        """
+        return np.load(path, mmap_mode=mmap_mode)
+
+    def peek_npy_shape(self, path: str) -> Tuple[int, ...]:
+        """Sniff the shape of a `.npy` array via a memory-mapped read, without loading
+        its data into memory -- useful for cheap id-discovery passes that need to know a
+        feature's dimensionality ahead of the (potentially much larger) actual load.
+
+        Args:
+            path (str): Path to the `.npy` file.
+
+        Returns:
+            Tuple[int, ...]: The array's shape.
+        """
+        return np.load(path, mmap_mode="r").shape
+
+    def discover_npy_ids(
+        self, folder_path: Optional[str]
+    ) -> Tuple[Set[int], Dict[int, int], Optional[Tuple[int, ...]]]:
+        """List a folder holding one `.npy` file per id (filename stem = id).
+
+        Returns the id set, an `id -> row index` map (row order = sorted id order), and
+        the per-id array shape, sniffed via `peek_npy_shape` so id-discovery never pulls
+        the actual data into memory. Returns `(set(), {}, None)` when `folder_path` is
+        falsy.
+
+        Args:
+            folder_path (str, optional): Path to the folder of `.npy` files.
+
+        Returns:
+            Tuple[Set[int], Dict[int, int], Optional[Tuple[int, ...]]]: `(ids, id_map, shape)`.
+        """
+        if not folder_path:
+            return set(), {}, None
+
+        files = self.read_folder(folder_path)
+        ids = {int(file_name(f)) for f in files}
+        id_map = {entity_id: idx for idx, entity_id in enumerate(sorted(ids))}
+        shape = self.peek_npy_shape(files[0]) if files else None
+        return ids, id_map, shape

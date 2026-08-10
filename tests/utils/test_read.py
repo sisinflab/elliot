@@ -245,5 +245,67 @@ def test_read_json():
     assert data == {"a": 1, "b": [1, 2, 3]}
 
 
+class TestDiscoverNpyIds:
+
+    def test_lists_ids_and_sniffs_shape(self, tmp_path):
+        import numpy as np
+
+        np.save(tmp_path / "1.npy", np.array([1.0, 2.0]))
+        np.save(tmp_path / "2.npy", np.array([3.0, 4.0]))
+
+        ids, id_map, shape = reader.discover_npy_ids(str(tmp_path))
+
+        assert ids == {1, 2}
+        assert set(id_map.keys()) == {1, 2}
+        assert shape == (2,)
+
+    def test_falsy_folder_returns_empty(self):
+        assert reader.discover_npy_ids(None) == (set(), {}, None)
+
+
+class TestReadNpy:
+
+    def test_loads_full_array(self, tmp_path):
+        import numpy as np
+
+        path = tmp_path / "1.npy"
+        np.save(path, np.array([1.0, 2.0, 3.0]))
+
+        loaded = reader.read_npy(str(path))
+
+        assert list(loaded) == [1.0, 2.0, 3.0]
+        assert not isinstance(loaded, np.memmap)
+
+    def test_mmap_mode_returns_memmap_without_full_copy(self, tmp_path):
+        import numpy as np
+
+        path = tmp_path / "1.npy"
+        np.save(path, np.array([1.0, 2.0, 3.0]))
+
+        loaded = reader.read_npy(str(path), mmap_mode="r")
+
+        assert isinstance(loaded, np.memmap)
+        assert list(loaded) == [1.0, 2.0, 3.0]
+
+
+class TestReadTriplesAsTuples:
+
+    def test_tsv_splits_on_tab(self, tmp_path):
+        path = tmp_path / "triples.tsv"
+        path.write_text("e1\trel1\te2\ne2\trel2\te3\n")
+
+        triples = reader.read_triples_as_tuples(str(path))
+
+        assert triples == [("e1", "rel1", "e2"), ("e2", "rel2", "e3")]
+
+    def test_non_tsv_splits_on_whitespace(self, tmp_path):
+        path = tmp_path / "triples.txt"
+        path.write_text("e1 rel1 e2\ne2 rel2 e3\n")
+
+        triples = reader.read_triples_as_tuples(str(path))
+
+        assert triples == [("e1", "rel1", "e2"), ("e2", "rel2", "e3")]
+
+
 if __name__ == '__main__':
     pytest.main()

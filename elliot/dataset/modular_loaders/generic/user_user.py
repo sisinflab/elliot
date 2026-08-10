@@ -1,43 +1,47 @@
-import typing as t
-import json
-from types import SimpleNamespace
+from typing import Dict, Any
 
 from elliot.dataset.modular_loaders.abstract_loader import AbstractLoader
+from elliot.dataset.modular_loaders.build import (
+    pairwise_ids_from_raw,
+    pairwise_raw_to_embedding_payload,
+    public_id_map
+)
+from elliot.dataset.modular_loaders.formats import EmbeddingPayload
+from elliot.utils.enums import EntityAxis
+from elliot.utils.registry import side_info_registry
 
 
+@side_info_registry.register(
+    provides="user_features",
+    format="embedding",
+    entity_axis={"user_similarity": EntityAxis.USER}
+)
 class UserUser(AbstractLoader):
-    def __init__(self, users: t.Set, items: t.Set, ns: SimpleNamespace, logger: object):
-        self.logger = logger
-        self.interactions_uu = getattr(ns, "interactions", None)
+    interactions_uu: str
 
-        self.item_mapping = {}
-        self.user_mapping = {}
+    def __init__(self, **params):
+        super().__init__(**params)
 
-        self.users = users
-        self.items = items
+        # Initializing variables
+        self._raw: Dict[str, Any] = {}
 
-    def get_mapped(self) -> t.Tuple[t.Set[int], t.Set[int]]:
-        return self.users, self.items
+        self._raw = self.reader.read_json(
+            path=self.interactions_uu,
+            encoding=self._reader_config.encoding
+        )
 
-    def filter(self, users: t.Set[int], items: t.Set[int]):
-        self.users = self.users & users
-        self.items = self.items & items
-
-    def create_namespace(self) -> SimpleNamespace:
-        ns = SimpleNamespace()
-        ns.__name__ = "UserUser"
-        ns.object = self
-
-        return ns
+        self.users = self.users & pairwise_ids_from_raw(self._raw)
 
     def get_all_features(self, public_users):
         rows_uu, cols_uu = [], []
-        with open(self.interactions_uu, 'r') as f:
-            int_sim = json.load(f)
-
-        for k, v in int_sim.items():
+        for k, v in self._raw.items():
             for val in v:
                 rows_uu.append(public_users[k if not k.isdigit() else int(k)])
                 cols_uu.append(public_users[val])
 
         return rows_uu, cols_uu
+
+    def load(self) -> Dict[str, EmbeddingPayload]:
+        id_map = public_id_map(self.users)
+        payload = pairwise_raw_to_embedding_payload(self._raw, id_map)
+        return {"user_similarity": payload}

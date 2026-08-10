@@ -1,108 +1,116 @@
-from types import SimpleNamespace
-import typing as t
-from os.path import splitext
-
-import numpy as np
+from typing import List, Tuple, Dict, Literal, Optional
 
 from elliot.dataset.modular_loaders.abstract_loader import AbstractLoader
+from elliot.dataset.modular_loaders.build import build_entity_relation_index, triples_to_graph_payload
+from elliot.dataset.modular_loaders.formats import GraphPayload
+from elliot.utils.registry import side_info_registry
 
 
+@side_info_registry.register(
+    provides="kg_edges",
+    format="graph"
+)
 class KGCompletion(AbstractLoader):
-    def __init__(self, users: t.Set, items: t.Set, ns: SimpleNamespace, logger: object):
-        self.logger = logger
-        self.train_path = getattr(ns, "train_path", None)
-        self.dev_path = getattr(ns, "dev_path", None)
-        self.test_path = getattr(ns, "test_path", None)
-        self.test_i_path = getattr(ns, "test_i_path", None)
-        self.test_ii_path = getattr(ns, "test_ii_path", None)
-        self.input_type = getattr(ns, "input_type", "standard")
-        self.users = users
-        self.items = items
+    """A standalone KG-completion dataset (train/dev/test/test_i/test_ii triple
+    splits), for models that learn directly over the knowledge graph rather than over
+    item/user-derived categorical features. Optionally accepts a `mapping` file (item
+    id -> KG entity uri) to also expose an `item_entity_map` on the produced
+    `GraphPayload`.
+    """
 
-        assert self.input_type in {'standard', 'reciprocal'}
+    train_path: str
+    dev_path: Optional[str] = None
+    test_path: Optional[str] = None
+    test_i_path: Optional[str] = None
+    test_ii_path: Optional[str] = None
+    input_type: Literal["standard", "reciprocal"] = "standard"
+    mapping: Optional[str] = None
 
-        self.Xi = self.Xs = self.Xp = self.Xo = None
+    def __init__(self, **params):
+        super().__init__(**params)
 
-        # Loading the dataset
-        self.train_triples = self.read_triples(self.train_path) if self.train_path else []
-        self.original_predicate_names = {p for (_, p, _) in self.train_triples}
+        # Initializing variables
+        self._item_mapping: Dict[int, str] = {}
+        self._train_triples: List[Tuple[str, str, str]] = []
+        self._dev_triples: List[Tuple[str, str, str]] = []
+        self._test_triples: List[Tuple[str, str, str]] = []
+        self._test_i_triples: List[Tuple[str, str, str]] = []
+        self._test_ii_triples: List[Tuple[str, str, str]] = []
+        self._entity_to_idx: Dict[str, int] = {}
+        self._predicate_to_idx: Dict[str, int] = {}
 
-        self.reciprocal_train_triples = None
-        if self.input_type in {'reciprocal'}:
-            self.reciprocal_train_triples = [(o, f'inverse_{p}', s) for (s, p, o) in self.train_triples]
-            self.train_triples += self.reciprocal_train_triples
+        if self.mapping is not None:
+            self._item_mapping = self.reader.read_key_value_lines(
+                path=self.mapping,
+                sep=self._reader_config.sep,
+                encoding=self._reader_config.encoding,
+                key_fn=int,
+                value_fn=lambda rest: rest[0]
+            )
 
-        self.dev_triples = self.read_triples(self.dev_path) if self.dev_path else []
-        self.test_triples = self.read_triples(self.test_path) if self.test_path else []
+        train_triples = self.reader.read_triples_as_tuples(
+            path=self.train_path,
+            encoding=self._reader_config.encoding
+        )
+        if self.input_type == "reciprocal":
+            train_triples = train_triples + [(o, f"inverse_{p}", s) for (s, p, o) in train_triples]
 
-        self.test_i_triples = self.read_triples(self.test_i_path) if self.test_i_path else []
-        self.test_ii_triples = self.read_triples(self.test_ii_path) if self.test_ii_path else []
+        self._train_triples = train_triples
 
-        self.all_triples = self.train_triples + self.dev_triples + self.test_triples
+        if self.dev_path is not None:
+            self._dev_triples = self.reader.read_triples_as_tuples(
+                path=self.dev_path,
+                encoding=self._reader_config.encoding
+            )
+        if self.test_path is not None:
+            self._test_triples = self.reader.read_triples_as_tuples(
+                path=self.test_path,
+                encoding=self._reader_config.encoding
+            )
+        if self.test_i_path is not None:
+            self._test_i_triples = self.reader.read_triples_as_tuples(
+                path=self.test_i_path,
+                encoding=self._reader_config.encoding
+            )
+        if self.test_ii_path is not None:
+            self._test_ii_triples = self.reader.read_triples_as_tuples(
+                path=self.test_ii_path,
+                encoding=self._reader_config.encoding
+            )
 
-        self.entity_set = {s for (s, _, _) in self.all_triples} | {o for (_, _, o) in self.all_triples}
-        self.predicate_set = {p for (_, p, _) in self.all_triples}
+        all_triples = train_triples + self._dev_triples + self._test_triples
+        _, self._entity_to_idx, self._predicate_to_idx = build_entity_relation_index(
+            all_triples, reciprocal=False
+        )
 
-        self.nb_examples = len(self.train_triples)
+        inverse_of_idx = {}
+        original_predicates = {p for _, p, _ in train_triples}
+        if self.input_type == "reciprocal":
+            for p in original_predicates:
+                p_idx, ip_idx = self._predicate_to_idx[p], self._predicate_to_idx[f"inverse_{p}"]
+                inverse_of_idx.update({p_idx: ip_idx, ip_idx: p_idx})
 
-        self.entity_to_idx = {entity: idx for idx, entity in enumerate(sorted(self.entity_set))}
-        self.nb_entities = max(self.entity_to_idx.values()) + 1
-        self.idx_to_entity = {v: k for k, v in self.entity_to_idx.items()}
+    def load(self) -> Dict[str, GraphPayload]:
+        item_entity_map = None
+        if self._item_mapping:
+            item_entity_map = {
+                item: self._entity_to_idx[uri]
+                for item, uri in self._item_mapping.items()
+                if item in self.items and uri in self._entity_to_idx
+            }
 
-        self.predicate_to_idx = {predicate: idx for idx, predicate in enumerate(sorted(self.predicate_set))}
-        self.nb_predicates = max(self.predicate_to_idx.values()) + 1
-        self.idx_to_predicate = {v: k for k, v in self.predicate_to_idx.items()}
+        payloads = {
+            "kg_triples": triples_to_graph_payload(
+                self._train_triples, self._entity_to_idx, self._predicate_to_idx, item_entity_map
+            )
+        }
+        if self._dev_triples:
+            payloads["kg_dev_triples"] = triples_to_graph_payload(
+                self._dev_triples, self._entity_to_idx, self._predicate_to_idx
+            )
+        if self._test_triples:
+            payloads["kg_test_triples"] = triples_to_graph_payload(
+                self._test_triples, self._entity_to_idx, self._predicate_to_idx
+            )
 
-        self.inverse_of_idx = {}
-        if self.input_type in {'reciprocal'}:
-            for p in self.original_predicate_names:
-                p_idx, ip_idx = self.predicate_to_idx[p], self.predicate_to_idx[f'inverse_{p}']
-                self.inverse_of_idx.update({p_idx: ip_idx, ip_idx: p_idx})
-
-        # Triples
-        self.Xs, self.Xp, self.Xo = self.triples_to_vectors(self.train_triples, self.entity_to_idx, self.predicate_to_idx)
-        self.Xi = np.arange(start=0, stop=self.Xs.shape[0], dtype=np.int32)
-
-        self.dev_Xs, self.dev_Xp, self.dev_Xo = self.triples_to_vectors(self.dev_triples, self.entity_to_idx,
-                                                                   self.predicate_to_idx)
-        self.dev_Xi = np.arange(start=0, stop=self.dev_Xs.shape[0], dtype=np.int32)
-
-        assert self.Xs.shape == self.Xp.shape == self.Xo.shape == self.Xi.shape
-        assert self.dev_Xs.shape == self.dev_Xp.shape == self.dev_Xo.shape == self.dev_Xi.shape
-
-    def get_mapped(self):
-        return self.users, self.items
-
-    def filter(self, users, items):
-        self.users = self.users & users
-        self.items = self.items & items
-
-    def create_namespace(self):
-        ns = SimpleNamespace()
-        ns.__name__ = "KGCompletion"
-        ns.object = self
-        ns.__dict__.update(self.__dict__)
-        return ns
-
-    def read_triples(self, path: str) -> t.List[t.Tuple[str, str, str]]:
-        triples = []
-
-        tmp = splitext(path)
-        ext = tmp[1] if len(tmp) > 1 else None
-
-        with open(path, 'rt') as f:
-            for line in f.readlines():
-                if ext is not None and ext.lower() == '.tsv':
-                    s, p, o = line.split('\t')
-                else:
-                    s, p, o = line.split()
-                triples += [(s.strip(), p.strip(), o.strip())]
-        return triples
-
-    def triples_to_vectors(self, triples: t.List[t.Tuple[str, str, str]],
-                           entity_to_idx: t.Dict[str, int],
-                           predicate_to_idx: t.Dict[str, int]) -> t.Tuple[np.ndarray, np.ndarray, np.ndarray]:
-        Xs = np.array([entity_to_idx[s] for (s, p, o) in triples], dtype=np.int32)
-        Xp = np.array([predicate_to_idx[p] for (s, p, o) in triples], dtype=np.int32)
-        Xo = np.array([entity_to_idx[o] for (s, p, o) in triples], dtype=np.int32)
-        return Xs, Xp, Xo
+        return payloads

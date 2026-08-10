@@ -37,6 +37,13 @@ class Materialization(Enum):
     MMAP = "mmap"
 
 
+class EntityAxis(Enum):
+    USER = "user"  # row identity is a public user id
+    ITEM = "item"  # row identity is a public item id
+    PAIR = "pair"  # row identity is a public (user, item) pair
+    NONE = "none"
+
+
 class NegativeSamplingStrategy(Enum):
     RANDOM = 'random'
     FIXED = 'fixed'

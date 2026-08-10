@@ -1,155 +1,207 @@
-from types import SimpleNamespace
-import typing as t
-from os.path import splitext
-
-import numpy as np
+from typing import List, Dict, Optional
 import pandas as pd
 
 from elliot.dataset.modular_loaders.abstract_loader import AbstractLoader
+from elliot.dataset.modular_loaders.build import raw_feature_map_to_embedding_payload
+from elliot.dataset.modular_loaders.formats import EmbeddingPayload
+from elliot.utils.enums import EntityAxis
+from elliot.utils.registry import side_info_registry
 
 
+@side_info_registry.register(
+    provides="item_features",
+    format="embedding",
+    entity_axis={"item_features": EntityAxis.ITEM}
+)
 class KGFlexLoader(AbstractLoader):
-    def __init__(self, users: t.Set, items: t.Set, ns: SimpleNamespace, logger: object):
-        self.logger = logger
-        self.mapping_path = getattr(ns, "mapping", None)
-        self.train_path = getattr(ns, "kg_train", None)
-        self.dev_path = getattr(ns, "kg_dev", None)
-        self.test_path = getattr(ns, "kg_test", None)
-        self.second_hop_path = getattr(ns, "second_hop", None)
-        self.properties_file = getattr(ns, "properties", None)
-        self.additive = getattr(ns, "additive", True)
-        self.threshold = getattr(ns, "threshold", 10)
-        self.users = users
-        self.items = items
+    """Categorical item features from raw KG triples, like `KAHFMLoader`, but also
+    mines 2-hop path features: every `(predicate_x, predicate_y, object_y)` path
+    reached via an item's first-hop object into a second KG (`second_hop`) becomes an
+    extra feature id, unioned with the 1-hop features into the same `item_features`
+    payload.
+    """
 
-        self.mapping = self.load_mapping_file(self.mapping_path)
-        self.properties = self.load_properties(self.properties_file)
-        train_triples = pd.read_csv(self.train_path, sep='\t', names=['uri', 'predicate', 'object'],
-                                    dtype={'uri': str, 'predicate': str, 'object': str})
-        self.dev_triples = None
-        if self.dev_path:
-            self.dev_triples = pd.read_csv(self.dev_path, sep='\t', names=['uri', 'predicate', 'object'],
-                                    dtype={'uri': str, 'predicate': str, 'object': str})
-        self.test_triples = None
-        if self.test_path:
-            self.test_triples = pd.read_csv(self.test_path, sep='\t', names=['uri', 'predicate', 'object'],
-                                    dtype={'uri': str, 'predicate': str, 'object': str})
-        self.triples = pd.concat([train_triples, self.dev_triples, self.test_triples])
-        del train_triples, self.dev_triples, self.test_triples
+    mapping: str
+    kg_train: str
+    kg_dev: Optional[str] = None
+    kg_test: Optional[str] = None
+    second_hop: Optional[str] = None
+    properties: Optional[str] = None
+    additive: bool = True
+    threshold: int = 10
 
-        self.second_hop = pd.DataFrame(columns=['uri', 'predicate', 'object'])\
-            .astype(dtype={'uri': str, 'predicate': str, 'object': str})
-        if self.second_hop_path:
-            import time
-            if self.second_hop_path.endswith("tar.gz"):
-                start = time.time()
-                self.second_hop = pd.read_csv(self.second_hop_path, compression='gzip', sep='\t', names=['uri', 'predicate', 'object'],
-                                    dtype={'uri': str, 'predicate': str, 'object': str})
-                self.logger.info(f"Time taken to load Second Hop: {time.time() - start}")
-            elif self.second_hop_path.endswith("tar.bz2"):
-                start = time.time()
-                self.second_hop = pd.read_csv(self.second_hop_path, compression='bz2', sep='\t', names=['uri', 'predicate', 'object'],
-                                    dtype={'uri': str, 'predicate': str, 'object': str})
-                self.logger.info(f"Time taken to load Second Hop: {time.time() - start}")
-            elif self.second_hop_path.endswith("tar.xz"):
-                start = time.time()
-                self.second_hop = pd.read_csv(self.second_hop_path, compression='xz', sep='\t', names=['uri', 'predicate', 'object'],
-                                    dtype={'uri': str, 'predicate': str, 'object': str})
-                self.logger.info(f"Time taken to load Second Hop: {time.time() - start}")
-            else:
-                start = time.time()
-                self.second_hop = pd.read_csv(self.second_hop_path, sep='\t', names=['uri', 'predicate', 'object'],
-                                              dtype={'uri': str, 'predicate': str, 'object': str})
-                self.logger.info(f"Time taken to load Second Hop: {time.time() - start}")
+    def __init__(self, **params):
+        super().__init__(**params)
 
-        if self.properties:
+        # Initializing variables
+        self._entity_mapping: Dict[int, str] = {}
+        self._triples: pd.DataFrame = pd.DataFrame()
+        self._second_hop_triples: pd.DataFrame = (
+            pd.DataFrame(columns=["uri", "predicate", "object"])
+            .astype(dtype={"uri": str, "predicate": str, "object": str})
+        )
+        self._second_order_features = (
+            pd.DataFrame(columns=["uri_x", "predicate_x", "object_x", "predicate_y", "object_y"])
+            .astype(dtype={
+                "uri_x": str,
+                "predicate_x": str,
+                "object_x": str,
+                "predicate_y": str,
+                "object_y": str
+            })
+        )
+
+        self._entity_mapping = self.reader.read_key_value_lines(
+            path=self.mapping,
+            sep=self._reader_config.sep,
+            encoding=self._reader_config.encoding,
+            key_fn=int,
+            value_fn=lambda rest: rest[0]
+        )
+
+        property_list: List[str] = []
+        if self.properties is not None:
+            property_list = self.reader.read_lines(
+                path=self.properties,
+                encoding=self._reader_config.encoding,
+                skip_fn=lambda line: line.startswith('#')
+            )
+
+        train_triples = self.reader.read_triples(
+            path=self.kg_train,
+            sep=self._reader_config.sep,
+            encoding=self._reader_config.encoding
+        )
+
+        dev_triples: pd.DataFrame = pd.DataFrame()
+        test_triples: pd.DataFrame = pd.DataFrame()
+        if self.kg_dev is not None:
+            dev_triples = self.reader.read_triples(
+                path=self.kg_dev,
+                sep=self._reader_config.sep,
+                encoding=self._reader_config.encoding
+            )
+        if self.kg_test is not None:
+            test_triples = self.reader.read_triples(
+                path=self.kg_test,
+                sep=self._reader_config.sep,
+                encoding=self._reader_config.encoding
+            )
+
+        self._triples = pd.concat([train_triples, dev_triples, test_triples])
+        del train_triples, dev_triples, test_triples
+
+        if self.second_hop is not None:
+            self._second_hop_triples = self.reader.read_triples(
+                path=self.second_hop,
+                sep=self._reader_config.sep,
+                encoding=self._reader_config.encoding
+            )
+
+        if property_list:
             if self.additive:
-                self.triples = self.triples[self.triples["predicate"].isin(self.properties)]
-                self.second_hop = self.second_hop[self.second_hop["predicate"].isin(self.properties)]
+                self._triples = self._triples[self._triples["predicate"].isin(property_list)]
+                self._second_hop_triples = self._second_hop_triples[
+                    self._second_hop_triples["predicate"].isin(property_list)
+                ]
             else:
-                self.triples = self.triples[~self.triples["predicate"].isin(self.properties)]
-                self.second_hop = self.second_hop[~self.second_hop["predicate"].isin(self.properties)]
+                self._triples = self._triples[~self._triples["predicate"].isin(property_list)]
+                self._second_hop_triples = self._second_hop_triples[
+                    ~self._second_hop_triples["predicate"].isin(property_list)
+                ]
 
-        # COMPUTE FEATURES
-        occurrences_per_feature = self.triples.groupby(['predicate', 'object']).size().to_dict()
-        keep_set = {f for f, occ in occurrences_per_feature.items() if occ > self.threshold}
+        self._compute_features()
 
-        second_order_features = self.triples.merge(self.second_hop, left_on='object', right_on='uri', how='left')
-        second_order_features = second_order_features[second_order_features['uri_y'].notna()]
-        occurrences_per_feature_2 = second_order_features.groupby(['predicate_x', 'predicate_y', 'object_y']) \
-            .size().to_dict()
-        keep_set2 = {f for f, occ in occurrences_per_feature_2.items() if occ > self.threshold}
+        possible_items = [str(uri) for uri in self._triples["uri"].unique()]
+        self._entity_mapping = {
+            k: v for k, v in self._entity_mapping.items()
+            if v in possible_items
+        }
 
-        self.triples = self.triples[
-            self.triples[['predicate', 'object']].set_index(['predicate', 'object']).index.map(
-                lambda f: f in keep_set)].astype(str)
-
-        if len(second_order_features) > 0:
-            self.second_order_features = second_order_features[second_order_features[
-                ['predicate_x', 'predicate_y', 'object_y']].set_index(['predicate_x', 'predicate_y', 'object_y'])
-                .index.map(lambda f: f in keep_set2)].astype(str)
-            #self.second_order_features = self.second_order_features.drop(['object_x', 'uri_y'], axis=1)
-            self.second_order_features = self.second_order_features.drop(['uri_y'], axis=1)
-        else:
-            self.second_order_features = pd.DataFrame(
-                columns=['uri_x', 'predicate_x', 'object_x', 'predicate_y', 'object_y']).astype(
-                dtype={'uri_x': str, 'predicate_x': str, 'object_x': str, 'predicate_y': str, 'object_y': str})
-
-        possible_items = [str(uri) for uri in self.triples["uri"].unique()]
-        self.mapping = {k: v for k, v in self.mapping.items() if v in possible_items}
-        self.items = self.items & set(self.mapping.keys())
-
-    def get_mapped(self):
-        return self.users, self.items
+        self.items = self.items & set(self._entity_mapping.keys())
 
     def filter(self, users, items):
-        self.users = self.users & users
-        self.mapping = {k: v for k, v in self.mapping.items() if k in items}
-        self.items = {i for i in self.items if i in self.mapping.keys()}
+        super().filter(users, items)
+        self._entity_mapping = {k: v for k, v in self._entity_mapping.items() if k in items}
+        self.items = {i for i in self.items if i in self._entity_mapping.keys()}
 
-    def create_namespace(self):
-        ns = SimpleNamespace()
-        ns.__name__ = "KGFlexLoader"
-        ns.object = self
-        ns.__dict__.update(self.__dict__)
-        return ns
+    def _compute_features(self):
+        """Threshold-filter 1-hop `(predicate, object)` and 2-hop `(predicate_x,
+        predicate_y, object_y)` features by occurrence count, mirroring the original
+        KGFlex feature-mining logic.
+        """
+        occurrences_per_feature = self._triples.groupby(["predicate", "object"]).size().to_dict()
+        keep_set = {
+            f for f, occ in occurrences_per_feature.items()
+            if occ > self.threshold
+        }
 
-    def load_properties(self, properties_file):
-        properties = []
-        if properties_file:
-            with open(properties_file) as file:
-                for line in file:
-                    if line[0] != '#':
-                        properties.append(line.rstrip("\n"))
-        return properties
+        second_order = self._triples.merge(
+            self._second_hop_triples, left_on="object", right_on="uri", how="left"
+        )
+        second_order = second_order[second_order["uri_y"].notna()]
+        occurrences_per_feature_2 = (
+            second_order
+            .groupby(["predicate_x", "predicate_y", "object_y"])
+            .size().to_dict()
+        )
+        keep_set2 = {
+            f for f, occ in occurrences_per_feature_2.items()
+            if occ > self.threshold
+        }
 
-    def read_triples(self, path: str) -> t.List[t.Tuple[str, str, str]]:
-        triples = []
+        self._triples = self._triples[
+            self._triples[["predicate", "object"]]
+            .set_index(["predicate", "object"])
+            .index.map(lambda f: f in keep_set)
+        ].astype(str)
 
-        tmp = splitext(path)
-        ext = tmp[1] if len(tmp) > 1 else None
+        if len(second_order) > 0:
+            self._second_order_features = (second_order[
+                second_order[["predicate_x", "predicate_y", "object_y"]]
+                .set_index(["predicate_x", "predicate_y", "object_y"])
+                .index.map(lambda f: f in keep_set2)
+            ].astype(str))
+            self._second_order_features = self._second_order_features.drop(["uri_y"], axis=1)
 
-        with open(path, 'rt') as f:
-            for line in f.readlines():
-                if ext is not None and ext.lower() == '.tsv':
-                    s, p, o = line.split('\t')
-                else:
-                    s, p, o = line.split()
-                triples += [(s.strip(), p.strip(), o.strip())]
-        return triples
+    def load(self) -> Dict[str, EmbeddingPayload]:
+        inverted_mapping = {v: k for k, v in self._entity_mapping.items()}
 
-    def triples_to_vectors(self, triples: t.List[t.Tuple[str, str, str]],
-                           entity_to_idx: t.Dict[str, int],
-                           predicate_to_idx: t.Dict[str, int]) -> t.Tuple[np.ndarray, np.ndarray, np.ndarray]:
-        Xs = np.array([entity_to_idx[s] for (s, p, o) in triples], dtype=np.int32)
-        Xp = np.array([predicate_to_idx[p] for (s, p, o) in triples], dtype=np.int32)
-        Xo = np.array([entity_to_idx[o] for (s, p, o) in triples], dtype=np.int32)
-        return Xs, Xp, Xo
+        first_keys = list(self._triples.groupby(["predicate", "object"]).indices.keys())
+        first_index = {k: i for i, k in enumerate(first_keys)}
 
-    def load_mapping_file(self, mapping_file, separator='\t'):
-        map = {}
-        with open(mapping_file) as file:
-            for line in file:
-                line = line.rstrip("\n").split(separator)
-                map[int(line[0])] = line[1]
-        return map
+        triples = self._triples.copy()
+        triples["idx_feature"] = (
+            triples[["predicate", "object"]]
+            .set_index(["predicate", "object"])
+            .index.map(first_index)
+        )
+        first_map = triples.groupby("uri")["idx_feature"].apply(list).to_dict()
+
+        second_map = {}
+        if len(self._second_order_features):
+            second_keys = list(
+                self._second_order_features
+                .groupby(["predicate_x", "predicate_y", "object_y"])
+                .indices.keys()
+            )
+            second_index = {k: i + len(first_index) for i, k in enumerate(second_keys)}
+
+            second = self._second_order_features.copy()
+            second["idx_feature"] = (
+                second[["predicate_x", "predicate_y", "object_y"]]
+                .set_index(["predicate_x", "predicate_y", "object_y"])
+                .index.map(second_index)
+            )
+            second_map = second.groupby("uri_x")["idx_feature"].apply(list).to_dict()
+
+        combined = {
+            uri: first_map.get(uri, []) + second_map.get(uri, [])
+            for uri in set(first_map) | set(second_map)
+        }
+        feature_map = {
+            inverted_mapping[uri]: feats for uri, feats in combined.items()
+            if uri in inverted_mapping
+        }
+
+        return {"item_features": raw_feature_map_to_embedding_payload(feature_map, self.items)}

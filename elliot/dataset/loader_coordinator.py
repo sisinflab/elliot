@@ -1,13 +1,13 @@
-from typing import List, Union, Dict, Tuple, Iterable
+from typing import List, Tuple, Dict, Set, Any, Union, Iterable, Optional
 import numpy as np
 import pandas as pd
 
 from elliot.namespace import ExperimentConfig, DataConfig
-from elliot.dataset.modular_loaders.abstract_loader import AbstractLoader
+from elliot.dataset.modular_loaders import AbstractLoader, SideInformation
 from elliot.dataset.splitting import Splitter
 from elliot.dataset.prefiltering import PreFilter
 from elliot.dataset.dataset import DataSet
-from elliot.utils.enums import DataLoadingStrategy, AlignmentMode, SessionStrategy
+from elliot.utils.enums import DataLoadingStrategy, SessionStrategy
 from elliot.utils.read import Reader
 from elliot.utils import logging
 from elliot.utils.registry import side_info_registry
@@ -42,7 +42,6 @@ class DataSetLoader:
         session_strategy: flat|session_only
         data_folder: this/is/the/path
         dataset_path: this/is/the/path
-      binarize: True|False
         side_information:
           - dataloader: FeatureLoader1
             map: this/is/the/path.tsv
@@ -50,11 +49,12 @@ class DataSetLoader:
             properties: this/is/the/path.conf
           - dataloader: FeatureLoader2
             folder_map_features: this/is/the/path/folder
+      binarize: True|False
     """
 
     data_config: DataConfig
     dataframe: Union[list, pd.DataFrame]
-    side_information: Dict[str, AbstractLoader]
+    side_information: Optional[SideInformation] = None
 
     # Inactivity threshold (in seconds) marking the start of a new session when
     # segmenting non-sequential interactions that carry a real timestamp.
@@ -64,8 +64,14 @@ class DataSetLoader:
         self.logger = logging.get_logger(self.__class__.__name__)
         self.reader = Reader(self.logger)
 
-        self.config = config
+        # Initializing variables
+        self.config: ExperimentConfig = config
         self.data_config = config.data_config
+
+        self._users: Set[Any] = set()
+        self._items: Set[Any] = set()
+
+        self.has_real_timestamps: bool = True
 
         # Default to align side information with the observed training set when present
         if self.data_config.side_information:
@@ -74,10 +80,8 @@ class DataSetLoader:
         if self.config.config_test:
             return
 
-        self.has_real_timestamps = True
-
         self._load_main_data()
-        self._load_side_information()
+        self._init_side_information()
         self._preprocess_data()
 
     def _load_main_data(self):
@@ -98,7 +102,10 @@ class DataSetLoader:
                 track_source_rows=True,
             )
 
-        callback_fn = self._rename_cols_and_binarize_sequence if sequential else self._rename_cols_and_binarize
+        callback_fn = (
+            self._rename_cols_and_binarize_sequence
+            if sequential else self._rename_cols_and_binarize
+        )
 
         match self.data_config.strategy:
 
@@ -130,6 +137,33 @@ class DataSetLoader:
                 )
 
         self._clean(self._filter_nan_and_duplicates)
+
+        users, items = set(), set()
+        df = self.dataframe
+
+        if isinstance(df, list):
+            folds, train, test = df[0]
+            users |= set(test["userId"].unique())
+            items |= set(test["itemId"].unique())
+
+            if train is None:
+                tr, val = folds[0]
+
+                users |= set(tr["userId"].unique())
+                items |= set(tr["itemId"].unique())
+
+                users |= set(val["userId"].unique())
+                items |= set(val["itemId"].unique())
+            else:
+                users |= set(train["userId"].unique())
+                items |= set(train["itemId"].unique())
+
+        else:
+            users = set(df["userId"].unique())
+            items = set(df["itemId"].unique())
+
+        self._users = users
+        self._items = items
 
     @staticmethod
     def _resolve_current_names(
@@ -221,51 +255,25 @@ class DataSetLoader:
 
         return data
 
-    def _load_side_information(self):
-        """Load side information (e.g., user/item features) using custom dataloaders defined in config.
+    def _init_side_information(self):
+        """Pre-load side information (e.g., user/item features) using custom dataloaders defined in config.
 
         Raises:
             TypeError: If a provided loader does not inherit from AbstractLoader.
         """
-        users, items = set(), set()
-        df = self.dataframe
-
-        if isinstance(df, list):
-            folds, train, test = df[0]
-            users |= set(test["userId"].unique())
-            items |= set(test["itemId"].unique())
-
-            if train is None:
-                tr, val = folds[0]
-
-                users |= set(tr["userId"].unique())
-                items |= set(tr["itemId"].unique())
-
-                users |= set(val["userId"].unique())
-                items |= set(val["itemId"].unique())
-            else:
-                users |= set(train["userId"].unique())
-                items |= set(train["itemId"].unique())
-
-        else:
-            users = set(df["userId"].unique())
-            items = set(df["itemId"].unique())
-
-        self._users = users
-        self._items = items
-
         side_info_objs = {}
         for side in self.data_config.side_information:
             side_obj = side_info_registry.get(
                 name=side.dataloader,
-                users=users,
-                items=items,
+                users=self._users,
+                items=self._items,
                 ns=side,
                 logger=self.logger
             )
             side_info_objs[side_obj.name] = side_obj
 
-        self.side_information = side_info_objs
+        if side_info_objs:
+            self.side_information = SideInformation(side_info_objs)
 
     def _preprocess_data(self):
         """Apply user/item filtering based on side information, and basic cleanup.
@@ -273,9 +281,6 @@ class DataSetLoader:
         """
         self._intersect_users_items()
         self._clean(self._filter_users_and_items)
-        self._maybe_materialize_cache()
-
-        del self._items, self._users
 
         if self.data_config.strategy == DataLoadingStrategy.DATASET:
             prefilter = PreFilter(self.dataframe, self.config.prefiltering)
@@ -312,32 +317,25 @@ class DataSetLoader:
         return df
 
     def _intersect_users_items(self):
-        """Align users/items with side information based on alignment mode:
-        - DROP: intersect with side info (current behavior)
-        - PAD: keep full train set; side loaders can pad/UNK internally
-        - IMPUTE: keep full train set; side loaders should impute defaults
+        """Narrow the shared users/items universe down to the intersection of the base
+        train/eval data and every configured loader's own discovered domain.
+        Every loader, and the shared dataframe itself (via `self._users`/`self._items`,
+        consumed by `_filter_users_and_items`), end up aligned to this same intersection.
         """
+        if not self.side_information:
+            return
+
         users, items = self._users, self._items
-        user_aligned = users.copy()
-        item_aligned = items.copy()
 
         for side_obj in self.side_information.values():
-            mode = side_obj.alignment
-            s_users, s_items = side_obj.get_mapped()
-            if mode == AlignmentMode.DROP:
-                user_aligned &= s_users
-                item_aligned &= s_items
-            elif mode in (AlignmentMode.PAD, AlignmentMode.IMPUTE):
-                # Keep full set; loaders handle padding/imputing internally
-                pass
+            mapped_users, mapped_items = side_obj.get_mapped()
+            users &= mapped_users
+            items &= mapped_items
 
-        # Apply filtering for DROP sources
+        self._users, self._items = users, items
+
         for side_obj in self.side_information.values():
-            mode = side_obj.alignment
-            if mode == AlignmentMode.DROP:
-                side_obj.filter(user_aligned, item_aligned)
-
-        self._users, self._items = user_aligned, item_aligned
+            side_obj.filter(users, items)
 
     def _clean(self, clean_fn):
         """Clean all loaded DataFrames by filtering users/items and removing duplicates."""
@@ -376,26 +374,6 @@ class DataSetLoader:
     def _filter_users_and_items(self, df: pd.DataFrame) -> pd.DataFrame:
         df = df[df["userId"].isin(self._users) & df["itemId"].isin(self._items)].reset_index(drop=True)
         return df
-
-    def _maybe_materialize_cache(self):
-        """Hook for large side-information sources: allow loaders to expose a
-        preferred materialization strategy (lazy/memory/mmap). For now, we
-        log intent; specific loaders can honor _materialization internally.
-        """
-        for side_obj in self.side_information.values():
-            mat = side_obj.materialization
-            if not mat:
-                continue
-            self.logger.debug(
-                "Side-info materialization hint",
-                extra={
-                    "context": {
-                        "source": side_obj.__class__.__name__,
-                        "materialization": mat,
-                        "alignment": side_obj.alignment,
-                    }
-                },
-            )
 
     def _drop_single_session_users(self):
         """Drop users left with fewer than two sessions, since a session-aware split
@@ -456,7 +434,7 @@ class DataSetLoader:
                 config=self.config,
                 train_data=train,
                 eval_data=test,
-                side_info_data=self.side_information,
+                side_info=self.side_information,
                 evaluation_set="test",
                 fold_index=(p1, None)
             )
@@ -477,7 +455,7 @@ class DataSetLoader:
                     config=self.config,
                     train_data=train_data,
                     eval_data=val,
-                    side_info_data=self.side_information,
+                    side_info=self.side_information,
                     evaluation_set="validation",
                     fold_index=(p1, p2)
                 )
@@ -525,7 +503,7 @@ def build_mock_dataset(config) -> Tuple[List[List[DataSet]], List[DataSet]]:
         config=config,
         train_data=train,
         eval_data=test,
-        side_info_data={}
+        side_info=None
     )
 
     return [[test_data_object]], [test_data_object]

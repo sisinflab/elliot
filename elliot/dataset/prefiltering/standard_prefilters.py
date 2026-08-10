@@ -49,10 +49,11 @@ class PreFilter:
 
     def __init__(self, data: pd.DataFrame, prefiltering_config: List[PreFilteringConfig]):
         self.logger = elog.get_logger(self.__class__.__name__)
+
+        # Initializing variables
         self.data = data
         self.prefiltering_config = prefiltering_config
-
-        self._mask = None
+        self._mask: Optional[pd.Series] = None
 
     def filter(self) -> pd.DataFrame:
         """Apply all configured pre-filtering strategies in sequence to the dataset.

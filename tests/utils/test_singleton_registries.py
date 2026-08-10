@@ -32,13 +32,16 @@ class CustomLoader(AbstractLoader):
         super().__init__(users, items, ns)
         self.custom_param = ns.custom_param
 
+    def discover(self):
+        pass
+
     def get_mapped(self):
         pass
 
     def filter(self, users, items):
         pass
 
-    def create_namespace(self):
+    def load(self):
         pass
 
 

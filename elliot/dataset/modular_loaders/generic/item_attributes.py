@@ -1,14 +1,16 @@
-from types import SimpleNamespace
+from typing import List, Dict
 
 from elliot.dataset.modular_loaders.abstract_loader import AbstractLoader
-from elliot.utils.enums import AlignmentMode
+from elliot.dataset.modular_loaders.build import raw_feature_map_to_embedding_payload
+from elliot.dataset.modular_loaders.formats import EmbeddingPayload
+from elliot.utils.enums import EntityAxis
 from elliot.utils.registry import side_info_registry
 
 
 @side_info_registry.register(
     provides="item_features",
-    format="sparse",
-    alignment=AlignmentMode.DROP
+    format="embedding",
+    entity_axis={"item_features": EntityAxis.ITEM}
 )
 class ItemAttributes(AbstractLoader):
     attribute_file: str
@@ -16,42 +18,29 @@ class ItemAttributes(AbstractLoader):
     def __init__(self, **params):
         super().__init__(**params)
 
-        self.map_ = self.load_attribute_file()
+        # Initializing variables
+        self._map: Dict[int, List[int]] = {}
 
-        self.items = self.items & set(self.map_.keys())
+        self._map = self.reader.read_key_value_lines(
+            path=self.attribute_file,
+            sep=self._reader_config.sep,
+            encoding=self._reader_config.encoding,
+            key_fn=int,
+            value_fn=lambda rest: list(set([int(x) for x in rest]))
+        )
+
+        self.items = self.items & set(self._map.keys())
+
         self.logger.debug(
             "Loaded item attributes",
             extra={
                 "context": {
                     "source": self.name,
                     "items_with_features": len(self.items),
-                    "unique_features": len(set(f for feats in self.map_.values() for f in feats)),
+                    "unique_features": len(set(f for feats in self._map.values() for f in feats)),
                 }
             },
         )
 
-    def get_mapped(self):
-        return self.users, self.items
-
-    def filter(self, users, items):
-        self.users = self.users & users
-        self.items = self.items & items
-
-    def create_namespace(self):
-        ns = SimpleNamespace()
-        ns.__name__ = self.name
-        ns.object = self
-        ns.feature_map = self.map_
-        ns.features = list({f for i in self.items for f in ns.feature_map[i]})
-        ns.nfeatures = len(ns.features)
-        ns.private_features = {p: f for p, f in enumerate(ns.features)}
-        ns.public_features = {v: k for k, v in ns.private_features.items()}
-        return ns
-
-    def load_attribute_file(self):
-        map_ = self.reader.read_mapping(
-            path=self.attribute_file,
-            sep=self._reader_config.sep,
-            dtype="int"
-        )
-        return map_
+    def load(self) -> Dict[str, EmbeddingPayload]:
+        return {"item_features": raw_feature_map_to_embedding_payload(self._map, self.items)}

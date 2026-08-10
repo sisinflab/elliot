@@ -29,28 +29,22 @@ class Sessions:
         name,
         u_map,
         i_map,
-        side_info_ns,
         sparse
     ):
-        self.name = name
         self.logger = logging.get_logger(self.__class__.__name__)
+
+        # Initializing variables
+        self.name = name
 
         self._u_map = u_map
         self._i_map = i_map
         self._n_users = len(u_map)
         self._n_items = len(i_map)
-
         self._sparse = copy.deepcopy(sparse)
-        self._sparse.sort_indices()
-
-        self._build_tape(dataframe)
-
-        # Sessions is built from the exact same dataframe as the parent train
-        # `Interactions`, so side information is already aligned to the same
-        # user/item universe: no need to re-filter it here.
-        self.side_information = side_info_ns
-
         self._cached_datasets = {}
+
+        self._sparse.sort_indices()
+        self._build_tape(dataframe)
 
     def _build_tape(self, dataframe):
         df = dataframe[["userId", "itemId", "timestamp"]].copy()
@@ -176,6 +170,7 @@ class EvalSessions:
     """
 
     def __init__(self, dataframe, u_map, i_map, inv_mappings, n_items):
+        # Initializing variables
         self._u_map = u_map
         self._i_map = i_map
         self._inv_u_map, self._inv_i_map = inv_mappings

@@ -1,17 +1,70 @@
 Loaders
 ======================
 
-If needed, it is possible to code a custom loader. To create your own loader, Elliot provides the abstract class
-``AbstractLoader`` into the file ``abstract_loader.py`` belonging to the package
+Elliot lets you plug in custom side-information loaders: code that reads item/user
+attributes, a knowledge graph, textual/visual embeddings, or anything else keyed by a
+user/item id, and hands it to your recommender as one of three canonical payload
+shapes (``EmbeddingPayload``/``TextPayload``/``GraphPayload``, defined in
+``elliot.dataset.modular_loaders.formats``).
 
-``dataset``
-    |___``modular_loaders``
+To write one, subclass ``AbstractLoader`` (``elliot/dataset/modular_loaders/abstract_loader.py``)
+and register it with ``side_info_registry``. A minimal loader only needs two methods:
 
+- ``discover()``: a *lightweight pre-load* pass -- cheap I/O, just enough to find out
+  which of the base users/items your data source actually covers, then narrow
+  ``self.users``/``self.items`` down to that domain (typically
+  ``self.items = self.items & {... ids found on disk ...}``). It must never
+  materialize the full feature payload -- that is ``load()``'s job.
+- ``load()``: materialize the actual payload, once, as a ``dict`` of named payloads.
 
-The ``init`` method is devoted to capture all the configuration fields provided by the loader section in configuration file and initialize the loader (read files, apply thresholds, create additional data structures).
+``get_mapped()`` and ``filter()`` already have sensible defaults on ``AbstractLoader``
+and rarely need overriding (see `When to override filter()`_ below).
 
-Example: Suppose we want to create a side information loader for movie genres. The side information file is structured as a TSV file with no header.
-The first element of the row denotes the item id, whereas the other numbers indicate the ids of the genres.
+Reading the raw file
+---------------------
+
+Don't hand-roll file parsing inside your loader. ``self.reader`` (an
+``elliot.utils.read.Reader``, available on every loader) already covers most on-disk
+layouts Elliot's side-information files come in:
+
+- ``read_mapping``: an ``id -> [value, ...]`` file (e.g. multi-hot feature ids per item).
+- ``read_id_mapping``: an ``id -> single value`` file (e.g. item id -> KG entity URI).
+- ``read_property_list``: a newline-delimited list (e.g. predicate URIs), skipping
+  ``#``-comment lines.
+- ``read_json`` / ``read_triples``: JSON files / headerless ``(subject, predicate,
+  object)`` KG triples.
+- ``read_folder`` / ``peek_npy_shape`` / ``read_npy``: listing a folder, cheaply
+  sniffing a ``.npy`` array's shape (via a memory-mapped read) without loading its
+  data, and fully loading one when you do need it.
+- ``discover_npy_ids``: the common "one ``.npy`` file per id" folder layout in one
+  call -- lists the folder, extracts ids from filenames, and shape-sniffs the first
+  file, returning ``(ids, id_map, shape)``.
+- ``read_triples_as_tuples``: KG triples as `List[(subject, predicate, object)]`.
+- ``read_tabular`` / ``read_sequence_tabular``: general-purpose tabular readers, for
+  layouts none of the above fit.
+
+Reader only ever returns raw, already-parsed data (dicts, DataFrames, arrays, id
+sets) -- never one of the canonical payload dataclasses. Shaping that raw data into a
+payload is what the adapters in ``elliot.dataset.modular_loaders.adapters`` do (see
+below); keeping the two responsibilities apart is what lets both be reused
+independently across loaders.
+
+If a raw layout genuinely isn't covered yet, add a method to ``Reader`` for it rather
+than parsing it by hand inside the loader -- that keeps every loader focused on *what*
+it loads, not *how* to read a file.
+
+For raw-format -> canonical-payload conversions (a folder of one ``.npy`` file per id, a
+categorical feature map, a pairwise similarity JSON, RDF triples, ...), check
+``elliot.dataset.modular_loaders.adapters`` first too. Most existing loaders are just
+"read something small with a ``Reader``/adapter helper, then hand it to another adapter
+helper" -- no bespoke parsing at all.
+
+Example: item attributes
+-------------------------
+
+Suppose we want to load per-item categorical attributes (e.g. movie genres) from a
+headerless TSV file, one row per item: the first column is the item id, the remaining
+columns are genre ids.
 
 .. list-table::
    :widths: 25 25 25 25
@@ -34,19 +87,38 @@ The first element of the row denotes the item id, whereas the other numbers indi
      - 3
      -
 
+This is exactly what ``elliot.dataset.modular_loaders.generic.item_attributes.ItemAttributes``
+does:
 
 .. code:: python
 
-    def __init__(self, users: t.Set, items: t.Set, ns: SimpleNamespace, logger: object):
-        self.logger = logger
-        self.attribute_file = getattr(ns, "attribute_file", None)
-        self.users = users
-        self.items = items
-        self.map_ = self.load_attribute_file(self.attribute_file)
-        self.items = self.items & set(self.map_.keys())
+    @side_info_registry.register(
+        provides="item_features",
+        format="embedding",
+        alignment=AlignmentMode.DROP,
+    )
+    class ItemAttributes(AbstractLoader):
+        attribute_file: str
 
-The ``__init__`` (mandatory) method takes four mandatory arguments: users, items, the namespace, and the elliot general logger.
-In our example, the namespace corresponds to the piece of the configuration file that refers to our side information loader (form now on named ItemAttributes).
+        def discover(self):
+            self.map_ = self.reader.read_mapping(self.attribute_file, dtype="int")
+            self.items = self.items & set(self.map_.keys())
+
+        def load(self):
+            return {"item_features": raw_feature_map_to_embedding_payload(self.map_, self.items)}
+
+That's the whole loader: ``get_mapped()``/``filter()`` are inherited from
+``AbstractLoader`` unchanged, the file is read with ``self.reader.read_mapping``
+(no hand-rolled ``open()``/``split()``), and the multi-hot -> ``EmbeddingPayload``
+conversion is delegated to ``raw_feature_map_to_embedding_payload`` (in
+``elliot.dataset.modular_loaders.adapters``).
+
+Configuration
+--------------
+
+Any field declared as a class attribute on your loader (``attribute_file: str`` above)
+is populated automatically from the matching key in the ``side_information`` block of
+the experiment configuration:
 
 .. code:: yaml
 
@@ -56,37 +128,20 @@ In our example, the namespace corresponds to the piece of the configuration file
           - dataloader: ItemAttributes
             attribute_file: this/is/the/path.tsv
 
-The ``__init__`` method creates its local attributes and retrieve the necessary information from the namespace.
-Then, it loads the side information file and aligns it with users and items as provided by the Elliot pipeline.
+The ``dataloader`` name must match the class name, or the ``name=`` given to
+``side_info_registry.register(...)``.
 
-The method ``get_mapped()`` (mandatory), returns a tuple of aligned users and items.
+When to override ``filter()``
+------------------------------
 
-.. code:: python
+``filter()`` is called once, globally, to narrow every loader down to the final
+cross-loader user/item intersection. The default on ``AbstractLoader`` just intersects
+``self.users``/``self.items``, which is correct for any loader that keeps no other
+id-keyed state.
 
-    def get_mapped(self) -> t.Tuple[t.Set[int], t.Set[int]]:
-        return self.users, self.items
-
-The method ``filter`` (mandatory), provides the functionality of filtering users, items, and side information data structures based on the sets of users and items passed as arguments.
-
-.. code:: python
-
-    def filter(self, users, items):
-        self.users = self.users & users
-        self.items = self.items & items
-
-Finally, the method ``create_namespace`` creates the namespace that will be passed to our recommendation algorithms.
-Be sure that the mandatory attributes (__name__, and object), and all the necessary data are present.
-Pay Attention! The name you choose here is the same you will use in your configuration file.
-
-.. code:: python
-
-    def create_namespace(self):
-        ns = SimpleNamespace()
-        ns.__name__ = "ItemAttributes" #MANDATORY
-        ns.object = self #MANDATORY
-        ns.feature_map = self.map_
-        ns.features = list({f for i in self.items for f in ns.feature_map[i]})
-        ns.nfeatures = len(ns.features)
-        ns.private_features = {p: f for p, f in enumerate(ns.features)}
-        ns.public_features = {v: k for k, v in ns.private_features.items()}
-        return ns
+Override it -- calling ``super().filter(users, items)`` first -- only when some other
+attribute set up in ``discover()`` (a raw triples table, a derived feature map, ...)
+also needs to be narrowed down to stay consistent with the new
+``self.users``/``self.items``. See
+``elliot.dataset.modular_loaders.kg.kahfm_style.ChainedKG`` for an example that
+re-derives its feature map after filtering.

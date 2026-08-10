@@ -1,7 +1,7 @@
 import inspect
 import random
 import logging as pylog
-from typing import Tuple, Optional, no_type_check
+from typing import List, Tuple, Optional, no_type_check
 
 import numpy as np
 import torch
@@ -23,6 +23,7 @@ from elliot.utils.write import Writer
 class AbstractRecommender(ABC):
     type: ModelType
     sampler_config: dict = {}
+    loaders: List[str] = []
 
     def __init__(
         self,
@@ -52,8 +53,12 @@ class AbstractRecommender(ABC):
         self.set_seed(seed)
         self.set_params(params)
 
-        if hasattr(self, '_loader') or hasattr(self, '_loaders'):
-            self.set_side_info()
+        missing = [name for name in self.loaders if name not in self._interactions.side_information]
+        if missing:
+            raise KeyError(
+                f"{self.__class__.__name__} declares `loaders` entries not present in "
+                f"the dataset's side information: {missing}."
+            )
 
         self.model_config.name = self.name
 
@@ -85,12 +90,6 @@ class AbstractRecommender(ABC):
                 setattr(self, name, val)
                 self.logger.info(f"Parameter '{name}' set to {val}")
                 self.params_list.append(name)
-
-    def set_side_info(self, loader=None, mod=None):
-        name = f"_side{('_' + mod) if mod else ''}"
-        loader_name = loader if loader else self._loader
-        loader_obj = getattr(self._interactions.side_information, loader_name)
-        setattr(self, name, loader_obj)
 
     @abstractmethod
     def get_model_state(self):

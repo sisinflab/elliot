@@ -1,115 +1,84 @@
-from typing import Set
-from types import SimpleNamespace
+from typing import Dict, Set, Any
 import numpy as np
+import pandas as pd
 
 from elliot.dataset.modular_loaders.abstract_loader import AbstractLoader
-from elliot.utils.enums import AlignmentMode, Materialization
-from elliot.utils.read import Reader
+from elliot.dataset.modular_loaders.formats import GraphPayload
 from elliot.utils.registry import side_info_registry
 
-reader = Reader()
-# forse vanno rimappati user e item dopo che sono stati mappati da dataset in questa classe
 
 @side_info_registry.register(
     provides="kg_edges",
-    format="graph",
-    alignment=AlignmentMode.DROP,
-    materialization=Materialization.MMAP,
+    format="graph"
 )
 class KGINTSVLoader(AbstractLoader):
-    attribute_file: str = None
+    """KG triples for KGIN-style relation-aware propagation, read from a headerless
+    tabular file of integer `(head, relation, tail)` triples via `Reader.read_tabular`
+    -- set `reader.sep` to a single space in the side-info config for whitespace-
+    separated dumps. Always fully loads into memory: building `entity2id`/`relation2id`
+    needs every triple read and indexed up front regardless.
+    """
+
+    attribute_file: str
 
     def __init__(self, **params):
         super().__init__(**params)
 
-        # test = pd.read_csv('./data/movielens_final_kg/mov/test.tsv', skiprows=[0], sep='\t', header=None
-        #                    , usecols=[i for i in range(3)])
-        # test.to_csv('./data/movielens_final_kg/test_kgin.tsv', index=False, sep='\t', header=None)
-        if self.attribute_file is not None:
-            self.map_ = self.read_triplets(self.attribute_file)  # KG
-            # self.items = self.items & set(self.map_.keys())
+        # Initializing variables
+        self._map: pd.DataFrame = pd.DataFrame()
+        self._entities: Set[Any] = set()
+        self._entity_list: Set[Any] = set()
 
-        # self.map_ = self.map_[self.map_['subject'].isin(self.items)]
-        #
-        # count_subject = pd.concat([pd.Series(self.map_.groupby('subject').size().index.to_list()),
-        #                            pd.Series(self.map_.groupby('subject').size().values.tolist())], axis=1)
-        #
-        # k_core_subject = count_subject[count_subject[1] >= 10][0].to_list()
-        #
-        # self.map_ = self.map_[self.map_['subject'].isin(k_core_subject)]
-        #
-        # count_object = pd.concat([pd.Series(self.map_.groupby('object').size().index.to_list()),
-        #                           pd.Series(self.map_.groupby('object').size().values.tolist())], axis=1)
-        #
-        # k_core_object = count_object[count_object[1] >= 10][0].to_list()
-        #
-        # k_core_object = set.union(set(k_core_object), set(k_core_subject))
-        #
-        # self.map_ = self.map_[self.map_['object'].isin(list(k_core_object))]
-
-        # entities = pd.read_csv(self.entities_file, sep='\t', header=0, names=['id', 'remap'])
-        # self.entities = set(entities.remap.unique())
-        self.entities = set(self.map_.values[:, 0]).union(set(self.map_.values[:, 2]))
-        self.items = set.intersection(self.items, self.entities)
-        # ma gli item non andrebbero filtrati nel senso: se non sono nel kg via?
-        # TODO: in realtà sarebbe interessante capire quali item sono stati eliminati, per rimuoverli anche da entities
-        self.entity_list = set.difference(self.entities, self.items)  # entities - items
-
-    def get_mapped(self):
-        return self.users, self.items
-
-    def filter(self, users: Set[int], items: Set[int]):
-        self.users = self.users & users  # solo elem comuni
-        self.items = self.items & items
-        self.map_ = self.map_[self.map_['subject'].isin(self.items)]
-
-        # count_subject = pd.concat([pd.Series(self.map_.groupby('subject').size().index.to_list()),
-        #                            pd.Series(self.map_.groupby('subject').size().values.tolist())], axis=1)
-        #
-        # k_core_subject = count_subject[count_subject[1] >= 10][0].to_list()
-        #
-        # self.map_ = self.map_[self.map_['subject'].isin(k_core_subject)]
-        #
-        # count_object = pd.concat([pd.Series(self.map_.groupby('object').size().index.to_list()),
-        #                           pd.Series(self.map_.groupby('object').size().values.tolist())], axis=1)
-        #
-        # k_core_object = count_object[count_object[1] >= 10][0].to_list()
-        #
-        # k_core_object = set.union(set(k_core_object), set(k_core_subject))
-        #
-        # self.map_ = self.map_[self.map_['object'].isin(list(k_core_object))]
-
-        self.entities = set(self.map_.values[:, 0]).union(set(self.map_.values[:, 2]))
-        self.items = set.intersection(self.items, self.entities)
-        self.entity_list = set.difference(self.entities, self.items)
-
-        # prendo triple kg solo quelle che corrispondono ad item
-        # self.map_ = self.map_[np.where(np.isin(self.map_[:, 2], list(self.items) + list(self.entity_list)))] # triple kg solo dove oggetti = item o entità diverse da item
-        # ci sta perchè ricordiamo che item: addestrati sia con kg che u-i, entità != item
-        # self.items = self.items & set(self.map_.keys())
-
-    def create_namespace(self):
-        ns = SimpleNamespace()
-        ns.__name__ = self.name
-        ns.object = self
-        ns.__dict__.update(self.__dict__)
-        ns.feature_map = self.map_   # è il kg
-        ns.relations = np.unique(ns.feature_map.values[:, 1])
-        ns.n_relations = len(ns.relations) + 1
-        # ns.entities = np.unique(ns.feature_map[:, 2])
-        ns.n_entities = len(self.items) + len(ns.entity_list)
-        ns.n_nodes = ns.n_entities + len(self.users)
-        # user e item mappati automaticamente in dataset
-        ns.private_relations = {p[0] + 1: f for p, f in list(np.ndenumerate(ns.relations))} # npden = lista con indice valore: [ ((0,), 1),  ((1,), 7)]
-        ns.public_relations = {v: k for k, v in ns.private_relations.items()}
-        ns.private_objects = {p + len(self.items): f for p, f in list(enumerate(ns.entity_list))}  #solo per entità != item
-        ns.public_objects = {v: k for k, v in ns.private_objects.items()}
-        return ns
-
-    def read_triplets(self, file_name):
-        return reader.read_tabular(
-            path=file_name,
+        self._map = self.reader.read_tabular(
+            path=self.attribute_file,
             header=self._reader_config.header,
-            sep=self._reader_config.sep
+            sep=self._reader_config.sep,
+            encoding=self._reader_config.encoding
         )
-        # return np.array(kg)
+
+        self._entities = set(self._map.values[:, 0]) | set(self._map.values[:, 2])
+        self.items = self.items & self._entities
+        self._entity_list = self._entities - self.items
+
+    def filter(self, users, items):
+        super().filter(users, items)
+        self._map = self._map[self._map[self._map.columns[0]].isin(self.items)]
+
+        self._entities = set(self._map.values[:, 0]) | set(self._map.values[:, 2])
+        self.items = self.items & self._entities
+        self._entity_list = self._entities - self.items
+
+    def load(self) -> Dict[str, GraphPayload]:
+        """Return the KG triples in the canonical `GraphPayload` encoding: parallel
+        (head, relation, tail) int-id arrays plus an `entity2id`/`relation2id` index,
+        normalizing this loader's pandas-DataFrame-of-raw-ids representation: items are
+        indexed first, then the remaining non-item entities (offset by `len(items)`).
+        """
+        heads_raw = self._map.values[:, 0]
+        relations_raw = self._map.values[:, 1]
+        tails_raw = self._map.values[:, 2]
+
+        items_sorted = sorted(self.items)
+        entity_list_sorted = sorted(self._entity_list)
+        entity2id = {e: i for i, e in enumerate(items_sorted)}
+        entity2id.update({e: i + len(items_sorted) for i, e in enumerate(entity_list_sorted)})
+
+        relations_sorted = sorted(set(relations_raw.tolist()))
+        # Offset by 1, reserving relation id 0.
+        relation2id = {r: i + 1 for i, r in enumerate(relations_sorted)}
+
+        heads = np.array([entity2id[h] for h in heads_raw], dtype=np.int64)
+        tails = np.array([entity2id[t] for t in tails_raw], dtype=np.int64)
+        relations = np.array([relation2id[r] for r in relations_raw], dtype=np.int64)
+
+        item_entity_map = {item: entity2id[item] for item in items_sorted}
+
+        payload = GraphPayload(
+            heads=heads,
+            relations=relations,
+            tails=tails,
+            entity2id=entity2id,
+            relation2id=relation2id,
+            item_entity_map=item_entity_map,
+        )
+        return {"kg_triples": payload}

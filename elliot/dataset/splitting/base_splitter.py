@@ -78,6 +78,7 @@ class Splitter:
         self.logger = elog.get_logger(self.__class__.__name__, seed=random_seed)
         self.writer = Writer(self.logger)
 
+        # Initializing variables
         self.data = data
         self.splitting_config = splitting_config
         self.has_real_timestamps = has_real_timestamps

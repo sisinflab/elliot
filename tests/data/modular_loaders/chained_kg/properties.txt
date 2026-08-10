@@ -1,0 +1,3 @@
+# predicates ChainedKG keeps when `additive: true` (threshold-filters the rest)
+genre
+director

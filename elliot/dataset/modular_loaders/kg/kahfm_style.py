@@ -1,112 +1,115 @@
+from typing import List, Dict, Any, Optional
 from collections import Counter
-from types import SimpleNamespace
-import typing as t
 
 from elliot.dataset.modular_loaders.abstract_loader import AbstractLoader
+from elliot.dataset.modular_loaders.build import raw_feature_map_to_embedding_payload
+from elliot.dataset.modular_loaders.formats import EmbeddingPayload
+from elliot.utils.enums import EntityAxis
+from elliot.utils.registry import side_info_registry
 
 
+@side_info_registry.register(
+    provides="item_features",
+    format="embedding",
+    entity_axis={"item_features": EntityAxis.ITEM}
+)
 class ChainedKG(AbstractLoader):
-    def __init__(self, users: t.Set, items: t.Set, ns: SimpleNamespace, logger: object):
-        self.logger = logger
-        self.attribute_file = getattr(ns, "map", None)
-        self.feature_file = getattr(ns, "features", None)
-        self.properties_file = getattr(ns, "properties", None)
-        self.additive = getattr(ns, "additive", True)
-        self.threshold = getattr(ns, "threshold", 10)
-        self.users = users
-        self.items = items
-        
-        if (self.attribute_file is not None) & (self.feature_file is not None) & (self.properties_file is not None):
-            self.map_ = self.load_attribute_file(self.attribute_file)
-            self.feature_names = self.load_feature_names(self.feature_file)
-            self.properties = self.load_properties(self.properties_file)
-            self.map_ = self.reduce_attribute_map_property_selection(self.map_, self.items, self.feature_names, self.properties, self.additive, self.threshold)
-            self.items = self.items & set(self.map_.keys())
+    """Categorical item features from a KG already flattened, outside Elliot, into a
+    plain `item -> [feature id, ...]` map plus a `feature id -> predicate URI` lookup
+    (used to filter features by predicate, via `properties`). For loading straight
+    from raw `(subject, predicate, object)` KG triples instead, see `KAHFMLoader`.
+    """
 
-    def get_mapped(self):
-        return self.users, self.items
+    map: str
+    features: str
+    properties: Optional[str] = None
+    additive: bool = True
+    threshold: int = 10
+
+    def __init__(self, **params):
+        super().__init__(**params)
+
+        # Initializing variables
+        self._map: Dict[int, List[int]] = {}
+        self._feature_names: Dict[int, Any] = {}
+        self._property_list: List[str] = []
+
+        self._map = self.reader.read_key_value_lines(
+            path=self.map,
+            sep=self._reader_config.sep,
+            encoding=self._reader_config.encoding,
+            key_fn=int,
+            value_fn=lambda rest: list(set([int(x) for x in rest]))
+        )
+
+        def _value_fn(rest):
+            pattern = rest[0].split('><')
+            pattern[0] = pattern[0][1:]
+            pattern[-1] = pattern[-1][:-1]
+            return pattern
+
+        self._feature_names = self.reader.read_key_value_lines(
+            path=self.features,
+            sep=self._reader_config.sep,
+            encoding=self._reader_config.encoding,
+            key_fn=int,
+            value_fn=_value_fn
+        )
+        if self.properties is not None:
+            self._property_list = self.reader.read_lines(
+                path=self.properties,
+                encoding=self._reader_config.encoding,
+                skip_fn=lambda line: line.startswith("#")
+            )
+
+        self._map = self.reduce_attribute_map_property_selection()
+
+        self.items = self.items & set(self._map.keys())
 
     def filter(self, users, items):
-        self.users = self.users & users
-        self.items = self.items & items
-        self.map_ = {k: v for k, v in self.map_.items() if k in self.items}
+        super().filter(users, items)
+        self._map = {k: v for k, v in self._map.items() if k in self.items}
+        self._map = self.reduce_attribute_map_property_selection()
+        self.items = self.items & set(self._map.keys())
 
-        self.map_ = self.reduce_attribute_map_property_selection(self.map_, self.items, self.feature_names,
-                                                                 self.properties, self.additive, self.threshold)
-        self.items = self.items & set(self.map_.keys())
-
-    def create_namespace(self):
-        ns = SimpleNamespace()
-        ns.__name__ = "ChainedKG"
-        ns.object = self
-        ns.feature_map = self.map_
-        ns.features = list({f for i in self.items for f in ns.feature_map[i]})
-        ns.nfeatures = len(ns.features)
-        ns.private_features = {p: f for p, f in enumerate(ns.features)}
-        ns.public_features = {v: k for k, v in ns.private_features.items()}
-        return ns
-
-    def load_attribute_file(self, attribute_file, separator='\t'):
-        map = {}
-        with open(attribute_file) as file:
-            for line in file:
-                line = line.split(separator)
-                int_list = [int(i) for i in line[1:]]
-                map[int(line[0])] = list(set(int_list))
-        return map
-
-    def load_item_set(self, ratings_file, separator='\t', itemPosition=1):
-        s = set()
-        with open(ratings_file) as file:
-            for line in file:
-                line = line.split(separator)
-                s.add(int(line[itemPosition]))
-        return s
-
-    def load_feature_names(self, infile, separator='\t'):
-        feature_names = {}
-        with open(infile, encoding='utf-8') as file:
-            for line in file:
-                line = line.split(separator)
-                pattern = line[1].split('><')
-                pattern[0] = pattern[0][1:]
-                pattern[len(pattern) - 1] = pattern[len(pattern) - 1][:-2]
-                feature_names[int(line[0])] = pattern
-        return feature_names
-
-    def load_properties(self, properties_file):
-        properties = []
-        with open(properties_file) as file:
-            for line in file:
-                if line[0] != '#':
-                    properties.append(line.rstrip("\n"))
-        return properties
-
-    def reduce_attribute_map_property_selection(self, map, items, feature_names, properties, additive, threshold = 10):
-
+    def reduce_attribute_map_property_selection(self):
         acceptable_features = set()
-        if not properties:
-            acceptable_features.update(feature_names.keys())
+        if not self._property_list:
+            acceptable_features.update(self._feature_names.keys())
         else:
-            for feature in feature_names.items():
-                if additive:
-                    if feature[1][0] in properties:
+            for feature in self._feature_names.items():
+                if self.additive:
+                    if feature[1][0] in self._property_list:
                         acceptable_features.add(int(feature[0]))
                 else:
-                    if feature[1][0] not in properties:
+                    if feature[1][0] not in self._property_list:
                         acceptable_features.add(int(feature[0]))
 
-        self.logger.info(f"Acceptable Features:\t{len(acceptable_features)}\tMapped items:\t{len(map)}")
+        self.logger.info(
+            f"Acceptable Features:\t{len(acceptable_features)}\t"
+            f"Mapped items:\t{len(self._map)}"
+        )
 
-        nmap = {k: v for k, v in map.items() if k in items}
+        nmap = {k: v for k, v in self._map.items() if k in self.items}
 
-        feature_occurrences_dict = Counter([x for xs in nmap.values() for x in xs  if x in acceptable_features])
-        features_popularity = {k: v for k, v in feature_occurrences_dict.items() if v > threshold}
+        feature_occurrences_dict = Counter([
+            x for xs in nmap.values() for x in xs
+            if x in acceptable_features
+        ])
+        features_popularity = {
+            k: v for k, v in feature_occurrences_dict.items() if v > self.threshold
+        }
 
         self.logger.info(f"Features above threshold:\t{len(features_popularity)}")
 
-        new_map = {k:[value for value in v if value in features_popularity.keys()] for k,v in nmap.items()}
-        new_map = {k:v for k,v in new_map.items() if len(v)>0}
+        new_map = {
+            k: [value for value in v if value in features_popularity.keys()]
+            for k, v in nmap.items()
+        }
+        new_map = {k: v for k, v in new_map.items() if len(v) > 0}
         self.logger.info(f"Final #items:\t{len(new_map.keys())}")
 
         return new_map
+
+    def load(self) -> Dict[str, EmbeddingPayload]:
+        return {"item_features": raw_feature_map_to_embedding_payload(self._map, self.items)}

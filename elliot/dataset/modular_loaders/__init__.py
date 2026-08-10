@@ -5,18 +5,29 @@ from .kg import (
     KAHFMLoader,
     KGCompletion,
     KGFlexLoader,
-    KGINLoader,
     KGINTSVLoader,
-    KGRec
 )
 from .textual import (
-    AspectsAttribute,
     TextualAttribute,
-    TextualAttributeSequence,
     InteractionsTextualAttributes,
-    SentimentInteractionsTextualAttributes,
-    SentimentInteractionsTextualAttributesUUII,
     WordsTextualAttributes,
-    WordsTextualAttributesPreprocessed
 )
 from .visual import VisualAttribute
+from .cache import SideInformation
+
+__all__ = [
+    "AbstractLoader",
+    "ItemAttributes",
+    "ItemItem",
+    "UserUser",
+    "ChainedKG",
+    "KAHFMLoader",
+    "KGCompletion",
+    "KGFlexLoader",
+    "KGINTSVLoader",
+    "InteractionsTextualAttributes",
+    "WordsTextualAttributes",
+    "TextualAttribute",
+    "VisualAttribute",
+    "SideInformation"
+]

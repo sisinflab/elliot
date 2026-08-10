@@ -1,0 +1,15 @@
+1990s	country	JP
+2010s	decade	1990s
+2020s	country	JP
+ActB	decade	2010s
+ActC	country	FR
+ActE	decade	2000s
+Action	actor	ActE
+Comedy	genre	Thriller
+DirA	director	DirD
+DirE	genre	Comedy
+Drama	country	IT
+FR	genre	Thriller
+IT	decade	2010s
+Romance	actor	ActE
+UK	genre	Drama

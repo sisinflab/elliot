@@ -1,43 +1,47 @@
-from typing import Tuple, Set
-from types import SimpleNamespace
+from typing import Dict, Any
 
 from elliot.dataset.modular_loaders.abstract_loader import AbstractLoader
+from elliot.dataset.modular_loaders.build import (
+    pairwise_ids_from_raw,
+    pairwise_raw_to_embedding_payload,
+    public_id_map
+)
+from elliot.dataset.modular_loaders.formats import EmbeddingPayload
+from elliot.utils.enums import EntityAxis
 from elliot.utils.registry import side_info_registry
 
 
 @side_info_registry.register(
-    name="ItemItem",
     provides="item_features",
-    format="sparse"
+    format="embedding",
+    entity_axis={"item_similarity": EntityAxis.ITEM}
 )
 class ItemItem(AbstractLoader):
     interactions_ii: str
 
     def __init__(self, **params):
         super().__init__(**params)
-        self.item_mapping = {}
-        self.user_mapping = {}
 
-    def get_mapped(self) -> Tuple[Set[int], Set[int]]:
-        return self.users, self.items
+        # Initializing variables
+        self._raw: Dict[str, Any] = {}
 
-    def filter(self, users: Set[int], items: Set[int]):
-        self.users = self.users & users
-        self.items = self.items & items
+        self._raw = self.reader.read_json(
+            path=self.interactions_ii,
+            encoding=self._reader_config.encoding
+        )
 
-    def create_namespace(self) -> SimpleNamespace:
-        ns = SimpleNamespace()
-        ns.__name__ = self.name
-        ns.object = self
-        return ns
+        self.items = self.items & pairwise_ids_from_raw(self._raw)
 
     def get_all_features(self, public_items):
-        int_sim = self.reader.read_json(self.interactions_ii)
-
         rows_ii, cols_ii = [], []
-        for k, v in int_sim.items():
+        for k, v in self._raw.items():
             for val in v:
                 rows_ii.append(public_items[k if not k.isdigit() else int(k)])
                 cols_ii.append(public_items[val])
 
         return rows_ii, cols_ii
+
+    def load(self) -> Dict[str, EmbeddingPayload]:
+        id_map = public_id_map(self.items)
+        payload = pairwise_raw_to_embedding_payload(self._raw, id_map)
+        return {"item_similarity": payload}

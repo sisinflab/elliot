@@ -20,7 +20,7 @@ from elliot.utils import logging as logging_project
 from elliot.utils import set_device
 from elliot.utils import wandb_logger
 from elliot.utils.callback import CallbackManager
-from elliot.utils.registry import callback_registry
+from elliot.utils.registry import callback_registry, model_registry
 
 print(u'''
 
@@ -92,6 +92,17 @@ def run_experiment(config_path: str = "", config_overrides: Optional[List[str]] 
         res_handler = ResultHandler(config=config)
 
         all_trials = {}
+
+        # Precompute, for every side-info loader, how many of the models configured
+        # for this run declare it via `_loaders` -- `marked_as_done()` below decrements
+        # this per model once it's done with every one of its folds, so a loader's
+        # cached payload is released as soon as (and only once) nothing else in the
+        # run still needs it. Safe now that `loader.side_information` is a single
+        # object shared across every fold rather than replicated per fold.
+        if loader.side_information:
+            loader.side_information.mapped_uses(
+                model_registry.get_class(model_name) for model_name in config.models
+            )
 
         for model_name, model_config in config.models.items():
             wandb_logger.start_model_run(config, model_name, logger)
@@ -212,6 +223,14 @@ def run_experiment(config_path: str = "", config_overrides: Optional[List[str]] 
                     all_trials[model_name] = all_trials[model_name][min_val]
 
             finally:
+                # Runs whether the model succeeded or errored out: this model won't
+                # touch side info again regardless, so its share of every loader it
+                # declared is released here unconditionally.
+                if loader.side_information:
+                    for loader_name in model.loaders:
+                        if loader_name in loader.side_information:
+                            loader.side_information.marked_as_done(loader_name)
+
                 wandb_logger.finish_model_run(logger)
 
         # NOTE: to be discussed

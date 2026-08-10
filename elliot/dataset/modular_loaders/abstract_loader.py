@@ -1,20 +1,17 @@
 from typing import Tuple, Dict, Optional, Set
-from types import SimpleNamespace
 from logging import LoggerAdapter
-import copy
-import logging
-import sys
-from packaging import version
 from abc import ABC, abstractmethod
 
 from elliot.namespace import SideInformationConfig
+from elliot.dataset.modular_loaders.formats import Payload
 from elliot.utils import logging as elog
-from elliot.utils.enums import AlignmentMode, Materialization
+from elliot.utils.enums import AlignmentMode, EntityAxis, Materialization
 from elliot.utils.read import Reader
 
 
 class AbstractLoader(ABC):
     provides: str  # e.g., "item_features", "user_features", "kg_edges"
+    entity_axis: Dict[str, EntityAxis] = {}
     format: str  # e.g., "sparse", "dense", "graph"
     dims: Optional[int] = None
     alignment: AlignmentMode = AlignmentMode.DROP
@@ -27,8 +24,12 @@ class AbstractLoader(ABC):
         users: Set,
         items: Set,
         ns: SideInformationConfig,
-        logger: LoggerAdapter = None
+        logger: Optional[LoggerAdapter] = None
     ):
+        """Pure configuration step -- no I/O. `users`/`items` are the *unfiltered* base
+        universe; `discover()` (called explicitly, once, right after construction) is
+        what actually narrows them down to this loader's own domain.
+        """
         self.logger = logger or elog.get_logger(self.__class__.__name__)
         self.reader = Reader(self.logger)
 
@@ -47,33 +48,58 @@ class AbstractLoader(ABC):
             if name in self.__class__.__annotations__:
                 setattr(self, name, val)
 
-    @abstractmethod
     def get_mapped(self) -> Tuple[Set[int], Set[int]]:
-        raise NotImplementedError()
+        """Report this loader's current id domain, as narrowed by `discover()`/
+        `filter()`. The default -- just `self.users`/`self.items` -- is correct for
+        every loader that keeps no other id-keyed state; override only if some other
+        attribute (a raw triples table, a derived feature map, ...) is the real source
+        of truth for the domain and could disagree with `self.users`/`self.items`.
+        """
+        return self.users, self.items
+
+    def filter(self, users: Set[int], items: Set[int]) -> None:
+        """Narrow `self.users`/`self.items` down to the given sets, in place. Called
+        exactly once, globally, by `DataSetLoader._intersect_users_items()` -- before
+        any `DataSet`/fold exists and before this loader is ever shared across owners.
+        Never call this per fold: with a single `SideInformation` shared by reference
+        across every fold, mutating a loader here would corrupt it for every other
+        fold/owner still holding it. Per-fold scoping instead happens non-destructively
+        in `load()`.
+
+        The default just intersects `self.users`/`self.items`. Override it -- calling
+        `super().filter(users, items)` first -- only when some other attribute set up in
+        `discover()` (a raw triples table, a derived feature map, ...) also needs to be
+        narrowed down to stay consistent with the new `self.users`/`self.items`.
+        """
+        self.users = self.users & users
+        self.items = self.items & items
 
     @abstractmethod
-    def filter(self, users: Set[int], items: Set[int]):
+    def load(self) -> Dict[str, Payload]:
+        """Materialize this loader's heavy payload into one (or more, named) of the
+        three canonical formats (`EmbeddingPayload`/`TextPayload`/`GraphPayload`, see
+        `elliot.dataset.modular_loaders.formats`), for this loader's full current
+        `self.users`/`self.items` domain (the whole cross-loader-intersected universe,
+        after `discover()`/`filter()`). The only place allowed to do the genuinely
+        expensive work (sparse-matrix/feature-index construction, `.npy` materialization,
+        ...).
+
+        Called at most once for the whole experiment: `SideInformation.get_payload()`
+        caches the result and hands the identical object to every fold/owner that asks
+        for it. Callers that need a subset (e.g. one batch's users/items) slice the
+        returned payload themselves via `elliot.dataset.modular_loaders.adapters`
+        (`embedding_to_dense(payload, ids=...)`, ...) -- this method never produces a
+        per-caller copy.
+        """
         raise NotImplementedError()
 
-    @abstractmethod
-    def create_namespace(self) -> SimpleNamespace:
-        raise NotImplementedError()
-
-    # if version.parse(sys.version.split()[0]) < version.parse("3.8"):
-    #     _version_warning = (
-    #         "WARNING: Your Python version is lower than 3.8. Consequently, "
-    #         "Custom class objects created in Side Information Namespace will be created shallowly."
-    #     )
-    #     logging.getLogger(__name__).warning(_version_warning)
-    #
-    #     def __deepcopy__(self, memo = {}):
-    #         self.logger.warning(self._version_warning)
-    #         newself = object.__new__(self.__class__)
-    #         for method_name in dir(self.__class__):
-    #             newself.__dict__[method_name] = getattr(self, method_name)
-    #         for attribute_name, attribute_value in self.__dict__.items():
-    #             if attribute_value.__class__.__module__ == "builtins":
-    #                 newself.__dict__[attribute_name] = copy.deepcopy(attribute_value)
-    #             else:
-    #                 newself.__dict__[attribute_name] = attribute_value
-    #         return newself
+    def unload(self) -> None:
+        """Optional hook: drop any large intermediate structures this loader itself
+        keeps around after `load()`'s result has been consumed elsewhere. Default is a
+        no-op. Called by `SideInformation.marked_as_done()` once every model that
+        declared this loader has finished every one of its folds -- unlike
+        `forget_side_info()` (which only drops one owner's own reference to the shared
+        payload), this is the point where it's actually safe to release the payload for
+        good, since nothing else in the experiment still needs it.
+        """
+        pass
