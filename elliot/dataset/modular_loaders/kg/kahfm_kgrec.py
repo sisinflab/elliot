@@ -1,4 +1,4 @@
-from typing import List, Dict, Optional
+from typing import Any, Dict, List, Optional, Set
 import pandas as pd
 
 from elliot.dataset.modular_loaders.abstract_loader import AbstractLoader
@@ -28,7 +28,7 @@ class KAHFMLoader(AbstractLoader):
     additive: bool = True
     threshold: float = 1.0
 
-    def __init__(self, **params):
+    def __init__(self, **params: Any):
         super().__init__(**params)
 
         # Initializing variables
@@ -43,6 +43,7 @@ class KAHFMLoader(AbstractLoader):
             value_fn=lambda rest: rest[0]
         )
 
+        # Optional predicate whitelist/blacklist for feature selection
         property_list: List[str] = []
         if self.properties is not None:
             property_list = self.reader.read_lines(
@@ -51,6 +52,7 @@ class KAHFMLoader(AbstractLoader):
                 skip_fn=lambda line: line.startswith("#")
             )
 
+        # Load and merge every configured KG split into one triples table
         train_triples = self.reader.read_triples(
             path=self.kg_train,
             sep=self._reader_config.sep,
@@ -75,6 +77,7 @@ class KAHFMLoader(AbstractLoader):
         self._triples = pd.concat([train_triples, dev_triples, test_triples])
         del train_triples, dev_triples, test_triples
 
+        # Keep only (additive) or drop (subtractive) triples matching the property list
         if property_list:
             if self.additive:
                 self._triples = self._triples[self._triples["predicate"].isin(property_list)]
@@ -83,17 +86,32 @@ class KAHFMLoader(AbstractLoader):
 
         self.filter_triples()
 
+        # Narrow the item domain to those with a KG entity mapping
         self.items = self.items & set(self._entity_mapping.keys())
 
-    def filter(self, users, items):
+    def filter(self, users: Set[Any], items: Set[Any]):
+        """See `AbstractLoader.filter`. Also drops entity-mapping entries outside the
+        new `items` domain and re-filters `self._triples` accordingly.
+
+        Args:
+            users (Set[Any]): The narrowed users domain.
+            items (Set[Any]): The narrowed items domain.
+        """
         super().filter(users, items)
         self._entity_mapping = {k: v for k, v in self._entity_mapping.items() if k in items}
         self.filter_triples()
         self.items = self.items & set(self._entity_mapping.keys())
 
     def filter_triples(self):
+        """Narrow `self._triples` down to rows whose `uri` is a mapped item, then
+        threshold-filter `(predicate, object)` features by the fraction of mapped
+        items they cover, dropping entity-mapping entries left with no triples.
+        """
+        # Keep only triples about items we actually have an entity mapping for
         self._triples = self._triples[self._triples["uri"].isin(self._entity_mapping.values())]
         n_mapped_subjects = self._triples["uri"].nunique()
+
+        # Drop (predicate, object) features whose coverage gap exceeds the threshold
         self._triples = (
             self._triples
             .groupby(["predicate", "object"])
@@ -104,12 +122,20 @@ class KAHFMLoader(AbstractLoader):
         self.logger.info(
             f"Filtering operation: KAHFM Mapped items:\t{len(self.items)}"
         )
+
+        # Drop entity-mapping entries that lost every one of their triples
         self._entity_mapping = {
             k: v for k, v in self._entity_mapping.items()
             if v in mapped_items
         }
 
     def load(self) -> Dict[str, EmbeddingPayload]:
+        """Build the `item_features` payload: every distinct `(predicate, object)`
+        pair observed in `self._triples` becomes one feature id.
+
+        Returns:
+            Dict[str, EmbeddingPayload]: The `item_features` payload.
+        """
         inverted_mapping = {v: k for k, v in self._entity_mapping.items()}
         feature_list = list(
             self._triples
@@ -121,6 +147,7 @@ class KAHFMLoader(AbstractLoader):
             f"Mapped items:\t{len(self.items)}"
         )
 
+        # Assign a contiguous feature index to every distinct (predicate, object) pair
         feature_index = {k: p for p, k in enumerate(feature_list)}
         self._triples["idx_feature"] = (
             self._triples[["predicate", "object"]]
@@ -128,6 +155,8 @@ class KAHFMLoader(AbstractLoader):
             .index.map(feature_index)
         )
         map_ = self._triples.groupby("uri")["idx_feature"].apply(list).to_dict()
+
+        # Translate the map's keys back from KG uri to item id
         map_ = {
             inverted_mapping[k]: v for k, v in map_.items()
             if k in inverted_mapping.keys()

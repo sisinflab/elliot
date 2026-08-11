@@ -1,4 +1,4 @@
-from typing import List, Dict, Literal, Optional, Union
+from typing import Dict, Literal, List, Optional, Union
 from pydantic import Field, field_validator, model_validator
 
 from elliot.namespace.common import BaseConfig, normalize_ext, get_default_value

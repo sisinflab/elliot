@@ -1,4 +1,4 @@
-from typing import TypeVar, Dict, Type, Optional, Callable, List, Generic, TYPE_CHECKING, Tuple, Any
+from typing import Any, Callable, Dict, Generic, List, Optional, Tuple, Type, TypeVar, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from elliot.dataset.modular_loaders import AbstractLoader

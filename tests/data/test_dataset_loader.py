@@ -455,6 +455,66 @@ class TestSequenceProcessing:
         assert "sessionId" not in df.columns
         assert "timestamp" in df.columns
 
+    def test_fixed_with_real_timestamp_segments_sessions(self):
+        config = {
+            "dataset": "fixed_strategy_session_gap",
+            "data_config": {
+                "strategy": "fixed",
+                "data_folder": data_folder,
+                "session_strategy": "session_only",
+                "reader": {"header": True}
+            }
+        }
+
+        loader = get_loader(config)
+        _, train, test = loader.dataframe[0]
+
+        assert loader.has_real_timestamps is True
+
+        u1_train = train[train["userId"] == "1"].sort_values("timestamp")
+        assert list(u1_train["sessionId"]) == [0, 0, 0, 1, 1, 1]
+        u2_train = train[train["userId"] == "2"]
+        assert u2_train["sessionId"].nunique() == 1
+
+        u1_test = test[test["userId"] == "1"]
+        assert u1_test["sessionId"].nunique() == 1
+        u2_test = test[test["userId"] == "2"].sort_values("timestamp")
+        assert list(u2_test["sessionId"]) == [0, 0, 1]
+
+    def test_hierarchy_with_real_timestamp_segments_sessions(self):
+        config = {
+            "dataset": "hierarchy_strategy_session_gap",
+            "data_config": {
+                "strategy": "hierarchy",
+                "data_folder": data_folder,
+                "session_strategy": "session_only",
+                "reader": {"header": True}
+            }
+        }
+
+        folds, train, test = load_data(config)[0]
+
+        assert folds == []
+        u1_train = train[train["userId"] == "1"].sort_values("timestamp")
+        assert list(u1_train["sessionId"]) == [0, 0, 0, 1, 1, 1]
+        u2_test = test[test["userId"] == "2"].sort_values("timestamp")
+        assert list(u2_test["sessionId"]) == [0, 0, 1]
+
+    def test_fixed_without_session_only_gets_no_session_column(self):
+        config = {
+            "dataset": "fixed_strategy_session_gap",
+            "data_config": {
+                "strategy": "fixed",
+                "data_folder": data_folder,
+                "reader": {"header": True}
+            }
+        }
+
+        _, train, test = load_data(config)[0]
+
+        assert "sessionId" not in train.columns
+        assert "sessionId" not in test.columns
+
 
 if __name__ == '__main__':
     pytest.main()

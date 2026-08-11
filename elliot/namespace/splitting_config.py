@@ -36,7 +36,6 @@ class SplittingSingleConfig(BaseConfig):
             SplittingSingleConfig: The object itself.
         """
         match self.strategy:
-
             case SplittingStrategy.FIXED_TS:
                 pass
 

@@ -1,4 +1,4 @@
-from typing import List, Tuple, Any, Optional, Union, TYPE_CHECKING, Dict
+from typing import Any, Dict, List, Optional, Tuple, Union, TYPE_CHECKING
 import pandas as pd
 
 if TYPE_CHECKING:

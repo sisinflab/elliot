@@ -1,4 +1,5 @@
-from typing import Dict, Tuple
+from typing import Any, Dict, Tuple
+import numpy as np
 import pandas as pd
 
 from elliot.dataset.modular_loaders.abstract_loader import AbstractLoader
@@ -20,14 +21,14 @@ from elliot.utils.registry import side_info_registry
 class InteractionsTextualAttributes(AbstractLoader):
     """One precomputed dense feature vector per *interaction* (e.g. a review-text
     embedding), read from a folder of `.npy` files keyed by a per-interaction id (the
-    3rd column of `interactions`) -- unlike `TextualAttribute`, this loader's row
+    3rd column of `interactions`) - unlike `TextualAttribute`, this loader's row
     identity is the `(user, item)` pair.
     """
 
     interaction_ids: str
     interaction_features: str
 
-    def __init__(self, **params):
+    def __init__(self, **params: Any):
         super().__init__(**params)
 
         # Initializing variables
@@ -41,33 +42,42 @@ class InteractionsTextualAttributes(AbstractLoader):
             encoding=self._reader_config.encoding
         )
 
+        # Sniff the per-interaction feature shape from one sample file
         feature_files = self.reader.read_folder(
             folder=self.interaction_features,
             ext=".npy"
         )
         self._interactions_features_shape = self.reader.peek_npy_shape(feature_files[0])
 
+        # Narrow the user/item domain to those actually referenced in an interaction
         self.users = self.users & set(self._interactions_df[0].unique().tolist())
         self.items = self.items & set(self._interactions_df[1].unique().tolist())
 
-    def get_all_features(self):
+    def get_all_features(self) -> np.ndarray:
+        """Dense `(n_interactions, dim)` matrix of interaction features, read through
+        `load()` so it honors `self.materialization`.
+
+        Returns:
+            np.ndarray: The dense interaction-features matrix.
+        """
         return embedding_to_dense(self.load()["interaction_features"])
 
     def load(self) -> Dict[str, EmbeddingPayload]:
         """Build the per-interaction `EmbeddingPayload` via the shared
         `rows_to_embedding_payload` dispatch (honors `self.materialization` there, not
-        here). Row identity is the `(user, item)` pair (`id_map`/`row_ids`), but the
-        actual filename each row is read from is this interaction's own id (the 3rd
-        `interactions` column, looked up per pair via `key_by_pair`) -- the two id
-        schemes are unrelated, so this can't reuse `npy_folder_to_embedding_payload`
-        (which assumes both coincide), only the dispatch it itself builds on.
+        here).
+
+        Returns:
+            Dict[str, EmbeddingPayload]: The `interaction_features` payload.
         """
+        # Keep only interactions whose user and item are both in the current domain
         all_interactions = self._interactions_df
         active = (all_interactions[
             all_interactions[0].isin(self.users) & all_interactions[1].isin(self.items)
         ])
         active = active.sort_values(by=[0, 1]).reset_index(drop=True)
 
+        # Row identity is the (user, item) pair; the filename is this interaction's own id
         row_ids = list(zip(active[0].tolist(), active[1].tolist()))
         id_map = {pair: idx for idx, pair in enumerate(row_ids)}
         key_by_pair = dict(zip(row_ids, active[2].tolist()))

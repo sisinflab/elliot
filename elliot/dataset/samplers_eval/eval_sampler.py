@@ -1,4 +1,4 @@
-from typing import Tuple, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 import bisect
 import random
 import numpy as np
@@ -13,7 +13,18 @@ from elliot.utils.read import Reader
 from elliot.utils.write import Writer
 
 
-def _zero_intervals(n_cols, nnz_sorted):
+def _zero_intervals(n_cols: int, nnz_sorted: List[int]) -> List[Tuple[int, int]]:
+    """Compute the maximal `[start, end]` column intervals not covered by the
+    sorted, already-present column indices `nnz_sorted`, over a row of width `n_cols`.
+
+    Args:
+        n_cols (int): Total number of columns in the row.
+        nnz_sorted (List[int]): Sorted column indices already present (excluded) in
+            the row.
+
+    Returns:
+        List[Tuple[int, int]]: The maximal zero (candidate) intervals, in column order.
+    """
     intervals = []
     prev = -1
     for c in nnz_sorted:
@@ -37,15 +48,18 @@ class NegativeSampler:
     - `fixed`: Uses negative items provided in an external file.
 
     Args:
-        neg_sampling_config (NegativeSamplingConfig): Configuration object containing negative sampling parameters.
-        mappings (Tuple[dict, dict]): User and item mappings from public ids to internal indices.
-        inv_mappings (Tuple[List[str], List[str]]): Inverse mappings from internal indices
-            to public user and item ids.
+        neg_sampling_config (NegativeSamplingConfig): Configuration object containing
+            negative sampling parameters.
+        mappings (Tuple[Dict[Any, int], Dict[Any, int]]): (user, item) mappings from
+            public ids to private indices.
+        inv_mappings (Tuple[List[Any], List[Any]]): Inverse (user, item) mappings from
+            private indices back to public ids.
         num_users (int): Total number of users.
         num_items (int): Total number of items.
-        train_pos_items (List[int]): Positive item indices per user in the training set.
-        eval_pos_items (List[int]): Positive item indices per user in the evaluation set.
-        evaluation_set (str): Evaluation set name. Defaults to "test".
+        train_pos_items (List[List[int]]): Positive item indices per user in the training set.
+        eval_pos_items (List[List[int]]): Positive item indices per user in the evaluation set.
+        evaluation_set (str): Name of this fold's eval split ("test" or "validation").
+            Defaults to "test".
         fold_index (Tuple[int, Optional[int]]): Tuple containing the complete fold index.
         random_seed (int): Random seed for reproducibility. Defaults to 42.
 
@@ -67,8 +81,8 @@ class NegativeSampler:
     def __init__(
         self,
         neg_sampling_config: NegativeSamplingConfig,
-        mappings: Tuple[dict, dict],
-        inv_mappings: Tuple[List[str], List[str]],
+        mappings: Tuple[Dict[Any, int], Dict[Any, int]],
+        inv_mappings: Tuple[List[Any], List[Any]],
         num_users: int,
         num_items: int,
         train_pos_items: List[List[int]],
@@ -80,6 +94,7 @@ class NegativeSampler:
         self.reader = Reader()
         self.writer = Writer()
 
+        # Initializing variables
         self.neg_sampling_config = neg_sampling_config
         self.fold_index = fold_index
 
@@ -89,14 +104,15 @@ class NegativeSampler:
         self._num_users = num_users
         self._num_items = num_items
 
-        self.merged_pos_items = self._merge_positives(train_pos_items, eval_pos_items)
         self._evaluation_set = evaluation_set
+
+        self.merged_pos_items = self._merge_positives(train_pos_items, eval_pos_items)
 
         np.random.seed(random_seed)
         random.seed(random_seed)
 
+    @staticmethod
     def _merge_positives(
-        self,
         train_pos: List[List[int]],
         eval_pos: List[List[int]]
     ) -> List[List[int]]:
@@ -264,17 +280,52 @@ class NegativeSampler:
 
 
 class NegEvalDataset(Dataset):
-    def __init__(self, num_users, sampler, eval_pos_items, evaluation_set="test", leave_one_out=False):
+    """Evaluation dataset pairing sampled negatives with the ground-truth positive(s)
+    for each user, used when `NegativeSamplingConfig` is configured (as opposed to
+    `FullEvalDataset`'s full-ranking evaluation).
+
+    Args:
+        num_users (int): Total number of users (or eval rows, for SESSION_ONLY
+            evaluation) to evaluate.
+        eval_neg_items (List[List[int]]): Negative item indices per row, already
+            sampled. Under SESSION_ONLY evaluation this is the owning user's single,
+            once-sampled negative list broadcast to every session row they own (see
+            `DataSet._get_user_negatives()`), so that FLAT and SESSION_ONLY models are
+            always scored against the same negatives.
+        eval_pos_items (List[List[int]]): Ground-truth positive item indices per user.
+        evaluation_set (str): Name of this fold's eval split ("test" or "validation").
+            Defaults to "test".
+        leave_one_out (bool): If True, only the last ground-truth positive per user is
+            kept. Defaults to False.
+    """
+
+    def __init__(
+        self,
+        num_users: int,
+        eval_neg_items: List[List[int]],
+        eval_pos_items: List[List[int]],
+        evaluation_set: str = "test",
+        leave_one_out: bool = False
+    ):
+        # Initializing variables
         self.num_users = num_users
         self.leave_one_out = leave_one_out
-        self._evaluation_set = evaluation_set
 
-        eval_neg_items = sampler.sample()
+        self._evaluation_set = evaluation_set
 
         self.eval_items = self._add_indices(eval_neg_items, eval_pos_items)
 
-    def _add_indices(self, neg, pos):
-        """Add test or validation samples to the sampled negatives."""
+    def _add_indices(self, neg: List[List[int]], pos: List[List[int]]) -> Optional[List[torch.Tensor]]:
+        """Add test or validation samples to the sampled negatives.
+
+        Args:
+            neg (List[List[int]]): Negative item indices per user.
+            pos (List[List[int]]): Ground-truth positive item indices per user.
+
+        Returns:
+            Optional[List[torch.Tensor]]: Per-user tensors of negative items followed
+                by the ground-truth positive(s), or None if `neg` is empty.
+        """
         if not neg:
             return None
 
@@ -297,14 +348,25 @@ class NegEvalDataset(Dataset):
 
         return final_items
 
-    def __len__(self):
+    def __len__(self) -> int:
         return self.num_users
 
-    def __getitem__(self, idx):
-        return idx, self.eval_items[idx]
+    def __getitem__(self, index: int) -> Tuple[int, torch.Tensor]:
+        return index, self.eval_items[index]
 
     @staticmethod
-    def collate_fn(batch):
+    def collate_fn(batch: List[Tuple[int, torch.Tensor]]) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Collate a batch of (user index, items) pairs, padding the ragged item
+        tensors to the batch's longest one.
+
+        Args:
+            batch (List[Tuple[int, torch.Tensor]]): The batch of (user index, items)
+                pairs.
+
+        Returns:
+            Tuple[torch.Tensor, torch.Tensor]: The batched user indices and the
+                padded (`-1`-filled) item tensor.
+        """
         user_indices, item_indices = zip(*batch)
 
         # User indices will be a list of ints, so we convert it
@@ -322,15 +384,34 @@ class NegEvalDataset(Dataset):
 
 
 class FullEvalDataset(Dataset):
-    def __init__(self, num_users):
+    """Full-ranking evaluation dataset: one entry per user, with no sampled
+    negatives (candidates are every item, ranked at evaluation time), used when no
+    `NegativeSamplingConfig` is configured.
+
+    Args:
+        num_users (int): Total number of users (or eval rows, for SESSION_ONLY
+            evaluation) to evaluate.
+    """
+
+    def __init__(self, num_users: int):
+        # Initializing variables
         self.num_users = num_users
 
-    def __len__(self):
+    def __len__(self) -> int:
         return self.num_users
 
-    def __getitem__(self, idx):
-        return idx
+    def __getitem__(self, index: int) -> int:
+        return index
 
     @staticmethod
-    def collate_fn(batch):
+    def collate_fn(batch: List[int]) -> Tuple[torch.Tensor, None]:
+        """Collate a batch of user indices; there is no per-user item tensor to pad.
+
+        Args:
+            batch (List[int]): The batch of user indices.
+
+        Returns:
+            Tuple[torch.Tensor, None]: The batched user indices, and `None` in place
+                of an item tensor.
+        """
         return torch.tensor(batch), None

@@ -5,7 +5,7 @@ Module description:
 
 __version__ = '0.3.1'
 
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field, model_validator, create_model
 
 from elliot.namespace.common import BaseConfig, build_fields_from_annotations
@@ -153,10 +153,10 @@ class ExperimentConfig(BaseConfig):
             is_proxy = model_name.startswith("Proxy")
             if is_proxy:
                 cls_name = "ProxyRecommender"
-                field_fn = None
+                field_type_alias = None
             else:
                 cls_name = model_name
-                field_fn = MODEL_FIELD
+                field_type_alias = MODEL_FIELD
 
             # If the model is not registered, skip it...
             if cls_name not in model_registry.all():
@@ -170,7 +170,7 @@ class ExperimentConfig(BaseConfig):
             # ...otherwise, load it
             cls = model_registry.get_class(cls_name)
 
-            fields = build_fields_from_annotations(cls, field_fn=field_fn)
+            fields = build_fields_from_annotations(cls, field_type_alias=field_type_alias)
 
             # Build recommender config dynamically
             model_config = create_model(

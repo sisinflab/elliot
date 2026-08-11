@@ -1,11 +1,6 @@
-"""
-Module description:
-
-"""
-
-import json
-from typing import List, Tuple, Dict, Any, Callable, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 from logging import LoggerAdapter
+import json
 import torch
 import pandas as pd
 from datetime import datetime
@@ -14,7 +9,13 @@ from elliot.utils.folder import check_dir, path_joiner
 from elliot.utils.logging import get_logger
 
 
-def _timestamp():
+def _timestamp() -> str:
+    """Build a filesystem-safe timestamp string for the current time, used to
+    disambiguate result/trial file names across repeated runs.
+
+    Returns:
+        str: The current time, formatted as "%Y_%m_%d_%H_%M_%S".
+    """
     return datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
 
 
@@ -35,6 +36,7 @@ class Writer:
         header: Union[bool, List[str]] = False,
         columns: Optional[List[Union[str, int]]] = None,
         sep: str = "\t",
+        encoding: Optional[str] = None,
         callback_fn: Optional[Callable] = None,
         **kwargs: Any
     ):
@@ -48,6 +50,7 @@ class Writer:
             columns (List[Union[str, int]], optional): List of column names or indices
                 to select. Defaults to None.
             sep (str): Column separator to use in the output file. Defaults to "\\t".
+            encoding (str, optional): File encoding. Defaults to None (using the platform default).
             callback_fn (Callable, optional): Function to call after writing the file. Defaults to None.
             **kwargs (Any): Additional keyword arguments passed to the `callback_fn` function.
         """
@@ -90,7 +93,7 @@ class Writer:
             )
             header = False
 
-        df.to_csv(path, sep=sep, index=False, header=header)
+        df.to_csv(path, sep=sep, index=False, header=header, encoding=encoding)
 
         self.logger.info(f"Saved: {path}")
 
@@ -106,6 +109,7 @@ class Writer:
         columns: Optional[List[str]] = None,
         sequence_sep: str = " ",
         sep: str = "\t",
+        encoding: Optional[str] = None,
         callback_fn: Optional[Callable] = None,
         **kwargs: Any
     ):
@@ -136,7 +140,8 @@ class Writer:
             columns (List[str], optional): List of column names to select. Defaults to None.
             sequence_sep (str): Separator used inside the serialized sequence string. Only
                 used when `format` is "inline". Defaults to " ".
-            sep (str, optional): Column/token separator used in the output file. Defaults to "\\t".
+            sep (str): Column/token separator used in the output file. Defaults to "\\t".
+            encoding (str, optional): File encoding. Defaults to None (using the platform default).
             callback_fn (Callable, optional): Function to call after writing the file. Defaults to None.
             **kwargs (Any): Additional keyword arguments passed to the `callback_fn` function.
 
@@ -162,7 +167,7 @@ class Writer:
         data = data.sort_values(sort_keys, kind="stable")
 
         # Collapse each group into an ordered item list (and earliest timestamp, if available)
-        agg = {"itemId": list}
+        agg: Dict[str, Any] = {"itemId": list}
         if has_timestamp:
             agg[timestamp_col] = "first"
         grouped = data.groupby(group_keys, sort=False).agg(agg).reset_index()
@@ -179,7 +184,9 @@ class Writer:
             if has_timestamp and timestamp_col in columns:
                 cols_to_use.append(timestamp_col)
 
-        # Case "wide": one ragged, sep-separated line per session
+        # Case "wide": one ragged, sep-separated line per session. Row lengths vary with
+        # each session's item count, so this cannot be delegated to `write_tabular`
+        # (which assumes a rectangular DataFrame) and is written out by hand instead.
         if format == "wide":
             # Serialize each session as the user identifier followed by its ordered items
             lines = [
@@ -198,10 +205,15 @@ class Writer:
                     lines = [header_line] + lines
 
             # Write the ragged lines directly since row lengths vary
-            with open(path, "w", encoding="utf-8") as handle:
+            with open(path, "w", encoding=encoding) as handle:
                 handle.write("\n".join(lines))
                 if lines:
                     handle.write("\n")
+
+            self.logger.info(f"Saved: {path}")
+
+            if callback_fn is not None:
+                callback_fn(grouped, **kwargs)
 
         # Case "inline": one row per session with the sequence serialized as a string
         else:
@@ -213,24 +225,17 @@ class Writer:
             if has_timestamp:
                 rows[timestamp_col] = list(grouped[timestamp_col])
 
-            df = pd.DataFrame(rows)
-            
-            # Select only the requested columns, in order
-            df = df[cols_to_use]
+            df = pd.DataFrame(rows)[cols_to_use]
 
-            # Check whether the header should be written
-            if isinstance(header, list) and len(header) != len(df.columns):
-                self.logger.warning(
-                    "`header` length does not match `data` selected columns count. Saving with no header."
-                )
-                header = False
-
-            df.to_csv(path, sep=sep, index=False, header=header)
-
-        self.logger.info(f"Saved: {path}")
-
-        if callback_fn is not None:
-            callback_fn(data, **kwargs)
+            self.write_tabular(
+                data=df,
+                path=path,
+                header=header,
+                sep=sep,
+                encoding=encoding,
+                callback_fn=callback_fn,
+                **kwargs
+            )
 
     def write_tabular_split(
         self,
@@ -248,7 +253,7 @@ class Writer:
                 a train DataFrame, and a test DataFrame.
             save_folder (str): Path to the folder where the datasets will be saved.
             ext (str): File extension for the output files. Defaults to ".tsv".
-            sequential (bool, optional): Whether each split file stores sequential interaction
+            sequential (bool): Whether each split file stores sequential interaction
                 data (see `write_sequence_tabular`) instead of plain tabular data. Defaults to False.
             **kwargs: Additional keyword arguments passed to `write_tabular` (or `write_sequence_tabular`
                 if `sequential` is True).
@@ -287,6 +292,7 @@ class Writer:
         neg_dict: Dict[str, List[str]],
         save_folder: str,
         sep: str = "\t",
+        encoding: Optional[str] = None,
         ext: str = ".tsv",
         fold_index: Tuple[int, Optional[int]] = (0, None),
         **kwargs: Any
@@ -297,8 +303,9 @@ class Writer:
             neg_dict (Dict[str, List[str]]): Dictionary containing user IDs as keys and lists of
                 negative samples as values.
             save_folder (str): Path to the folder where the output file will be saved.
-            sep (str, optional): Field separator to use in the output file. Defaults to "\\t".
-            ext (str, optional): File extension for the output file. Defaults to ".tsv".
+            sep (str): Field separator to use in the output file. Defaults to "\\t".
+            encoding (str, optional): File encoding. Defaults to None (using the platform default).
+            ext (str): File extension for the output file. Defaults to ".tsv".
             fold_index (Tuple[int, Optional[int]]): Tuple containing the complete fold index.
             **kwargs (Any): Additional keyword arguments.
         """
@@ -307,7 +314,7 @@ class Writer:
         name = f"test{fold_index[0] + 1}{suffix}_negative{ext}"
         path = path_joiner(save_folder, name)
 
-        with open(path, "w") as f:
+        with open(path, "w", encoding=encoding) as f:
             for user_id, neg_list in neg_dict.items():
                 f.write(f"{(user_id,)}{sep}" + sep.join(map(str, neg_list)) + "\n")
 
@@ -327,7 +334,7 @@ class Writer:
             obj (object): Model object to be saved.
             save_folder (str): Path to the folder where the model will be saved.
             model_name (str): Name of the model, used to generate the file name.
-            ext (str, optional): File extension for the output file. Defaults to ".pth".
+            ext (str): File extension for the output file. Defaults to ".pth".
             **kwargs (Any): Additional keyword arguments.
         """
         check_dir(save_folder)
@@ -586,6 +593,7 @@ class Writer:
         data: Any,
         path: str,
         indent: int = 2,
+        encoding: Optional[str] = None,
         **kwargs: Any
     ):
         """Write data to a JSON file.
@@ -594,9 +602,10 @@ class Writer:
             data (Any): Data to be serialized and written to the JSON file.
             path (str): Path to the output file.
             indent (int): Number of spaces to use for indentation in the JSON output. Defaults to 2.
+            encoding (str, optional): File encoding. Defaults to None.
             **kwargs (Any): Additional keyword arguments.
         """
-        with open(path, "w", encoding="utf-8") as handle:
+        with open(path, "w", encoding=encoding) as handle:
             json.dump(data, handle, indent=indent)
 
         self.logger.info(f"Saved: {path}")
@@ -619,10 +628,18 @@ def store_recommendation(
     it: Optional[int] = None,
     sep: str = "\t",
     ext: str = ".tsv"
-):
-    """
-    Store recommendation list (top-k)
-    :return:
+) -> None:
+    """Write top-k recommendations to a plain delimited file, one `user, item, score`
+    row per recommended item.
+
+    Args:
+        recommendations (dict): Dictionary where keys are user ids and values
+            are lists of (item id, score) tuples.
+        save_folder (str): Path to the folder where the file will be saved. Defaults to "".
+        model_name (str): Name of the model to use as part of the file name. Defaults to "".
+        it (int, optional): Iteration number to include in the file name. Defaults to None.
+        sep (str): Field separator to use in the output file. Defaults to "\\t".
+        ext (str): File extension for the output file. Defaults to ".tsv".
     """
     check_dir(save_folder)
 

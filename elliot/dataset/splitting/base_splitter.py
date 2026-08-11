@@ -1,4 +1,4 @@
-from typing import List, Tuple, Union, Callable
+from typing import Callable, List, Optional, Tuple, Union
 import pandas as pd
 import numpy as np
 import math
@@ -87,12 +87,12 @@ class Splitter:
 
     def process_splitting(
         self
-    ) -> List[Tuple[List[Tuple[pd.DataFrame, pd.DataFrame]], pd.DataFrame, pd.DataFrame]]:
+    ) -> List[Tuple[List[Tuple[pd.DataFrame, pd.DataFrame]], Optional[pd.DataFrame], pd.DataFrame]]:
         """Execute the configured splitting strategy (Train/Test or Train/Validation/Test).
 
         Returns:
-            List[Tuple[List[Tuple[pd.DataFrame, pd.DataFrame]], pd.DataFrame, pd.DataFrame]]:
-                A list of ([(train, val), ...], train, test) tuples.
+            List[Tuple[List[Tuple[pd.DataFrame, pd.DataFrame]], Optional[pd.DataFrame], pd.DataFrame]]:
+                A list of ([(train, val), ...], train|None, test) tuples.
         """
 
         tuple_list = self.handle_hierarchy(self.data, self.splitting_config.test_splitting)
@@ -258,8 +258,13 @@ class Splitter:
         Returns:
             Tuple[pd.DataFrame, pd.DataFrame]: The (train, test) interaction-level data.
         """
-        test_keys = set(zip(test_proxy["userId"], test_proxy["sessionId"]))
-        row_keys = pd.Series(list(zip(data["userId"], data["sessionId"])), index=data.index)
+        test_keys = set(
+            zip(test_proxy["userId"], test_proxy["sessionId"])
+        )
+        row_keys = pd.Series(
+            list(zip(data["userId"], data["sessionId"])),
+            index=data.index
+        )
         is_test = row_keys.isin(test_keys)
 
         test = data[is_test].reset_index(drop=True)

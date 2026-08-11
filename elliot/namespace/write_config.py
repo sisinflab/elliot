@@ -1,4 +1,4 @@
-from typing import List, Optional, Union, Literal
+from typing import Literal, List, Optional, Union
 from pydantic import field_validator
 
 from elliot.namespace.common import BaseConfig, normalize_ext
@@ -9,9 +9,11 @@ class BaseWriterConfig(BaseConfig):
 
     Attributes:
         ext (str): File extension for the output file. Defaults to "".
+        encoding (str, optional): File encoding. Defaults to None (using the platform default).
     """
 
     ext: str = ""
+    encoding: Optional[str] = None
 
     @field_validator("ext", mode="after")
     @classmethod

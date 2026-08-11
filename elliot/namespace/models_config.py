@@ -1,4 +1,4 @@
-from typing import List, Any, Union, Optional
+from typing import Any, List, Optional, TypeAlias, TypeVar, Union
 from ast import literal_eval
 from pydantic import Field, model_validator, field_validator
 from pydantic_core.core_schema import ValidationInfo
@@ -8,7 +8,8 @@ from elliot.namespace.read_config import InteractionsReaderConfig, ModelReaderCo
 from elliot.namespace.write_config import TabularWriterConfig, ModelWriterConfig
 from elliot.utils.enums import SearchSpace, OptimizationAlgorithm, SessionStrategy
 
-MODEL_FIELD = lambda t: Union[t, List[Union[str, t]]]
+T = TypeVar("T")
+MODEL_FIELD: TypeAlias = Union[T, List[Union[str, T]]]
 
 
 class MetaConfig(BaseConfig):
@@ -39,7 +40,7 @@ class MetaConfig(BaseConfig):
     verbose: bool = True
     validation_metric: str = ""
     validation_rate: int = Field(default=1, ge=1)
-    optimization_target: str = None
+    optimization_target: Optional[str] = None
     optimize_internal_loss: bool = False
     hyper_max_evals: Optional[int] = None
     hyper_opt_alg: OptimizationAlgorithm = OptimizationAlgorithm.TPE
@@ -56,7 +57,7 @@ class MetaConfig(BaseConfig):
         Returns:
             MetaConfig: The object itself.
         """
-        if self.optimization_target is None and self.optimize_internal_loss:
+        if self.optimize_internal_loss and self.optimization_target is None:
             self.optimization_target = "internal_loss"
         self.optimization_target = self.optimization_target or "validation_metric"
         return self
@@ -120,11 +121,11 @@ class RecommenderConfig(BaseConfig):
 
     meta: MetaConfig = Field(default_factory=MetaConfig)
     early_stopping: Optional[EarlyStoppingConfig] = Field(default=None, exclude=True)
-    epochs: MODEL_FIELD(int) = 1
-    batch_size: MODEL_FIELD(int) = 1024
-    eval_batch_size: MODEL_FIELD(int) = None
-    best_iteration: int = None
-    name: str = None
+    epochs: MODEL_FIELD[int] = 1
+    batch_size: MODEL_FIELD[int] = 1024
+    eval_batch_size: MODEL_FIELD[int] | None = None
+    best_iteration: int | None = None
+    name: int | None = None
 
     warn_on_extra_fields = True
 

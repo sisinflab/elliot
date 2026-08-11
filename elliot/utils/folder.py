@@ -4,7 +4,7 @@ Module description:
 """
 
 
-from typing import List, Generator, Union
+from typing import Generator, List, Union
 from os import PathLike
 import re
 import shutil

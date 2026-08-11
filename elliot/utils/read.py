@@ -2,7 +2,7 @@
 Module description:
 
 """
-from typing import List, Tuple, Dict, Any, Callable, Optional, Set, Union
+from typing import Any, Callable, Dict, Literal, List, Optional, Set, Tuple, Union, cast
 from ast import literal_eval
 from logging import LoggerAdapter
 import fnmatch
@@ -48,9 +48,9 @@ class Reader:
             header (bool): Whether the input file contains a header row. Defaults to False.
             columns (List[Union[str, int]], optional): List of column names or indices
                 to select. Defaults to None.
-            datatypes (Dict[Union[str, int], str], optional): Mapping of column names or indices
+            datatypes (Dict[Union[str, int], str]): Mapping of column names or indices
                 to data types. Defaults to {}.
-            sep (str, optional): Column separator used in the input file. Defaults to "\\t".
+            sep (str): Column separator used in the input file. Defaults to "\\t".
             encoding (str, optional): File encoding. Defaults to None (using the platform default).
             pandas_kwargs (Dict[str, Any], optional): Extra keyword arguments forwarded as-is
                 to `pandas.read_csv` (e.g. `compression`, `dtype`, `names`, `quoting`). Defaults to None.
@@ -65,11 +65,21 @@ class Reader:
             # Determine header row index for pandas
             header_row = 0 if header else None
 
-            data = pd.read_csv(path, sep=sep, header=header_row, encoding=encoding, **(pandas_kwargs or {}))
+            data = cast(
+                pd.DataFrame,
+                pd.read_csv(
+                    path,
+                    sep=sep,
+                    header=header_row,
+                    encoding=encoding,
+                    **(pandas_kwargs or {})
+                )
+            )
         except pd.errors.EmptyDataError:
             self.logger.warning(
                 "The data file is empty. Returning an empty DataFrame."
             )
+
             # Create an empty DataFrame with expected columns
             cols = (
                 columns if columns and all(isinstance(c, str) for c in columns)
@@ -171,11 +181,11 @@ class Reader:
             header (bool): Whether the input file contains a header row. Defaults to True.
             columns (List[Union[str, int]], optional): List of column names or indices
                 to select. Defaults to None.
-            datatypes (Dict[Union[str, int], str], optional): Mapping of column names or indices
+            datatypes (Dict[Union[str, int], str]): Mapping of column names or indices
                 to data types. Defaults to {}.
             sequence_sep (str): Separator used inside the sequence string. Only used when
                 `format` is "inline". Defaults to " ".
-            sep (str, optional): Column/token separator used in the input file. Defaults to "\\t".
+            sep (str): Column/token separator used in the input file. Defaults to "\\t".
             encoding (str, optional): File encoding. Defaults to None (using the platform default).
             callback_fn (Callable, optional): Function to apply to the resulting DataFrame
                 before returning. Defaults to None.
@@ -339,9 +349,9 @@ class Reader:
         Args:
             read_folder (str): Path to the folder containing tabular data files or other folders
                 for hierarchical splits.
-            hierarchical (bool, optional): Whether the data follows a hierarchical
+            hierarchical (bool): Whether the data follows a hierarchical
                 split structure. Defaults to False.
-            sequential (bool, optional): Whether each split file stores sequential interaction
+            sequential (bool): Whether each split file stores sequential interaction
                 data (see `read_sequence_tabular`) instead of plain tabular data. Defaults to False.
             **kwargs (Any): Additional keyword arguments passed to `read_folder` and to
                 `read_sequence_tabular` (if `sequential` is True) or `read_tabular` (otherwise).
@@ -356,7 +366,7 @@ class Reader:
         def get_file_path(folder, name):
             files = self.read_folder(folder, **kwargs)
             by_name = {file_name(p): p for p in files}
-            return by_name.get(name)
+            return by_name.get(name, "")
 
         tuple_list = []
 
@@ -369,7 +379,7 @@ class Reader:
             train_df = read_fn(train_path, **kwargs)
             test_df = read_fn(test_path, **kwargs)
 
-            if val_path is not None:
+            if val_path:
                 val_df = read_fn(val_path, **kwargs)
                 folds = [(train_df, val_df)]
                 original_train_df = None
@@ -463,16 +473,16 @@ class Reader:
         """Read `key<sep>rest...`-style lines into a `dict[key] -> value`, factoring out
         the open/iterate/split/log boilerplate shared by every line-based mapping reader
         in this module (`read_mapping`, `read_negatives`, `read_id_mapping`,
-        `read_feature_name_patterns`) -- only `key_fn`/`value_fn` differ per format.
+        `read_feature_name_patterns`) - only `key_fn`/`value_fn` differ per format.
 
         Args:
             path (str): Path to the mapping file.
-            sep (str, optional): Column separator. Defaults to "\\t".
+            sep (str): Column separator used in the input file. Defaults to "\\t".
             encoding (str, optional): File encoding. Defaults to None (using the platform default).
             key_fn (Callable[[str], Any]): Turns the first token of a line into the dict key.
                 Defaults to `str`.
-            value_fn (Callable[[List[str]], Any], optional): Turns the remaining tokens of a
-                line into the dict value. Defaults to `None`, keeping the raw token list.
+            value_fn (Union[Callable[[List[str]], Any], Type], optional): Turns the remaining tokens of a
+                line into the dict value. Defaults to None, keeping the raw token list.
 
         Returns:
             Dict[Any, Any]: The `key -> value` mapping, in file order.
@@ -518,14 +528,14 @@ class Reader:
 
         suffix = f"_val{fold_index[1] + 1}" if fold_index[1] is not None else ""
         name = f"test{fold_index[0] + 1}{suffix}_negative"
-        path = by_name.get(name)
+        path = by_name.get(name, "")
 
         return self.read_key_value_lines(
             path,
             sep=sep,
             encoding=encoding,
             key_fn=lambda head: str(literal_eval(head)[0]),
-            value_fn=list,
+            value_fn=lambda x: list(x)
         )
 
     def read_model(
@@ -550,7 +560,7 @@ class Reader:
         """
         files = self.read_folder(read_folder, **kwargs)
         by_name = {file_name(p): p for p in files}
-        path = by_name.get(f"best-weights-{model_name}")
+        path = by_name.get(f"best-weights-{model_name}", "")
 
         model = torch.load(path)
 
@@ -597,7 +607,7 @@ class Reader:
 
         Args:
             path (str): Path to the triples file.
-            sep (str, optional): Column separator. Defaults to "\\t".
+            sep (str): Column separator used in the input file. Defaults to "\\t".
             encoding (str, optional): File encoding. Defaults to None (using the platform default).
 
         Returns:
@@ -618,7 +628,7 @@ class Reader:
             header=False,
             sep=sep,
             columns=columns,
-            datatypes={c: str for c in columns},
+            datatypes={c: "str" for c in columns},
             encoding=encoding,
             pandas_kwargs={"compression": compression, "dtype": {i: str for i in range(len(columns))}},
         )
@@ -653,21 +663,25 @@ class Reader:
             skip_fn=lambda line: not line.strip()
         )
 
-    def read_npy(self, path: str, mmap_mode: Optional[str] = None) -> np.ndarray:
+    def read_npy(
+        self,
+        path: str,
+        mmap_mode: Optional[Literal["r"]] = None
+    ) -> np.ndarray:
         """Load a single `.npy` file.
 
         With `mmap_mode=None` (the default), the file is fully read into a fresh
-        in-memory array -- what `Materialization.LAZY`/`MEMORY` callers want: a plain,
+        in-memory array - what `Materialization.LAZY`/`MEMORY` callers want: a plain,
         writable `ndarray` with no lingering open file handle. With `mmap_mode="r"`
         (what `Materialization.MMAP` callers pass), the array is memory-mapped instead:
         `numpy` pages its data in from disk on access rather than copying it all in
         upfront here, and repeated reads of the same file benefit from the OS page
-        cache instead of re-reading from disk every time -- at the cost of a read-only
+        cache instead of re-reading from disk every time - at the cost of a read-only
         array backed by an open file handle for as long as it's referenced.
 
         Args:
             path (str): Path to the `.npy` file.
-            mmap_mode (str, optional): Forwarded to `numpy.load`'s `mmap_mode`. `None`
+            mmap_mode (Literal["r"], optional): Forwarded to `numpy.load`'s `mmap_mode`. None
                 (default) reads the file fully; `"r"` memory-maps it read-only.
 
         Returns:

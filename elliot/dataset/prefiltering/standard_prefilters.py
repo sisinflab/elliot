@@ -53,6 +53,7 @@ class PreFilter:
         # Initializing variables
         self.data = data
         self.prefiltering_config = prefiltering_config
+
         self._mask: Optional[pd.Series] = None
 
     def filter(self) -> pd.DataFrame:

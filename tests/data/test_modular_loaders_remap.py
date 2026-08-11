@@ -6,13 +6,15 @@ import pandas as pd
 from elliot.dataset import Interactions
 from elliot.dataset.modular_loaders import AbstractLoader, SideInformation
 from elliot.dataset.modular_loaders.formats import EmbeddingPayload
+from elliot.namespace import SideInformationConfig, GeneralReaderConfig
 from elliot.utils.enums import EntityAxis
 
 
-def _fake_ns(fields=None):
-    fields = fields or {}
-    ns = SimpleNamespace(reader=SimpleNamespace(sep="\t", header=False, encoding=None), **fields)
-    ns.model_dump = lambda: fields
+def _fake_ns():
+    ns = SideInformationConfig(
+        dataloader="",
+        reader=GeneralReaderConfig(sep="\t", header=False, encoding=None)
+    )
     return ns
 
 
@@ -50,7 +52,7 @@ def _make_fold(items_public_order, side_info, user=100):
     i_map = {item: idx for idx, item in enumerate(items_public_order)}
     inv_mappings = ([user], list(items_public_order))
     return Interactions(
-        dataframe=df, name="train", u_map=u_map, i_map=i_map, inv_mappings=inv_mappings, side_info=side_info
+        dataframe=df, name="train", mappings=(u_map, i_map), inv_mappings=inv_mappings, side_info=side_info
     )
 
 

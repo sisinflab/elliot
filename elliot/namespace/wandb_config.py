@@ -12,7 +12,7 @@ class WandBConfig(BaseConfig):
             Defaults to "disabled".
         project (str, optional): W&B project name.
             Required when mode is "online" or "offline".
-        run_name (str, optional): Custom run name prefix.
+        run_prefix (str, optional): Custom run name prefix.
     """
     mode: Literal["online", "offline", "disabled"] = "disabled"
     project: Optional[str] = None
@@ -28,8 +28,7 @@ class WandBConfig(BaseConfig):
 
         Returns:
             Literal["online", "offline", "disabled"]: Parsed and validated field value."""
-        if isinstance(value, str):
-            value = value.strip().lower()
+        value = value.strip().lower()
         return value
 
     @model_validator(mode="after")

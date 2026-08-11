@@ -1,4 +1,4 @@
-from typing import List, Any, Optional
+from typing import Any, List, Optional
 from pydantic import Field, model_validator, create_model
 
 from elliot.namespace.common import BaseConfig, build_fields_from_annotations
@@ -72,16 +72,15 @@ class DataConfig(BaseConfig):
             DataConfig: The object itself.
         """
         match self.strategy:
-
             case DataLoadingStrategy.FIXED | DataLoadingStrategy.HIERARCHY:
                 if self.data_folder is None:
                     raise AttributeError(f"Attribute `data_folder` must be provided "
-                                         f"with '{self.strategy.value}' strategy.")
+                                         f"with '{self.strategy}' strategy.")
 
             case DataLoadingStrategy.DATASET:
                 if self.dataset_path is None:
                     raise AttributeError(f"Attribute `dataset_path` must be provided "
-                                         f"with '{self.strategy.value}' strategy.")
+                                         f"with '{self.strategy}' strategy.")
 
         return self
 

@@ -17,6 +17,7 @@ from .read_config import (
     InteractionsReaderConfig,
     SequenceReaderConfig,
     ModelReaderConfig,
+    GeneralReaderConfig
 )
 from .results_config import ResultsConfig
 from .write_config import (

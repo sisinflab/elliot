@@ -1,5 +1,6 @@
-from typing import Dict, Tuple, Optional
+from typing import Any, Dict, Optional, Tuple, Union
 from ast import literal_eval
+import numpy as np
 
 from elliot.dataset.modular_loaders.abstract_loader import AbstractLoader
 from elliot.dataset.modular_loaders.build import npy_folder_to_embedding_payload, public_id_map
@@ -21,8 +22,8 @@ from elliot.utils.registry import side_info_registry
     }
 )
 class VisualAttribute(AbstractLoader):
-    """One or more precomputed dense feature vectors per item -- raw, PCA-reduced,
-    and/or feature-map -- each read from its own folder of `.npy` files (filename
+    """One or more precomputed dense feature vectors per item - raw, PCA-reduced,
+    and/or feature-map - each read from its own folder of `.npy` files (filename
     stem = item id). Any combination of the three folders may be configured; only
     those found are returned by `load()`.
     """
@@ -33,7 +34,7 @@ class VisualAttribute(AbstractLoader):
     images_folder_path: Optional[str] = None
     image_size_tuple: Optional[str] = None
 
-    def __init__(self, **params):
+    def __init__(self, **params: Any):
         super().__init__(**params)
 
         # Initializing variables
@@ -42,9 +43,11 @@ class VisualAttribute(AbstractLoader):
         self._visual_feat_map_features_shape: Optional[Tuple[int, ...]] = None
         self._item_mapping: Dict[int, int] = {}
 
+        # Parse the configured "(h, w)"-style string into an actual tuple
         if self.image_size_tuple is not None:
             self.image_size_tuple = literal_eval(self.image_size_tuple)
 
+        # Union the item ids discovered across every configured feature/image folder
         items = set()
 
         folder_items, _, shape = self.reader.discover_npy_ids(
@@ -73,26 +76,47 @@ class VisualAttribute(AbstractLoader):
         )
         items |= folder_items
 
+        # Build a stable, sorted row index over the union of all discovered items
         if items:
             self._item_mapping = {item: idx for idx, item in enumerate(sorted(items))}
 
         self.items = self.items & items
 
-    def get_all_features(self):
+    def get_all_features(self) -> np.ndarray:
+        """Alias for `get_all_visual_features`.
+
+        Returns:
+            np.ndarray: The dense raw-visual-features matrix.
+        """
         return self.get_all_visual_features()
 
-    def get_all_visual_features(self):
+    def get_all_visual_features(self) -> np.ndarray:
         """Dense `(n_items, dim)` matrix of raw visual features, read through `load()`
         so it honors `self.materialization` (and the correctly re-indexed, post-filter
         `id_map` it builds) exactly like every other consumer of this loader's payload,
         rather than re-reading files by hand against the *pre-filter* `item_mapping`.
+
+        Returns:
+            np.ndarray: The dense raw-visual-features matrix.
         """
         return embedding_to_dense(self.load()["visual_features"])
 
-    def get_all_visual_pca_features(self):
+    def get_all_visual_pca_features(self) -> np.ndarray:
+        """Dense `(n_items, dim)` matrix of PCA-reduced visual features, read
+        through `load()` (see `get_all_visual_features`).
+
+        Returns:
+            np.ndarray: The dense PCA-visual-features matrix.
+        """
         return embedding_to_dense(self.load()["visual_pca_features"])
 
-    def get_all_visual_feat_map_features(self):
+    def get_all_visual_feat_map_features(self) -> np.ndarray:
+        """Dense feature-map visual features, read through `load()` (see
+        `get_all_visual_features`).
+
+        Returns:
+            np.ndarray: The dense visual-feature-map matrix.
+        """
         return embedding_to_dense(self.load()["visual_feat_map_features"])
 
     def load(self) -> Dict[str, EmbeddingPayload]:
@@ -106,10 +130,18 @@ class VisualAttribute(AbstractLoader):
         each payload is a fully materialized dense matrix instead. `get_all_visual_*`
         go through this same method (via `embedding_to_dense`), so they honor whatever
         `materialization` is configured too.
+
+        Returns:
+            Dict[str, EmbeddingPayload]: The configured `visual_features`/
+                `visual_pca_features`/`visual_feat_map_features` payloads (only those
+                for which a folder was configured).
         """
+        # Re-index to the current (post-filter) item domain
         id_map = public_id_map(i for i in self._item_mapping if i in self.items)
 
-        def make_payload(folder_path: Optional[str], shape) -> Optional[EmbeddingPayload]:
+        def make_payload(
+            folder_path: Optional[str], shape: Optional[Union[int, Tuple[int, ...]]]
+        ) -> Optional[EmbeddingPayload]:
             if not folder_path or not id_map:
                 return None
             row_shape = shape if isinstance(shape, tuple) else (shape,)
@@ -117,6 +149,7 @@ class VisualAttribute(AbstractLoader):
                 folder_path, id_map, row_shape, self.materialization, self.reader
             )
 
+        # Build only the payloads whose folder was actually configured
         payloads = {}
         visual = make_payload(
             self.visual_feature_folder_path, self._visual_features_shape

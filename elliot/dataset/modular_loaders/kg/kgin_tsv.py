@@ -1,4 +1,4 @@
-from typing import Dict, Set, Any
+from typing import Any, Dict, Set
 import numpy as np
 import pandas as pd
 
@@ -14,14 +14,14 @@ from elliot.utils.registry import side_info_registry
 class KGINTSVLoader(AbstractLoader):
     """KG triples for KGIN-style relation-aware propagation, read from a headerless
     tabular file of integer `(head, relation, tail)` triples via `Reader.read_tabular`
-    -- set `reader.sep` to a single space in the side-info config for whitespace-
+    - set `reader.sep` to a single space in the side-info config for whitespace-
     separated dumps. Always fully loads into memory: building `entity2id`/`relation2id`
     needs every triple read and indexed up front regardless.
     """
 
     attribute_file: str
 
-    def __init__(self, **params):
+    def __init__(self, **params: Any):
         super().__init__(**params)
 
         # Initializing variables
@@ -36,14 +36,23 @@ class KGINTSVLoader(AbstractLoader):
             encoding=self._reader_config.encoding
         )
 
+        # Collect every distinct head/tail entity, then split into items vs. other entities
         self._entities = set(self._map.values[:, 0]) | set(self._map.values[:, 2])
         self.items = self.items & self._entities
         self._entity_list = self._entities - self.items
 
-    def filter(self, users, items):
+    def filter(self, users: Set[Any], items: Set[Any]) -> None:
+        """See `AbstractLoader.filter`. Also re-derives `self._entities`/
+        `self._entity_list` from the re-filtered `self._map`.
+
+        Args:
+            users (Set[Any]): The narrowed users domain.
+            items (Set[Any]): The narrowed items domain.
+        """
         super().filter(users, items)
         self._map = self._map[self._map[self._map.columns[0]].isin(self.items)]
 
+        # Re-derive the entity/item split from the re-filtered triples
         self._entities = set(self._map.values[:, 0]) | set(self._map.values[:, 2])
         self.items = self.items & self._entities
         self._entity_list = self._entities - self.items
@@ -53,11 +62,15 @@ class KGINTSVLoader(AbstractLoader):
         (head, relation, tail) int-id arrays plus an `entity2id`/`relation2id` index,
         normalizing this loader's pandas-DataFrame-of-raw-ids representation: items are
         indexed first, then the remaining non-item entities (offset by `len(items)`).
+
+        Returns:
+            Dict[str, GraphPayload]: The `kg_triples` payload.
         """
         heads_raw = self._map.values[:, 0]
         relations_raw = self._map.values[:, 1]
         tails_raw = self._map.values[:, 2]
 
+        # Index items first, then the remaining non-item entities (offset by len(items))
         items_sorted = sorted(self.items)
         entity_list_sorted = sorted(self._entity_list)
         entity2id = {e: i for i, e in enumerate(items_sorted)}
@@ -67,6 +80,7 @@ class KGINTSVLoader(AbstractLoader):
         # Offset by 1, reserving relation id 0.
         relation2id = {r: i + 1 for i, r in enumerate(relations_sorted)}
 
+        # Vectorize each triple's (head, relation, tail) into parallel int-id arrays
         heads = np.array([entity2id[h] for h in heads_raw], dtype=np.int64)
         tails = np.array([entity2id[t] for t in tails_raw], dtype=np.int64)
         relations = np.array([relation2id[r] for r in relations_raw], dtype=np.int64)

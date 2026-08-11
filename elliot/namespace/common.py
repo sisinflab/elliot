@@ -1,4 +1,4 @@
-from typing import List, Any, Optional, Union, ClassVar, get_origin, get_args, Set, Callable
+from typing import Any, ClassVar, List, Optional, Union, Set, get_args, get_origin
 from logging import LoggerAdapter
 from pydantic import BaseModel, ConfigDict, model_validator, field_validator
 from pydantic_core.core_schema import ValidationInfo
@@ -40,7 +40,7 @@ class BaseConfig(BaseModel):
 
     @field_validator("*", mode="before")
     @classmethod
-    def transform_to_list(cls, value: Any, info: ValidationInfo) -> List[Any]:
+    def transform_to_list(cls, value: Any, info: ValidationInfo) -> Optional[List[Any]]:
         """Ensure that a configuration value is represented as a list.
 
         Args:
@@ -48,7 +48,7 @@ class BaseConfig(BaseModel):
             info (ValidationInfo): Pydantic field metadata.
 
         Returns:
-            List[Any]: Value converted to a list.
+            (List[Any], optional): Value converted to a list.
         """
         field = cls.model_fields[info.field_name]
         hint = field.annotation
@@ -118,15 +118,15 @@ def normalize_ext(ext: str) -> str:
 
 def build_fields_from_annotations(
     cls: object,
-    exclude: Set[str] = {},
-    field_fn: Callable = None,
+    exclude: Set[str] = set(),
+    field_type_alias: Optional[Any] = None,
 ) -> dict:
     """Build Pydantic field definitions from class annotations.
 
     Args:
         cls (object): The class from which keeping the annotations.
         exclude (Set[str]): The fields to exclude from the annotations.
-        field_fn (Callable): The function to customize the field type.
+        field_type_alias (Any, optional): The alias to customize the field type.
 
     Returns:
         dict: The extracted fields' dict.
@@ -141,7 +141,7 @@ def build_fields_from_annotations(
         # Get default value
         default = getattr(cls, name, "__MISSING__")
 
-        field_type = field_fn(hint) if field_fn is not None else hint
+        field_type = field_type_alias[hint] if field_type_alias is not None else hint
         fields[name] = (field_type, default) if default != "__MISSING__" else field_type
 
     return fields
@@ -149,8 +149,11 @@ def build_fields_from_annotations(
 
 def get_default_value(model_cls, field_name) -> Any:
     f = model_cls.model_fields[field_name]
+
     if f.default_factory is not None:
         return f.default_factory()
+
     if f.default is not None:
         return f.default
+
     return None

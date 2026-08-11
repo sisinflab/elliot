@@ -381,6 +381,55 @@ class TestEvalDataloader:
         batches = list(test_dataloader)
         assert batches
 
+    def test_negatives_shared_across_session_strategies_of_the_same_fold(self):
+        # A single experiment can mix FLAT and SESSION_ONLY models on the same fold
+        # (each requesting its own `session_strategy` from the shared `DataSet`); they
+        # must all be scored against the exact same negatives per user, so negative
+        # sampling has to happen once, not once per requested strategy.
+        num_negatives = 1  # Below the 3-item candidate pool of user 2 (private 1):
+                            # forces genuine subsampling instead of the full pool being
+                            # trivially returned every time.
+        config = {
+            "negative_sampling": {
+                "strategy": "random",
+                "num_negatives": num_negatives,
+            }
+        }
+
+        # Load once, with sessions available, then request both strategies off the
+        # very same `DataSet`, exactly like two different models would in one run.
+        _, main_data = _load_data(config, load_as_session_only=True)
+
+        flat_dataloader = main_data.get_eval_dataloader(batch_size=10)
+        session_dataloader = main_data.get_eval_dataloader(
+            batch_size=10, session_strategy=SessionStrategy.SESSION_ONLY
+        )
+
+        def negatives_by_row(dataloader):
+            result = {}
+            for users, eval_items in dataloader:
+                for row, eval_ in zip(users.tolist(), eval_items):
+                    result[row] = set(eval_[eval_ != -1].tolist())
+            return result
+
+        flat_negatives = negatives_by_row(flat_dataloader)
+        session_negatives = negatives_by_row(session_dataloader)
+
+        # User 2 (private 1) owns test rows 2 and 3 (its two sessions, per
+        # `test_session_only_neg_random`); its candidate negative pool there is
+        # {0, 2, 4}, disjoint from its ground-truth positives {1, 3, 5}, so those
+        # positives can simply be filtered out to isolate the sampled negatives.
+        positives = {1, 3, 5}
+
+        row2_negatives = session_negatives[2] - positives
+        row3_negatives = session_negatives[3] - positives
+        flat_negatives_user2 = flat_negatives[1] - positives
+
+        assert len(row2_negatives) == num_negatives
+        # Sampled once per user and broadcast: both of user 2's session rows,
+        # and its FLAT row, land on the exact same sampled negatives.
+        assert row2_negatives == row3_negatives == flat_negatives_user2
+
 
 if __name__ == "__main__":
     pytest.main()

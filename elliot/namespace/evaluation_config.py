@@ -1,4 +1,4 @@
-from typing import List, Dict, Optional, Any, Callable
+from typing import Any, Callable, Dict, List, Optional
 from pydantic import Field, model_validator
 
 from elliot.namespace.common import BaseConfig
@@ -13,7 +13,7 @@ class EvaluationConfig(BaseConfig):
     Attributes:
         cutoffs (List[int]): List of cutoff values used for evaluation metrics. Defaults to [].
         simple_metrics (List[str]): List of simple evaluation metric names. Defaults to [].
-        complex_metrics (List[Dict[str, dict]]): List of complex evaluation metric configurations. Defaults to {}.
+        complex_metrics (List[Dict[str, dict]]): List of complex evaluation metric configurations. Defaults to [].
         relevance_threshold (int): Minimum relevance value to consider an interaction relevant. Defaults to 0.
         paired_ttest (Dict[str, dict]): Configuration for paired t-test comparisons. Defaults to {}.
         wilcoxon_test (Dict[str, dict]): Configuration for Wilcoxon signed-rank tests. Defaults to {}.
@@ -29,7 +29,7 @@ class EvaluationConfig(BaseConfig):
 
     cutoffs: List[int] = []
     simple_metrics: List[str] = []
-    complex_metrics: List[Dict[str, dict]] = {}
+    complex_metrics: List[Dict[str, dict]] = []
     relevance_threshold: int = 0
     paired_ttest: Dict[str, dict] = {}
     wilcoxon_test: Dict[str, dict] = {}
@@ -56,7 +56,7 @@ class EvaluationConfig(BaseConfig):
 
         return self
 
-    def _validate_metric_list(self, metrics: List[Any], name_fn: Callable = None) -> List[Any]:
+    def _validate_metric_list(self, metrics: List[Any], name_fn: Optional[Callable] = None) -> List[Any]:
         """Filter and validate a list of metrics against a registry.
 
         Args:

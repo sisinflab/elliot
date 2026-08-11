@@ -1,4 +1,4 @@
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional, Set
 from collections import Counter
 
 from elliot.dataset.modular_loaders.abstract_loader import AbstractLoader
@@ -26,7 +26,7 @@ class ChainedKG(AbstractLoader):
     additive: bool = True
     threshold: int = 10
 
-    def __init__(self, **params):
+    def __init__(self, **params: Any):
         super().__init__(**params)
 
         # Initializing variables
@@ -42,6 +42,7 @@ class ChainedKG(AbstractLoader):
             value_fn=lambda rest: list(set([int(x) for x in rest]))
         )
 
+        # Strip the surrounding "<...>" and split into a [predicate, object] pattern
         def _value_fn(rest):
             pattern = rest[0].split('><')
             pattern[0] = pattern[0][1:]
@@ -55,6 +56,8 @@ class ChainedKG(AbstractLoader):
             key_fn=int,
             value_fn=_value_fn
         )
+
+        # Optional predicate whitelist/blacklist for feature selection
         if self.properties is not None:
             self._property_list = self.reader.read_lines(
                 path=self.properties,
@@ -64,19 +67,37 @@ class ChainedKG(AbstractLoader):
 
         self._map = self.reduce_attribute_map_property_selection()
 
+        # Narrow the item domain to those left with at least one feature
         self.items = self.items & set(self._map.keys())
 
-    def filter(self, users, items):
+    def filter(self, users: Set[Any], items: Set[Any]):
+        """See `AbstractLoader.filter`. Also re-derives `self._map` for the new
+        `items` domain via `reduce_attribute_map_property_selection`.
+
+        Args:
+            users (Set[Any]): The narrowed users domain.
+            items (Set[Any]): The narrowed items domain.
+        """
         super().filter(users, items)
         self._map = {k: v for k, v in self._map.items() if k in self.items}
         self._map = self.reduce_attribute_map_property_selection()
         self.items = self.items & set(self._map.keys())
 
-    def reduce_attribute_map_property_selection(self):
+    def reduce_attribute_map_property_selection(self) -> Dict[int, List[int]]:
+        """Restrict `self._feature_names` to the configured `properties`
+        (additive/subtractive, per `self.additive`), then threshold-filter
+        `self._map` to features occurring more than `self.threshold` times among
+        the current `self.items`, dropping items left with no feature.
+
+        Returns:
+            Dict[int, List[int]]: The filtered `item -> [feature id, ...]` map.
+        """
         acceptable_features = set()
         if not self._property_list:
+            # No property filter: every feature is acceptable
             acceptable_features.update(self._feature_names.keys())
         else:
+            # Keep (additive) or drop (subtractive) features whose predicate matches
             for feature in self._feature_names.items():
                 if self.additive:
                     if feature[1][0] in self._property_list:
@@ -92,6 +113,7 @@ class ChainedKG(AbstractLoader):
 
         nmap = {k: v for k, v in self._map.items() if k in self.items}
 
+        # Count how many (current) items each acceptable feature covers
         feature_occurrences_dict = Counter([
             x for xs in nmap.values() for x in xs
             if x in acceptable_features
@@ -102,6 +124,7 @@ class ChainedKG(AbstractLoader):
 
         self.logger.info(f"Features above threshold:\t{len(features_popularity)}")
 
+        # Drop below-threshold features, then items left with none
         new_map = {
             k: [value for value in v if value in features_popularity.keys()]
             for k, v in nmap.items()
@@ -112,4 +135,9 @@ class ChainedKG(AbstractLoader):
         return new_map
 
     def load(self) -> Dict[str, EmbeddingPayload]:
+        """Build the `item_features` payload from `self._map`.
+
+        Returns:
+            Dict[str, EmbeddingPayload]: The `item_features` payload.
+        """
         return {"item_features": raw_feature_map_to_embedding_payload(self._map, self.items)}

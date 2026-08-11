@@ -1,9 +1,9 @@
-from typing import List, Tuple, Dict, Set, Any, Union, Iterable, Optional
+from typing import Any, Callable, Iterable, List, Optional, Set, Tuple, Union
 import numpy as np
 import pandas as pd
 
 from elliot.namespace import ExperimentConfig, DataConfig
-from elliot.dataset.modular_loaders import AbstractLoader, SideInformation
+from elliot.dataset.modular_loaders import SideInformation
 from elliot.dataset.splitting import Splitter
 from elliot.dataset.prefiltering import PreFilter
 from elliot.dataset.dataset import DataSet
@@ -22,8 +22,7 @@ class DataSetLoader:
     The final output is a list of `DataSet` objects, ready to be consumed by the recommendation pipeline.
 
     Args:
-        config (ExperimentConfig): Configuration namespace object defining data paths, splitting strategy,
-            filters, etc.
+        config (ExperimentConfig): Experiment configuration object.
 
     Supported Loading Strategies:
 
@@ -57,7 +56,7 @@ class DataSetLoader:
     side_information: Optional[SideInformation] = None
 
     # Inactivity threshold (in seconds) marking the start of a new session when
-    # segmenting non-sequential interactions that carry a real timestamp.
+    # segmenting non-sequential interactions that carry a real timestamp
     SESSION_GAP_SECONDS = 1800
 
     def __init__(self, config: ExperimentConfig):
@@ -85,7 +84,10 @@ class DataSetLoader:
         self._preprocess_data()
 
     def _load_main_data(self):
-        """Load user-item interaction data according to the selected strategy."""
+        """Load user-item interaction data according to the selected strategy, then
+        clean it and discover the shared users/items universe (`self._users`/
+        `self._items`) it defines.
+        """
         reader_config = self.data_config.reader
         sequential = self.data_config.sequential
 
@@ -94,6 +96,7 @@ class DataSetLoader:
             columns=reader_config.column_names(),
             datatypes=reader_config.column_dtypes(),
             sep=reader_config.sep,
+            encoding=reader_config.encoding
         )
         if sequential:
             read_kwargs.update(
@@ -109,6 +112,7 @@ class DataSetLoader:
 
         match self.data_config.strategy:
 
+            # Classic train/test(/val) split, already on disk
             case DataLoadingStrategy.FIXED:
                 self.dataframe = self.reader.read_tabular_split(
                     read_folder=self.data_config.data_folder,
@@ -118,6 +122,7 @@ class DataSetLoader:
                     **read_kwargs
                 )
 
+            # Nested per-fold train/test(/val) split, already on disk
             case DataLoadingStrategy.HIERARCHY:
                 self.dataframe = self.reader.read_tabular_split(
                     read_folder=self.data_config.data_folder,
@@ -128,6 +133,7 @@ class DataSetLoader:
                     **read_kwargs
                 )
 
+            # Single dataset file; splitting happens later, in build()
             case DataLoadingStrategy.DATASET:
                 read_fn = self.reader.read_sequence_tabular if sequential else self.reader.read_tabular
                 self.dataframe = read_fn(
@@ -136,16 +142,21 @@ class DataSetLoader:
                     **read_kwargs
                 )
 
-        self._clean(self._filter_nan_and_duplicates)
+        self._process(self._filter_nan_and_duplicates)
 
         users, items = set(), set()
         df = self.dataframe
 
+        # FIXED/HIERARCHY strategies return a list of (folds, train, test) tuples
+        # (one per test fold): union the users/items across every split of the
+        # first test fold, falling back to its first validation fold's train/val
+        # when no standalone train set was found (see `Reader.read_tabular_split`)
         if isinstance(df, list):
             folds, train, test = df[0]
             users |= set(test["userId"].unique())
             items |= set(test["itemId"].unique())
 
+            # No standalone train file: fall back to the first validation fold's train+val union
             if train is None:
                 tr, val = folds[0]
 
@@ -158,6 +169,7 @@ class DataSetLoader:
                 users |= set(train["userId"].unique())
                 items |= set(train["itemId"].unique())
 
+        # DATASET strategy: a single DataFrame, split later on
         else:
             users = set(df["userId"].unique())
             items = set(df["itemId"].unique())
@@ -172,9 +184,8 @@ class DataSetLoader:
     ) -> List[Union[str, int]]:
         """Resolve requested column identifiers against the columns actually present
         in a DataFrame. Positional (int) identifiers are replaced, in order, with the
-        corresponding column label found in `data_columns`, since a column selected
-        positionally may not keep its original integer label (e.g. when the source
-        file has a header). Name-based identifiers are left untouched.
+        corresponding column label found in `data_columns`.
+        Name-based identifiers are left untouched.
 
         Args:
             requested (List[Union[str, int]]): The originally requested column identifiers,
@@ -187,23 +198,40 @@ class DataSetLoader:
         col_iter = iter(data_columns)
         return [next(col_iter) if isinstance(c, int) else c for c in requested]
 
-    def _rename_cols_and_binarize(self, data, **kwargs):
+    def _rename_cols_and_binarize(self, data: pd.DataFrame, **kwargs: Any) -> pd.DataFrame:
+        """Rename the configured columns to their canonical names, fall back to a
+        synthetic per-user order key when no real timestamp is available, and
+        binarize the rating when requested (or absent).
+
+        Args:
+            data (pd.DataFrame): The just-read, not-yet-renamed interactions.
+            **kwargs (Any): Unused; accepted so this can be used as a reader
+                `callback_fn` regardless of the extra keyword arguments it forwards.
+
+        Returns:
+            pd.DataFrame: The interactions, with canonical column names.
+
+        Raises:
+            KeyError: If either the user or item column is missing after renaming.
+        """
         names = ["userId", "itemId", "rating", "timestamp"]
         current_names = self._resolve_current_names(self.data_config.reader.column_names(), data.columns)
 
+        # Build a rename map from whatever columns are actually present to canonical names
         col_mapping = {c: names[i] for i, c in enumerate(current_names) if c in data.columns}
 
         cols_to_use = list(col_mapping.values())
         data.rename(columns=col_mapping, inplace=True)
         data = data[cols_to_use]
 
+        # Both user and item columns are mandatory
         if any(c not in data.columns for c in ("userId", "itemId")):
             raise KeyError("Missing some required columns: 'userId' or 'itemId'.")
 
         if "timestamp" not in data.columns:
             # No real timestamp is available: fall back to each interaction's position
             # within its user's history as a synthetic order key, mirroring the sequential
-            # loader, so order-aware splitting strategies keep working on relative order alone.
+            # loader, so order-aware splitting strategies keep working on relative order alone
             data["timestamp"] = data.groupby("userId").cumcount()
             self.has_real_timestamps = False
 
@@ -212,10 +240,27 @@ class DataSetLoader:
 
         return data
 
-    def _rename_cols_and_binarize_sequence(self, data, **kwargs):
+    def _rename_cols_and_binarize_sequence(self, data: pd.DataFrame, **kwargs: Any) -> pd.DataFrame:
+        """Rename the configured columns to their canonical names, derive a
+        `sessionId` from each source row, fall back to a synthetic per-user order key
+        when no real timestamp is available, and mark every interaction as implicit
+        feedback.
+
+        Args:
+            data (pd.DataFrame): The just-read, not-yet-renamed sequential interactions.
+            **kwargs (Any): Unused; accepted so this can be used as a reader
+                `callback_fn` regardless of the extra keyword arguments it forwards.
+
+        Returns:
+            pd.DataFrame: The interactions, with canonical column names.
+
+        Raises:
+            KeyError: If either the user or item column is missing after renaming.
+        """
         reader_config = self.data_config.reader
         columns = reader_config.columns
 
+        # itemId is already produced by `read_sequence_tabular`; only user/timestamp need renaming
         requested = [columns.user_id_col]
         if reader_config.format == "inline" and columns.timestamp_col is not None:
             requested.append(columns.timestamp_col)
@@ -223,13 +268,14 @@ class DataSetLoader:
         names = ["userId", "timestamp"]
         current_names = self._resolve_current_names(requested, data.columns)
 
+        # Build a rename map from whatever columns are actually present to canonical names
         col_mapping = {c: names[i] for i, c in enumerate(current_names) if c in data.columns}
 
         data = data.rename(columns=col_mapping)
 
         if "_sourceRow" in data.columns:
             # Each raw source row is a distinct session for its user: number sessions
-            # 0, 1, 2, ... per user, in the order they appear in the source file.
+            # 0, 1, 2, ... per user, in the order they appear in the source file
             data["sessionId"] = data.groupby("userId")["_sourceRow"].transform(
                 lambda s: pd.factorize(s)[0]
             )
@@ -239,6 +285,7 @@ class DataSetLoader:
             cols_to_use.append("sessionId")
         data = data[cols_to_use]
 
+        # Both user and item columns are mandatory
         if any(c not in data.columns for c in ("userId", "itemId")):
             raise KeyError("Missing some required columns: 'userId' or 'itemId'.")
 
@@ -246,7 +293,7 @@ class DataSetLoader:
             # No real timestamp is available (e.g. "wide" format, or "inline" without a
             # configured timestamp column): fall back to each item's position within its
             # user's sequence as a synthetic order key, so order-aware splitting strategies
-            # (temporal_hold_out, temporal_leave_n_out) keep working on positional order alone.
+            # (temporal_hold_out, temporal_leave_n_out) keep working on positional order alone
             data["timestamp"] = data.groupby("userId").cumcount()
             self.has_real_timestamps = False
 
@@ -256,11 +303,10 @@ class DataSetLoader:
         return data
 
     def _init_side_information(self):
-        """Pre-load side information (e.g., user/item features) using custom dataloaders defined in config.
-
-        Raises:
-            TypeError: If a provided loader does not inherit from AbstractLoader.
+        """Pre-load side information (e.g., user/item features) using custom dataloaders
+        defined in config.
         """
+        # Instantiate every configured side-info loader via the registry
         side_info_objs = {}
         for side in self.data_config.side_information:
             side_obj = side_info_registry.get(
@@ -277,44 +323,27 @@ class DataSetLoader:
 
     def _preprocess_data(self):
         """Apply user/item filtering based on side information, and basic cleanup.
-        Perform optional pre-filtering.
+        Perform optional pre-filtering, then optional session segmentation.
         """
         self._intersect_users_items()
-        self._clean(self._filter_users_and_items)
+        self._process(self._filter_users_and_items)
 
+        # Pre-filtering only applies to a single, not-yet-split dataset
         if self.data_config.strategy == DataLoadingStrategy.DATASET:
             prefilter = PreFilter(self.dataframe, self.config.prefiltering)
             self.dataframe = prefilter.filter()
 
-            should_segment = (
-                self.data_config.session_strategy == SessionStrategy.SESSION_ONLY
-                and not self.data_config.sequential
-                and self.has_real_timestamps
-            )
-            if should_segment:
-                self.dataframe = self._segment_sessions_by_time_gap(self.dataframe)
-
-    def _segment_sessions_by_time_gap(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Assign a `sessionId` to each interaction, starting a new session for a user
-        whenever the gap since their previous interaction exceeds `SESSION_GAP_SECONDS`.
-        Only called when `data_config.session_strategy` is SESSION_ONLY: segmenting
-        forces `_drop_single_session_users` to later drop every user left with fewer
-        than two sessions, which can shrink some datasets substantially, so it's opt-in
-        rather than automatic for every dataset with real timestamps.
-
-        Args:
-            df (pd.DataFrame): Interaction data with real, cross-user-comparable timestamps.
-
-        Returns:
-            pd.DataFrame: The same data, with an added `sessionId` column.
-        """
-        ordered = df.sort_values(["userId", "timestamp"], kind="stable")
-        is_new_session = ordered.groupby("userId")["timestamp"].diff() > self.SESSION_GAP_SECONDS
-        session_id = is_new_session.groupby(ordered["userId"]).cumsum()
-
-        df = df.copy()
-        df["sessionId"] = session_id
-        return df
+        should_segment = (
+            self.data_config.session_strategy == SessionStrategy.SESSION_ONLY
+            and not self.data_config.sequential
+            and self.has_real_timestamps
+        )
+        if should_segment:
+            # FIXED/HIERARCHY already come as a list of independently pre-split
+            # DataFrames (one per train/test/validation file): `_process` segments
+            # each of them on its own, so sessions never need to reconcile ids
+            # across files that were split ahead of time on disk
+            self._process(self._segment_sessions_by_time_gap)
 
     def _intersect_users_items(self):
         """Narrow the shared users/items universe down to the intersection of the base
@@ -327,6 +356,7 @@ class DataSetLoader:
 
         users, items = self._users, self._items
 
+        # Narrow down to the intersection of every loader's own discovered domain
         for side_obj in self.side_information.values():
             mapped_users, mapped_items = side_obj.get_mapped()
             users &= mapped_users
@@ -334,23 +364,30 @@ class DataSetLoader:
 
         self._users, self._items = users, items
 
+        # Propagate the final intersection back to each loader
         for side_obj in self.side_information.values():
             side_obj.filter(users, items)
 
-    def _clean(self, clean_fn):
-        """Clean all loaded DataFrames by filtering users/items and removing duplicates."""
-        def clean(df): return clean_fn(df) if df is not None else None
+    def _process(self, proc_fn: Callable[[pd.DataFrame], pd.DataFrame]):
+        """Process all loaded DataFrames applying the provided function.
+
+        Args:
+            proc_fn (Callable[[pd.DataFrame], pd.DataFrame]): Processing function applied
+                to every non-None DataFrame in `self.dataframe` (either a single
+                DataFrame or the fixed/hierarchical fold structure).
+        """
+        def process(df): return proc_fn(df) if df is not None else None
 
         if isinstance(self.dataframe, list):
             new_dataframe = []
             for folds, tr, te in self.dataframe:
-                test = clean(te)
-                train = clean(tr)
-                folds = [(clean(tr_), clean(va)) for tr_, va in folds]
+                test = process(te)
+                train = process(tr)
+                folds = [(process(tr_), process(va)) for tr_, va in folds]
                 new_dataframe.append((folds, train, test))
             self.dataframe = new_dataframe
         else:
-            self.dataframe = clean(self.dataframe)
+            self.dataframe = process(self.dataframe)
 
     def _filter_nan_and_duplicates(self, df: pd.DataFrame) -> pd.DataFrame:
         """Filter a single DataFrame based on valid users/items and applies basic cleanup,
@@ -362,6 +399,7 @@ class DataSetLoader:
         Returns:
             pd.DataFrame: Cleaned DataFrame.
         """
+        # Impute missing timestamps with the column mean before dropping other NaNs
         mean_imputing_feats = ["timestamp"]
         for feat in mean_imputing_feats:
             if feat in list(df.columns):
@@ -372,7 +410,38 @@ class DataSetLoader:
         return df
 
     def _filter_users_and_items(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Restrict a DataFrame to interactions whose user and item both belong to
+        the shared `self._users`/`self._items` universe.
+
+        Args:
+            df (pd.DataFrame): The DataFrame to filter.
+
+        Returns:
+            pd.DataFrame: The filtered DataFrame.
+        """
         df = df[df["userId"].isin(self._users) & df["itemId"].isin(self._items)].reset_index(drop=True)
+        return df
+
+    def _segment_sessions_by_time_gap(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Assign a `sessionId` to each interaction, starting a new session for a user
+        whenever the gap since their previous interaction exceeds `SESSION_GAP_SECONDS`.
+        Only called when `data_config.session_strategy` is SESSION_ONLY.
+
+        Args:
+            df (pd.DataFrame): Interaction data with real, cross-user-comparable timestamps.
+
+        Returns:
+            pd.DataFrame: The same data, with an added `sessionId` column.
+        """
+        # Sort chronologically per user, then flag gaps exceeding the inactivity threshold
+        ordered = df.sort_values(["userId", "timestamp"], kind="stable")
+        is_new_session = ordered.groupby("userId")["timestamp"].diff() > self.SESSION_GAP_SECONDS
+
+        # Cumulative sum of new-session flags gives each row its session index
+        session_id = is_new_session.groupby(ordered["userId"]).cumsum()
+
+        df = df.copy()
+        df["sessionId"] = session_id
         return df
 
     def _drop_single_session_users(self):
@@ -398,6 +467,16 @@ class DataSetLoader:
             self.dataframe = df[df["userId"].isin(valid_users)].reset_index(drop=True)
 
     def build(self) -> Tuple[List[List[DataSet]], List[DataSet]]:
+        """Split (if needed) the loaded data and wrap every resulting train/eval pair
+        into a `DataSet`, one per (test fold, validation fold).
+
+        Returns:
+            Tuple[List[List[DataSet]], List[DataSet]]: `(train_val_data, main_data)`,
+                where `main_data[p1]` is the test-fold `DataSet` and
+                `train_val_data[p1]` lists that test fold's validation-fold `DataSet`s
+                (falling back to `[main_data[p1]]` when there are none).
+        """
+        # FIXED/HIERARCHY strategies are already split; only DATASET needs splitting here
         if self.data_config.strategy != DataLoadingStrategy.DATASET:
             tuple_list = self.dataframe
         else:
@@ -411,6 +490,7 @@ class DataSetLoader:
             )
             tuple_list = splitter.process_splitting()
 
+        # Multiple folds can't be paired for significance testing
         if len(tuple_list) > 1:
             self.logger.warning(
                 "You are using a splitting strategy with folds. "
@@ -425,6 +505,7 @@ class DataSetLoader:
             # Test level
             self.logger.info(f"Test Fold {p1}")
 
+            # No standalone train file: reuse the first validation fold's own train split
             train = (
                 original_train
                 if original_train is not None else folds[0][0]
@@ -446,6 +527,7 @@ class DataSetLoader:
                 # Validation level
                 self.logger.info(f"Test Fold {p1} - Validation Fold {p2}")
 
+                # No standalone train file: reuse the test fold's already-built train view
                 train_data = (
                     test_data_object.train_set
                     if original_train is None else train
@@ -462,6 +544,7 @@ class DataSetLoader:
 
                 val_list.append(val_data_object)
 
+            # No validation folds configured: evaluate directly against the test fold
             if not val_list:
                 val_list = [test_data_object]
 
@@ -469,24 +552,46 @@ class DataSetLoader:
 
         return train_val_data, main_data
 
-    def prepare_dataset(self, val_data, main_data):
+    def prepare_dataset(self, val_data: List[List[DataSet]], main_data: List[DataSet]):
+        """Sample user negative items eagerly only when explicitly requested
+        in config, and cache them for reuse when constructing the DataLoaders,
+        avoiding repeated sampling across evaluation calls.
+
+        Args:
+            val_data (List[List[DataSet]]): Per-test-fold lists of validation-fold
+                `DataSet`s, as returned by `build()`.
+            main_data (List[DataSet]): Per-test-fold `DataSet`s, as returned by
+                `build()`.
+        """
         self.logger.info("Preparing dataset for evaluation")
 
         for p1, (folds, main) in enumerate(zip(val_data, main_data)):
             # Test level
             self.logger.info(f"Test Fold {p1}")
-            main.get_eval_dataloader()
+            main.sample_user_negatives()
 
             for p2, fold in enumerate(folds):
                 # Validation level
                 self.logger.info(f"Test Fold {p1} - Validation Fold {p2}")
-                fold.get_eval_dataloader()
+                fold.sample_user_negatives()
 
 
-def build_mock_dataset(config) -> Tuple[List[List[DataSet]], List[DataSet]]:
+def build_mock_dataset(config: ExperimentConfig) -> Tuple[List[List[DataSet]], List[DataSet]]:
+    """Build a single `DataSet` wrapping random train/test interactions, for
+    lightweight tests/config checks that need a `DataSet` shape without a real
+    dataset on disk.
+
+    Args:
+        config (ExperimentConfig): Experiment configuration object.
+
+    Returns:
+        Tuple[List[List[DataSet]], List[DataSet]]: `([[test_data_object]],
+            [test_data_object])`, mirroring `DataSetLoader.build()`'s return shape.
+    """
     names = ["userId", "itemId", "rating"]
     np.random.seed(config.random_seed)
 
+    # Random synthetic interactions, just to exercise the DataSet shape
     train = np.hstack((
         np.random.randint(0, 5 * 20, size=(5 * 20, 2)),
         np.random.randint(0, 2, size=(5 * 20, 1))
