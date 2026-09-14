@@ -1,4 +1,4 @@
-from typing import Any, List, Tuple, Union
+from typing import Any, List, Tuple, Union, Sequence
 import torch
 
 from elliot.dataset.samplers.base_sampler import TraditionalSampler, PipelineSampler
@@ -74,7 +74,7 @@ class PointWisePosNegRatioRatingsSampler(PipelineSampler):
 
         self._sampled_users = self._sample_users()
 
-    def sample(self, it: int) -> Tuple[int, int, float]:
+    def sample(self, it: int) -> Sequence[Union[int, float]]:
         """Build the (user, item, rating) triple for event `it`, item and rating
         drawn as either a positive or a negative interaction.
 
@@ -82,7 +82,7 @@ class PointWisePosNegRatioRatingsSampler(PipelineSampler):
             it (int): Event index.
 
         Returns:
-            Tuple[int, int, float]: The (user, item, rating) triple.
+            Sequence[Union[int, float]]: The (user, item, rating) triple.
         """
         u = self._sampled_users[it]
         ui = self._ui_dict[u]

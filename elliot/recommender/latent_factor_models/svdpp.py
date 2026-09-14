@@ -6,6 +6,7 @@ Module description:
 
 import torch
 from torch import nn
+from torch_sparse import SparseTensor
 
 from elliot.dataset import Interactions
 from elliot.namespace import RecommenderConfig
@@ -31,6 +32,11 @@ class SVDpp(GeneralRecommender):
         **kwargs
     ):
         super(SVDpp, self).__init__(params, seed, interactions, *args, **kwargs)
+
+        # Row-sliceable (users x items) interaction matrix, for `_compute_user_representation`
+        interact_coo = self._interactions.sparse_tensor.coalesce()
+        row, col = interact_coo.indices()
+        self.interact_mat = SparseTensor(row=row, col=col, sparse_sizes=interact_coo.shape).to(self._device)
 
         # Embeddings
         self.user_mf_embedding = nn.Embedding(self._num_users, self.factors, dtype=torch.float32)
@@ -125,7 +131,7 @@ class SVDpp(GeneralRecommender):
 
     def _compute_user_representation(self, users):
         item_y_all = self.item_y_embedding.weight
-        offsets, indices, _ = self._interactions.sparse_tensor[users].csr()
+        offsets, indices, _ = self.interact_mat[users].csr()
 
         puyj = nn.functional.embedding_bag(
             input=indices,

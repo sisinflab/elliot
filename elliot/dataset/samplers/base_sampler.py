@@ -8,7 +8,6 @@ from functools import partial
 from logging import LoggerAdapter
 from scipy.sparse import csr_matrix
 from tqdm import tqdm
-from torch.utils.data import Dataset, TensorDataset
 
 from elliot.utils import logging as elog
 from elliot.utils.enums import SamplerType, SessionStrategy
@@ -94,12 +93,6 @@ class AbstractSampler(ABC):
         """
         pass
 
-    def read_features(self, *args):
-        return args
-
-    def read_features_eval(self, *args):
-        return args
-
 
 class TraditionalSampler(AbstractSampler):
     """Materializes its whole event stream at once, via `sample_full()`, for
@@ -151,13 +144,11 @@ class TraditionalSampler(AbstractSampler):
         )
         samples = []
 
-        # Pick sample()/read_features() or their eval-time counterparts
+        # Pick sample() or its eval-time counterpart
         sample_fn = self.sample if not val else self.sample_eval
-        read_features_fn = self.read_features if not val else self.read_features_eval
 
         for it in iter_data:
             output = sample_fn(it)
-            output = read_features_fn(*output)
 
             # A hook may explode one sample into several (e.g. windowed sequences)
             if isinstance(output, list):
@@ -224,6 +215,48 @@ class PipelineSampler(AbstractSampler):
         )
 
         return tensors
+
+
+class SideInfoSampler(AbstractSampler):
+    """Base class for samplers drawing from a model's side information (e.g. a
+    knowledge graph, item/user attributes, ...) rather than its interaction data.
+
+    A side-info sampler is wired in separately from the interaction sampler, through
+    a recommender's own `side_info_sampler_config` (see
+    `AbstractRecommender._with_side_info_sampler`) and built by
+    `Interactions.get_side_info_dataloader` rather than `Interactions.get_dataloader`:
+    the two are sampled, batched and cached entirely independently, and only zipped
+    together (via `CombinedDataLoader`) into the single batch a model's `train_step`
+    sees. Because of this, a subclass never receives (and shouldn't expect) the
+    interaction-derived `users`/`items`/`n_users`/`n_items`/`train_dict`/
+    `transactions` that `Interactions.get_dataloader` forwards to an interaction
+    sampler -- only `seed` plus whatever the subclass itself declares (e.g.
+    `KGTriplesSampler`'s `kg_heads`/`kg_relations`/...).
+
+    Args:
+        seed (int): Random seed for reproducibility.
+        logger (LoggerAdapter, optional): Logging instance. Defaults to None.
+        **kwargs (Any): Forwarded to `AbstractSampler.__init__`.
+    """
+
+    type = SamplerType.PIPELINE
+
+    def __init__(self, seed: int, logger: Optional[LoggerAdapter] = None, **kwargs: Any):
+        # No interaction data to forward here -- see the class docstring
+        super().__init__(users=[], items=[], n_users=0, n_items=0, seed=seed, logger=logger, **kwargs)
+
+    def collate_fn(self, batch: List[Tuple[Any, ...]]) -> Tuple[torch.Tensor, ...]:
+        """Shuffle a batch of same-length tuples and stack each tuple position into
+        its own tensor.
+
+        Args:
+            batch (List[Tuple[Any, ...]]): The batch of tuples.
+
+        Returns:
+            Tuple[torch.Tensor, ...]: One tensor per tuple position.
+        """
+        self._r_shuffle(batch)
+        return tuple(torch.tensor(x, dtype=torch.long) for x in zip(*batch))
 
 
 class SessionSampler(AbstractSampler):
@@ -390,85 +423,3 @@ class SessionSampler(AbstractSampler):
             negatives.append(cand)
 
         return negatives
-
-
-class PipelineDataset(Dataset):
-    """Lazy `Dataset` for `SamplerType.PIPELINE` samplers, replaying `sampler.sample`
-    `m + 1` times per event (`m` extra negatives sampled per positive, when the
-    sampler declares one via its own `m` attribute).
-
-    Args:
-        sampler (AbstractSampler): The pipeline sampler to draw samples from.
-    """
-
-    def __init__(self, sampler: AbstractSampler):
-        super().__init__()
-        self.sampler = sampler
-        self.m = getattr(sampler, 'm', 0)
-
-    def __len__(self) -> int:
-        return self.sampler.events * (self.m + 1)
-
-    def __getitem__(self, index: int) -> Any:
-        real_idx = index // (self.m + 1)
-        return self.sampler.sample(real_idx)
-
-
-class SequentialDataset(Dataset):
-    """Lazy dataset for samplers whose `sample(it)` already returns a tuple of
-    built tensors (e.g. padded sequences). Left to PyTorch's default collate,
-    which stacks each tuple position independently.
-
-    Args:
-        sampler (AbstractSampler): The sampler to draw samples from.
-    """
-
-    def __init__(self, sampler: AbstractSampler):
-        super().__init__()
-        self.sampler = sampler
-
-    def __len__(self) -> int:
-        return self.sampler.events
-
-    def __getitem__(self, index: int) -> Any:
-        return self.sampler.sample(index)
-
-
-def build_dataset(sampler: AbstractSampler) -> Dataset:
-    """Wrap `sampler` into the `torch.utils.data.Dataset` matching its declared
-    `SamplerType`: an eagerly materialized `TensorDataset` for `TRADITIONAL`, or a
-    lazy `PipelineDataset`/`SequentialDataset` for `PIPELINE`/`SEQUENTIAL`. Any
-    `collate_fn` the sampler itself defines is attached to the returned dataset.
-
-    Args:
-        sampler (AbstractSampler): The sampler to wrap.
-
-    Returns:
-        Dataset: The dataset built from `sampler`.
-
-    Raises:
-        ValueError: If `sampler.type` is not a recognized `SamplerType`.
-    """
-    match sampler.type:
-        # Eagerly materialize the whole stream into one in-memory tensor dataset
-        case SamplerType.TRADITIONAL:
-            samples = sampler.sample_full()
-            tensors = tuple(torch.tensor(x, dtype=torch.long) for x in zip(*samples))
-            dataset = TensorDataset(*tensors)
-
-        # Lazy: sample one event per __getitem__ call
-        case SamplerType.PIPELINE:
-            dataset = PipelineDataset(sampler)
-
-        case SamplerType.SEQUENTIAL:
-            dataset = SequentialDataset(sampler)
-
-        case _:
-            raise ValueError(f"Invalid sampler type {sampler.type}")
-
-    # Forward the sampler's own collate_fn, if it declares one
-    collate_fn = getattr(sampler, 'collate_fn', None)
-    if collate_fn is not None:
-        setattr(dataset, 'collate_fn', collate_fn)
-
-    return dataset

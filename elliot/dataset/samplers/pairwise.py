@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Sequence, Tuple
 import numpy as np
 
 from elliot.dataset.samplers.base_sampler import TraditionalSampler, PipelineSampler
@@ -23,14 +23,14 @@ class PairWiseSampler(PipelineSampler):
 
         self._sampled_users = self._sample_users()
 
-    def sample(self, it: int) -> Tuple[int, int, int]:
+    def sample(self, it: int) -> Sequence[int]:
         """Build the (user, positive item, negative item) triple for event `it`.
 
         Args:
             it (int): Event index.
 
         Returns:
-            Tuple[int, int, int]: The (user, positive item, negative item) triple.
+            Sequence[int]: The (user, positive item, negative item) triple.
         """
         u = self._sampled_users[it]
         ui = self._ui_dict[u]

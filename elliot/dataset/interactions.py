@@ -3,7 +3,6 @@ import numpy as np
 import pandas as pd
 import torch
 from torch.utils.data import DataLoader
-from torch_sparse import SparseTensor
 from scipy.sparse import csr_matrix
 from collections import defaultdict
 from functools import cached_property
@@ -12,11 +11,12 @@ from tqdm import tqdm
 from elliot.dataset.modular_loaders.cache import SideInformation
 from elliot.dataset.modular_loaders.remap import (
     remap_embedding_payload,
+    remap_graph_payload,
     remap_pair_payload,
     remap_text_payload,
 )
-from elliot.dataset.modular_loaders.formats import EmbeddingPayload, TextPayload
-from elliot.dataset.samplers.base_sampler import build_dataset
+from elliot.dataset.modular_loaders.formats import EmbeddingPayload, GraphPayload, TextPayload
+from elliot.dataset.samplers.base_data import build_dataset
 from elliot.utils.enums import EntityAxis
 from elliot.utils.registry import sampler_registry
 
@@ -44,7 +44,7 @@ class Interactions:
     transactions: int
     sparse_ratings: csr_matrix
     sparse: csr_matrix
-    sparse_tensor: SparseTensor
+    sparse_tensor: torch.Tensor
 
     def __init__(
         self,
@@ -184,7 +184,13 @@ class Interactions:
 
         return users, items
 
-    def get_dataloader(self, sampler_name: str, batch_size: int = 1024, seed: int = 42, **kwargs: Any) -> DataLoader:
+    def get_dataloader(
+        self,
+        sampler_name: str,
+        batch_size: int = 1024,
+        seed: int = 42,
+        **kwargs: Any
+    ) -> DataLoader:
         """Build (or reuse a cached) dataloader over this split's interactions, for
         the given sampler.
 
@@ -238,6 +244,48 @@ class Interactions:
 
         return dataloader
 
+    def get_side_info_dataloader(
+        self,
+        sampler_name: str,
+        batch_size: int = 1024,
+        seed: int = 42,
+        **kwargs: Any
+    ) -> DataLoader:
+        """Build (or reuse a cached) dataloader for a `SideInfoSampler`, entirely
+        independent of this split's interaction data.
+
+        Unlike `get_dataloader`, no `train_dict`/`users`/`items`/`n_users`/`n_items`
+        are forwarded to the sampler - a side-info sampler draws from its own source
+        (e.g. a knowledge graph), so it only needs `seed` plus whatever `**kwargs`
+        itself declares (see `SideInfoSampler`).
+
+        Args:
+            sampler_name (str): Name of the sampler registered in `sampler_registry`.
+            batch_size (int): Batch size for the returned dataloader. Defaults to 1024.
+            seed (int): Random seed forwarded to the sampler. Defaults to 42.
+            **kwargs (Any): Additional keyword arguments forwarded to the sampler.
+
+        Returns:
+            DataLoader: The (possibly cached) dataloader for this sampler.
+        """
+        if sampler_name not in self._cached_datasets:
+            sampler = sampler_registry.get(
+                name=sampler_name,
+                seed=seed,
+                **kwargs
+            )
+            self._cached_datasets[sampler_name] = build_dataset(sampler)
+
+        dataset = self._cached_datasets[sampler_name]
+        dataloader = DataLoader(
+            dataset,
+            batch_size=batch_size,
+            collate_fn=getattr(dataset, 'collate_fn', None),
+            shuffle=True
+        )
+
+        return dataloader
+
     def build_items_neighbour(self) -> Dict[int, List[int]]:
         """Build, for every item, the list of user (private) indices that
         interacted with it, derived from `self.sparse`.
@@ -270,12 +318,12 @@ class Interactions:
         return self.sparse_ratings.astype(bool).astype('float32')
 
     @cached_property
-    def sparse_tensor(self) -> SparseTensor:
-        """`torch_sparse.SparseTensor` view of `self.sparse`."""
+    def sparse_tensor(self) -> torch.Tensor:
+        """Sparse (users x items) COO `torch.Tensor` view of `self.sparse`."""
         coo = self.sparse.tocoo()
-        row = torch.tensor(coo.row, dtype=torch.long)
-        col = torch.tensor(coo.col, dtype=torch.long)
-        return SparseTensor(row=row, col=col, sparse_sizes=coo.shape)
+        indices = torch.tensor(np.vstack([coo.row, coo.col]), dtype=torch.long)
+        values = torch.tensor(coo.data, dtype=torch.float32)
+        return torch.sparse_coo_tensor(indices, values, size=coo.shape).coalesce()
 
     @property
     def dataframe(self) -> pd.DataFrame:
@@ -412,6 +460,8 @@ class Interactions:
             return remap_embedding_payload(payload, mapping)
         if isinstance(payload, TextPayload):
             return remap_text_payload(payload, mapping)
+        if isinstance(payload, GraphPayload):
+            return remap_graph_payload(payload, mapping)
 
         return payload
 

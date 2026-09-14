@@ -7,7 +7,7 @@ in place.
 
 from typing import Any, Dict, List
 
-from elliot.dataset.modular_loaders.formats import EmbeddingPayload, TextPayload
+from elliot.dataset.modular_loaders.formats import EmbeddingPayload, GraphPayload, TextPayload
 
 
 def remap_embedding_payload(payload: EmbeddingPayload, inv_mapping: List[Any]) -> EmbeddingPayload:
@@ -153,6 +153,54 @@ def remap_text_payload(payload: TextPayload, inv_mapping: List[Any]) -> TextPayl
         raw_text=raw_text,
         id_map=private_id_map,
         vocab_size=payload.vocab_size
+    )
+
+
+def remap_graph_payload(payload: GraphPayload, inv_mapping: List[Any]) -> GraphPayload:
+    """`GraphPayload` counterpart of `remap_text_payload`: only `item_entity_map`
+    (item id -> KG entity id) is user/item-keyed, so only it is re-keyed from public
+    to private item ids `0..len(inv_mapping)-1`. Every other field (`heads`/
+    `relations`/`tails`, `id2entity`/`id2relation`) lives in the KG's own
+    entity/relation id space - shared across the whole dataset rather than scoped to
+    one fold - so it is passed through unchanged.
+
+    Args:
+        payload (GraphPayload): The public-item-id-keyed payload to remap.
+        inv_mapping (List[Any]): Inverse item mapping from private indices back to
+            public ids; `inv_mapping[private_id]` is that private id's public
+            counterpart.
+
+    Returns:
+        GraphPayload: The payload, with `item_entity_map` remapped into this fold's
+            private-id view.
+
+    Raises:
+        KeyError: If any id in `inv_mapping` is missing from `payload.item_entity_map`:
+            that would mean this fold's items aren't actually covered by the loader's
+            domain, which `discover()`/`filter()`'s cross-loader intersection is
+            supposed to already guarantee - surfacing it loudly here is cheaper than a
+            silent item misalignment downstream.
+    """
+    missing = [pub for pub in inv_mapping if pub not in payload.item_entity_map]
+    if missing:
+        raise KeyError(
+            f"{len(missing)} id(s) from this fold are not covered by the loader's "
+            f"payload domain (e.g. {missing[:5]}) - discover()/filter() should "
+            f"already guarantee every fold's items are covered; this signals a "
+            f"domain-intersection bug."
+        )
+
+    item_entity_map = {i: payload.item_entity_map[pub] for i, pub in enumerate(inv_mapping)}
+
+    return GraphPayload(
+        heads=payload.heads,
+        relations=payload.relations,
+        tails=payload.tails,
+        id2entity=payload.id2entity,
+        id2relation=payload.id2relation,
+        n_entities=payload.n_entities,
+        n_relations=payload.n_relations,
+        item_entity_map=item_entity_map
     )
 
 

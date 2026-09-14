@@ -242,9 +242,10 @@ class DataSetLoader:
 
     def _rename_cols_and_binarize_sequence(self, data: pd.DataFrame, **kwargs: Any) -> pd.DataFrame:
         """Rename the configured columns to their canonical names, derive a
-        `sessionId` from each source row, fall back to a synthetic per-user order key
-        when no real timestamp is available, and mark every interaction as implicit
-        feedback.
+        `sessionId` from each source row when `session_strategy` is SESSION_ONLY
+        (flattening a user's rows into a single sequence under FLAT instead), fall
+        back to a synthetic per-user order key when no real timestamp is available,
+        and mark every interaction as implicit feedback.
 
         Args:
             data (pd.DataFrame): The just-read, not-yet-renamed sequential interactions.
@@ -273,9 +274,15 @@ class DataSetLoader:
 
         data = data.rename(columns=col_mapping)
 
-        if "_sourceRow" in data.columns:
+        if (
+            "_sourceRow" in data.columns
+            and self.data_config.session_strategy == SessionStrategy.SESSION_ONLY
+        ):
             # Each raw source row is a distinct session for its user: number sessions
-            # 0, 1, 2, ... per user, in the order they appear in the source file
+            # 0, 1, 2, ... per user, in the order they appear in the source file.
+            # Under FLAT, a user's rows are instead flattened together into a single
+            # sequence (no sessionId), since a sequential source's rows may equally be
+            # a user's whole history split across multiple lines rather than sessions
             data["sessionId"] = data.groupby("userId")["_sourceRow"].transform(
                 lambda s: pd.factorize(s)[0]
             )

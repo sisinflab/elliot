@@ -8,7 +8,7 @@ from scipy.sparse import csr_matrix
 from torch.utils.data import Dataset, DataLoader
 from torch.nn.utils.rnn import pad_sequence
 
-from elliot.dataset.samplers.base_sampler import build_dataset
+from elliot.dataset.samplers.base_data import build_dataset
 from elliot.utils import logging
 from elliot.utils.enums import SessionStrategy
 from elliot.utils.registry import sampler_registry

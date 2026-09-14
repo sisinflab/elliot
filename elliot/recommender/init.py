@@ -13,14 +13,12 @@ def zeros_init(module):
 def normal_init(module, mean=0.0, std=0.1):
     if isinstance(module, nn.Embedding):
         normal_(module.weight.data, mean=mean, std=std)
-    elif isinstance(module, nn.Linear):
+    elif isinstance(module, (nn.Linear, nn.Conv2d)):
         normal_(module.weight.data, mean=mean, std=std)
         if module.bias is not None:
             zeros_(module.bias.data)
-    elif isinstance(module, nn.Conv2d):
-        normal_(module.weight.data, mean=mean, std=std)
-        if module.bias is not None:
-            zeros_(module.bias.data)
+    elif isinstance(module, nn.Parameter):
+        normal_(module.data, mean=mean, std=std)
     elif isinstance(module, np.ndarray):
         module[:] = np.random.normal(loc=mean, scale=std, size=module.shape)
 
@@ -28,10 +26,12 @@ def normal_init(module, mean=0.0, std=0.1):
 def xavier_normal_init(module):
     if isinstance(module, nn.Embedding):
         xavier_normal_(module.weight.data)
-    elif isinstance(module, nn.Linear):
+    elif isinstance(module, (nn.Linear, nn.Conv2d)):
         xavier_normal_(module.weight.data)
         if module.bias is not None:
             zeros_(module.bias.data)
+    elif isinstance(module, nn.Parameter):
+        xavier_normal_(module.data)
     elif isinstance(module, np.ndarray):
         module[:] = xavier_init(module.shape, init=np.random.normal)
 
@@ -39,10 +39,12 @@ def xavier_normal_init(module):
 def xavier_uniform_init(module):
     if isinstance(module, nn.Embedding):
         xavier_uniform_(module.weight.data)
-    elif isinstance(module, nn.Linear):
+    elif isinstance(module, (nn.Linear, nn.Conv2d)):
         xavier_uniform_(module.weight.data)
         if module.bias is not None:
             zeros_(module.bias.data)
+    elif isinstance(module, nn.Parameter):
+        xavier_uniform_(module.data)
     elif isinstance(module, np.ndarray):
         module[:] = xavier_init(module.shape, init=np.random.uniform)
 

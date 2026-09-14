@@ -283,15 +283,16 @@ class TestDataSetLoaderFailures:
 
 class TestSequenceProcessing:
 
-    def test_sequential_forces_session_only(self):
+    def test_sequential_respects_explicit_flat(self):
         config = {
             "dataset": "dataset_loader",
             "data_config": {
                 "strategy": "dataset",
                 "dataset_path": dataset_path("sequence_wide"),
                 "sequential": True,
-                # Explicitly requesting FLAT must still be overridden, since
-                # sequential source rows are already organized in sessions.
+                # A sequential source's rows may be a user's whole history split
+                # across multiple lines rather than sessions, so FLAT must be
+                # honored, not overridden, for sequential data too.
                 "session_strategy": "flat",
                 "reader": {"header": False}
             }
@@ -299,7 +300,28 @@ class TestSequenceProcessing:
 
         loader = get_loader(config)
 
-        assert loader.data_config.session_strategy == SessionStrategy.SESSION_ONLY
+        assert loader.data_config.session_strategy == SessionStrategy.FLAT
+        assert "sessionId" not in loader.dataframe.columns
+
+    def test_sequential_session_only_derives_session_per_row(self):
+        config = {
+            "dataset": "dataset_loader",
+            "data_config": {
+                "strategy": "dataset",
+                "dataset_path": dataset_path("sequence_wide"),
+                "sequential": True,
+                "session_strategy": "session_only",
+                "reader": {"header": False}
+            }
+        }
+
+        loader = get_loader(config)
+        df = loader.dataframe
+
+        assert list(df.columns) == ["userId", "itemId", "sessionId", "timestamp", "rating"]
+
+        u1 = df[df["userId"] == "1"].sort_values("timestamp")
+        assert list(u1["sessionId"]) == [0, 0, 0, 0, 0]
 
     def test_wide_synthesizes_order_key(self):
         config = {
@@ -317,13 +339,12 @@ class TestSequenceProcessing:
 
         assert loader.has_real_timestamps is False
         assert df.shape[0] == 12
-        assert list(df.columns) == ["userId", "itemId", "sessionId", "timestamp", "rating"]
+        assert list(df.columns) == ["userId", "itemId", "timestamp", "rating"]
         assert (df["rating"] == 1.0).all()
 
         u1 = df[df["userId"] == "1"].sort_values("timestamp")
         assert list(u1["itemId"]) == ["1", "2", "3", "4", "5"]
         assert list(u1["timestamp"]) == [0, 1, 2, 3, 4]
-        assert list(u1["sessionId"]) == [0, 0, 0, 0, 0]
 
     def test_inline_with_real_timestamp(self):
         config = {
@@ -384,7 +405,24 @@ class TestSequenceProcessing:
 
         assert (df["rating"] == 1.0).all()
 
-    def test_multi_row_user(self):
+    def test_multi_row_user_session_only(self):
+        config = {
+            "dataset": "dataset_loader",
+            "data_config": {
+                "strategy": "dataset",
+                "dataset_path": dataset_path("multi_row_user"),
+                "sequential": True,
+                "session_strategy": "session_only",
+                "reader": {"header": False}
+            }
+        }
+
+        df = load_data(config)
+
+        u1 = df[df["userId"] == "1"].sort_values("timestamp")
+        assert list(u1["sessionId"]) == [0, 0, 0, 1, 1]
+
+    def test_multi_row_user_flat_flattens_rows_into_one_sequence(self):
         config = {
             "dataset": "dataset_loader",
             "data_config": {
@@ -397,8 +435,9 @@ class TestSequenceProcessing:
 
         df = load_data(config)
 
+        assert "sessionId" not in df.columns
         u1 = df[df["userId"] == "1"].sort_values("timestamp")
-        assert list(u1["sessionId"]) == [0, 0, 0, 1, 1]
+        assert list(u1["itemId"]) == ["1", "2", "3", "4", "5"]
 
     def test_interactions_with_real_timestamp_segments_sessions(self):
         config = {

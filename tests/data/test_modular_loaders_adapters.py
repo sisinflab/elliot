@@ -1,5 +1,6 @@
 import pytest
 import numpy as np
+import torch
 
 from elliot.dataset.modular_loaders.build import (
     npy_folder_to_embedding_payload,
@@ -8,6 +9,7 @@ from elliot.dataset.modular_loaders.build import (
     rows_to_embedding_payload
 )
 from elliot.dataset.modular_loaders.materialize import (
+    dedupe_edges,
     embedding_to_dense,
     embedding_to_sparse,
     feature_map_to_sparse,
@@ -67,13 +69,36 @@ class TestAdapters:
             heads=np.array([0, 1]),
             relations=np.array([1, 1]),
             tails=np.array([1, 2]),
-            entity2id={0: 0, 1: 1, 2: 2},
-            relation2id={10: 1},
+            id2entity={0: 0, 1: 1, 2: 2},
+            id2relation={1: 10},
         )
         edge_index = graph_triples_to_edge_index(payload)
         assert edge_index.shape == (2, 2)
         adjacency = graph_triples_to_adjacency(payload, n_nodes=3)
         assert adjacency.nnz == 4  # symmetrized
+
+    def test_dedupe_edges_drops_repeated_head_tail_relation_triples(self):
+        # (0, 2) repeated with the same relation (5, collapses); (1, 3) appears with
+        # two distinct relations (5 and 6, both kept) - 3 unique triples overall.
+        edge_index = torch.tensor([[0, 0, 1, 1, 1], [2, 2, 3, 3, 3]])
+        edge_attr = torch.tensor([5, 5, 5, 5, 6])
+
+        deduped_index, deduped_attr = dedupe_edges(edge_index, edge_attr)
+
+        assert deduped_index.shape == (2, 3)
+        triples = set(zip(deduped_index[0].tolist(), deduped_index[1].tolist(), deduped_attr.tolist()))
+        assert triples == {(0, 2, 5), (1, 3, 5), (1, 3, 6)}
+
+    def test_dedupe_edges_without_attr_ignores_relation(self):
+        # Same raw edges as above, but with no edge_attr: (0, 2) and (1, 3) collapse
+        # to one edge each regardless of the (dropped) relation.
+        edge_index = torch.tensor([[0, 0, 1, 1, 1], [2, 2, 3, 3, 3]])
+
+        deduped_index = dedupe_edges(edge_index)
+
+        assert deduped_index.shape == (2, 2)
+        pairs = set(zip(deduped_index[0].tolist(), deduped_index[1].tolist()))
+        assert pairs == {(0, 2), (1, 3)}
 
     def test_pairwise_ids_from_raw_adjacency_list_layout(self):
         assert pairwise_ids_from_raw({"1": ["2", "3"]}) == {1, 2, 3}

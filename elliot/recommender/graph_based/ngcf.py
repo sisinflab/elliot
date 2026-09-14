@@ -8,7 +8,6 @@ from typing import Tuple
 import torch
 import torch_geometric
 from torch import nn
-from torch_sparse import SparseTensor
 
 from elliot.dataset import Interactions
 from elliot.namespace import RecommenderConfig
@@ -82,7 +81,7 @@ class NGCF(GraphBasedRecommender):
         self.Gi = nn.Embedding(self._num_items, self.factors)
 
         # Adjacency matrix
-        self.adj = self.get_adj_mat()
+        self.adj = self.get_adj_mat(normalize=self.normalize)
 
         # Optionally define a dropout layer (optimized for sparse data)
         self.sparse_dropout = SparseDropout(self.node_dropout) if self.node_dropout > 0 else None
@@ -184,38 +183,3 @@ class NGCF(GraphBasedRecommender):
             einsum_string, user_embeddings, item_embeddings
         )
         return predictions
-
-    def get_adj_mat(self):
-        A = super().get_adj_mat()
-
-        # Return the simple adjacency matrix
-        # in case the 'normalize' flag is set to False
-        if not self.normalize:
-            return A
-
-        # Symmetric Normalization: D^{-0.5} A D^{-0.5}
-        # Convert to COO format for better work with rows, cols, and values
-        A = A.to_torch_sparse_coo_tensor().coalesce()
-        indices = A.indices()
-        row, col = indices[0], indices[1]
-        values = A.values()
-
-        # Compute D^{-0.5} diagonal values
-        deg = torch.zeros(A.size(0), dtype=values.dtype, device=values.device)
-        deg.index_add_(0, row, values)
-        # Add epsilon to avoid division by zero
-        deg[deg == 0] = 1e-7
-        deg_inv_sqrt = deg.pow(-0.5)
-
-        # L = D^{-0.5} A D^{-0.5}
-        new_val = deg_inv_sqrt[row] * values * deg_inv_sqrt[col]
-
-        # Return the tensor as a SparseTensor
-        normalized_adj = SparseTensor(
-            row=row,
-            col=col,
-            value=new_val,
-            sparse_sizes=A.shape
-        )
-
-        return normalized_adj

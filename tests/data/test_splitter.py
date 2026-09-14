@@ -28,8 +28,8 @@ def load_and_split_data(config_dict, file_name=None, seq=False, session_strategy
     val_data, main_data = loader.build()
     return val_data, main_data
 
-def load_and_split_sequence_data(config_dict):
-    return load_and_split_data(config_dict, "sequence", True)
+def load_and_split_sequence_data(config_dict, session_strategy="session_only"):
+    return load_and_split_data(config_dict, "sequence", True, session_strategy=session_strategy)
 
 
 class TestSplitter:

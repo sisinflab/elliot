@@ -30,10 +30,12 @@ class DataConfig(BaseConfig):
         sequential (bool): Whether to load sequential or interactions data. Defaults to False.
         session_strategy (SessionStrategy): Whether to segment interactions into sessions
             (SESSION_ONLY) or keep each user's whole history as a single flat sequence (FLAT).
-            Segmenting requires dropping users left with fewer than two sessions, which can shrink
-            some datasets substantially, so it's opt-in. Defaults to FLAT, and is always forced to
-            SESSION_ONLY when `sequential` is True, since sequential data is already organized in
-            per-row sessions.
+            Applies to sequential data too: each source row can be treated as one session
+            (SESSION_ONLY) or flattened, alongside a user's other rows, into a single sequence
+            (FLAT) — a sequential source doesn't imply its rows are sessions rather than a
+            user's whole history split across multiple lines. Segmenting requires dropping
+            users left with fewer than two sessions, which can shrink some datasets
+            substantially, so it's opt-in. Defaults to FLAT.
         reader (Any): Reading configuration.
         side_information(List[Any]): List of side-info configurations. Defaults to [].
     """
@@ -45,18 +47,6 @@ class DataConfig(BaseConfig):
     session_strategy: SessionStrategy = SessionStrategy.FLAT
     reader: Any = Field(default={}, exclude=True)
     side_information: List[Any] = []
-
-    @model_validator(mode="after")
-    def resolve_session_strategy(self) -> "DataConfig":
-        """Force SESSION_ONLY when reading sequential data, since each row of a
-        sequential source file is already a distinct session.
-
-        Returns:
-            DataConfig: The object itself.
-        """
-        if self.sequential:
-            self.session_strategy = SessionStrategy.SESSION_ONLY
-        return self
 
     @model_validator(mode="after")
     def build_reader_config(self):

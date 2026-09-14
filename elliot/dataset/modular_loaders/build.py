@@ -15,16 +15,33 @@ from elliot.utils.folder import path_joiner
 from elliot.utils.read import Reader
 
 
-def public_id_map(ids: Iterable[Any]) -> Dict[Any, int]:
-    """Assign a deterministic `0..n-1` row index to every id in `ids`, in sorted order.
+def public_id_map(ids: Iterable[Any], priority: Optional[Iterable[Any]] = None) -> Dict[Any, int]:
+    """Assign a deterministic `0..n-1` row index to every id in `ids`. With no
+    `priority`, ids are indexed in plain sorted order. With `priority`, the ids in
+    it (deduped, order preserved, anything not in `ids` dropped) get the lowest
+    indices first, in that order; every other id follows, in sorted order - e.g. so
+    an item's KG entity always gets a lower id than any other KG entity, the
+    convention KGIN's own dataset dumps use (see `kg.kg_triples.KGTriplesLoader`).
 
     Args:
         ids (Iterable[Any]): The domain ids to index.
+        priority (Iterable[Any], optional): Ids to place first, in this order.
+            Defaults to None, indexing every id in plain sorted order.
 
     Returns:
         Dict[Any, int]: Mapping from a domain id to its row index.
     """
-    return {entity_id: idx for idx, entity_id in enumerate(sorted(ids))}
+    ids = set(ids)
+    if not priority:
+        ids = ids if all(isinstance(x, str) for x in ids) else sorted(ids)
+        return {entity_id: idx for idx, entity_id in enumerate(ids)}
+
+    priority_ids = list(dict.fromkeys(i for i in priority if i in ids))
+    remaining_ids = sorted(ids - set(priority_ids))
+
+    id_map = {entity_id: idx for idx, entity_id in enumerate(priority_ids)}
+    id_map.update({entity_id: idx + len(priority_ids) for idx, entity_id in enumerate(remaining_ids)})
+    return id_map
 
 
 def rows_to_embedding_payload(
@@ -162,14 +179,17 @@ def raw_feature_map_to_embedding_payload(feature_map: Dict[Any, List[Any]], item
     )
 
 
-def _resolve_pairwise_id(key: Any) -> Any:
-    """Coerce a raw JSON key/value into the same id type `Reader.read_mapping`-style
-    id sets use: `int` when possible (even via a `"1.0"`-style float string), else the
-    original string. Shared by `pairwise_raw_to_embedding_payload` and
-    `pairwise_ids_from_raw` so both agree on what an id looks like.
+def coerce_id(key: Any) -> Any:
+    """Coerce a raw string (or JSON key/value) into the same id type
+    `Reader.read_mapping`-style id sets use: `int` when possible (even via a
+    `"1.0"`-style float string), else the original string. Shared by every reader that
+    doesn't know upfront whether the raw ids it's parsing are numeric (matching an
+    existing `int`-typed user/item domain) or opaque strings (e.g. KG URIs) -
+    `pairwise_raw_to_embedding_payload`, `pairwise_ids_from_raw`, and the KG triples
+    loaders (`kg.kg_triples`).
 
     Args:
-        key (Any): The raw JSON key or value to coerce.
+        key (Any): The raw JSON key/value or string token to coerce.
 
     Returns:
         Any: The coerced id, as `int` when possible, else the original string.
@@ -202,14 +222,14 @@ def pairwise_ids_from_raw(raw: Dict[str, Any]) -> Set[Any]:
     for key, value in raw.items():
         # Adjacency-list entry: collect the source id and every target id
         if isinstance(value, list):
-            ids.add(_resolve_pairwise_id(key))
-            ids.update(_resolve_pairwise_id(v) for v in value)
+            ids.add(coerce_id(key))
+            ids.update(coerce_id(v) for v in value)
 
         # Weighted-pair-key entry: split "a_b" into its two ids
         else:
             a_key, b_key = str(key).split("_", 1)
-            ids.add(_resolve_pairwise_id(a_key))
-            ids.add(_resolve_pairwise_id(b_key))
+            ids.add(coerce_id(a_key))
+            ids.add(coerce_id(b_key))
 
     return ids
 
@@ -235,11 +255,11 @@ def pairwise_raw_to_embedding_payload(raw: Dict[str, Any], id_map: Dict[Any, int
     for key, value in raw.items():
         # Adjacency-list entry: unweighted edges, weight defaults to 1.0
         if isinstance(value, list):
-            src = _resolve_pairwise_id(key)
+            src = coerce_id(key)
             if src not in id_map:
                 continue
             for dst_key in value:
-                dst = _resolve_pairwise_id(dst_key)
+                dst = coerce_id(dst_key)
                 if dst not in id_map:
                     continue
                 rows.append(id_map[src])
@@ -249,7 +269,7 @@ def pairwise_raw_to_embedding_payload(raw: Dict[str, Any], id_map: Dict[Any, int
         # Weighted-pair-key entry: explicit float weight
         else:
             a_key, b_key = str(key).split("_", 1)
-            src, dst = _resolve_pairwise_id(a_key), _resolve_pairwise_id(b_key)
+            src, dst = coerce_id(a_key), coerce_id(b_key)
             if src not in id_map or dst not in id_map:
                 continue
             rows.append(id_map[src])
@@ -270,6 +290,7 @@ def pairwise_raw_to_embedding_payload(raw: Dict[str, Any], id_map: Dict[Any, int
 def build_entity_relation_index(
     triples: List[Tuple[str, str, str]],
     reciprocal: bool = False,
+    priority_entities: Optional[Iterable[Any]] = None,
 ) -> Tuple[List[Tuple[str, str, str]], Dict[str, int], Dict[str, int]]:
     """From a list of `(s, p, o)` string triples, build sorted (deterministic)
     `entity2id`/`relation2id` indices. When `reciprocal`, an `inverse_<predicate>`
@@ -281,6 +302,10 @@ def build_entity_relation_index(
             string triples.
         reciprocal (bool): If True, add an `inverse_<predicate>` relation plus the
             reversed triple for every original triple. Defaults to False.
+        priority_entities (Iterable[Any], optional): Entities to assign the lowest
+            ids first, in this order (see `public_id_map`) - e.g. an item's KG
+            entity, so it lands before any other KG entity. Defaults to None,
+            indexing every entity in plain sorted order.
 
     Returns:
         Tuple[List[Tuple[str, str, str]], Dict[str, int], Dict[str, int]]:
@@ -295,7 +320,7 @@ def build_entity_relation_index(
     entities = {s for s, _, _ in triples} | {o for _, _, o in triples}
     predicates = {p for _, p, _ in triples}
 
-    entity2id = public_id_map(entities)
+    entity2id = public_id_map(entities, priority=priority_entities)
     relation2id = public_id_map(predicates)
     return triples, entity2id, relation2id
 
@@ -304,8 +329,9 @@ def triples_to_graph_payload(
     triples: List[Tuple[str, str, str]],
     entity2id: Dict[str, int],
     relation2id: Dict[str, int],
-    item_entity_map: Optional[Dict[Any, int]] = None,
-    user_entity_map: Optional[Dict[Any, int]] = None,
+    item_entity_map: Dict[Any, int],
+    remap_entity: bool = True,
+    remap_relation: bool = True
 ) -> GraphPayload:
     """Vectorize `(s, p, o)` string triples into the canonical `GraphPayload`, using an
     existing `entity2id`/`relation2id` index (see `build_entity_relation_index`).
@@ -314,27 +340,46 @@ def triples_to_graph_payload(
         triples (List[Tuple[str, str, str]]): The `(subject, predicate, object)`
             string triples.
         entity2id (Dict[str, int]): Existing entity id index (see
-            `build_entity_relation_index`).
-        relation2id (Dict[str, int]): Existing relation id index (see
-            `build_entity_relation_index`).
-        item_entity_map (Dict[Any, int], optional): Item id -> KG entity id map,
-            exposed on the produced payload. Defaults to None.
-        user_entity_map (Dict[Any, int], optional): User id -> KG entity id map,
-            exposed on the produced payload. Defaults to None.
+            `build_entity_relation_index`), keyed by whatever id `triples`
+            themselves use - used here only to vectorize them.
+        relation2id (Dict[str, int]): Existing relation id index, analogous to
+            `entity2id`.
+        item_entity_map (Dict[Any, int]): Item id -> KG entity id map, exposed on
+            the produced payload as-is.
+        remap_entity (bool): If True, vectorize the triples' subject/object strings 
+            into the `entity2id` index. Defaults to True.
+        remap_relation (bool): If True, vectorize the triples' predicate strings 
+            into the `relation2id` index. Defaults to True.
 
     Returns:
         GraphPayload: The vectorized triples.
     """
+    heads = [entity2id[s] if remap_entity else s for s, _, _ in triples]
+    relations = [relation2id[p] if remap_relation else p for _, p, _ in triples]
+    tails = [entity2id[o] if remap_entity else o for _, _, o in triples]
+
     # Vectorize each triple's (head, relation, tail) into parallel int-id arrays
-    heads = np.array([entity2id[s] for s, _, _ in triples], dtype=np.int64)
-    relations = np.array([relation2id[p] for _, p, _ in triples], dtype=np.int64)
-    tails = np.array([entity2id[o] for _, _, o in triples], dtype=np.int64)
+    heads = np.array(heads, dtype=np.int64)
+    relations = np.array(relations, dtype=np.int64)
+    tails = np.array(tails, dtype=np.int64)
+
+    # Build final id -> raw KG entity id mapping only if raw KG entity ids are provided
+    id2entity = (
+        None if all(coerce_id(raw_id) == coerce_id(final_id) for raw_id, final_id in entity2id.items())
+        else {final_id: raw_id for raw_id, final_id in entity2id.items()}
+    )
+    id2relation = (
+        None if all(coerce_id(raw_id) == coerce_id(final_id) for raw_id, final_id in relation2id.items())
+        else {final_id: raw_id for raw_id, final_id in relation2id.items()}
+    )
+
     return GraphPayload(
         heads=heads,
         relations=relations,
         tails=tails,
-        entity2id=entity2id,
-        relation2id=relation2id,
-        item_entity_map=item_entity_map,
-        user_entity_map=user_entity_map,
+        id2entity=id2entity,
+        id2relation=id2relation,
+        n_entities=len(entity2id),
+        n_relations=len(relation2id),
+        item_entity_map=item_entity_map
     )

@@ -1,10 +1,10 @@
-import typing as t
+from typing import List, Tuple, Union
 import torch
 from torch import nn, Tensor
 from torch.nn.init import zeros_, xavier_normal_
-from torch_sparse import SparseTensor
 
 from elliot.recommender.init import normal_init
+from elliot.recommender.modules import SparseAdjacency
 
 
 def get_activation(activation: str = "relu") -> nn.Module:
@@ -56,7 +56,7 @@ class MLP(nn.Module):
 
     def __init__(
         self,
-        layers: t.List[int],
+        layers: List[int],
         dropout: float = 0.0,
         activation: str = "relu",
         batch_normalization: bool = False,
@@ -64,7 +64,7 @@ class MLP(nn.Module):
         last_activation: bool = True,
     ):
         super(MLP, self).__init__()
-        mlp_modules: t.List[nn.Module] = []
+        mlp_modules: List[nn.Module] = []
         for input_size, output_size in zip(layers[:-1], layers[1:]):
             mlp_modules.append(nn.Dropout(p=dropout))
             mlp_modules.append(nn.Linear(input_size, output_size))
@@ -103,43 +103,144 @@ class SparseDropout(nn.Module):
             )
         self.p = p
 
-    def forward(self, X: SparseTensor) -> SparseTensor:
-        """Apply dropout to SparseTensor.
+    def forward(self, X: Union[Tensor, SparseAdjacency]) -> Union[Tensor, SparseAdjacency]:
+        """Apply dropout to a sparse matrix.
 
         Args:
-            X (SparseTensor): The input tensor.
+            X (Union[Tensor, SparseAdjacency]): The input matrix - either a
+                `SparseAdjacency` or a plain `torch.sparse_coo_tensor`.
 
         Returns:
-            SparseTensor: The tensor after the dropout.
+            Union[Tensor, SparseAdjacency]: The matrix after the dropout,
+                rescaled so that the expected value is unchanged, in the same
+                representation as the input.
         """
         if self.p == 0 or not self.training:
             return X
 
-        # Get indices and values of the sparse tensor
-        X = X.to_torch_sparse_coo_tensor().coalesce()
+        if isinstance(X, SparseAdjacency):
+            _, _, values = X.coo()
+            keep = (torch.rand(values.numel(), device=values.device) > self.p).to(values.dtype)
+            return X.set_value(values * keep / (1 - self.p))
+
+        # Plain torch sparse COO tensor
+        X = X.coalesce()
         indices = X.indices()
         values = X.values()
 
-        # Calculate number of non-zero elements
-        n_nonzero_elems = len(values)
+        random_tensor = torch.rand(values.numel(), device=X.device)
+        dropout_mask = random_tensor > self.p
 
-        # Create a dropout mask
-        random_tensor = torch.rand(n_nonzero_elems, device=X.device)
-        dropout_mask = (random_tensor > self.p)
-
-        # Apply mask and scale
         out_indices = indices[:, dropout_mask]
         out_values = values[dropout_mask] / (1 - self.p)
 
-        # Return the tensor as a SparseTensor
-        filtered_adj = SparseTensor(
-            row=out_indices[0],
-            col=out_indices[1],
-            value=out_values,
-            sparse_sizes=X.shape
-        )
+        return torch.sparse_coo_tensor(
+            out_indices, out_values, X.shape, device=X.device
+        ).coalesce()
 
-        return filtered_adj
+
+class EdgeDropout(nn.Module):
+    """Dropout layer for graph edges: prunes a `p` fraction of a `(2, n_edges)`
+    edge index, carrying along the parallel per-edge relation-type tensor so
+    the two stay in sync.
+
+    Args:
+        p (float): Dropout rate. Values accepted in range [0, 1].
+
+    Raises:
+        ValueError: If p is not in range.
+    """
+
+    def __init__(self, p: float):
+        super(EdgeDropout, self).__init__()
+        if not (0 <= p <= 1):
+            raise ValueError(
+                f"Dropout probability has to be between 0 and 1, but got {p}"
+            )
+        self.p = p
+
+    def forward(self, edge_index: Tensor, edge_type: Tensor) -> Tuple[Tensor, Tensor]:
+        """Apply dropout to an edge index and its parallel relation-type tensor.
+
+        Args:
+            edge_index (Tensor): The `(2, n_edges)` `(head, tail)` edge index.
+            edge_type (Tensor): The parallel `(n_edges,)` relation-type tensor.
+
+        Returns:
+            Tuple[Tensor, Tensor]: The pruned `(edge_index, edge_type)` pair.
+        """
+        if self.p == 0 or not self.training:
+            return edge_index, edge_type
+
+        n_edges = edge_index.shape[1]
+        keep = torch.randperm(n_edges, device=edge_index.device)[:int(n_edges * (1 - self.p))]
+        return edge_index[:, keep], edge_type[keep]
+
+
+class RelationAwareEdgeDropout(nn.Module):
+    """Edge dropout applied independently within every relation type, so a rare
+    relation isn't starved by a single global draw over the whole edge set - a
+    per-relation wrapper around a single shared `EdgeDropout`.
+
+    Args:
+        p (float): Dropout rate, forwarded to the underlying `EdgeDropout`.
+    """
+
+    def __init__(self, p: float):
+        super().__init__()
+        self.edge_dropout = EdgeDropout(p)
+
+    def forward(self, edge_index: Tensor, edge_type: Tensor) -> Tuple[Tensor, Tensor]:
+        """Apply per-relation dropout to an edge index and its parallel
+        relation-type tensor.
+
+        Args:
+            edge_index (Tensor): The `(2, n_edges)` `(head, tail)` edge index.
+            edge_type (Tensor): The parallel `(n_edges,)` relation-type tensor.
+
+        Returns:
+            Tuple[Tensor, Tensor]: The pruned `(edge_index, edge_type)` pair.
+        """
+        sampled_index, sampled_type = [], []
+        for rel in torch.unique(edge_type):
+            mask = edge_type == rel
+            idx, typ = self.edge_dropout(edge_index[:, mask], edge_type[mask])
+            sampled_index.append(idx)
+            sampled_type.append(typ)
+        return torch.cat(sampled_index, dim=1), torch.cat(sampled_type, dim=0)
+
+
+class RelationWeightedMeanAggregator(nn.Module):
+    """Relation-weighted mean aggregation over a knowledge graph: for every
+    entity, the mean over its incoming `(head, relation, tail)` edges of
+    `entity_emb[tail] * relation_weight[relation]`. Relation id `0` is assumed
+    reserved for a relation with no learned embedding (e.g. a non-KG
+    "interacts" relation) and is excluded from `relation_weight` indexing.
+    """
+
+    def forward(
+        self, entity_emb: Tensor, edge_index: Tensor, edge_type: Tensor, relation_weight: Tensor
+    ) -> Tensor:
+        """
+        Args:
+            entity_emb (Tensor): The `(n_entities, channel)` entity embeddings.
+            edge_index (Tensor): The `(2, n_edges)` `(head, tail)` edge index.
+            edge_type (Tensor): The parallel `(n_edges,)` relation-type tensor.
+            relation_weight (Tensor): The `(n_relations - 1, channel)` per-relation weights.
+
+        Returns:
+            Tensor: The `(n_entities, channel)` aggregated entity embeddings.
+        """
+        n_entities, channel = entity_emb.shape
+        head, tail = edge_index[0], edge_index[1]
+        edge_relation_emb = relation_weight[edge_type - 1]
+        neigh_relation_emb = entity_emb[tail] * edge_relation_emb
+
+        entity_agg = torch.zeros(n_entities, channel, device=entity_emb.device)
+        entity_agg.index_add_(0, head, neigh_relation_emb)
+        neigh_count = torch.zeros(n_entities, device=entity_emb.device)
+        neigh_count.index_add_(0, head, torch.ones(head.shape[0], device=entity_emb.device))
+        return entity_agg / neigh_count.clamp(min=1.0).unsqueeze(-1)
 
 
 class NGCFLayer(nn.Module):
@@ -180,13 +281,13 @@ class NGCFLayer(nn.Module):
         zeros_(self.b1.data)
         zeros_(self.b2.data)
 
-    def forward(self, ego_embeddings: Tensor, adj_matrix: SparseTensor) -> Tensor:
+    def forward(self, ego_embeddings: Tensor, adj_matrix: SparseAdjacency) -> Tensor:
         """
         Performs a single NGCF propagation step.
 
         Args:
             ego_embeddings (Tensor): Current embeddings of all nodes (users + items).
-            adj_matrix (SparseTensor): Normalized adjacency matrix (A_hat).
+            adj_matrix (SparseAdjacency): Normalized adjacency matrix (A_hat).
 
         Returns:
             Tensor: Propagated embeddings for the next layer.

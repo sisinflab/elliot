@@ -4,7 +4,7 @@ compute with. None of these touch the filesystem or build a payload themselves -
 `.build` for that half of the pipeline.
 """
 
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 import numpy as np
 import scipy.sparse as sp
 import torch
@@ -177,6 +177,75 @@ def graph_triples_to_edge_index(payload: GraphPayload) -> torch.Tensor:
     heads = torch.as_tensor(payload.heads, dtype=torch.long)
     tails = torch.as_tensor(payload.tails, dtype=torch.long)
     return torch.stack([heads, tails], dim=0)
+
+
+def graph_item_entity_ids_to_tensor(payload: GraphPayload, device: Optional[Any] = None) -> torch.Tensor:
+    """Materialize a `GraphPayload.item_entity_map` into a dense `int64`
+    `torch.LongTensor` indexed by private item id `0..n_items-1` - the bridge a
+    recommender needs to gather its own (private-index-ordered) item embeddings
+    from the KG's shared entity embedding table.
+
+    `payload` is expected to already be this fold's private-id view (as returned by
+    `Interactions.get_side_info()`, via `remap_graph_payload` - see
+    `elliot.dataset.modular_loaders.remap`), i.e. `item_entity_map` keyed by private
+    item id, not the loader's raw public-id-keyed one.
+
+    Args:
+        payload (GraphPayload): The (already fold-private) payload whose
+            `item_entity_map` to materialize.
+        device (Any, optional): Device to move the resulting tensor to. Defaults to
+            None, keeping the tensor on its default device.
+
+    Returns:
+        torch.Tensor: The `int64` entity id tensor, indexed by private item id.
+    """
+    n_items = len(payload.item_entity_map)
+    tensor = torch.tensor(
+        [payload.item_entity_map[i] for i in range(n_items)], dtype=torch.long
+    )
+    return tensor.to(device) if device is not None else tensor
+
+
+def dedupe_edges(
+    edge_index: torch.Tensor,
+    edge_attr: Optional[torch.Tensor] = None,
+    device: Optional[Any] = None,
+) -> Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
+    """Remove duplicate rows from a `(2, n_edges)` edge index (and its optional
+    parallel per-edge attribute, e.g. a relation type) - payload-agnostic building
+    block for any model that must not double-count a repeated edge. Combine with
+    `graph_triples_to_edge_index`'s output and `payload.relations` for a
+    relation-aware KG-propagation model (e.g. KGIN), which expects one edge per
+    distinct (head, relation, tail) triple, not per occurrence in the raw data.
+
+    Args:
+        edge_index (torch.Tensor): The `(2, n_edges)` edge index to de-duplicate.
+        edge_attr (torch.Tensor, optional): A parallel `(n_edges,)` per-edge
+            attribute (e.g. relation type); when given, two edges are only
+            considered duplicates if they also share the same attribute value.
+            Defaults to None.
+        device (Any, optional): Device to move the result(s) to. Defaults to None,
+            keeping them on their default device.
+
+    Returns:
+        torch.Tensor | Tuple[torch.Tensor, torch.Tensor]: The de-duplicated
+            `(2, n_unique_edges)` edge index alone, or paired with the matching
+            `(n_unique_edges,)` attribute tensor when `edge_attr` was given.
+    """
+    columns = [edge_index[0], edge_index[1]] + ([edge_attr] if edge_attr is not None else [])
+    unique_rows = torch.unique(torch.stack(columns, dim=1), dim=0)
+
+    deduped_index = unique_rows[:, :2].T.contiguous()
+    if device is not None:
+        deduped_index = deduped_index.to(device)
+
+    if edge_attr is None:
+        return deduped_index
+
+    deduped_attr = unique_rows[:, 2].contiguous()
+    if device is not None:
+        deduped_attr = deduped_attr.to(device)
+    return deduped_index, deduped_attr
 
 
 def graph_triples_to_adjacency(payload: GraphPayload, n_nodes: int) -> sp.csr_matrix:

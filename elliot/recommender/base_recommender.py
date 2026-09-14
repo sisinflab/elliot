@@ -1,18 +1,19 @@
+from typing import List, Tuple, Optional, no_type_check, Union, Any
 import inspect
 import random
 import logging as pylog
-from typing import List, Tuple, Optional, no_type_check
-
 import numpy as np
 import torch
-
 from torch import nn, Tensor
-from torch_sparse import SparseTensor
+from torch.utils.data import DataLoader
 from abc import ABC, abstractmethod
 
 from elliot.dataset import Interactions, Sessions
+from elliot.dataset.modular_loaders.materialize import graph_item_entity_ids_to_tensor
+from elliot.dataset.samplers import CombinedDataLoader
 from elliot.namespace import RecommenderConfig
 from elliot.recommender.init import zeros_init
+from elliot.recommender.layers import SparseAdjacency
 from elliot.utils import get_device, logging
 from elliot.utils.enums import ModelType, SamplerType
 from elliot.utils.registry import sampler_registry
@@ -23,6 +24,7 @@ from elliot.utils.write import Writer
 class AbstractRecommender(ABC):
     type: ModelType
     sampler_config: dict = {}
+    side_info_sampler_config: dict = {}
     loaders: List[str] = []
 
     def __init__(
@@ -112,9 +114,10 @@ class AbstractRecommender(ABC):
     def predict(self, *args, item_indices=None, **kwargs):
         raise NotImplementedError()
 
-    def _check_sampler(self, allowed_types):
+    def _check_sampler(self, allowed_types, config: Optional[dict] = None):
+        config = self.sampler_config if config is None else config
         try:
-            sampler_name = self.sampler_config.pop("name")
+            sampler_name = config.pop("name")
         except KeyError:
             raise ValueError(
                 f"Sampler name is not specified for {self.__class__.__name__}. "
@@ -129,6 +132,44 @@ class AbstractRecommender(ABC):
                 f"Please use a sampler of type {'or '.join([t.name for t in allowed_types])}."
             )
         return sampler_name
+
+    def _check_for_side_info_dataloader(
+        self,
+        dataloader: DataLoader[Any],
+        batch_size: int
+    ) -> Union[DataLoader[Any], CombinedDataLoader]:
+        """Wrap `dataloader` together with a second one built from
+        `self.side_info_sampler_config`, when the model declares one.
+
+        This is how side information (e.g. a knowledge graph) gets its own,
+        entirely independent sampler instead of being folded into the
+        interaction sampler producing `dataloader`: the two are sampled, batched
+        and cached separately, and only zipped together (via
+        `CombinedDataLoader`) into the combined batch a model's `train_step` sees.
+
+        Args:
+            dataloader (DataLoader[Any]): The (already built) primary training dataloader.
+            batch_size (int): Batch size for the side-information dataloader.
+
+        Returns:
+            Union[DataLoader[Any], CombinedDataLoader]: The unwrapped `dataloader`,
+                or a `CombinedDataLoader` pairing it with the side-information dataloader.
+        """
+        if not self.side_info_sampler_config:
+            return dataloader
+
+        side_info_sampler_config = dict(self.side_info_sampler_config)
+        sampler_name = self._check_sampler(
+            allowed_types=(SamplerType.TRADITIONAL, SamplerType.PIPELINE),
+            config=side_info_sampler_config
+        )
+        side_info_dataloader = self._interactions.get_side_info_dataloader(
+            sampler_name=sampler_name,
+            batch_size=batch_size,
+            seed=self._seed,
+            **side_info_sampler_config
+        )
+        return CombinedDataLoader(dataloader, side_info_dataloader)
 
 
 class BaseRecommender(AbstractRecommender):
@@ -177,7 +218,7 @@ class BaseRecommender(AbstractRecommender):
                 seed=self._seed,
                 **self.sampler_config
             )
-            return dataloader
+            return self._check_for_side_info_dataloader(dataloader, batch_size)
         else:
             for _ in range(1):
                 yield None
@@ -271,7 +312,7 @@ class GeneralRecommender(nn.Module, AbstractRecommender):
             seed=self._seed,
             **self.sampler_config
         )
-        return dataloader
+        return self._check_for_side_info_dataloader(dataloader, batch_size)
 
     @abstractmethod
     def predict(self, user_indices, item_indices=None, **kwargs):
@@ -325,11 +366,15 @@ class GraphBasedRecommender(GeneralRecommender):
 
         return self._cached_user_emb, self._cached_item_emb
 
-    def get_adj_mat(self) -> SparseTensor:
-        """Get the normalized interaction matrix of users and items.
+    def get_adj_mat(self, normalize: bool = False) -> SparseAdjacency:
+        """Get the interaction matrix of users and items as a sparse adjacency.
+
+        Args:
+            normalize (bool): Whether to apply symmetric normalization
+                (D^-0.5 * A * D^-0.5) to the adjacency.
 
         Returns:
-            SparseTensor: The sparse adjacency matrix.
+            SparseAdjacency: The sparse adjacency matrix.
         """
         # Extract user and items nodes
         row, col = self._interactions.sparse.nonzero()
@@ -347,15 +392,35 @@ class GraphBasedRecommender(GeneralRecommender):
 
         size = self._num_items + self._num_users
 
-        # Create the SparseTensor using the edge indexes.
-        # This is the format expected by LGConv
-        adj = SparseTensor(
+        adj = SparseAdjacency(
             row=edge_index[0],
             col=edge_index[1],
-            sparse_sizes=(size, size),
+            size=(size, size),
         ).to(self._device)
 
+        if normalize:
+            adj = self._symmetric_normalization(adj)
+
         return adj
+
+    @staticmethod
+    def _symmetric_normalization(adj: SparseAdjacency) -> SparseAdjacency:
+        """Applies symmetric normalization: D^-0.5 * A * D^-0.5.
+
+        Args:
+            adj (SparseAdjacency): The adjacency to normalize.
+
+        Returns:
+            SparseAdjacency: The normalized adjacency.
+        """
+        deg = adj.sum(dim=1)
+        deg_inv_sqrt = deg.pow(-0.5)
+        deg_inv_sqrt.masked_fill_(torch.isinf(deg_inv_sqrt), 0.0)
+
+        row, col, _ = adj.coo()
+        norm_vals = deg_inv_sqrt[row] * deg_inv_sqrt[col]
+
+        return adj.set_value(norm_vals)
 
     def get_ego_embeddings(
         self, user_embedding: nn.Embedding, item_embedding: nn.Embedding
@@ -373,6 +438,64 @@ class GraphBasedRecommender(GeneralRecommender):
         item_embeddings = item_embedding.weight
         ego_embeddings = torch.cat([user_embeddings, item_embeddings], dim=0)
         return ego_embeddings
+
+
+class KnowledgeAwareRecommender(GeneralRecommender):
+    """Base class for recommenders consuming `KGTriplesLoader`'s `kg_triples`
+    payload: exposes the KG's entity/relation counts, the item -> KG entity bridge
+    (`item_entity_ids`), and the raw `(head, relation, tail)` triples as parallel
+    `int64` tensors - the common ground any KG-aware model builds on, regardless of
+    how it actually consumes the KG (translational embeddings, graph propagation, ...).
+    """
+
+    def __init__(
+        self,
+        params: RecommenderConfig,
+        seed: int,
+        interactions: Interactions,
+        *args,
+        **kwargs
+    ):
+        super().__init__(params, seed, interactions, *args, **kwargs)
+
+        payload = self._interactions.get_side_info(self.loaders[0])["kg_triples"]
+
+        self.n_entities = payload.n_entities
+        self.n_relations = payload.n_relations
+
+        self.item_entity_ids = graph_item_entity_ids_to_tensor(payload, device=self._device)
+
+        self.kg_heads = torch.as_tensor(payload.heads, dtype=torch.long, device=self._device)
+        self.kg_relations = torch.as_tensor(payload.relations, dtype=torch.long, device=self._device)
+        self.kg_tails = torch.as_tensor(payload.tails, dtype=torch.long, device=self._device)
+
+    def build_interact_mat(self) -> torch.Tensor:
+        """Build the row-normalized (D^{-1}A) user -> entity interaction matrix,
+        i.e. the (n_users x n_entities) block of the full user/entity adjacency,
+        remapping `self._interactions.sparse_tensor`'s item columns to their KG
+        entity ids (row-normalization only ever mixes a user row with its own,
+        entity-only, non-zero columns, so it is equivalent to normalize this block
+        directly).
+
+        Returns:
+            torch.Tensor: The sparse (n_users x n_entities) interaction matrix.
+        """
+        row, col = self._interactions.sparse_tensor.indices()
+        row, col = row.to(self._device), col.to(self._device)
+        col = self.item_entity_ids[col]
+
+        # D^{-1}, using the same per-user degree as the un-remapped matrix
+        deg = torch.zeros(self._num_users, device=self._device)
+        deg.index_add_(0, row, torch.ones_like(row, dtype=torch.float32))
+        d_inv = deg.pow(-1.)
+        d_inv[torch.isinf(d_inv)] = 0.
+
+        indices = torch.stack([row, col])
+        values = d_inv[row]
+
+        return torch.sparse_coo_tensor(
+            indices, values, size=(self._num_users, self.n_entities), device=self._device
+        ).coalesce()
 
 
 class SequentialRecommender(GeneralRecommender):

@@ -183,64 +183,146 @@ class TestKGFlexLoader:
         assert len(payload.col_ids) > 0
 
 
-class TestKGCompletion:
-    data_path = path_joiner(data_folder, "kg_completion")
+class TestKGTriplesLoader:
+    data_path = path_joiner(data_folder, "kg_triples")
 
-    def test_load_returns_graph_payload_and_item_entity_map(self):
+    # CASE 1: kg_train holds raw KG ids directly (here plain "fN" strings) -
+    # item_mapping bridges an item straight to that raw id, no entity_mapping needed
+    def test_item_mapping_bridges_items_to_raw_kg_ids(self):
         config = {
-            "dataloader": "KGCompletion",
-            "train_path": path_joiner(self.data_path, "train.txt"),
-            "input_type": "standard",
-            "mapping": path_joiner(self.data_path, "mapping.tsv"),
+            "dataloader": "KGTriplesLoader",
+            "kg_train": path_joiner(self.data_path, "kg_train_direct.txt"),
+            "item_mapping": path_joiner(self.data_path, "item_mapping.tsv"),
         }
 
         loader = get_loader(config)
-        kg_completion = loader.side_information["KGCompletion"]
+        kg_completion = loader.side_information["KGTriplesLoader"]
         payload = kg_completion.load()["kg_triples"]
 
         assert len(payload.heads) > 100
         assert payload.item_entity_map
         assert set(payload.item_entity_map.keys()) <= kg_completion.items
 
-    def test_load_without_mapping_has_no_item_entity_map(self):
+    def test_id2entity_is_still_valued_by_the_raw_kg_id(self):
         config = {
-            "dataloader": "KGCompletion",
-            "train_path": path_joiner(self.data_path, "train_no_map.txt"),
-            "input_type": "standard"
+            "dataloader": "KGTriplesLoader",
+            "kg_train": path_joiner(self.data_path, "kg_train_direct.txt"),
+            "item_mapping": path_joiner(self.data_path, "item_mapping.tsv"),
         }
 
         loader = get_loader(config)
-        payload = loader.side_information["KGCompletion"].load()["kg_triples"]
+        payload = loader.side_information["KGTriplesLoader"].load()["kg_triples"]
 
-        assert payload.item_entity_map is None
+        assert all(str(raw_id).startswith("f") for raw_id in payload.id2entity.values())
+        assert all(str(raw_id).startswith("rel") for raw_id in payload.id2relation.values())
 
-
-class TestKGINTSVLoader:
-    data_path = path_joiner(data_folder, "kgin_tsv")
-
-    def test_load_returns_canonical_graph_payload(self):
+    def test_item_mapping_with_no_matching_entity_has_no_item_entity_map(self):
         config = {
-            "dataloader": "KGINTSVLoader",
-            "attribute_file": path_joiner(self.data_path, "kg.tsv")
+            "dataloader": "KGTriplesLoader",
+            "kg_train": path_joiner(self.data_path, "kg_train_direct_unmatched.txt"),
+            "item_mapping": path_joiner(self.data_path, "item_mapping_unmatched.tsv"),
+        }
+
+        loader = get_loader(config)
+        payload = loader.side_information["KGTriplesLoader"].load()["kg_triples"]
+
+        assert payload.item_entity_map == {}
+
+    # CASE 1b: no item_mapping at all - kg_train already uses the interactions
+    # file's own item ids directly (e.g. KGAT-style dumps), so the loader falls
+    # back to an identity bridge (domain id -> domain id)
+    def test_no_item_mapping_falls_back_to_identity_bridge(self):
+        config = {
+            "dataloader": "KGTriplesLoader",
+            "kg_train": path_joiner(self.data_path, "kg_train_item_ids_match_dataset.txt"),
+        }
+
+        loader = get_loader(config)
+        kg_completion = loader.side_information["KGTriplesLoader"]
+        payload = kg_completion.load()["kg_triples"]
+
+        assert len(payload.heads) == 20
+        assert payload.item_entity_map
+        assert set(payload.item_entity_map.keys()) == set(range(1, 11))
+        assert set(payload.item_entity_map.keys()) == kg_completion.items
+
+    def test_no_item_mapping_with_no_matching_entity_has_no_item_entity_map(self):
+        config = {
+            "dataloader": "KGTriplesLoader",
+            "kg_train": path_joiner(self.data_path, "kg_train_direct.txt"),
+        }
+
+        loader = get_loader(config)
+        payload = loader.side_information["KGTriplesLoader"].load()["kg_triples"]
+
+        assert payload.item_entity_map == {}
+
+    # CASE 2: kg_train already holds ids remapped away from freebase
+    # (`kg_train_remapped.tsv`) - item_mapping (item -> freebase id) is composed
+    # through entity_mapping (freebase id -> kg_train's own id) to reach kg_train's
+    # actual entities
+    def test_item_mapping_composed_through_entity_mapping(self):
+        config = {
+            "dataloader": "KGTriplesLoader",
+            "kg_train": path_joiner(self.data_path, "kg_train_remapped.tsv"),
+            "item_mapping": path_joiner(self.data_path, "item_mapping.tsv"),
+            "entity_mapping": path_joiner(self.data_path, "entity_mapping.tsv"),
         }
 
         payloads, _, loader = load_data(config)
-        kgin = loader.side_information["KGINTSVLoader"]
+        kgin = loader.side_information["KGTriplesLoader"]
 
         payload = payloads["kg_triples"]
         assert len(payload.heads) > 100
-        assert set(payload.item_entity_map.keys()) == kgin.items
+        assert set(payload.item_entity_map.keys()) == set(range(len(kgin.items)))
         assert len(kgin.items) > 40
+
+    def test_id2entity_and_id2relation_resolve_to_the_freebase_id(self):
+        config = {
+            "dataloader": "KGTriplesLoader",
+            "kg_train": path_joiner(self.data_path, "kg_train_remapped.tsv"),
+            "item_mapping": path_joiner(self.data_path, "item_mapping.tsv"),
+            "entity_mapping": path_joiner(self.data_path, "entity_mapping.tsv"),
+            "relation_mapping": path_joiner(self.data_path, "relation_mapping.tsv"),
+        }
+
+        payloads, _, _ = load_data(config)
+        payload = payloads["kg_triples"]
+
+        assert len(payload.id2entity) == 77
+        assert all(str(raw_id).startswith("f") for raw_id in payload.id2entity.values())
+        assert len(payload.id2relation) == 5
+        assert all(str(raw_id).startswith("rf") for raw_id in payload.id2relation.values())
+
+    def test_built_index_assigns_item_entities_first(self):
+        config = {
+            "dataloader": "KGTriplesLoader",
+            "kg_train": path_joiner(self.data_path, "kg_train_remapped.tsv"),
+            "item_mapping": path_joiner(self.data_path, "item_mapping.tsv"),
+            "entity_mapping": path_joiner(self.data_path, "entity_mapping.tsv"),
+        }
+
+        payloads, _, _ = load_data(config)
+        payload = payloads["kg_triples"]
+
+        item_ids = set(payload.item_entity_map.values())
+        other_ids = set(payload.id2entity.keys()) - item_ids
+
+        # Items get the lowest ids, as a contiguous 0..n_items-1 block
+        assert item_ids == set(range(len(item_ids)))
+        assert other_ids and max(item_ids) < min(other_ids)
 
     def test_defaults_to_memory_materialization(self):
         config = {
-            "dataloader": "KGINTSVLoader",
-            "attribute_file": path_joiner(self.data_path, "kg.tsv")
+            "dataloader": "KGTriplesLoader",
+            "kg_train": path_joiner(self.data_path, "kg_train_remapped.tsv"),
+            "item_mapping": path_joiner(self.data_path, "item_mapping.tsv"),
+            "entity_mapping": path_joiner(self.data_path, "entity_mapping.tsv"),
         }
 
         loader = get_loader(config)
 
-        assert loader.side_information["KGINTSVLoader"].materialization == Materialization.MEMORY
+        assert loader.side_information["KGTriplesLoader"].materialization == Materialization.MEMORY
 
 
 class TestInteractionsTextualAttributes:

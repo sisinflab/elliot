@@ -1,7 +1,5 @@
 import torch
-import torch_geometric
 from torch import nn
-from torch_geometric.nn import LGConv
 
 from elliot.dataset import Interactions
 from elliot.namespace import RecommenderConfig
@@ -61,16 +59,8 @@ class LightGCN(GraphBasedRecommender):
         self.Gu = nn.Embedding(self._num_users, self.factors, dtype=torch.float32)
         self.Gi = nn.Embedding(self._num_items, self.factors, dtype=torch.float32)
 
-        # Adjacency matrix
-        self.adj = self.get_adj_mat()
-
-        # Propagation network
-        propagation_network_list = []
-        for _ in range(self.n_layers):
-            propagation_network_list.append((LGConv(), "x, edge_index -> x"))
-        self.propagation_network = torch_geometric.nn.Sequential(
-            "x, edge_index", propagation_network_list
-        )
+        # Adjacency matrix, pre-normalized since propagation is a plain matmul
+        self.adj = self.get_adj_mat(normalize=True)
 
         # Vectorized normalization for embedding
         self.alpha = torch.tensor([1 / (k + 1) for k in range(self.n_layers + 1)], device=self._device)
@@ -98,8 +88,8 @@ class LightGCN(GraphBasedRecommender):
         # This is used later to correctly multiply each layer by
         # the corresponding value of alpha
         current_embeddings = ego_embeddings
-        for layer_module in self.propagation_network.children():
-            current_embeddings = layer_module(current_embeddings, self.adj)
+        for _ in range(self.n_layers):
+            current_embeddings = self.adj.matmul(current_embeddings)
             embeddings_list.append(current_embeddings)
 
         # Aggregate embeddings using the alpha value

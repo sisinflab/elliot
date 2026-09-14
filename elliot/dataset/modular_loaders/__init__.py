@@ -3,9 +3,8 @@ from .generic import ItemAttributes, ItemItem, UserUser
 from .kg import (
     ChainedKG,
     KAHFMLoader,
-    KGCompletion,
     KGFlexLoader,
-    KGINTSVLoader,
+    KGTriplesLoader,
 )
 from .textual import (
     TextualAttribute,
@@ -22,9 +21,8 @@ __all__ = [
     "UserUser",
     "ChainedKG",
     "KAHFMLoader",
-    "KGCompletion",
     "KGFlexLoader",
-    "KGINTSVLoader",
+    "KGTriplesLoader",
     "InteractionsTextualAttributes",
     "WordsTextualAttributes",
     "TextualAttribute",

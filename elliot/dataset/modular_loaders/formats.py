@@ -78,22 +78,28 @@ class GraphPayload:
         heads (np.ndarray): Head entity id per triple.
         relations (np.ndarray): Relation id per triple.
         tails (np.ndarray): Tail entity id per triple.
-        entity2id (Dict[Any, int]): Entity id index (see `build_entity_relation_index`).
-        relation2id (Dict[Any, int]): Relation id index (see
-            `build_entity_relation_index`).
-        item_entity_map (Dict[Any, int], optional): Item id -> KG entity id map.
-            Defaults to None.
-        user_entity_map (Dict[Any, int], optional): User id -> KG entity id map.
-            Defaults to None.
+        id2entity (Dict[int, Any], optional): Final id -> raw KG entity id index (see
+            `build_entity_relation_index`) - always keyed by the final id,
+            so a model that supports explainability can always report a final id
+            back to the real-world entity it corresponds to. Defaults to None.
+        id2relation (Dict[int, Any], optional): Final id -> raw KG relation id index,
+            analogous to `id2entity`. Defaults to None.
+        n_entities (int): Number of entities in the graph. Defaults to 0.
+        n_relations (int): Number of relations in the graph. Defaults to 0.
+        item_entity_map (Dict[Any, int]): Item id -> KG entity id map, always
+            populated (a KG-propagation model needs every item it embeds to have a
+            counterpart) - empty only when `item_mapping` was misconfigured to
+            resolve to nothing.
     """
 
     heads: np.ndarray = field(default_factory=lambda: np.empty(0, dtype=np.int64))
     relations: np.ndarray = field(default_factory=lambda: np.empty(0, dtype=np.int64))
     tails: np.ndarray = field(default_factory=lambda: np.empty(0, dtype=np.int64))
-    entity2id: Dict[Any, int] = field(default_factory=dict)
-    relation2id: Dict[Any, int] = field(default_factory=dict)
-    item_entity_map: Optional[Dict[Any, int]] = None
-    user_entity_map: Optional[Dict[Any, int]] = None
+    id2entity: Optional[Dict[int, Any]] = None
+    id2relation: Optional[Dict[int, Any]] = None
+    n_entities: int = 0
+    n_relations: int = 0
+    item_entity_map: Dict[Any, int] = field(default_factory=dict)
 
 
 Payload = Union[EmbeddingPayload, TextPayload, GraphPayload]

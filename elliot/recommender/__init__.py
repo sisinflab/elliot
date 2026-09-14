@@ -10,7 +10,7 @@ from .latent_factor_models import BPRMF, BPRMFBatch, WRMF, PureSVD, MF, FunkSVD,
     FFM, BPRSlim, Slim, CML, FISM, SVDpp, MF2020, iALS, MF2020Batch
 from .unpersonalized import Random, MostPop
 from .autoencoders import MultiDAE, MultiVAE, EASER
-from .knowledge_aware import KaHFM, KaHFMBatch, KaHFMEmbeddings, KGIN
+from .knowledge_aware import KaHFM, KaHFMBatch, KaHFMEmbeddings, CKE, KGIN, KGRec
 from .graph_based import NGCF, LightGCN, RP3beta
 from .visual_recommenders import VBPR, DeepStyle, ACF, DVBPR, VNPR
 from .knn import ItemKNN, UserKNN, AttributeItemKNN, AttributeUserKNN
@@ -26,7 +26,8 @@ from .base_recommender import (
     BaseRecommender,
     TraditionalRecommender,
     GeneralRecommender,
-    GraphBasedRecommender
+    GraphBasedRecommender,
+    KnowledgeAwareRecommender
 )
 from .base_trainer import (
     AbstractTrainer,

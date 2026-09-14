@@ -8,6 +8,7 @@ from .base_sampler import (
     AbstractSampler,
     TraditionalSampler,
     PipelineSampler,
+    SideInfoSampler,
     SessionSampler
 )
 from .pointwise import (
@@ -29,3 +30,5 @@ from .sequential import (
     SlidingWindowSampler,
     ClozeSampler
 )
+from .kg import KGTriplesSampler
+from .base_data import CombinedDataLoader
