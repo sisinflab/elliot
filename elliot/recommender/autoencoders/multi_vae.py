@@ -76,7 +76,6 @@ class MultiVAE(GeneralRecommender):
         )
 
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
-        self.transactions = self._num_users
 
         self._update_count = 0
         self._total_anneal_steps = 200000

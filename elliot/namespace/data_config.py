@@ -27,15 +27,12 @@ class DataConfig(BaseConfig):
         strategy (DataLoadingStrategy): Loading strategy to use.
         data_folder (str, optional): Path to the folder containing dataset files.
         dataset_path (str, optional): Path to the dataset file.
+        remove_duplicates (bool): Whether to keep a single row per (userId, itemId)
+            pair, resolving repeats to the most recent one by timestamp (falling back to the
+            dataframe's own row order when no `timestamp` column is present).
         sequential (bool): Whether to load sequential or interactions data. Defaults to False.
         session_strategy (SessionStrategy): Whether to segment interactions into sessions
             (SESSION_ONLY) or keep each user's whole history as a single flat sequence (FLAT).
-            Applies to sequential data too: each source row can be treated as one session
-            (SESSION_ONLY) or flattened, alongside a user's other rows, into a single sequence
-            (FLAT) — a sequential source doesn't imply its rows are sessions rather than a
-            user's whole history split across multiple lines. Segmenting requires dropping
-            users left with fewer than two sessions, which can shrink some datasets
-            substantially, so it's opt-in. Defaults to FLAT.
         reader (Any): Reading configuration.
         side_information(List[Any]): List of side-info configurations. Defaults to [].
     """
@@ -43,6 +40,7 @@ class DataConfig(BaseConfig):
     strategy: DataLoadingStrategy
     data_folder: Optional[str] = None
     dataset_path: Optional[str] = None
+    remove_duplicates: bool = False
     sequential: bool = False
     session_strategy: SessionStrategy = SessionStrategy.FLAT
     reader: Any = Field(default={}, exclude=True)

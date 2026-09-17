@@ -35,7 +35,11 @@ class Popularity(object):
     def get_short_head(self):
         if not self._short_head:
             self.get_sorted_pop_items()
-            short_head_limit = self._data.train_set.transactions * self._pop_ratio
+            # Budget must be in the same unit as `_sorted_pop_items`' values (each
+            # user-item pair counted once, per this module's own docstring): the
+            # number of non-zero entries in the binary interaction matrix, not
+            # `transactions` (which counts raw, possibly-duplicated rows).
+            short_head_limit = self._data.train_set.sparse.nnz * self._pop_ratio
             self._short_head = []
             for i, pop in self._sorted_pop_items.items():
                 self._short_head.append(i)

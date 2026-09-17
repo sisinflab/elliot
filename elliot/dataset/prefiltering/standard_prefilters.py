@@ -42,7 +42,7 @@ class PreFilter:
           rounds: 2
 
     Notes:
-        Pre-filtering is optional and can be applied regardless of the `data_config.strategy` value.
+        Pre-filtering only applies when `data_config.strategy` is DATASET.
     """
 
     prefiltering_config: List[PreFilteringConfig]

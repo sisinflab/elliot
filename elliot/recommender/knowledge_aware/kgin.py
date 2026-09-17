@@ -284,7 +284,7 @@ class KGIN(KnowledgeAwareRecommender, GraphBasedRecommender):
             mess_dropout_rate=self.mess_dropout_rate
         )
 
-        # Loss and optimizer
+        # Optimizer
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
 
         # Sampler configuration

@@ -76,7 +76,6 @@ class MultiDAE(GeneralRecommender):
         )
 
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
-        self.transactions = self._num_users
 
         self.sampler_config = {
             "name": "SparseSampler",

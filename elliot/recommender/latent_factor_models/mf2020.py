@@ -71,8 +71,6 @@ class AbstractMF2020(BaseRecommender):
         # Global bias
         self._global_bias = 0
 
-        self.transactions = self._interactions.transactions * (self.m + 1)
-
         # Sampler configuration
         self.sampler_config = {
             "name": "MFPointWisePosNegSampler",

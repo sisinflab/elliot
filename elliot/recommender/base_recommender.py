@@ -523,10 +523,66 @@ class SequentialRecommender(GeneralRecommender):
             sampler_name=sampler_name,
             batch_size=batch_size,
             seed=self._seed,
-            session_strategy=self._session_strategy,
+            strategy=self._session_strategy,
             **self.sampler_config
         )
         return dataloader
+
+    @staticmethod
+    def _gather_indexes(output: Tensor, gather_index: Tensor) -> Tensor:
+        """Gather one position per batch row out of a sequence of hidden states.
+
+        Args:
+            output (Tensor): Hidden states, shape `(batch, seq_len, dim)`.
+            gather_index (Tensor): Position to gather per row, shape `(batch,)`.
+
+        Returns:
+            Tensor: The gathered hidden states, shape `(batch, dim)`.
+        """
+        index = gather_index.view(-1, 1, 1).expand(-1, 1, output.size(-1))
+        return output.gather(1, index).squeeze(1)
+
+    @staticmethod
+    def _gather_multi_indexes(output: Tensor, gather_index: Tensor) -> Tensor:
+        """Gather several positions per batch row out of a sequence of hidden states.
+
+        Args:
+            output (Tensor): Hidden states, shape `(batch, seq_len, dim)`.
+            gather_index (Tensor): Positions to gather per row, shape `(batch, k)`.
+
+        Returns:
+            Tensor: The gathered hidden states, shape `(batch, k, dim)`.
+        """
+        index = gather_index.unsqueeze(-1).expand(-1, -1, output.size(-1))
+        return output.gather(1, index)
+
+    @staticmethod
+    def _pad_to_length(seq: Tensor, length: int, padding_value: int) -> Tensor:
+        """Right-pad (or truncate) a left-aligned, batch-first sequence tensor to
+        exactly `length` columns.
+
+        `Sessions.get_history`/`EvalSessions.get_eval_context` only pad a batch up
+        to its own longest sequence, which can be narrower than a model's
+        `max_seq_len` (e.g. every sequence in a small evaluation batch is short).
+        Models built around a fixed-width window (e.g. Caser's convolutions, or a
+        precomputed causal mask) need the width padded back out to `max_seq_len`
+        before use.
+
+        Args:
+            seq (Tensor): Left-aligned sequences, shape `(batch, seq_len)`.
+            length (int): Target width.
+            padding_value (int): Fill value for the added columns.
+
+        Returns:
+            Tensor: `seq`, padded (or truncated) to shape `(batch, length)`.
+        """
+        width = seq.size(1)
+        if width == length:
+            return seq
+        if width > length:
+            return seq[:, :length]
+        pad = seq.new_full((seq.size(0), length - width), padding_value)
+        return torch.cat([seq, pad], dim=1)
 
     @abstractmethod
     def predict(self, user_seq, seq_len, item_indices=None, *args, **kwargs):

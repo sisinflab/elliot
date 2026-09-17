@@ -48,6 +48,7 @@ class DataSetLoader:
             properties: this/is/the/path.conf
           - dataloader: FeatureLoader2
             folder_map_features: this/is/the/path/folder
+        remove_duplicate_interactions: True|False
       binarize: True|False
     """
 
@@ -142,7 +143,11 @@ class DataSetLoader:
                     **read_kwargs
                 )
 
-        self._process(self._filter_nan_and_duplicates)
+        self._process(self._filter_nan)
+
+        # Remove duplicates, if configured
+        if self.data_config.remove_duplicates:
+            self._process(self._filter_duplicates)
 
         users, items = set(), set()
         df = self.dataframe
@@ -396,9 +401,9 @@ class DataSetLoader:
         else:
             self.dataframe = process(self.dataframe)
 
-    def _filter_nan_and_duplicates(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Filter a single DataFrame based on valid users/items and applies basic cleanup,
-        i.e., handles missing values in the 'timestamp' column (if present), and removes duplicates.
+    def _filter_nan(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Apply basic cleanup to a single DataFrame, i.e., impute missing values in
+        the 'timestamp' column (if present) and drop rows still carrying a NaN.
 
         Args:
             df (pd.DataFrame): The DataFrame to clean.
@@ -413,8 +418,23 @@ class DataSetLoader:
                 df[feat] = df[feat].fillna(df[feat].mean())
 
         df.dropna(inplace=True)
-        df.drop_duplicates(keep='first', inplace=True)
         return df
+
+    def _filter_duplicates(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Keep a single row per (userId, itemId) pair, resolving repeats to the most
+        recent one by timestamp when a `timestamp` column is present, otherwise to the
+        last one in the dataframe's own row order.
+
+        Args:
+            df (pd.DataFrame): The DataFrame to deduplicate.
+
+        Returns:
+            pd.DataFrame: The same data, with only the last occurrence of each
+                (userId, itemId) pair kept, in its original row order.
+        """
+        ordered = df.sort_values("timestamp", kind="stable") if "timestamp" in df.columns else df
+        keep_index = ordered.drop_duplicates(subset=["userId", "itemId"], keep="last").index
+        return df[df.index.isin(keep_index)]
 
     def _filter_users_and_items(self, df: pd.DataFrame) -> pd.DataFrame:
         """Restrict a DataFrame to interactions whose user and item both belong to

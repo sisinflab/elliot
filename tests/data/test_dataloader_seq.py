@@ -110,6 +110,53 @@ class TestTrainDataloader:
         assert total_rows == len(expected)
         assert actual == expected
 
+    @pytest.mark.parametrize("strategy,expected", [
+        (SessionStrategy.FLAT, {
+            (0, (0,), 1, 1),
+            (0, (0, 1), 2, 2),
+            (0, (0, 1, 2), 3, 3),
+            (0, (1, 2, 3), 3, 4),
+            (0, (2, 3, 4), 3, 3),
+            (1, (1,), 1, 3),
+            (1, (1, 3), 2, 5),
+            (1, (1, 3, 5), 3, 3),
+            (1, (3, 5, 3), 3, 5),
+            (1, (5, 3, 5), 3, 1),
+        }),
+        (SessionStrategy.SESSION_ONLY, {
+            (0, (0,), 1, 1),
+            (0, (0, 1), 2, 2),
+            (0, (3,), 1, 4),
+            (0, (3, 4), 2, 3),
+            (1, (1,), 1, 3),
+            (1, (1, 3), 2, 5),
+            (1, (3,), 1, 5),
+            (1, (3, 5), 2, 1),
+        }),
+    ])
+    def test_user_sessions_sequential(self, strategy, expected):
+        config = {
+            "sampler_name": "UserSequentialSampler",
+            "strategy": strategy,
+            "batch_size": 3,
+            "max_seq_len": 3,
+            "neg_samples": 1,
+            "seed": 0
+        }
+
+        train_dataloader, _ = train_data(load_as_session_only=True, **config)
+
+        actual = set()
+        total_rows = 0
+        for user, seq, length, target, negs in train_dataloader:
+            assert (negs.squeeze(-1) != target).all()
+            for i in range(len(seq)):
+                actual.add((int(user[i]), tuple(seq[i, :length[i]].tolist()), int(length[i]), int(target[i])))
+            total_rows += len(seq)
+
+        assert total_rows == len(expected)
+        assert actual == expected
+
     def test_sessions_same_target(self):
         config = {
             "sampler_name": "SameTargetSequentialSampler",
@@ -166,8 +213,12 @@ class TestTrainDataloader:
         assert actual == expected
 
     @pytest.mark.parametrize("strategy,expected", [
-        (SessionStrategy.FLAT, {(3, 4, 3), (3, 5, 1)}),
-        (SessionStrategy.SESSION_ONLY, {(0, 1, 2), (3, 4, 3), (1, 3, 5), (3, 5, 1)}),
+        (SessionStrategy.FLAT, {
+            (0, 1, 2), (1, 2, 3), (2, 3, 4), (3, 4, 3), (1, 3, 5), (3, 5, 3), (5, 3, 5), (3, 5, 1),
+        }),
+        (SessionStrategy.SESSION_ONLY, {
+            (0, 1, 2), (3, 4, 3), (1, 3, 5), (3, 5, 1),
+        }),
     ])
     def test_sessions_cloze(self, strategy, expected):
         mask_token_id = 6
@@ -176,6 +227,7 @@ class TestTrainDataloader:
             "strategy": strategy,
             "batch_size": 3,
             "max_seq_len": 3,
+            "stride": 1,
             "mask_prob": 0.5,
             "mask_token_id": mask_token_id,
             "neg_samples": 1,

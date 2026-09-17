@@ -297,7 +297,7 @@ class BaseTrainer(AbstractTrainer):
         total_loss = 0.0
         steps = 0
         iter_ = tqdm(
-            total=int(self.model.transactions // self.model_config.batch_size),
+            total=len(dataloader),
             desc=f"Epoch {it + 1}/{self.model_config.epochs}",
             disable=not self.model_config.meta.verbose
         )
@@ -338,7 +338,7 @@ class GeneralTrainer(AbstractTrainer):
         self.model.train()
         total_loss, steps = 0.0, 0
         iter_ = tqdm(
-            total=int(self.model.transactions // self.model_config.batch_size),
+            total=len(dataloader),
             desc=f"Epoch {it + 1}/{self.model_config.epochs}",
             disable=not self.model_config.meta.verbose
         )

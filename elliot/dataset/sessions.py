@@ -253,7 +253,7 @@ class EvalSessions:
 
         self._build_tape(dataframe)
 
-    def _build_tape(self, dataframe: pd.DataFrame) -> None:
+    def _build_tape(self, dataframe: pd.DataFrame):
         """Flatten `dataframe` into a single item tape, globally sorted by (user,
         session, timestamp), plus the per-row boundary and bookkeeping arrays used to
         slice it into one row per eval session.
@@ -285,7 +285,10 @@ class EvalSessions:
             # flags gives each tape position its 0-based, globally unique row index
             is_new_row = np.empty(n, dtype=bool)
             is_new_row[0] = True
-            is_new_row[1:] = (flat_users[1:] != flat_users[:-1]) | (session_col[1:] != session_col[:-1])
+            is_new_row[1:] = (
+                (flat_users[1:] != flat_users[:-1]) |
+                (session_col[1:] != session_col[:-1])
+            )
             row_id = np.cumsum(is_new_row) - 1
             n_rows = int(row_id[-1]) + 1
         else:
@@ -297,7 +300,10 @@ class EvalSessions:
         self._flat_items = flat_items
         self._row_starts = np.searchsorted(row_id, np.arange(n_rows + 1))
         self._n_rows = n_rows
-        self._owner_users = flat_users[self._row_starts[:-1]] if n_rows else np.array([], dtype=np.int64)
+        self._owner_users = (
+            flat_users[self._row_starts[:-1]]
+            if n_rows else np.array([], dtype=np.int64)
+        )
 
         if n_rows:
             # 0-based index of each row among the rows owned by the same user, used

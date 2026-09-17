@@ -128,6 +128,8 @@ class MFPairWiseSampler(PipelineSampler):
 
         self._pos = [(u, i) for u, items in self._ui_dict.items() for i in items]
 
+        self.events = len(self._pos)
+
     def sample(self, it: int) -> List[Tuple[int, int, int]]:
         """Build one positive pair plus `self.m` sampled negative pairs for event `it`.
 

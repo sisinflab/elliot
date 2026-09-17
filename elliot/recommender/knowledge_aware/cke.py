@@ -78,7 +78,7 @@ class CKE(KnowledgeAwareRecommender):
         # Per-relation TransR projection matrix, from entity space to relation space
         self.trans_w = nn.Embedding(self.n_relations, self.factors * self.kg_factors)
 
-        # Loss and optimizer
+        # Optimizer
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
 
         # Interaction sampler: one (user, pos, neg) triple per event

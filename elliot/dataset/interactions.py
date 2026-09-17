@@ -27,6 +27,14 @@ class Interactions:
     per-fold sampler dataloaders plus this split's own private view of any side
     information.
 
+    A duplicate (user, item) pair (the same interaction repeated at different
+    timestamps) is collapsed ONLY in `get_dict()`/`get_positive_items()` - a plain
+    `dict` can hold just one value per key, so `_build_dict()` keeps the rating of
+    the most recent occurrence by timestamp (or, absent a `timestamp` column, the
+    dataframe's own last row for that pair). Every other view - `transactions`,
+    `sparse_ratings`, `sparse_counts`, `sparse`, `sparse_tensor` - is built directly
+    from the raw dataframe and never collapses repeats.
+
     Args:
         dataframe (pd.DataFrame): Interactions for this split, with at least
             'userId', 'itemId', and 'rating' columns.
@@ -42,8 +50,9 @@ class Interactions:
     dataframe: pd.DataFrame
     dims: Tuple[int, int]
     transactions: int
-    sparse_ratings: csr_matrix
     sparse: csr_matrix
+    sparse_ratings: csr_matrix
+    sparse_counts: csr_matrix
     sparse_tensor: torch.Tensor
 
     def __init__(
@@ -70,14 +79,12 @@ class Interactions:
 
         # Build the ratings dict, in both its public-id (`_dict`) and private-id
         # (`_p_dict`) views (most callers only ever need the latter)
-        self._dict = self._build_dict()
-        self._p_dict = self._build_mapped_dict()
+        self._dict, self._transactions = self._build_dict()
+        self._p_dict = self._remap_ids(self._dict)
 
         self._users, self._items = self._get_users_and_items()
         self._n_users = len(self._users)
         self._n_items = len(self._items)
-
-        self._transactions = sum(len(v) for v in self._dict.values())
 
         if name == "train":
             # Eagerly materialize (and cache) the sparse ratings matrix: `Sessions`
@@ -91,7 +98,10 @@ class Interactions:
             {loader_name: None for loader_name in self._side_info} if self._side_info else {}
         )
 
-    def _build_dict(self, skip_cold_users_items: bool = True) -> Dict[Any, Dict[Any, float]]:
+    def _build_dict(
+        self,
+        skip_cold_users_items: bool = True
+    ) -> Tuple[Dict[Any, Dict[Any, float]], int]:
         """Convert the raw interactions DataFrame into a `dict[user -> dict[item ->
         rating]]`, keyed by public ids, tracking cold users/items encountered along
         the way.
@@ -102,11 +112,18 @@ class Interactions:
                 `self._u_map`/`self._i_map`. Defaults to True.
 
         Returns:
-            Dict[Any, Dict[Any, float]]: The ratings dict, keyed by public ids.
+            Tuple[Dict[Any, Dict[Any, float]], int]: The ratings dict (keyed by
+                public ids) and the total number of (non-cold) raw rows.
         """
         ratings_dict = defaultdict(dict)
+        transactions = 0
 
         data = self._dataframe
+        if "timestamp" in data.columns:
+            # Stable sort: among same-timestamp duplicates (or when every
+            # timestamp is a tie, e.g. absent entirely), the dataframe's own row
+            # order still breaks the tie, exactly matching the no-timestamp case
+            data = data.sort_values("timestamp", kind="stable")
         users, items, ratings = data["userId"], data["itemId"], data["rating"]
 
         iter_df = tqdm(
@@ -133,30 +150,31 @@ class Interactions:
                     self._cold_items.add(item)
                     continue
 
-            # Register rating, if not cold
+            # Register rating, if not cold; later rows (see the timestamp sort
+            # above) win over earlier ones for the same (user, item) pair
             ratings_dict[user][item] = rating
+            transactions += 1
 
-        return dict(ratings_dict)
+        return dict(ratings_dict), transactions
 
-    def _build_mapped_dict(self) -> Dict[int, Dict[int, float]]:
-        """Translate `self._dict` (keyed by public ids) into the private-id-keyed
-        equivalent, using `self._u_map`/`self._i_map`.
+    def _remap_ids(self, nested: Dict[Any, Dict[Any, Any]]) -> Dict[int, Dict[int, Any]]:
+        """Translate a public-id-keyed nested dict (`user -> item -> value`) into
+        its private-id-keyed equivalent, using `self._u_map`/`self._i_map`.
+
+        Args:
+            nested (Dict[Any, Dict[Any, Any]]): The public-id-keyed nested dict.
 
         Returns:
-            Dict[int, Dict[int, float]]: The ratings dict, keyed by private ids.
+            Dict[int, Dict[int, Any]]: The same dict, keyed by private ids.
         """
         private_dict = {}
 
         # Translate both the outer (user) and inner (item) keys to private ids
-        for user, items in self._dict.items():
+        for user, inner in nested.items():
             mapped_user = self._u_map.get(user)
-
-            new_items = {}
-            for i, v in items.items():
-                mapped_item = self._i_map.get(i)
-                new_items[mapped_item] = v
-
-            private_dict[mapped_user] = new_items
+            private_dict[mapped_user] = {
+                self._i_map.get(i): v for i, v in inner.items()
+            }
 
         return private_dict
 
@@ -208,7 +226,8 @@ class Interactions:
         if kwargs.get('transactions') is not None:
             transactions = kwargs.pop('transactions')
         else:
-            transactions = self._transactions
+            # Default event budget: one event per distinct (user, item) pair
+            transactions = self.get_unique_pairs()
 
         # Rebuild if never cached, or if the cached dataset's own size no longer
         # matches the requested number of transactions (e.g. a different sampling
@@ -309,8 +328,17 @@ class Interactions:
 
     @cached_property
     def sparse_ratings(self) -> csr_matrix:
-        """Sparse (users x items) matrix of raw ratings."""
-        return self._to_sparse()
+        """Sparse (users x items) matrix of raw ratings, built directly from the
+        DataFrame: a duplicate (user, item) pair is never collapsed - repeated rows
+        simply sum into the same cell (scipy's own COO->CSR construction)."""
+        return self._rows_to_sparse(self._dataframe["rating"])
+
+    @cached_property
+    def sparse_counts(self) -> csr_matrix:
+        """Sparse (users x items) matrix of per-pair interaction repetition counts
+        (>=1 for every seen pair; >1 wherever a user repeated the same interaction).
+        Suitable as an implicit-feedback confidence signal."""
+        return self._rows_to_sparse(pd.Series(1.0, index=self._dataframe.index))
 
     @cached_property
     def sparse(self) -> csr_matrix:
@@ -337,7 +365,8 @@ class Interactions:
 
     @property
     def transactions(self) -> int:
-        """Total number of (non-cold) interactions in this split."""
+        """Total number of (non-cold) raw interaction rows in this split, duplicate
+        (user, item) pairs counted individually."""
         return self._transactions
 
     @property
@@ -366,6 +395,14 @@ class Interactions:
         """
         return self._dict if not private else self._p_dict
 
+    def get_unique_pairs(self) -> int:
+        """Number of distinct (user, item) pairs in this split's ratings dict.
+
+        Returns:
+            int: The number of distinct (user, item) pairs.
+        """
+        return sum(len(items) for items in self._p_dict.values())
+
     def get_positive_items(self) -> List[List[int]]:
         """Return the list of positive (private) item indices per (private) user
         index, sorted by user index.
@@ -383,6 +420,34 @@ class Interactions:
             pos.append(list(train_set))
 
         return pos
+
+    def _rows_to_sparse(self, values: pd.Series) -> csr_matrix:
+        """Build a sparse (users x items) matrix directly from this split's raw
+        DataFrame, one contribution per interaction row (cold rows excluded).
+        Duplicate (user, item) rows are never collapsed to a single entry.
+
+        Args:
+            values (pd.Series): Per-row values to place at each (user, item)
+                coordinate (e.g. `self._dataframe["rating"]`, or a constant `1.0`
+                series for occurrence counts), aligned by index with
+                `self._dataframe`.
+
+        Returns:
+            csr_matrix: The sparse matrix, shaped `(len(u_map), len(i_map))`.
+        """
+        users = self._dataframe["userId"].map(self._u_map)
+        items = self._dataframe["itemId"].map(self._i_map)
+        # `.map()` on a dict yields NaN for keys absent from it: exactly the
+        # (non-)cold rows this split's mappings were built to recognize
+        not_cold = users.notna() & items.notna()
+
+        rows = users[not_cold].to_numpy(dtype=np.int64)
+        cols = items[not_cold].to_numpy(dtype=np.int64)
+        data = values[not_cold].to_numpy(dtype=np.float64)
+
+        return csr_matrix(
+            (data, (rows, cols)), dtype=float, shape=(len(self._u_map), len(self._i_map))
+        )
 
     def get_loader(self, name: str) -> Any:
         """Return the raw `AbstractLoader` instance registered under `name` on the
@@ -464,33 +529,3 @@ class Interactions:
             return remap_graph_payload(payload, mapping)
 
         return payload
-
-    def _get_triples(self) -> Tuple[List[int], List[int], List[float]]:
-        """Flatten `self._p_dict` (private-id-keyed) into parallel (user, item,
-        rating) lists, one entry per interaction.
-
-        Returns:
-            Tuple[List[int], List[int], List[float]]: The (users, items, ratings)
-                triples.
-        """
-        users, items, ratings = [], [], []
-
-        # Flatten the nested user -> item -> rating dict into three parallel lists
-        for u, item_list in self._p_dict.items():
-            for i, r in item_list.items():
-                users.append(u)
-                items.append(i)
-                ratings.append(r)
-
-        return users, items, ratings
-
-    def _to_sparse(self) -> csr_matrix:
-        """Build the sparse (users x items) ratings matrix from `self._p_dict`.
-
-        Returns:
-            csr_matrix: The sparse ratings matrix, shaped `(len(u_map), len(i_map))`.
-        """
-        rows, cols, data = self._get_triples()
-        return csr_matrix(
-            (data, (rows, cols)), dtype=float, shape=(len(self._u_map), len(self._i_map))
-        )

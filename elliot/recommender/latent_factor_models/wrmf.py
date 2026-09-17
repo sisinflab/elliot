@@ -57,7 +57,9 @@ class WRMF(BaseRecommender):
     ):
         super().__init__(params, seed, interactions, *args, **kwargs)
 
-        self.C = self.alpha * self._interactions.sparse
+        # Use raw per-pair interaction counts as the confidence signal,
+        # so a user repeating the same interaction contributes extra confidence
+        self.C = self.alpha * self._interactions.sparse_counts
 
         # Embeddings
         self.X = np.empty((self._num_users, self.factors))

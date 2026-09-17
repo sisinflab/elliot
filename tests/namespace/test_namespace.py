@@ -73,6 +73,8 @@ class TestNamespace:
 
         assert side_info_config.attribute_file == path_joiner(expected_data_path, "map")
         assert config.data_config.dataset_path == path_joiner(expected_data_path, "dataset.tsv")
+        assert config.data_config.sequential is False
+        assert config.data_config.remove_duplicates is False
         assert config.splitting.save_folder == path_joiner(expected_data_path, "splitting")
         assert config.negative_sampling.save_folder == expected_data_path
         assert config.path_output_rec_result.endswith(path_joiner("results", "demo", "recs"))

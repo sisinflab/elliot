@@ -222,6 +222,43 @@ class TestDataSetLoader:
         assert df.duplicated().sum() == 0
         assert not df["timestamp"].isna().any()
 
+    def test_filter_duplicates_when_flag_enabled(self):
+        config = {
+            "dataset": "dataset_loader",
+            "data_config": {
+                "strategy": "dataset",
+                "dataset_path": dataset_path("filter_duplicates"),
+                "remove_duplicates": True,
+                "reader": {"header": True}
+            }
+        }
+
+        df = load_data(config)
+
+        assert len(df) == 5
+        assert not df.duplicated(subset=["userId", "itemId"]).any()
+
+        by_pair = df.set_index(["userId", "itemId"])
+        assert by_pair.loc[("1", "1"), "rating"] == 5  # kept: timestamp 20 > 5
+        assert by_pair.loc[("2", "1"), "rating"] == 1  # kept: timestamp 50 > 2
+        assert by_pair.loc[("1", "2"), "rating"] == 2
+        assert by_pair.loc[("2", "2"), "rating"] == 4
+        assert by_pair.loc[("3", "3"), "rating"] == 1
+
+    def test_keep_duplicates_when_flag_disabled(self):
+        config = {
+            "dataset": "dataset_loader",
+            "data_config": {
+                "strategy": "dataset",
+                "dataset_path": dataset_path("filter_duplicates"),
+                "reader": {"header": True}
+            }
+        }
+
+        df = load_data(config)
+
+        assert len(df) == 7
+
 
 class TestDataSetLoaderFailures:
 
@@ -290,9 +327,6 @@ class TestSequenceProcessing:
                 "strategy": "dataset",
                 "dataset_path": dataset_path("sequence_wide"),
                 "sequential": True,
-                # A sequential source's rows may be a user's whole history split
-                # across multiple lines rather than sessions, so FLAT must be
-                # honored, not overridden, for sequential data too.
                 "session_strategy": "flat",
                 "reader": {"header": False}
             }

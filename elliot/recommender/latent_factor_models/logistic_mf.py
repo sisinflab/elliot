@@ -69,7 +69,8 @@ class LogisticMF(GeneralRecommender):
         # NOTE: Removed Adagrad optimizer due to its poor performance
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
 
-        self.transactions = self._interactions.transactions * 2
+        # Unique (user, item) pairs
+        self.transactions = self._interactions.get_unique_pairs() * 2
 
         # Sampler configuration
         self.sampler_config = {
@@ -105,7 +106,7 @@ class LogisticMF(GeneralRecommender):
         ) + self.lambda_weights * reg
 
         steps = args[0]
-        inputs = ([self.Gu.weight, self.Bu.weight] if steps > self._interactions.transactions
+        inputs = ([self.Gu.weight, self.Bu.weight] if steps > self.transactions // 2
                   else [self.Gi.weight, self.Bi.weight])
 
         return loss, inputs

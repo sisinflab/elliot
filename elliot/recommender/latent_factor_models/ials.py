@@ -39,7 +39,9 @@ class iALS(BaseRecommender):
     ):
         super().__init__(params, seed, interactions, *args, **kwargs)
 
-        self.C = self._interactions.sparse
+        # Use raw per-pair interaction counts as the confidence signal,
+        # so a user repeating the same interaction contributes extra confidence
+        self.C = self._interactions.sparse_counts.copy()
 
         if self.scaling == "linear":
             self.C.data = 1.0 + self.alpha * self.C.data

@@ -170,6 +170,8 @@ class MFPointWisePosNegSampler(PipelineSampler):
 
         self._pos = [(u, i, 1) for u, items in self._ui_dict.items() for i in items]
 
+        self.events = len(self._pos)
+
     def sample(self, it: int) -> List[Tuple[int, int, int]]:
         """Build one positive triple plus `self.m` sampled negative triples for
         event `it`.

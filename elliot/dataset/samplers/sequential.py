@@ -11,11 +11,45 @@ class SequentialSampler(SessionSampler):
     """Next-item prediction: (sequence, length, target[, negatives]).
 
     Args:
+        target_len (int): Number of consecutive future items predicted from a
+            single context window. Defaults to 1, which keeps `target` a scalar
+            and `negatives` shaped `(neg_samples,)`, exactly as before;
+            `target_len > 1` shapes them `(target_len,)` and
+            `(target_len, neg_samples)` instead.
         **params (Any): Forwarded to `SessionSampler.__init__`.
     """
 
-    def __init__(self, **params: Any):
+    def __init__(self, target_len: int = 1, **params: Any):
+        self.target_len = target_len
         super().__init__(**params)
+
+    def _compute_valid_targets(self) -> np.ndarray:
+        """A flat position is a valid target window start iff it isn't its
+        boundary segment's first position (needs >=1 context item) and the
+        `target_len`-item window starting there doesn't run past the
+        segment's end.
+
+        Returns:
+            np.ndarray: The valid target flat tape positions.
+        """
+        valid = super()._compute_valid_targets()
+        if self.target_len == 1:
+            return valid
+
+        n = len(self._flat_items)
+        valid_mask = np.zeros(n, dtype=bool)
+        valid_mask[valid] = True
+
+        starts = self._boundaries[:-1]
+        ends = self._boundaries[1:]
+
+        # Exclude positions whose target window would spill into the next segment
+        for k in range(1, self.target_len):
+            pos = ends - k
+            keep = pos >= starts
+            valid_mask[pos[keep]] = False
+
+        return np.arange(n)[valid_mask]
 
     def sample(self, it: int) -> Tuple[torch.Tensor, ...]:
         """Build the (sequence, length, target[, negatives]) sample for event `it`.
@@ -24,29 +58,76 @@ class SequentialSampler(SessionSampler):
             it (int): Event index.
 
         Returns:
-            Tuple[torch.Tensor, ...]: `(seq_tensor, seq_len, target_item)`, plus a
-                trailing `negatives` tensor when `self.neg_samples > 0`.
+            Tuple[torch.Tensor, ...]: `(seq_tensor, seq_len, target)`, plus a
+                trailing `negatives` tensor when `self.neg_samples > 0`. `target`
+                is a scalar (and `negatives` shaped `(neg_samples,)`) when
+                `self.target_len == 1`; otherwise `target` is shaped
+                `(target_len,)` (and `negatives` `(target_len, neg_samples)`),
+                covering the `target_len` consecutive items starting at this
+                flat position.
         """
         target_idx = int(self._valid_target_indices[it])
         boundary_start = self._boundary_start_of(target_idx)
 
-        # The target itself is the item at this flat position; context is everything before it
+        # The target(s) are the item(s) at this flat position; context is everything before it
         seq_tensor, seq_len = self._build_padded_sequence(target_idx, boundary_start)
-        target_item = int(self._flat_items[target_idx])
         owner_user = int(self._flat_users[target_idx])
 
-        ret = [
-            seq_tensor,
-            torch.tensor(seq_len, dtype=torch.long), torch.tensor(target_item, dtype=torch.long)
-        ]
+        if self.target_len == 1:
+            target_item = int(self._flat_items[target_idx])
+            target_tensor = torch.tensor(target_item, dtype=torch.long)
+        else:
+            target_items = self._flat_items[target_idx:target_idx + self.target_len]
+            target_tensor = torch.from_numpy(target_items.copy()).long()
+
+        ret = [seq_tensor, torch.tensor(seq_len, dtype=torch.long), target_tensor]
 
         if self._neg_samples > 0:
-            negs = self._sample_negatives(
-                owner_user, self._neg_samples, exclude_item=target_item
-            )
-            ret.append(torch.tensor(negs, dtype=torch.long))
+            if self.target_len == 1:
+                negs = self._sample_negatives(
+                    owner_user, self._neg_samples, exclude_item=target_item
+                )
+                ret.append(torch.tensor(negs, dtype=torch.long))
+            else:
+                negs = np.stack([
+                    self._sample_negatives(
+                        owner_user, self._neg_samples, exclude_item=int(item)
+                    )
+                    for item in target_items
+                ])
+                ret.append(torch.tensor(negs, dtype=torch.long))
 
         return tuple(ret)
+
+
+@sampler_registry.register()
+class UserSequentialSampler(SequentialSampler):
+    """`SequentialSampler`, with the owning (private) user index prepended:
+    (user, sequence, length, target[, negatives]). Used by sequential models
+    that condition on a learned per-user embedding (e.g. Caser) in addition to
+    the item sequence itself.
+
+    Args:
+        **params (Any): Forwarded to `SequentialSampler.__init__`.
+    """
+
+    def __init__(self, **params: Any):
+        super().__init__(**params)
+
+    def sample(self, it: int) -> Tuple[torch.Tensor, ...]:
+        """Build the (user, sequence, length, target[, negatives]) sample for
+        event `it`.
+
+        Args:
+            it (int): Event index.
+
+        Returns:
+            Tuple[torch.Tensor, ...]: `super().sample(it)`, with the owning
+                user index prepended.
+        """
+        target_idx = int(self._valid_target_indices[it])
+        owner_user = int(self._flat_users[target_idx])
+        return torch.tensor(owner_user, dtype=torch.long), *super().sample(it)
 
 
 @sampler_registry.register()
@@ -219,43 +300,29 @@ class SlidingWindowSampler(SessionSampler):
 
 
 @sampler_registry.register()
-class ClozeSampler(SessionSampler):
-    """BERT4Rec-style masked-language-modeling window anchored at the end of
-    a boundary segment.
+class ClozeSampler(SlidingWindowSampler):
+    """BERT4Rec-style masked-language-modeling window sampler.
+
+    Reuses `SlidingWindowSampler`'s windowing: every `stride`-spaced window
+    (length `max_seq_len`) within a boundary segment becomes its own masked
+    training instance, rather than a single window anchored at the segment's
+    end -- so a segment longer than `max_seq_len` contributes more than one
+    example per epoch, covering its whole history instead of just its tail.
 
     Args:
         mask_prob (float): Fraction of a window's items to mask.
         mask_token_id (int): Token id substituted for a masked item.
+        stride (int): Step, in flat tape positions, between consecutive windows
+            within a boundary segment. Defaults to 1.
         **params (Any): Forwarded to `SessionSampler.__init__`.
     """
 
-    def __init__(self, mask_prob: float, mask_token_id: int, **params: Any):
-        super().__init__(**params)
+    def __init__(self, mask_prob: float, mask_token_id: int, stride: int = 1, **params: Any):
+        super().__init__(stride=stride, **params)
 
         # Initializing variables
         self.mask_prob = mask_prob
         self.mask_token_id = mask_token_id
-
-        self._window_starts, self._window_ends = self._compute_windows()
-        self.events = len(self._window_starts)
-
-    def _compute_windows(self) -> Tuple[np.ndarray, np.ndarray]:
-        """Compute one window per boundary segment long enough to hold at least two
-        items, anchored at the segment's end and clipped to `max_seq_len`.
-
-        Returns:
-            Tuple[np.ndarray, np.ndarray]: `(window_starts, window_ends)`, parallel
-                arrays giving each window's flat tape start/end positions.
-        """
-        seg_lens = np.diff(self._boundaries)
-        valid_segments = np.where(seg_lens >= 2)[0]
-
-        # Anchor each window at its segment's end, clipped to max_seq_len
-        starts = self._boundaries[valid_segments]
-        ends = self._boundaries[valid_segments + 1]
-        window_starts = np.maximum(starts, ends - self.max_seq_len)
-
-        return window_starts.astype(np.int64), ends.astype(np.int64)
 
     def sample(self, it: int) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         """Build the (masked sequence, positive targets, negative targets, masked
@@ -269,7 +336,12 @@ class ClozeSampler(SessionSampler):
                 `(masked_seq_tensor, pos_items_tensor, neg_items_tensor,
                 masked_indices_tensor)`.
         """
-        start, end = int(self._window_starts[it]), int(self._window_ends[it])
+        start = int(self._window_starts[it])
+        boundary_id = int(self._window_boundary[it])
+        boundary_end = int(self._boundaries[boundary_id + 1])
+
+        # Clip the window to its own boundary segment's end, same as SlidingWindowSampler
+        end = min(start + self.max_seq_len, boundary_end)
         owner_user = int(self._flat_users[start])
 
         seq_array = self._flat_items[start:end].copy()

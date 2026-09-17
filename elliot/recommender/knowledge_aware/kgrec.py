@@ -492,7 +492,7 @@ class KGRec(KnowledgeAwareRecommender, GraphBasedRecommender):
         self.edge_dropout = RelationAwareEdgeDropout(self.node_dropout_rate)
         self.sparse_dropout = SparseDropout(self.node_dropout_rate)
 
-        # Loss and optimizer
+        # Optimizer
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
 
         # Sampler configuration
