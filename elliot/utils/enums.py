@@ -49,10 +49,15 @@ class NegativeSamplingStrategy(Enum):
     FIXED = 'fixed'
 
 
-class SamplerType(Enum):
+class SamplerMaterialization(Enum):
     TRADITIONAL = 1
     PIPELINE = 2
-    SEQUENTIAL = 3
+
+
+class SamplerType(Enum):
+    INTERACTIONS = 1
+    SEQUENTIAL = 2
+    SIDE_INFO = 3
 
 
 class SessionStrategy(Enum):

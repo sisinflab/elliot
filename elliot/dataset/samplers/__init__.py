@@ -8,8 +8,10 @@ from .base_sampler import (
     AbstractSampler,
     TraditionalSampler,
     PipelineSampler,
-    SideInfoSampler,
-    SessionSampler
+    TraditionalSessionSampler,
+    PipelineSessionSampler,
+    TraditionalSideInfoSampler,
+    PipelineSideInfoSampler
 )
 from .pointwise import (
     CustomPointWiseSparseSampler,

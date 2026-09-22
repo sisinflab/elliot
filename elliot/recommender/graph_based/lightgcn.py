@@ -5,6 +5,7 @@ from elliot.dataset import Interactions
 from elliot.namespace import RecommenderConfig
 from elliot.recommender.base_recommender import GraphBasedRecommender
 from elliot.recommender.init import xavier_normal_init
+from elliot.recommender.losses import BPRLoss, EmbLoss
 from elliot.utils.registry import model_registry
 
 
@@ -66,7 +67,8 @@ class LightGCN(GraphBasedRecommender):
         self.alpha = torch.tensor([1 / (k + 1) for k in range(self.n_layers + 1)], device=self._device)
 
         # Loss and optimizer
-        self.softplus = nn.functional.softplus
+        self.bpr_loss = BPRLoss()
+        self.reg_loss = EmbLoss()
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
 
         # Sampler configuration
@@ -118,13 +120,12 @@ class LightGCN(GraphBasedRecommender):
         xu_pos = torch.mul(u_embeddings, pos_embeddings).sum(dim=1)
         xu_neg = torch.mul(u_embeddings, neg_embeddings).sum(dim=1)
 
-        reg = 0.5 * (self.Gu.weight[user].norm(2).pow(2) +
-                     self.Gi.weight[pos].norm(2).pow(2) +
-                     self.Gi.weight[neg].norm(2).pow(2)) / float(batch[0].shape[0])
+        main_loss = self.bpr_loss(xu_pos, xu_neg)
+        reg_loss = self.lambda_weights * self.reg_loss(
+            self.Gu.weight[user], self.Gi.weight[pos], self.Gi.weight[neg]
+        )
 
-        loss = torch.mean(self.softplus(xu_neg - xu_pos)) + self.lambda_weights * reg
-
-        return loss
+        return main_loss + reg_loss
 
     def predict(self, user_indices, item_indices=None, **kwargs):
         user_e_all, item_e_all = self.propagate_embeddings()

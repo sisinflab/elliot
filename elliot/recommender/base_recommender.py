@@ -160,7 +160,7 @@ class AbstractRecommender(ABC):
 
         side_info_sampler_config = dict(self.side_info_sampler_config)
         sampler_name = self._check_sampler(
-            allowed_types=(SamplerType.TRADITIONAL, SamplerType.PIPELINE),
+            allowed_types=SamplerType.SIDE_INFO,
             config=side_info_sampler_config
         )
         side_info_dataloader = self._interactions.get_side_info_dataloader(
@@ -210,7 +210,7 @@ class BaseRecommender(AbstractRecommender):
     def get_training_dataloader(self, batch_size):
         if self.sampler_config:
             sampler_name = self._check_sampler(
-                allowed_types=(SamplerType.TRADITIONAL, SamplerType.PIPELINE)
+                allowed_types=SamplerType.INTERACTIONS
             )
             dataloader = self._interactions.get_dataloader(
                 sampler_name=sampler_name,
@@ -304,7 +304,7 @@ class GeneralRecommender(nn.Module, AbstractRecommender):
 
     def get_training_dataloader(self, batch_size):
         sampler_name = self._check_sampler(
-            allowed_types=(SamplerType.TRADITIONAL, SamplerType.PIPELINE)
+            allowed_types=SamplerType.INTERACTIONS
         )
         dataloader = self._interactions.get_dataloader(
             sampler_name=sampler_name,

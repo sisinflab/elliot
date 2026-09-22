@@ -1,12 +1,12 @@
 from typing import Any, Dict, Iterable, Set, Tuple
 import numpy as np
 
-from elliot.dataset.samplers.base_sampler import SideInfoSampler
+from elliot.dataset.samplers.base_sampler import PipelineSideInfoSampler
 from elliot.utils.registry import sampler_registry
 
 
 @sampler_registry.register()
-class KGTriplesSampler(SideInfoSampler):
+class KGTriplesSampler(PipelineSideInfoSampler):
     """Samples `(head, relation, positive_tail, negative_tail)` quadruples directly
     from a knowledge graph's `(head, relation, tail)` triples, one per event, with
     the negative tail uniformly sampled among entities that are never an observed
@@ -14,14 +14,14 @@ class KGTriplesSampler(SideInfoSampler):
 
     Fully decoupled from interaction data: it draws only from the KG itself and
     ignores the `train_dict`/`users`/`items` a `sampler_registry.get()` call always
-    forwards (see `SideInfoSampler`).
+    forwards (see `PipelineSideInfoSampler`).
 
     Args:
         kg_heads (Iterable[int]): Head entity id per KG triple.
         kg_relations (Iterable[int]): Relation id per KG triple.
         kg_tails (Iterable[int]): Tail entity id per KG triple.
         n_entities (int): Total number of KG entities, for negative-tail sampling.
-        **kwargs (Any): Forwarded to `SideInfoSampler.__init__`.
+        **kwargs (Any): Forwarded to `PipelineSideInfoSampler.__init__`.
     """
 
     def __init__(

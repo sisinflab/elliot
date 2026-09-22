@@ -10,20 +10,29 @@ from scipy.sparse import csr_matrix
 from tqdm import tqdm
 
 from elliot.utils import logging as elog
-from elliot.utils.enums import SamplerType, SessionStrategy
+from elliot.utils.enums import SamplerMaterialization, SamplerType, SessionStrategy
 
 
 class AbstractSampler(ABC):
     """Base class every sampler registered in `sampler_registry` implements.
 
-    Subclasses must implement `sample(it)`; `sample_full()`/`sample_eval(it)` are
-    optional hooks, no-ops by default.
+    A concrete sampler is always built from two orthogonal mixins, combined via
+    multiple inheritance: a domain mixin, which sets `type` and owns whatever
+    domain-specific state/helpers it needs (e.g. `_InteractionDataMixin`,
+    `_SessionDataMixin`, `_SideInfoMixin`), and a materialization-strategy mixin,
+    which sets `materialization` and owns how `sample(it)`'s stream becomes a
+    `torch.utils.data.Dataset` (`_TraditionalMixin` or `_PipelineMixin`). Neither
+    axis knows about the other, so any domain can be combined with either strategy.
 
     Args:
-        users (List[int]): Private user indices in this split's domain.
-        items (List[int]): Private item indices in this split's domain.
-        n_users (int): Total number of users.
-        n_items (int): Total number of items.
+        users (List[int], optional): Private user indices in this split's domain.
+            Defaults to `[]` - a side-info sampler (see `PipelineSideInfoSampler`,
+            `TraditionalSideInfoSampler`) draws from its own source and never
+            receives one.
+        items (List[int], optional): Private item indices in this split's domain.
+            Defaults to `[]`, for the same reason as `users`.
+        n_users (int): Total number of users. Defaults to 0.
+        n_items (int): Total number of items. Defaults to 0.
         seed (int): Random seed for reproducibility.
         logger (LoggerAdapter, optional): Logging instance. Defaults to None, building
             a fresh one via `elliot.utils.logging.get_logger`.
@@ -32,23 +41,24 @@ class AbstractSampler(ABC):
     """
 
     type: SamplerType
+    materialization: SamplerMaterialization
 
     def __init__(
         self,
-        users: List[int],
-        items: List[int],
-        n_users: int,
-        n_items: int,
         seed: int,
+        users: Optional[List[int]] = None,
+        items: Optional[List[int]] = None,
+        n_users: int = 0,
+        n_items: int = 0,
         logger: Optional[LoggerAdapter] = None,
         **kwargs: Any
     ):
         self.logger = logger or elog.get_logger(self.__class__.__name__, seed=seed)
 
         # Initializing variables
-        self._users = users
+        self._users = users if users is not None else []
         self._nusers = n_users
-        self._items = items
+        self._items = items if items is not None else []
         self._nitems = n_items
 
         np.random.seed(seed)
@@ -61,13 +71,6 @@ class AbstractSampler(ABC):
         self._r_sample = partial(random.sample)
 
         self.events: int = 0
-
-    def sample_full(self):
-        """Optional hook: build the whole sample stream at once (used by
-        `SamplerType.TRADITIONAL` samplers via `build_dataset`). Default is a no-op;
-        see `TraditionalSampler.sample_full` for the actual implementation.
-        """
-        pass
 
     @abstractmethod
     def sample(self, it: int) -> Any:
@@ -82,8 +85,7 @@ class AbstractSampler(ABC):
         raise NotImplementedError()
 
     def sample_eval(self, it: int) -> Any:
-        """Optional hook: `sample`'s evaluation-time counterpart (used by
-        `TraditionalSampler.sample_full` when `val=True`). Default is a no-op.
+        """Optional hook: `sample`'s evaluation-time counterpart. Default is a no-op.
 
         Args:
             it (int): Event index.
@@ -94,42 +96,19 @@ class AbstractSampler(ABC):
         pass
 
 
-class TraditionalSampler(AbstractSampler):
-    """Materializes its whole event stream at once, via `sample_full()`, for
-    consumption as a single in-memory `TensorDataset` (see `build_dataset`,
-    `SamplerType.TRADITIONAL`).
-
-    Args:
-        train_dict (Dict[int, Dict[int, float]]): Private-id-keyed ratings dict for
-            this split (`user -> {item: rating}`).
-        transactions (int): Number of events to sample.
-        **kwargs (Any): Forwarded to `AbstractSampler.__init__`.
+class _TraditionalMixin:
+    """Materialization strategy: eagerly builds the whole event stream at once,
+    via `sample_full()`, for consumption as a single in-memory `TensorDataset`.
     """
 
-    type = SamplerType.TRADITIONAL
-
-    def __init__(
-        self,
-        train_dict: Dict[int, Dict[int, float]],
-        transactions: int,
-        **kwargs: Any
-    ):
-        super().__init__(**kwargs)
-
-        # Initializing variables
-        self.events = transactions
-        self._indexed_ratings = train_dict
-
-        # Per-user item list and its length, cached for O(1) sampling
-        self._ui_dict = {u: list(set(self._indexed_ratings[u])) for u in self._indexed_ratings}
-        self._lui_dict = {u: len(v) for u, v in self._ui_dict.items()}
+    materialization = SamplerMaterialization.TRADITIONAL
 
     def sample_full(self, val: bool = False) -> List[Any]:
         """Build every sample in the event stream at once, shuffled.
 
         Args:
-            val (bool): If True, use `sample_eval`/`read_features_eval` instead of
-                `sample`/`read_features`. Defaults to False.
+            val (bool): If True, use `sample_eval` instead of `sample`.
+                Defaults to False.
 
         Returns:
             List[Any]: The full, shuffled sample stream.
@@ -168,10 +147,38 @@ class TraditionalSampler(AbstractSampler):
         return samples
 
 
-class PipelineSampler(AbstractSampler):
-    """Lazily sampled counterpart to `TraditionalSampler`: `sample(it)` is called
-    on demand, once per dataset index, by `PipelineDataset` (see `build_dataset`,
-    `SamplerType.PIPELINE`).
+class _PipelineMixin:
+    """Materialization strategy: lazily sampled, `sample(it)` called on demand,
+    once per dataset index, by `PipelineDataset`.
+    """
+
+    materialization = SamplerMaterialization.PIPELINE
+
+    def collate_fn(self, batch: List[Any]) -> Union[torch.Tensor, Tuple[torch.Tensor, ...]]:
+        """Shuffle a batch of samples and stack each tuple position into its own tensor.
+
+        Args:
+            batch (List[Any]): The batch of samples, each a tuple of same-length
+                values - either plain scalars or tensors, consistently per position.
+
+        Returns:
+            Union[torch.Tensor, Tuple[torch.Tensor, ...]]: One tensor per tuple position.
+        """
+        self._r_shuffle(batch)
+
+        # Transpose the batch of tuples into one tensor per tuple position
+        tensors = tuple(
+            torch.stack(column) if isinstance(column[0], torch.Tensor)
+            else torch.tensor(column, dtype=torch.long)
+            for column in zip(*batch)
+        )
+
+        return tensors
+
+
+class _InteractionDataMixin:
+    """Domain: `SamplerType.INTERACTIONS`. A split's interaction dict, indexed
+    for O(1) sampling.
 
     Args:
         train_dict (Dict[int, Dict[int, float]]): Private-id-keyed ratings dict for
@@ -180,7 +187,7 @@ class PipelineSampler(AbstractSampler):
         **kwargs (Any): Forwarded to `AbstractSampler.__init__`.
     """
 
-    type = SamplerType.PIPELINE
+    type = SamplerType.INTERACTIONS
 
     def __init__(
         self,
@@ -198,74 +205,15 @@ class PipelineSampler(AbstractSampler):
         self._ui_dict = {u: list(set(self._indexed_ratings[u])) for u in self._indexed_ratings}
         self._lui_dict = {u: len(v) for u, v in self._ui_dict.items()}
 
-    def collate_fn(self, batch: List[Any]) -> Union[torch.Tensor, Tuple[torch.Tensor, ...]]:
-        """Shuffle a batch of samples and stack each tuple position into its own tensor.
 
-        Args:
-            batch (List[Any]): The batch of samples, each a tuple of same-length values.
-
-        Returns:
-            Union[torch.Tensor, Tuple[torch.Tensor, ...]]: One tensor per tuple position.
-        """
-        self._r_shuffle(batch)
-
-        # Transpose the batch of tuples into one tensor per tuple position
-        tensors = tuple(
-            torch.tensor(x, dtype=torch.long) for x in zip(*batch)
-        )
-
-        return tensors
-
-
-class SideInfoSampler(AbstractSampler):
-    """Base class for samplers drawing from a model's side information (e.g. a
-    knowledge graph, item/user attributes, ...) rather than its interaction data.
-
-    A side-info sampler is wired in separately from the interaction sampler, through
-    a recommender's own `side_info_sampler_config` (see
-    `AbstractRecommender._with_side_info_sampler`) and built by
-    `Interactions.get_side_info_dataloader` rather than `Interactions.get_dataloader`:
-    the two are sampled, batched and cached entirely independently, and only zipped
-    together (via `CombinedDataLoader`) into the single batch a model's `train_step`
-    sees. Because of this, a subclass never receives (and shouldn't expect) the
-    interaction-derived `users`/`items`/`n_users`/`n_items`/`train_dict`/
-    `transactions` that `Interactions.get_dataloader` forwards to an interaction
-    sampler -- only `seed` plus whatever the subclass itself declares (e.g.
-    `KGTriplesSampler`'s `kg_heads`/`kg_relations`/...).
-
-    Args:
-        seed (int): Random seed for reproducibility.
-        logger (LoggerAdapter, optional): Logging instance. Defaults to None.
-        **kwargs (Any): Forwarded to `AbstractSampler.__init__`.
-    """
-
-    type = SamplerType.PIPELINE
-
-    def __init__(self, seed: int, logger: Optional[LoggerAdapter] = None, **kwargs: Any):
-        # No interaction data to forward here -- see the class docstring
-        super().__init__(users=[], items=[], n_users=0, n_items=0, seed=seed, logger=logger, **kwargs)
-
-    def collate_fn(self, batch: List[Tuple[Any, ...]]) -> Tuple[torch.Tensor, ...]:
-        """Shuffle a batch of same-length tuples and stack each tuple position into
-        its own tensor.
-
-        Args:
-            batch (List[Tuple[Any, ...]]): The batch of tuples.
-
-        Returns:
-            Tuple[torch.Tensor, ...]: One tensor per tuple position.
-        """
-        self._r_shuffle(batch)
-        return tuple(torch.tensor(x, dtype=torch.long) for x in zip(*batch))
-
-
-class SessionSampler(AbstractSampler):
-    """Base class for samplers operating on `Sessions`' flat item tape.
+class _SessionDataMixin:
+    """Domain: `SamplerType.SEQUENTIAL`. `Sessions`' flat item tape, plus the
+    boundary bookkeeping and helpers every session/sequential sampler builds on.
 
     Subclasses receive the same globally sorted (by user, session, timestamp)
     tape regardless of strategy: the only thing that changes between FLAT and
     SESSION_ONLY is which boundary array bounds a sequence (per-user vs.
-    per-session), resolved once here so subclasses never branch on strategy.
+    per-session), resolved once here.
 
     Args:
         flat_items (np.ndarray): Item id per flat tape position.
@@ -423,3 +371,99 @@ class SessionSampler(AbstractSampler):
             negatives.append(cand)
 
         return negatives
+
+
+class _SideInfoMixin:
+    """Domain: `SamplerType.SIDE_INFO`. Draws from a model's side information
+    (e.g. a knowledge graph, item/user attributes, ...) rather than its
+    interaction data.
+
+    A side-info sampler is wired in separately from the interaction sampler,
+    through a recommender's own `side_info_sampler_config`: the two are sampled,
+    batched and cached entirely independently, and only zipped together
+    (via `CombinedDataLoader`) into the single batch a model's `train_step` sees.
+    """
+
+    type = SamplerType.SIDE_INFO
+
+
+class TraditionalSampler(_TraditionalMixin, _InteractionDataMixin, AbstractSampler):
+    """Interaction sampler, eagerly materialized.
+
+    Args:
+        train_dict (Dict[int, Dict[int, float]]): Private-id-keyed ratings dict for
+            this split (`user -> {item: rating}`).
+        transactions (int): Number of events to sample.
+        **kwargs (Any): Forwarded to `AbstractSampler.__init__`.
+    """
+
+
+class PipelineSampler(_PipelineMixin, _InteractionDataMixin, AbstractSampler):
+    """Interaction sampler, lazily sampled on demand.
+
+    Args:
+        train_dict (Dict[int, Dict[int, float]]): Private-id-keyed ratings dict for
+            this split (`user -> {item: rating}`).
+        transactions (int): Number of events to sample.
+        **kwargs (Any): Forwarded to `AbstractSampler.__init__`.
+    """
+
+
+class TraditionalSessionSampler(_TraditionalMixin, _SessionDataMixin, AbstractSampler):
+    """Session sampler, eagerly materialized.
+
+    Args:
+        flat_items (np.ndarray): Item id per flat tape position.
+        flat_users (np.ndarray): Owning (private) user index per flat tape position.
+        flat_session (np.ndarray): Owning (private) session index per flat tape position.
+        user_offsets (np.ndarray): Per-user boundary array over the flat tape.
+        session_offsets (np.ndarray): Per-session boundary array over the flat tape.
+        sparse (csr_matrix): Train interaction matrix, used to exclude seen items when
+            sampling negatives.
+        strategy (SessionStrategy): FLAT or SESSION_ONLY. Defaults to FLAT.
+        max_seq_len (int): Maximum sequence length built from the flat tape. Defaults
+            to 50.
+        neg_samples (int): Number of negatives sampled per target, or 0 to disable
+            negative sampling. Defaults to 0.
+        **kwargs (Any): Forwarded to `AbstractSampler.__init__`.
+    """
+
+
+class PipelineSessionSampler(_PipelineMixin, _SessionDataMixin, AbstractSampler):
+    """Session sampler, lazily sampled on demand.
+
+    Args:
+        flat_items (np.ndarray): Item id per flat tape position.
+        flat_users (np.ndarray): Owning (private) user index per flat tape position.
+        flat_session (np.ndarray): Owning (private) session index per flat tape position.
+        user_offsets (np.ndarray): Per-user boundary array over the flat tape.
+        session_offsets (np.ndarray): Per-session boundary array over the flat tape.
+        sparse (csr_matrix): Train interaction matrix, used to exclude seen items when
+            sampling negatives.
+        strategy (SessionStrategy): FLAT or SESSION_ONLY. Defaults to FLAT.
+        max_seq_len (int): Maximum sequence length built from the flat tape. Defaults
+            to 50.
+        neg_samples (int): Number of negatives sampled per target, or 0 to disable
+            negative sampling. Defaults to 0.
+        **kwargs (Any): Forwarded to `AbstractSampler.__init__`.
+    """
+
+
+class TraditionalSideInfoSampler(_TraditionalMixin, _SideInfoMixin, AbstractSampler):
+    """Side-info sampler, eagerly materialized.
+
+    Args:
+        seed (int): Random seed for reproducibility.
+        logger (LoggerAdapter, optional): Logging instance. Defaults to None.
+        **kwargs (Any): Forwarded to `AbstractSampler.__init__`.
+    """
+
+
+class PipelineSideInfoSampler(_PipelineMixin, _SideInfoMixin, AbstractSampler):
+    """Side-info sampler, lazily sampled on demand.
+
+    Args:
+        seed (int): Random seed for reproducibility.
+        logger (LoggerAdapter, optional): Logging instance. Defaults to None.
+        **kwargs (Any): Forwarded to `AbstractSampler.__init__`.
+    """

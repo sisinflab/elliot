@@ -2,12 +2,12 @@ from typing import Any, Dict, Tuple
 import numpy as np
 import torch
 
-from elliot.dataset.samplers.base_sampler import SessionSampler
+from elliot.dataset.samplers.base_sampler import PipelineSessionSampler
 from elliot.utils.registry import sampler_registry
 
 
 @sampler_registry.register()
-class SequentialSampler(SessionSampler):
+class SequentialSampler(PipelineSessionSampler):
     """Next-item prediction: (sequence, length, target[, negatives]).
 
     Args:
@@ -16,7 +16,7 @@ class SequentialSampler(SessionSampler):
             and `negatives` shaped `(neg_samples,)`, exactly as before;
             `target_len > 1` shapes them `(target_len,)` and
             `(target_len, neg_samples)` instead.
-        **params (Any): Forwarded to `SessionSampler.__init__`.
+        **params (Any): Forwarded to `PipelineSessionSampler.__init__`.
     """
 
     def __init__(self, target_len: int = 1, **params: Any):
@@ -131,12 +131,12 @@ class UserSequentialSampler(SequentialSampler):
 
 
 @sampler_registry.register()
-class SameTargetSequentialSampler(SessionSampler):
+class SameTargetSequentialSampler(PipelineSessionSampler):
     """Next-item prediction paired with a second sequence sampled from a
     different boundary segment that shares the same target item.
 
     Args:
-        **params (Any): Forwarded to `SessionSampler.__init__`.
+        **params (Any): Forwarded to `PipelineSessionSampler.__init__`.
     """
 
     def __init__(self, **params: Any):
@@ -197,14 +197,14 @@ class SameTargetSequentialSampler(SessionSampler):
 
 
 @sampler_registry.register()
-class SlidingWindowSampler(SessionSampler):
+class SlidingWindowSampler(PipelineSessionSampler):
     """Sequence-to-sequence windows (length `max_seq_len`, step `stride`)
     within a boundary segment.
 
     Args:
         stride (int): Step, in flat tape positions, between consecutive windows
             within a boundary segment. Defaults to 1.
-        **params (Any): Forwarded to `SessionSampler.__init__`.
+        **params (Any): Forwarded to `PipelineSessionSampler.__init__`.
     """
 
     def __init__(self, stride: int = 1, **params: Any):
@@ -314,7 +314,7 @@ class ClozeSampler(SlidingWindowSampler):
         mask_token_id (int): Token id substituted for a masked item.
         stride (int): Step, in flat tape positions, between consecutive windows
             within a boundary segment. Defaults to 1.
-        **params (Any): Forwarded to `SessionSampler.__init__`.
+        **params (Any): Forwarded to `PipelineSessionSampler.__init__`.
     """
 
     def __init__(self, mask_prob: float, mask_token_id: int, stride: int = 1, **params: Any):

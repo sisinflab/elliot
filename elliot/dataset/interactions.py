@@ -270,13 +270,14 @@ class Interactions:
         seed: int = 42,
         **kwargs: Any
     ) -> DataLoader:
-        """Build (or reuse a cached) dataloader for a `SideInfoSampler`, entirely
+        """Build (or reuse a cached) dataloader for a side-info sampler (see
+        `PipelineSideInfoSampler`/`TraditionalSideInfoSampler`), entirely
         independent of this split's interaction data.
 
         Unlike `get_dataloader`, no `train_dict`/`users`/`items`/`n_users`/`n_items`
         are forwarded to the sampler - a side-info sampler draws from its own source
         (e.g. a knowledge graph), so it only needs `seed` plus whatever `**kwargs`
-        itself declares (see `SideInfoSampler`).
+        itself declares.
 
         Args:
             sampler_name (str): Name of the sampler registered in `sampler_registry`.

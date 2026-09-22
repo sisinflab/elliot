@@ -3,13 +3,13 @@ import torch
 from torch.utils.data import Dataset, TensorDataset, DataLoader
 
 from elliot.dataset.samplers.base_sampler import AbstractSampler
-from elliot.utils.enums import SamplerType
+from elliot.utils.enums import SamplerMaterialization
 
 
 class PipelineDataset(Dataset):
-    """Lazy `Dataset` for `SamplerType.PIPELINE` samplers, replaying `sampler.sample`
-    `m + 1` times per event (`m` extra negatives sampled per positive, when the
-    sampler declares one via its own `m` attribute).
+    """Lazy `Dataset` for `SamplerType.PIPELINE` or `SamplerType.SEQUENTIAL` samplers,
+    replaying `sampler.sample` `m + 1` times per event (`m` extra negatives sampled per positive,
+    when the sampler declares one via its own `m` attribute).
 
     Args:
         sampler (AbstractSampler): The pipeline sampler to draw samples from.
@@ -28,26 +28,6 @@ class PipelineDataset(Dataset):
         return self.sampler.sample(real_idx)
 
 
-class SequentialDataset(Dataset):
-    """Lazy dataset for samplers whose `sample(it)` already returns a tuple of
-    built tensors (e.g. padded sequences). Left to PyTorch's default collate,
-    which stacks each tuple position independently.
-
-    Args:
-        sampler (AbstractSampler): The sampler to draw samples from.
-    """
-
-    def __init__(self, sampler: AbstractSampler):
-        super().__init__()
-        self.sampler = sampler
-
-    def __len__(self) -> int:
-        return self.sampler.events
-
-    def __getitem__(self, index: int) -> Any:
-        return self.sampler.sample(index)
-
-
 def build_dataset(sampler: AbstractSampler) -> Dataset:
     """Wrap `sampler` into the `torch.utils.data.Dataset` matching its declared
     `SamplerType`: an eagerly materialized `TensorDataset` for `TRADITIONAL`, or a
@@ -63,19 +43,16 @@ def build_dataset(sampler: AbstractSampler) -> Dataset:
     Raises:
         ValueError: If `sampler.type` is not a recognized `SamplerType`.
     """
-    match sampler.type:
+    match sampler.materialization:
         # Eagerly materialize the whole stream into one in-memory tensor dataset
-        case SamplerType.TRADITIONAL:
+        case SamplerMaterialization.TRADITIONAL:
             samples = sampler.sample_full()
             tensors = tuple(torch.tensor(x, dtype=torch.long) for x in zip(*samples))
             dataset = TensorDataset(*tensors)
 
         # Lazy: sample one event per __getitem__ call
-        case SamplerType.PIPELINE:
+        case SamplerMaterialization.PIPELINE:
             dataset = PipelineDataset(sampler)
-
-        case SamplerType.SEQUENTIAL:
-            dataset = SequentialDataset(sampler)
 
         case _:
             raise ValueError(f"Invalid sampler type {sampler.type}")

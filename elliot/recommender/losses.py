@@ -7,20 +7,26 @@ class BPRLoss(nn.Module):
     """Bayesian Personalized Ranking pairwise loss: `-log(sigmoid(pos - neg))`,
     averaged over the batch and, when present, the negatives dimension.
 
-    Supports multiple negatives per positive: `pos_score` broadcasts against
-    the trailing dimension of `neg_score`.
+    Supports both a single negative per positive (`pos_score` and `neg_score`
+    share the same shape) and multiple negatives per positive (`neg_score`
+    carries one extra trailing `neg_samples` dimension, against which
+    `pos_score` broadcasts).
     """
 
     def forward(self, pos_score: Tensor, neg_score: Tensor) -> Tensor:
         """
         Args:
             pos_score (Tensor): Positive item scores, shape `(*batch,)`.
-            neg_score (Tensor): Negative item scores, shape `(*batch, neg_samples)`.
+            neg_score (Tensor): Negative item scores, shape `(*batch,)` for a
+                single negative per positive, or `(*batch, neg_samples)` for
+                multiple negatives per positive.
 
         Returns:
             Tensor: The scalar loss.
         """
-        distance = pos_score.unsqueeze(-1) - neg_score
+        if neg_score.dim() > pos_score.dim():
+            pos_score = pos_score.unsqueeze(-1)
+        distance = pos_score - neg_score
         return F.softplus(-distance).mean()
 
 
