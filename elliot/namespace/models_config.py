@@ -125,7 +125,7 @@ class RecommenderConfig(BaseConfig):
     batch_size: MODEL_FIELD[int] = 1024
     eval_batch_size: MODEL_FIELD[int] | None = None
     best_iteration: int | None = None
-    name: int | None = None
+    name: str | None = None
 
     warn_on_extra_fields = True
 

@@ -21,7 +21,7 @@ class NegEvalDataset(Dataset):
         eval_pos_items (List[List[int]]): Ground-truth positive item indices per user.
         evaluation_set (str): Name of this fold's eval split ("test" or "validation").
             Defaults to "test".
-        leave_one_out (bool): If True, only the last ground-truth positive per user is
+        leave_one_out (bool): If True, only the first ground-truth positive per user is
             kept. Defaults to False.
     """
 
@@ -67,7 +67,7 @@ class NegEvalDataset(Dataset):
                 if not neg_u:
                     pos_u = []
                 elif self.leave_one_out:
-                    pos_u = [pos_u[-1]] if pos_u else []
+                    pos_u = [pos_u[0]] if pos_u else []
 
                 final_items.append(torch.tensor(neg_u + pos_u))
                 t.update(1)

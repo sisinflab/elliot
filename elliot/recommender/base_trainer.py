@@ -151,11 +151,15 @@ class AbstractTrainer(ABC):
                 self._losses.append(loss)
                 self.evaluate(dataset, it, evaluation_set)
 
-        if validate:
-            result_dict = self._val_results[self.get_best_arg()]
-            return self.get_report(result_dict, evaluation_set)
-        else:
+        if not validate:
             return {}
+
+        best = self.get_best_arg()
+        if best is None:
+            # No validation ran during training (e.g. early stop before the first validation epoch)
+            return self.evaluate(dataset, evaluation_set=evaluation_set)
+
+        return self.get_report(self._val_results[best], evaluation_set)
 
     def evaluate(self, dataset, it=None, evaluation_set="test"):
         if self.model_config.eval_batch_size is None:
@@ -219,7 +223,7 @@ class AbstractTrainer(ABC):
                         ext=self.model_config.meta.model_writer.ext
                     )
 
-            return True
+            return {}
 
         return self.get_report(result_dict, evaluation_set)
 
@@ -231,28 +235,27 @@ class AbstractTrainer(ABC):
                 ext=self.model_config.meta.model_reader.ext
             )
             self.model.set_model_state(weights)
-            self.evaluate(dataset, evaluation_set=evaluation_set)
-            return True
+            return self.evaluate(dataset, evaluation_set=evaluation_set)
         except Exception as ex:
             raise Exception(f"Error in model restoring operation! {ex}")
 
     def get_loss(self):
-        if self.model_config.meta.optimize_internal_loss:
-            return min(self._losses)
-        else:
-            return -max([r[self._val_k]["val_results"][self._val_metric] for r in self._val_results])
+        # Training loss of the best checkpoint (the minimum one when optimizing the internal loss)
+        best = self.get_best_arg()
+        return self._losses[best] if best is not None else None
 
     def get_params(self):
         return self.model_config.model_dump()
 
     def get_best_arg(self):
+        # Nothing to rank when no training/validation happened (e.g. restored weights)
         if self.model_config.meta.optimize_internal_loss:
-            val_results = np.argmin(self._losses)
-        else:
-            val_results = np.argmax(
-                [r[self._val_k]["val_results"][self._val_metric] for r in self._val_results]
-            )
-        return val_results
+            return int(np.argmin(self._losses)) if self._losses else None
+        if not self._val_results:
+            return None
+        return int(np.argmax(
+            [r[self._val_k]["val_results"][self._val_metric] for r in self._val_results]
+        ))
 
     def get_report(self, results, evaluation_set="test"):
         return {

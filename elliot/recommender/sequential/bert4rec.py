@@ -30,7 +30,8 @@ class BERT4Rec(SequentialRecommender):
         mask_prob: Fraction of a training window's items replaced by `[MASK]`
         reg_weight: L2 regularization weight over the embeddings used in a batch
         weight_decay: Weight decay passed to the Adam optimizer
-        neg_samples: Number of negative items sampled per masked position
+        neg_samples: Number of negative items sampled per masked position (0 disables
+            negative sampling and switches to a full-catalog cross-entropy loss)
         max_seq_len: Maximum number of items kept from a user's history
 
     To include the recommendation model, add it to the config file adopting the following pattern:
@@ -66,8 +67,8 @@ class BERT4Rec(SequentialRecommender):
     reg_weight: float = 0.0
     weight_decay: float = 0.0
     learning_rate: float = 0.001
-    neg_samples: int = 1
-    max_seq_len: int = 10
+    neg_samples: int = 0
+    max_seq_len: int = 20
 
     def __init__(
         self,
@@ -89,9 +90,10 @@ class BERT4Rec(SequentialRecommender):
         self.item_embedding = nn.Embedding(
             self._num_items + 2, self.embedding_size, padding_idx=self.padding_token_id
         )
-        # One extra slot: at prediction time a [MASK] token is appended right
-        # after the (up to max_seq_len) real context positions.
-        self.position_embedding = nn.Embedding(self.max_seq_len + 1, self.embedding_size)
+        # Training windows only ever span positions [0, max_seq_len),
+        # so at prediction time the context is cut to max_seq_len - 1 items
+        # to keep the appended [MASK] on a trained position
+        self.position_embedding = nn.Embedding(self.max_seq_len, self.embedding_size)
         self.layernorm = nn.LayerNorm(self.embedding_size, eps=1e-8)
         self.dropout = nn.Dropout(self.dropout_prob)
 
@@ -114,6 +116,7 @@ class BERT4Rec(SequentialRecommender):
         self.out_bias = nn.Parameter(torch.zeros(self._num_items + 1))
 
         # Losses
+        self.ce_loss = nn.CrossEntropyLoss()
         self.bpr_loss = BPRLoss()
         self.reg_loss = EmbLoss()
 
@@ -166,24 +169,33 @@ class BERT4Rec(SequentialRecommender):
         transformer_output = self.forward(masked_seq)
         seq_output = self._gather_multi_indexes(transformer_output, masked_indices)
 
-        pos_items_emb = self.item_embedding(pos_items)
-        neg_items_emb = self.item_embedding(neg_items)
-        pos_bias = self.out_bias[pos_items]
-        neg_bias = self.out_bias[neg_items]
-
-        # Calculate BPR Loss
-        pos_score = torch.sum(seq_output * pos_items_emb, dim=-1) + pos_bias
-        neg_score = torch.sum(seq_output.unsqueeze(2) * neg_items_emb, dim=-1) + neg_bias
-
         # `pos_items`/`neg_items`/`masked_indices` are fixed-size (`max_seq_len`)
         # tensors, only the first `num_to_mask` slots of a given row are real
         # masked positions; the rest are filled with `padding_token_id`
         loss_mask = pos_items != self.padding_token_id
-        main_loss = self.bpr_loss(pos_score[loss_mask], neg_score[loss_mask])
+        seq_output = seq_output[loss_mask]
+        pos_items = pos_items[loss_mask]
 
-        reg_loss = self.reg_weight * self.reg_loss(
-            self.item_embedding(masked_seq), pos_items_emb, neg_items_emb
-        )
+        pos_items_emb = self.item_embedding(pos_items)
+
+        # Calculate BPR (sampled) or cross-entropy (full-catalog) loss
+        if self.neg_samples > 0:
+            neg_items = neg_items[loss_mask]
+            neg_items_emb = self.item_embedding(neg_items)
+            pos_score = torch.sum(seq_output * pos_items_emb, dim=-1) + self.out_bias[pos_items]
+            neg_score = torch.sum(seq_output.unsqueeze(1) * neg_items_emb, dim=-1) + self.out_bias[neg_items]
+            main_loss = self.bpr_loss(pos_score, neg_score)
+            reg_loss = self.reg_weight * self.reg_loss(
+                self.item_embedding(masked_seq), pos_items_emb, neg_items_emb
+            )
+        else:
+            logits = torch.matmul(
+                seq_output, self.item_embedding.weight[:self._num_items].transpose(0, 1)
+            ) + self.out_bias[:self._num_items]
+            main_loss = self.ce_loss(logits, pos_items)
+            reg_loss = self.reg_weight * self.reg_loss(
+                self.item_embedding(masked_seq), pos_items_emb
+            )
 
         return main_loss + reg_loss
 
@@ -191,32 +203,47 @@ class BERT4Rec(SequentialRecommender):
         """Append a `[MASK]` token right after each sequence's real context,
         to represent the (yet unseen) next item to predict.
 
+        Contexts are first cut to their most recent `max_seq_len - 1` items,
+        so that the `[MASK]` always lands on a position seen during training.
+
         Args:
-            user_seq (Tensor): Padded item sequences, shape `(batch, max_seq_len)`.
+            user_seq (Tensor): Left-aligned padded item sequences, shape
+                `(batch, width)` with `width <= max_seq_len`.
             seq_len (Tensor): True (pre-padding) context lengths, shape `(batch,)`.
 
         Returns:
-            Tensor: The extended sequences, shape `(batch, max_seq_len + 1)`.
+            Tuple[Tensor, Tensor]: The extended sequences, shape
+                `(batch, min(width + 1, max_seq_len))`, and the position of
+                each row's `[MASK]` token, shape `(batch,)`.
         """
-        pred_seq = torch.full(
-            (user_seq.size(0), user_seq.size(1) + 1),
-            self.padding_token_id,
-            dtype=torch.long,
-            device=user_seq.device,
+        # Guarantee at least one column to gather from (all-empty contexts)
+        user_seq = self._pad_to_length(user_seq, max(user_seq.size(1), 1), self.padding_token_id)
+        batch_size, width = user_seq.shape
+        out_width = min(width + 1, self.max_seq_len)
+        mask_pos = seq_len.clamp(max=self.max_seq_len - 1)
+
+        # Drop the oldest items of contexts too long to fit the [MASK] after them
+        shift = (seq_len - mask_pos).unsqueeze(1)
+        gather_idx = torch.arange(out_width, device=user_seq.device).unsqueeze(0) + shift
+        valid = gather_idx < seq_len.unsqueeze(1)
+        pred_seq = torch.where(
+            valid,
+            user_seq.gather(1, gather_idx.clamp(max=width - 1)),
+            torch.full_like(gather_idx, self.padding_token_id),
         )
-        pred_seq[:, :user_seq.size(1)] = user_seq
-        batch_indices = torch.arange(user_seq.size(0), device=user_seq.device)
-        pred_seq[batch_indices, seq_len] = self.mask_token_id
-        return pred_seq
+
+        batch_indices = torch.arange(batch_size, device=user_seq.device)
+        pred_seq[batch_indices, mask_pos] = self.mask_token_id
+        return pred_seq, mask_pos
 
     def predict(self, user_seq, seq_len, item_indices=None, user_indices=None, **kwargs):
         user_seq = user_seq.to(self._device)
         seq_len = seq_len.to(self._device)
 
         # Append [MASK] and encode the sequence to get its next-item representation
-        pred_seq = self._append_mask_token(user_seq, seq_len)
+        pred_seq, mask_pos = self._append_mask_token(user_seq, seq_len)
         transformer_output = self.forward(pred_seq)
-        seq_output = self._gather_indexes(transformer_output, seq_len)
+        seq_output = self._gather_indexes(transformer_output, mask_pos)
 
         # Compute predictions
         if item_indices is None:

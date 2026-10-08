@@ -57,7 +57,7 @@ class GRU4Rec(SequentialRecommender):
     weight_decay: float = 0.0
     learning_rate: float = 0.001
     neg_samples: int = 1
-    max_seq_len: int = 10
+    max_seq_len: int = 20
     target_len: int = 1
 
     def __init__(

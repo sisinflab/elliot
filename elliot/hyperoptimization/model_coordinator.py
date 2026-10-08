@@ -191,8 +191,9 @@ class ModelCoordinator(object):
         losses = getattr(model, "_losses", None)
         if losses:
             return float(np.min(losses))
-        loss = getattr(model, "get_loss", None)
-        return float(loss()) if callable(loss) else None
+        get_loss = getattr(model, "get_loss", None)
+        loss = get_loss() if callable(get_loss) else None
+        return float(loss) if loss is not None else None
 
     @staticmethod
     def _safe_float(value):

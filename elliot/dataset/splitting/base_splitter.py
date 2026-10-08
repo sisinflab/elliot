@@ -537,7 +537,8 @@ class Splitter:
 
     @staticmethod
     def _check_timestamp_range(df: pd.DataFrame, timestamp: float):
-        """Validate that `timestamp` falls within the 10th to 90th percentile of the dataset.
+        """Validate that `timestamp` falls within the range
+        corresponding to 10% to 90% of the total number of interactions.
 
         Args:
             df (pd.DataFrame): DataFrame containing a 'timestamp' column.
@@ -561,9 +562,8 @@ class Splitter:
 
     @staticmethod
     def _check_leave_n_out_range(df: pd.DataFrame, leave_n_out: int):
-        """Validate that `leave_n_out` is within a reasonable range per user.
-
-        The range is calculated as 10% to 90% of average interactions per user.
+        """Validate that `leave_n_out` falls within 1
+        and 90% of the average number of interactions per user.
 
         Args:
             df (pd.DataFrame): DataFrame containing a 'userId' column.
@@ -575,7 +575,7 @@ class Splitter:
         user_count = df['userId'].nunique()
         interaction_count = len(df)
 
-        min_leave_n_out = math.ceil(0.1 * interaction_count / user_count)
+        min_leave_n_out = 1
         max_leave_n_out = math.floor(0.9 * interaction_count / user_count)
 
         check_range('leave_n_out', leave_n_out, min_leave_n_out, max_leave_n_out)
