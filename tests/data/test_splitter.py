@@ -170,6 +170,21 @@ class TestSplitter:
         assert all(test["timestamp"] >= 21600)
         assert all(train["timestamp"] < 21600)
 
+    def test_fixed_timestamp_test_ratio(self):
+        config = {
+            "test_splitting": {
+                "strategy": "fixed_timestamp",
+                "test_ratio": 0.2
+            }
+        }
+
+        _, train_test = load_and_split_data(config)
+
+        train = train_test[0].train_set.dataframe
+        test = train_test[0].eval_set.dataframe
+        assert len(test) == 6
+        assert train["timestamp"].max() < test["timestamp"].min()
+
     def test_best_timestamp(self):
         config = {
             "test_splitting": {
@@ -302,6 +317,29 @@ class TestSequenceSplitter:
             test_sessions = set(zip(test["userId"], test["sessionId"]))
             assert not (train_sessions & test_sessions)
 
+    def test_fixed_timestamp_sessions(self):
+        config = {
+            "test_splitting": {
+                "strategy": "fixed_timestamp",
+                "timestamp": 5000
+            }
+        }
+
+        _, train_test = load_and_split_data(config, "sessions", session_strategy="session_only")
+
+        train = train_test[0].train_set.dataframe
+        test = train_test[0].eval_set.dataframe
+
+        # Only sessions starting at or after the timestamp go to test...
+        assert all(test.groupby(["userId", "sessionId"])["timestamp"].min() >= 5000)
+        assert not (
+            set(zip(train["userId"], train["sessionId"])) &
+            set(zip(test["userId"], test["sessionId"]))
+        )
+        # ...while a session straddling it stays whole in train
+        assert list(train[train["userId"] == "2"]["itemId"]) == ["1", "2", "3", "4", "5"]
+        assert list(test["itemId"]) == ["4", "5", "6", "7", "6", "7"]
+
 
 class TestSplitterFailures:
 
@@ -405,6 +443,18 @@ class TestSplitterFailures:
         }
 
         with pytest.raises(ValueError):
+            load_and_split_data(config)
+
+    @pytest.mark.parametrize("params", p["invalid_fixed_timestamp_test_ratio"])
+    def test_invalid_or_missing_params_fixed_timestamp_test_ratio(self, params):
+        config = {
+            "test_splitting": {
+                "strategy": "fixed_timestamp",
+                **params
+            }
+        }
+
+        with pytest.raises((ValueError, AttributeError)):
             load_and_split_data(config)
 
     @pytest.mark.parametrize("params", p["invalid_best_timestamp"])

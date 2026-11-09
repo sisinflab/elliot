@@ -13,7 +13,7 @@ from elliot.utils.enums import EntityAxis
 def _fake_ns():
     ns = SideInformationConfig(
         dataloader="",
-        reader=GeneralReaderConfig(sep="\t", header=False, encoding=None)
+        reader=GeneralReaderConfig(sep="\t", header=False)
     )
     return ns
 

@@ -65,6 +65,14 @@ class SessionStrategy(Enum):
     SESSION_ONLY = "session_only"
 
 
+class EvalTarget(Enum):
+    ALL = "all"
+    FIRST = "first"
+    LAST = "last"
+    RANDOM = "random"
+    SUCCESSIVE = "successive"
+
+
 class ModelType(Enum):
     BASE = 1
     TRADITIONAL = 2

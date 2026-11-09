@@ -36,7 +36,7 @@ class Writer:
         header: Union[bool, List[str]] = False,
         columns: Optional[List[Union[str, int]]] = None,
         sep: str = "\t",
-        encoding: Optional[str] = None,
+        encoding: str = "utf-8",
         callback_fn: Optional[Callable] = None,
         **kwargs: Any
     ):
@@ -50,7 +50,7 @@ class Writer:
             columns (List[Union[str, int]], optional): List of column names or indices
                 to select. Defaults to None.
             sep (str): Column separator to use in the output file. Defaults to "\\t".
-            encoding (str, optional): File encoding. Defaults to None (using the platform default).
+            encoding (str): File encoding. Defaults to "utf-8".
             callback_fn (Callable, optional): Function to call after writing the file. Defaults to None.
             **kwargs (Any): Additional keyword arguments passed to the `callback_fn` function.
         """
@@ -109,7 +109,7 @@ class Writer:
         columns: Optional[List[str]] = None,
         sequence_sep: str = " ",
         sep: str = "\t",
-        encoding: Optional[str] = None,
+        encoding: str = "utf-8",
         callback_fn: Optional[Callable] = None,
         **kwargs: Any
     ):
@@ -141,7 +141,7 @@ class Writer:
             sequence_sep (str): Separator used inside the serialized sequence string. Only
                 used when `format` is "inline". Defaults to " ".
             sep (str): Column/token separator used in the output file. Defaults to "\\t".
-            encoding (str, optional): File encoding. Defaults to None (using the platform default).
+            encoding (str): File encoding. Defaults to "utf-8".
             callback_fn (Callable, optional): Function to call after writing the file. Defaults to None.
             **kwargs (Any): Additional keyword arguments passed to the `callback_fn` function.
 
@@ -292,7 +292,7 @@ class Writer:
         neg_dict: Dict[str, List[str]],
         save_folder: str,
         sep: str = "\t",
-        encoding: Optional[str] = None,
+        encoding: str = "utf-8",
         ext: str = ".tsv",
         fold_index: Tuple[int, Optional[int]] = (0, None),
         **kwargs: Any
@@ -304,7 +304,7 @@ class Writer:
                 negative samples as values.
             save_folder (str): Path to the folder where the output file will be saved.
             sep (str): Field separator to use in the output file. Defaults to "\\t".
-            encoding (str, optional): File encoding. Defaults to None (using the platform default).
+            encoding (str): File encoding. Defaults to "utf-8".
             ext (str): File extension for the output file. Defaults to ".tsv".
             fold_index (Tuple[int, Optional[int]]): Tuple containing the complete fold index.
             **kwargs (Any): Additional keyword arguments.
@@ -593,7 +593,7 @@ class Writer:
         data: Any,
         path: str,
         indent: int = 2,
-        encoding: Optional[str] = None,
+        encoding: str = "utf-8",
         **kwargs: Any
     ):
         """Write data to a JSON file.
@@ -602,7 +602,7 @@ class Writer:
             data (Any): Data to be serialized and written to the JSON file.
             path (str): Path to the output file.
             indent (int): Number of spaces to use for indentation in the JSON output. Defaults to 2.
-            encoding (str, optional): File encoding. Defaults to None.
+            encoding (str): File encoding. Defaults to "utf-8".
             **kwargs (Any): Additional keyword arguments.
         """
         with open(path, "w", encoding=encoding) as handle:
@@ -648,7 +648,7 @@ def store_recommendation(
 
     path = path_joiner(save_folder, f"{file_name}{ext}")
 
-    with open(path, 'w') as out:
+    with open(path, 'w', encoding="utf-8") as out:
         for u, recs in recommendations.items():
             for i, value in recs:
                 out.write(str(u) + sep + str(i) + sep + str(value) + '\n')

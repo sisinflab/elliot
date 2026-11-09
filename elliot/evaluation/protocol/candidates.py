@@ -60,17 +60,20 @@ class NegativeSampler:
         fold_index (Tuple[int, Optional[int]]): Tuple containing the complete fold index.
         random_seed (int): Random seed for reproducibility. Defaults to 42.
 
-    To configure the negative sampling, include the appropriate
-    settings in the configuration file using the pattern shown below.
+    The sampled negatives only decide the candidates each eval row is ranked
+    against; the row's target item(s) are decided by `evaluation.protocol.target`.
+    To configure the negative sampling, include the appropriate settings in the
+    `evaluation.protocol` block of the configuration file, as shown below.
 
     .. code:: yaml
 
-      negative_sampling:
-        strategy: random|fixed
-        num_negatives: 5
-        save_folder: this/is/the/path
-        read_folder: this/is/the/path
-        leave_one_out: True|False
+      evaluation:
+        protocol:
+          negative_sampling:
+            strategy: random|fixed
+            num_negatives: 5
+            save_folder: this/is/the/path
+            read_folder: this/is/the/path
     """
 
     neg_sampling_config: NegativeSamplingConfig

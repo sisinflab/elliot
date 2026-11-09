@@ -62,7 +62,12 @@ class ModelCoordinator(object):
         reports = []
         fold_trends = []
 
-        save_model = len(self.train_val_data) == 1
+        # The trained model is reused for testing only if it was trained on the test fold's
+        # own train; otherwise (e.g. test train being train+val) it gets retrained by `train()`
+        save_model = (
+            len(self.train_val_data) == 1
+            and self.train_val_data[0].train_set is self.main_data.train_set
+        )
 
         for train_val_index, train_val_obj in enumerate(self.train_val_data):
             if args is not None:

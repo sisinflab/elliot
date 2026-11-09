@@ -326,21 +326,30 @@ It takes the parameter ``folds`` with an **int** value, that defines the overall
             strategy: random_cross_validation
             folds: 5
 
-Negative Sampling
-""""""""""""""""""""""""""""
-Elliot let us to set up a set of negative items for each user, these items are useful to provide a negative sampling
-evaluation. It is possible to provide a file with these items or give to Elliot the possibility to generate a specific
-number of negative items for each user.
+Evaluation Target and Negative Sampling
+""""""""""""""""""""""""""""""""""""""""
+The ``evaluation.protocol`` block defines the evaluation protocol: ``target`` decides what each evaluation row predicts
+(a single value for the whole experiment), ``negative_sampling`` decides which candidates each row is ranked against
+(the whole catalog, if absent). Negative items can be read from files or sampled at random for each user.
+``mask_seen`` excludes already-seen items from full-ranking recommendations, and ``user_filter`` restricts the
+evaluation to the users listed in a file (one id per line, in the ``public`` or ``private`` id space).
 
 .. code:: yaml
 
     experiment:
-        negative_sampling:
+      evaluation:
+        protocol:
+          target: all|first|last|random|successive
+          mask_seen: True
+          negative_sampling:
             strategy: fixed|random
-            files: [ path/to/file ]
-            num_items: 5
+            read_folder: path/to/folder
+            num_negatives: 99
+          user_filter:
+            path: path/to/users.tsv
+            id_space: public|private
 
-For further details regarding the file format and other feature about Negative Sampling, please refer to the :ref:`section<Negative Sampling>`.
+For further details regarding the available targets, the file format and other features, please refer to the :ref:`section<Evaluation Protocol>`.
 
 Dataset Name Configuration
 """"""""""""""""""""""""""""

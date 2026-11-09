@@ -33,7 +33,7 @@ class Reader:
         columns: Optional[List[Union[str, int]]] = None,
         datatypes: Dict[Union[str, int], str] = {},
         sep: str = "\t",
-        encoding: Optional[str] = None,
+        encoding: str = "utf-8",
         pandas_kwargs: Optional[Dict[str, Any]] = None,
         callback_fn: Optional[Callable] = None,
         **kwargs: Any,
@@ -51,7 +51,7 @@ class Reader:
             datatypes (Dict[Union[str, int], str]): Mapping of column names or indices
                 to data types. Defaults to {}.
             sep (str): Column separator used in the input file. Defaults to "\\t".
-            encoding (str, optional): File encoding. Defaults to None (using the platform default).
+            encoding (str): File encoding. Defaults to "utf-8".
             pandas_kwargs (Dict[str, Any], optional): Extra keyword arguments forwarded as-is
                 to `pandas.read_csv` (e.g. `compression`, `dtype`, `names`, `quoting`). Defaults to None.
             callback_fn (Callable, optional): Function to apply to the resulting DataFrame
@@ -152,7 +152,7 @@ class Reader:
         datatypes: Dict[Union[str, int], str] = {},
         sequence_sep: str = " ",
         sep: str = "\t",
-        encoding: Optional[str] = None,
+        encoding: str = "utf-8",
         callback_fn: Optional[Callable] = None,
         track_source_rows: bool = True,
         **kwargs: Any,
@@ -186,7 +186,7 @@ class Reader:
             sequence_sep (str): Separator used inside the sequence string. Only used when
                 `format` is "inline". Defaults to " ".
             sep (str): Column/token separator used in the input file. Defaults to "\\t".
-            encoding (str, optional): File encoding. Defaults to None (using the platform default).
+            encoding (str): File encoding. Defaults to "utf-8".
             callback_fn (Callable, optional): Function to apply to the resulting DataFrame
                 before returning. Defaults to None.
             track_source_rows (bool): If True, add a "_sourceRow" column recording, for
@@ -342,7 +342,7 @@ class Reader:
         hierarchical: bool = False,
         sequential: bool = False,
         **kwargs: Any
-    ) -> List[Tuple[List[Tuple[pd.DataFrame, pd.DataFrame]], Optional[pd.DataFrame], pd.DataFrame]]:
+    ) -> List[Tuple[List[Tuple[pd.DataFrame, pd.DataFrame]], pd.DataFrame, pd.DataFrame]]:
         """Read tabular data splits from a specified folder,
         supporting both classic and hierarchical split structures.
 
@@ -357,9 +357,10 @@ class Reader:
                 `read_sequence_tabular` (if `sequential` is True) or `read_tabular` (otherwise).
 
         Returns:
-            List[Tuple[List[Tuple[pd.DataFrame, pd.DataFrame]], Optional[pd.DataFrame], pd.DataFrame]]:
-                A list of tuples where each tuple contains an optional list of train/validation
-                DataFrame pairs, a train DataFrame, and a test DataFrame.
+            List[Tuple[List[Tuple[pd.DataFrame, pd.DataFrame]], pd.DataFrame, pd.DataFrame]]:
+                A list of tuples where each tuple contains a (possibly empty) list of
+                train/validation DataFrame pairs, the test fold's train DataFrame (the
+                train + val union when validation folds exist), and a test DataFrame.
         """
         read_fn = self.read_sequence_tabular if sequential else self.read_tabular
 
@@ -382,7 +383,7 @@ class Reader:
             if val_path:
                 val_df = read_fn(val_path, **kwargs)
                 folds = [(train_df, val_df)]
-                original_train_df = None
+                original_train_df = pd.concat([train_df, val_df], ignore_index=True)
             else:
                 folds = []
                 original_train_df = train_df
@@ -401,7 +402,6 @@ class Reader:
 
                 val_dirs = [p for p in list_dir(test_folder_path) if is_dir(p)]
                 val_list = []
-                original_train_df = None
 
                 # Validation fold level
                 for val_folder_path in val_dirs:
@@ -413,10 +413,11 @@ class Reader:
 
                     val_list.append((train_df, val_df))
 
+                # Every validation fold derives from the same train set:
+                # the first fold's train + val union rebuilds it
                 if val_list:
                     train_df, val_df = val_list[0]
-                    if len(val_list) > 1:
-                        original_train_df = pd.concat([train_df, val_df], ignore_index=True)
+                    original_train_df = pd.concat([train_df, val_df], ignore_index=True)
 
                 # Load only train dataset if validation folds are missing
                 else:
@@ -430,7 +431,7 @@ class Reader:
     def read_lines(
         self,
         path: str,
-        encoding: Optional[str] = None,
+        encoding: str = "utf-8",
         parse_fn: Optional[Callable[[str], Any]] = None,
         skip_fn: Optional[Callable[[str], bool]] = None
     ) -> List[Any]:
@@ -440,7 +441,7 @@ class Reader:
 
         Args:
             path (str): Path to the file.
-            encoding (str, optional): File encoding. Defaults to None (using the platform default).
+            encoding (str): File encoding. Defaults to "utf-8".
             parse_fn (Callable[[str], Any], optional): Turns a raw (newline-stripped) line
                 into the entry to collect. Defaults to `None`, keeping the raw line.
             skip_fn (Callable[[str], bool], optional): If it returns `True` for a line, that
@@ -466,7 +467,7 @@ class Reader:
         self,
         path: str,
         sep: str = "\t",
-        encoding: Optional[str] = None,
+        encoding: str = "utf-8",
         key_fn: Callable[[str], Any] = str,
         value_fn: Optional[Callable[[List[str]], Any]] = None
     ) -> Dict[Any, Any]:
@@ -478,7 +479,7 @@ class Reader:
         Args:
             path (str): Path to the mapping file.
             sep (str): Column separator used in the input file. Defaults to "\\t".
-            encoding (str, optional): File encoding. Defaults to None (using the platform default).
+            encoding (str): File encoding. Defaults to "utf-8".
             key_fn (Callable[[str], Any]): Turns the first token of a line into the dict key.
                 Defaults to `str`.
             value_fn (Union[Callable[[List[str]], Any], Type], optional): Turns the remaining tokens of a
@@ -503,7 +504,7 @@ class Reader:
         self,
         read_folder: str,
         sep: str = "\t",
-        encoding: Optional[str] = None,
+        encoding: str = "utf-8",
         fold_index: Tuple[int, Optional[int]] = (0, None),
         **kwargs: Any
     ) -> Dict[str, List[str]]:
@@ -512,7 +513,7 @@ class Reader:
         Args:
             read_folder (str): Path to the folder containing the negative samples file.
             sep (str): Field separator used in the input file. Defaults to "\\t".
-            encoding (str, optional): File encoding. Defaults to None (using the platform default).
+            encoding (str): File encoding. Defaults to "utf-8".
             fold_index (Tuple[int, Optional[int]]): Tuple containing the complete fold index.
             **kwargs (Any): Additional keyword arguments passed to the `read_folder` method.
 
@@ -574,13 +575,13 @@ class Reader:
     def read_json(
         self,
         path: str,
-        encoding: Optional[str] = None
+        encoding: str = "utf-8"
     ) -> Any:
         """Read and parse data from a JSON file.
 
         Args:
             path (str): Path to the JSON file.
-            encoding (str, optional): File encoding. Defaults to None (using the platform default).
+            encoding (str): File encoding. Defaults to "utf-8".
 
         Returns:
             Any: The loaded and parsed JSON data.
@@ -596,7 +597,7 @@ class Reader:
         self,
         path: str,
         sep: str = "\t",
-        encoding: Optional[str] = None,
+        encoding: str = "utf-8",
     ) -> pd.DataFrame:
         """Read `(subject, predicate, object)` KG triples from a headerless tabular file
         into a string-typed `DataFrame`.
@@ -608,7 +609,7 @@ class Reader:
         Args:
             path (str): Path to the triples file.
             sep (str): Column separator used in the input file. Defaults to "\\t".
-            encoding (str, optional): File encoding. Defaults to None (using the platform default).
+            encoding (str): File encoding. Defaults to "utf-8".
 
         Returns:
             pd.DataFrame: The triples, with columns `["uri", "predicate", "object"]`.
@@ -636,7 +637,7 @@ class Reader:
     def read_triples_as_tuples(
         self,
         path: str,
-        encoding: Optional[str] = None
+        encoding: str = "utf-8"
     ) -> List[Tuple[str, str, str]]:
         """Read whitespace- or tab-separated RDF triples as `(subject, predicate,
         object)` string tuples, one line per triple (`.tsv` files split on tab;
@@ -645,7 +646,7 @@ class Reader:
 
         Args:
             path (str): Path to the triples file.
-            encoding (str, optional): File encoding. Defaults to None (using the platform default).
+            encoding (str): File encoding. Defaults to "utf-8".
 
         Returns:
             List[Tuple[str, str, str]]: The triples, in file order.

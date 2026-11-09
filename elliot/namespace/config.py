@@ -12,12 +12,12 @@ from elliot.namespace.common import BaseConfig, build_fields_from_annotations
 from elliot.namespace.data_config import DataConfig
 from elliot.namespace.evaluation_config import EvaluationConfig
 from elliot.namespace.models_config import RecommenderConfig, MODEL_FIELD
-from elliot.namespace.negative_sampling_config import NegativeSamplingConfig
 from elliot.namespace.prefiltering_config import PreFilteringConfig
 from elliot.namespace.results_config import ResultsConfig
 from elliot.namespace.splitting_config import SplittingConfig
 from elliot.namespace.wandb_config import WandBConfig
 from elliot.utils import split_metric, import_submodules
+from elliot.utils.enums import DataLoadingStrategy, EvalTarget, SessionStrategy, SplittingStrategy
 from elliot.utils.folder import set_config_folder, parent_dir, path_joiner, path_resolver, file_ext
 from elliot.utils.hydra_config import load_config
 from elliot.utils.read import Reader
@@ -40,7 +40,6 @@ class ExperimentConfig(BaseConfig):
         align_side_with_train (bool): Align side information with training split. Defaults to True.
         prefiltering (List[PreFilteringConfig]): List of pre-filtering configurations. Defaults to [].
         splitting (SplittingConfig, optional): Dataset splitting configuration.
-        negative_sampling (NegativeSamplingConfig, optional): Negative sampling configuration.
         top_k (int): Number of recommended items per user. Defaults to 10.
         evaluation (EvaluationConfig): Evaluation configuration.
         results (ResultsConfig): Results handling configuration.
@@ -66,7 +65,6 @@ class ExperimentConfig(BaseConfig):
     align_side_with_train: bool = True
     prefiltering: List[PreFilteringConfig] = []
     splitting: Optional[SplittingConfig] = None
-    negative_sampling: Optional[NegativeSamplingConfig] = None
     wandb: Optional[WandBConfig] = None
     top_k: int = 10
     evaluation: EvaluationConfig = Field(default_factory=EvaluationConfig)
@@ -201,6 +199,77 @@ class ExperimentConfig(BaseConfig):
         self.models = parsed_models
         return self
 
+    @property
+    def session_only_models(self) -> List[str]:
+        """Names of the models trained and evaluated on sessions (SESSION_ONLY)."""
+        return [
+            name for name, model_cfg in self.models.items()
+            if model_cfg.meta.session_strategy == SessionStrategy.SESSION_ONLY
+        ]
+
+    @property
+    def mixes_session_strategies(self) -> bool:
+        """Whether SESSION_ONLY models are evaluated alongside other (FLAT or
+        non-sequential) ones in this experiment."""
+        return 0 < len(self.session_only_models) < len(self.models)
+
+    @model_validator(mode="after")
+    def validate_evaluation_target(self) -> "ExperimentConfig":
+        """Resolve the single evaluation target shared by every model, then check it
+        against the models' session strategies and the splitting:
+
+        - only FLAT and non-sequential models: any target;
+        - only SESSION_ONLY models: "last", "random" or "successive" (a session has
+          no context before its first item);
+        - SESSION_ONLY models mixed with other ones: only "last", with a test set
+          holding each user's last session (`temporal_holdout` with `leave_n_out: 1`).
+          With any other combination the two kinds of models are scored on
+          different rows, so their results are not comparable;
+        - any target but "all" needs a temporal splitting.
+
+        Returns:
+            ExperimentConfig: The object itself, with `evaluation.protocol.target` resolved.
+        """
+        session_models = self.session_only_models
+
+        if self.evaluation.protocol.target is None:
+            self.evaluation.protocol.target = EvalTarget.LAST if session_models else EvalTarget.ALL
+        target = self.evaluation.protocol.target
+
+        if session_models:
+            if self.data_config.session_strategy != SessionStrategy.SESSION_ONLY:
+                raise ValueError(f"SESSION_ONLY models {session_models} need a dataset segmented "
+                                 f"into sessions: set `data_config.session_strategy: session_only`.")
+
+            if target in (EvalTarget.ALL, EvalTarget.FIRST):
+                raise ValueError(f"Evaluation target '{target.value}' is not available "
+                                 f"for SESSION_ONLY models: {session_models}.")
+
+        if self.mixes_session_strategies:
+            if target != EvalTarget.LAST:
+                raise ValueError(f"Experiments mixing SESSION_ONLY models {session_models} with other models "
+                                 f"only support evaluation target '{EvalTarget.LAST.value}', not '{target.value}': "
+                                 f"any other target scores them on different rows, so results are not comparable.")
+            self._check_last_session_holdout(session_models)
+
+        if target == EvalTarget.ALL:
+            return self
+
+        random_splitting_strategies = (
+            SplittingStrategy.RAND_HOLDOUT,
+            SplittingStrategy.RAND_SUB_SMP,
+            SplittingStrategy.RAND_CV
+        )
+
+        # Any other target needs eval items that follow their history in time
+        if self.splitting is not None:
+            for split_cfg in (self.splitting.test_splitting, self.splitting.validation_splitting):
+                if split_cfg is not None and split_cfg.strategy in random_splitting_strategies:
+                    raise ValueError(f"Evaluation target '{target.value}' requires a temporal splitting, "
+                                     f"not '{split_cfg.strategy.value}'.")
+
+        return self
+
     def handle_recommendation_folder(self):
         """Expand a folder-based recommender configuration into multiple proxy models.
 
@@ -266,6 +335,35 @@ class ExperimentConfig(BaseConfig):
             raise ValueError(f"Cutoff {final_k} is not in general cutoff values.")
 
         return final_name + "@" + str(final_k)
+
+    def _check_last_session_holdout(self, session_models: List[str]):
+        """Check that the test set holds each user's last session only, so that the
+        "last" target is the same item for SESSION_ONLY and FLAT models alike.
+
+        Args:
+            session_models (List[str]): Names of the SESSION_ONLY models.
+
+        Raises:
+            ValueError: If the test splitting is not `temporal_holdout` with `leave_n_out: 1`.
+        """
+        # Pre-split data can't be checked here
+        if self.data_config.strategy != DataLoadingStrategy.DATASET or self.splitting is None:
+            self.logger.warning(
+                f"Experiments mixing SESSION_ONLY models {session_models} with other models are only "
+                f"comparable if each user's test set holds a single session: "
+                f"this can't be checked on already split data."
+            )
+            return
+
+        test_cfg = self.splitting.test_splitting
+        if (
+            test_cfg.strategy != SplittingStrategy.TEMP_HOLDOUT
+            or test_cfg.test_ratio is not None
+            or test_cfg.leave_n_out != 1
+        ):
+            raise ValueError(f"Experiments mixing SESSION_ONLY models {session_models} with other models "
+                             f"need a test set holding each user's last session only: set `test_splitting` "
+                             f"to strategy '{SplittingStrategy.TEMP_HOLDOUT.value}' with `leave_n_out: 1`.")
 
 
 def build_namespace(

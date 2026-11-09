@@ -1,6 +1,7 @@
 import pytest
+import numpy as np
 
-from elliot.utils.folder import file_full_name
+from elliot.utils.folder import file_full_name, path_joiner
 from elliot.utils.read import Reader
 
 from tests.params import reader_folder, reader_path
@@ -159,6 +160,9 @@ class TestReadSequenceTabular:
         assert df.empty
         assert list(df.columns) == ["userId", "itemId"]
 
+
+class TestReadSequenceTabularFailures:
+
     def test_invalid_format(self):
         path = reader_path("wide_no_header")
 
@@ -247,13 +251,8 @@ def test_read_json():
 
 class TestDiscoverNpyIds:
 
-    def test_lists_ids_and_sniffs_shape(self, tmp_path):
-        import numpy as np
-
-        np.save(tmp_path / "1.npy", np.array([1.0, 2.0]))
-        np.save(tmp_path / "2.npy", np.array([3.0, 4.0]))
-
-        ids, id_map, shape = reader.discover_npy_ids(str(tmp_path))
+    def test_lists_ids_and_sniffs_shape(self):
+        ids, id_map, shape = reader.discover_npy_ids(reader_path(folder="npy"))
 
         assert ids == {1, 2}
         assert set(id_map.keys()) == {1, 2}
@@ -265,46 +264,45 @@ class TestDiscoverNpyIds:
 
 class TestReadNpy:
 
-    def test_loads_full_array(self, tmp_path):
-        import numpy as np
+    def test_loads_full_array(self):
+        path = reader_path(folder=path_joiner("npy", "1.npy"))
 
-        path = tmp_path / "1.npy"
-        np.save(path, np.array([1.0, 2.0, 3.0]))
+        loaded = reader.read_npy(path)
 
-        loaded = reader.read_npy(str(path))
-
-        assert list(loaded) == [1.0, 2.0, 3.0]
+        assert list(loaded) == [1.0, 2.0]
         assert not isinstance(loaded, np.memmap)
 
-    def test_mmap_mode_returns_memmap_without_full_copy(self, tmp_path):
-        import numpy as np
+    def test_mmap_mode_returns_memmap_without_full_copy(self):
+        path = reader_path(folder=path_joiner("npy", "1.npy"))
 
-        path = tmp_path / "1.npy"
-        np.save(path, np.array([1.0, 2.0, 3.0]))
-
-        loaded = reader.read_npy(str(path), mmap_mode="r")
+        loaded = reader.read_npy(path, mmap_mode="r")
 
         assert isinstance(loaded, np.memmap)
-        assert list(loaded) == [1.0, 2.0, 3.0]
+        assert list(loaded) == [1.0, 2.0]
 
 
 class TestReadTriplesAsTuples:
 
-    def test_tsv_splits_on_tab(self, tmp_path):
-        path = tmp_path / "triples.tsv"
-        path.write_text("e1\trel1\te2\ne2\trel2\te3\n")
+    def test_tsv_splits_on_tab(self):
+        path = reader_path("triples")
 
-        triples = reader.read_triples_as_tuples(str(path))
+        triples = reader.read_triples_as_tuples(path)
+
+        assert triples == [("e1", "rel1", "e2"), ("e2", "rel2", "e3")]
+
+    def test_non_tsv_splits_on_whitespace(self):
+        path = reader_path("triples", ext="txt")
+
+        triples = reader.read_triples_as_tuples(path)
 
         assert triples == [("e1", "rel1", "e2"), ("e2", "rel2", "e3")]
 
-    def test_non_tsv_splits_on_whitespace(self, tmp_path):
-        path = tmp_path / "triples.txt"
-        path.write_text("e1 rel1 e2\ne2 rel2 e3\n")
+    def test_reads_utf8_regardless_of_platform_default(self):
+        path = reader_path("triples_utf8")
 
-        triples = reader.read_triples_as_tuples(str(path))
+        triples = reader.read_triples_as_tuples(path)
 
-        assert triples == [("e1", "rel1", "e2"), ("e2", "rel2", "e3")]
+        assert triples == [("café", "relà", "naïve")]
 
 
 if __name__ == '__main__':

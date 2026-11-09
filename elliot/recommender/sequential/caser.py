@@ -52,8 +52,8 @@ class Caser(SequentialRecommender):
         Unlike SASRec/GRU4Rec/BERT4Rec, Caser learns an explicit per-user
         embedding, so it can only be personalized correctly when its `predict`
         is given the item sequence's real owning user index. This holds for
-        FLAT evaluation; under SESSION_ONLY evaluation `collector.py` resolves
-        the eval row back to its owning user for exactly this reason.
+        FLAT evaluation; under SESSION_ONLY evaluation `elliot.evaluation.protocol.collect()`
+        resolves the eval row back to its owning user for exactly this reason.
     """
 
     # Model hyperparameters

@@ -1,7 +1,6 @@
+import pytest
 import math
 from types import SimpleNamespace
-
-import pytest
 
 from elliot.evaluation.accelerated_metrics import compute_accelerated_metrics
 from elliot.evaluation.relevance import Relevance

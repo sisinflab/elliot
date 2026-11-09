@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional, Tuple, Union, TYPE_CHECKING
+from typing import Any, Dict, List, Tuple, Union, TYPE_CHECKING
 import pandas as pd
 
 if TYPE_CHECKING:
@@ -6,7 +6,7 @@ if TYPE_CHECKING:
     from elliot.namespace import RecommenderConfig
     from elliot.recommender import AbstractRecommender
 
-SPLITTING_TYPE = List[Tuple[List[Tuple[pd.DataFrame, pd.DataFrame]], Optional[pd.DataFrame], pd.DataFrame]]
+SPLITTING_TYPE = List[Tuple[List[Tuple[pd.DataFrame, pd.DataFrame]], pd.DataFrame, pd.DataFrame]]
 
 
 class ElliotCallback:

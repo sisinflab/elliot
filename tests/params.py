@@ -8,6 +8,10 @@ test_path = parent_dir(__file__)
 data_folder = path_joiner(test_path, "data", "{0}")
 dataset_path = lambda file_name=None: path_joiner(data_folder, f"{file_name or "dataset"}.tsv")
 
+eval_data_folder = path_joiner(test_path, "evaluation", "{0}")
+eval_dataset_path = lambda file_name=None: path_joiner(eval_data_folder, f"{file_name or "dataset"}.tsv")
+user_filter_path = lambda file_name: path_joiner(eval_data_folder, "user_filter", f"{file_name}.tsv")
+
 config_path = path_joiner(test_path, "configs", "test.yml")
 
 reader_folder = path_joiner(test_path, "utils", "reader")
@@ -166,6 +170,12 @@ params_splitting_fail = {
             "timestamp": [50, [3]]
         }
     ),
+    "invalid_fixed_timestamp_test_ratio": generate_param_combinations(
+        ["test_ratio"],
+        {
+            "test_ratio": [1.0, "invalid"]
+        }
+    ),
     "invalid_best_timestamp": generate_param_combinations(
         [("min_below", "min_over")],
         {
@@ -180,26 +190,73 @@ params_splitting_fail = {
 }
 
 
-# NegativeSampler
+# EvalProtocol
 
-params_neg_sampling_fail = {
+params_eval_protocol_fail = {
     "invalid_neg_random": generate_param_combinations(
-        [("num_negatives", "leave_one_out")],
+        ["num_negatives"],
         {
-            "num_negatives": [20, [3], -5],
-            "leave_one_out": [True, "invalid"]
+            "num_negatives": [[3], -5]
         }
     ),
     "invalid_neg_fixed": generate_param_combinations(
-        [("read_folder", "leave_one_out")],
+        ["read_folder"],
         {
-            "read_folder": ["./{0}", "non/existent/path", 3, None],
-            "leave_one_out": [True, "invalid"]
+            "read_folder": ["non/existent/path", 3, None]
         }
     ),
     "invalid_strategy": generate_param_combinations(
         ["strategy"],
         {"strategy": ["invalid", 3, None]}
+    ),
+    "missing_user_filter_file": generate_param_combinations(
+        ["path"],
+        {"path": [user_filter_path("missing"), "non/existent/path"]}
+    ),
+    "invalid_user_filter_id_space": generate_param_combinations(
+        ["id_space"],
+        {"id_space": ["internal", 3]}
+    ),
+    "invalid_session_only_target": generate_param_combinations(
+        ["target"],
+        {"target": ["all", "first"]}
+    )
+}
+
+
+# Namespace
+
+params_namespace_fail = {
+    "invalid_target_for_mixed_session_strategies": generate_param_combinations(
+        ["target"],
+        {"target": ["all", "first", "random", "successive"]}
+    ),
+    "invalid_splitting_for_mixed_session_strategies": generate_param_combinations(
+        ["test_splitting"],
+        {
+            "test_splitting": [
+                {"strategy": "temporal_holdout", "leave_n_out": 2},
+                {"strategy": "temporal_holdout", "test_ratio": 0.2},
+                {"strategy": "fixed_timestamp", "timestamp": 1000}
+            ]
+        }
+    ),
+    # Prefix-based targets need a temporal splitting
+    "invalid_splitting_for_evaluation_target": generate_param_combinations(
+        ["splitting"],
+        {
+            "splitting": [
+                {"test_splitting": {"strategy": "random_holdout", "test_ratio": 0.2}},
+                {
+                    "test_splitting": {"strategy": "temporal_holdout", "test_ratio": 0.2},
+                    "validation_splitting": {"strategy": "random_cross_validation", "folds": 2}
+                }
+            ]
+        }
+    ),
+    "invalid_evaluation_target_for_session_models": generate_param_combinations(
+        ["target"],
+        {"target": ["all", "first"]}
     )
 }
 

@@ -12,8 +12,8 @@ from torch.utils.data import DataLoader
 from elliot.namespace import RecommenderConfig, ExperimentConfig
 from elliot.dataset import DataSet
 from elliot.evaluation.evaluator import Evaluator
+from elliot.evaluation.protocol import collect
 from elliot.recommender import AbstractRecommender
-from elliot.recommender.collector import get_recommendations
 from elliot.recommender.early_stopping import EarlyStopping
 
 from elliot.utils.read import Reader
@@ -99,11 +99,12 @@ class AbstractTrainer(ABC):
         self._params_list = []
         self._epoch_train_history = []
         self._validation_history = []
+        self._best_state = None
 
         if disable_early_stopping:
             self._early_stopping.active = False
 
-    def train(self, dataset, validate=True):
+    def train(self, dataset: DataSet, validate=True):
         self._init_train(disable_early_stopping=not validate)
         evaluation_set = "val"
 
@@ -159,25 +160,31 @@ class AbstractTrainer(ABC):
             # No validation ran during training (e.g. early stop before the first validation epoch)
             return self.evaluate(dataset, evaluation_set=evaluation_set)
 
+        # Hand over the best validation epoch's weights, not the last ones
+        if self._best_state is not None:
+            self.model.load_state_dict(self._best_state)
+            # Switching to train mode drops any embeddings cached from the last weights
+            self.model.train()
+
         return self.get_report(self._val_results[best], evaluation_set)
 
-    def evaluate(self, dataset, it=None, evaluation_set="test"):
+    def evaluate(self, dataset: DataSet, it=None, evaluation_set="test"):
         if self.model_config.eval_batch_size is None:
             self.model_config.eval_batch_size = self.model_config.batch_size
 
-        dataloader = dataset.get_eval_dataloader(
+        dataloader = dataset.protocol.get_eval_dataloader(
             batch_size=self.model_config.eval_batch_size,
             session_strategy=self.model_config.meta.session_strategy
         )
         k = self.evaluator.get_needed_recommendations()
 
-        recs = get_recommendations(self.model, dataloader, dataset, k)
-        result_dict = self.evaluator.eval(recs, dataset, evaluation_set)
+        collected = collect(self.model, dataloader, dataset.protocol, k)
+        result_dict = self.evaluator.eval(collected, dataset, evaluation_set)
 
         if self.model_config.meta.save_recs:
             self.logger.info(f"Writing recommendations at: {self.config.path_output_rec_result}")
             self.writer.write_recommendations(
-                recommendations=recs[1],
+                recommendations=collected.recs,
                 save_folder=self.config.path_output_rec_result,
                 model_name=self.name,
                 it=it,
@@ -214,6 +221,10 @@ class AbstractTrainer(ABC):
                     "Recorded best validation result",
                     extra={"context": {"metric": self._val_metric, "value": val_metric, "iteration": it + 1}}
                 )
+
+                # Keep the best weights in memory, restored once training ends
+                if isinstance(self.model, torch.nn.Module):
+                    self._best_state = {k: v.detach().clone() for k, v in self.model.state_dict().items()}
 
                 if self.model_config.meta.save_weights:
                     self.writer.write_model(

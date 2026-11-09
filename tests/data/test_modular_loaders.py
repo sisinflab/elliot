@@ -39,7 +39,6 @@ def load_data(side_information, before_first_load=None):
     name = side_information["dataloader"]
     loader = get_loader(side_information)
     val_data, main_data = loader.build()
-    loader.prepare_dataset(val_data, main_data)
     train_set = main_data[0].train_set
 
     if before_first_load is not None:

@@ -9,11 +9,11 @@ class BaseWriterConfig(BaseConfig):
 
     Attributes:
         ext (str): File extension for the output file. Defaults to "".
-        encoding (str, optional): File encoding. Defaults to None (using the platform default).
+        encoding (str): File encoding. Defaults to "utf-8".
     """
 
     ext: str = ""
-    encoding: Optional[str] = None
+    encoding: str = "utf-8"
 
     @field_validator("ext", mode="after")
     @classmethod

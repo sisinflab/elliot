@@ -561,7 +561,7 @@ class SequentialRecommender(GeneralRecommender):
         """Right-pad (or truncate) a left-aligned, batch-first sequence tensor to
         exactly `length` columns.
 
-        `Sessions.get_history`/`EvalSessions.get_eval_context` only pad a batch up
+        `EvalTargets.get_eval_context` only pads a batch up
         to its own longest sequence, which can be narrower than a model's
         `max_seq_len` (e.g. every sequence in a small evaluation batch is short).
         Models built around a fixed-width window (e.g. Caser's convolutions, or a

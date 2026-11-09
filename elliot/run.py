@@ -13,6 +13,7 @@ import socket
 import numpy as np
 
 from elliot.dataset import DataSetLoader, build_mock_dataset
+from elliot.evaluation.protocol import prepare_protocols
 from elliot.namespace import build_namespace, ExperimentConfig
 from elliot.hyperoptimization import run_hyperopt, run_single, run_proxy, run_evaluation, requires_hyperopt
 from elliot.result_handler import ResultHandler, attach_test_fold_stats
@@ -87,7 +88,7 @@ def run_experiment(config_path: str = "", config_overrides: Optional[List[str]] 
             main_dataset=main_data
         )
 
-        loader.prepare_dataset(val_data, main_data)
+        prepare_protocols(config, val_data, main_data)
 
         res_handler = ResultHandler(config=config)
 
@@ -265,6 +266,7 @@ def config_test(config: ExperimentConfig):
     logger.info("Start config test")
 
     val_data, main_data = build_mock_dataset(config)
+    prepare_protocols(config, val_data, main_data)
 
     res_handler = ResultHandler(config=config)
 

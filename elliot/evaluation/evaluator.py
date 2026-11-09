@@ -34,7 +34,6 @@ from elliot.evaluation.accelerated_metrics import compute_accelerated_metrics, i
 from elliot.evaluation.metrics.base_metric import BaseMetric
 from elliot.namespace import RecommenderConfig, ExperimentConfig, EvaluationConfig
 from elliot.utils import logging, get_device
-from elliot.utils.folder import path_absolute, check_path
 from elliot.utils.registry import metric_registry
 
 
@@ -89,38 +88,23 @@ class Evaluator(object):
 
     def _init_state(self, dataset):
         self._data = dataset
-        self._eval_users = self._load_eval_users()
-        self._session_only = dataset.session_only_evaluation
-        self._session_owner_map = dataset.eval_sessions.owner_map if self._session_only else None
         self._pop = Popularity(dataset)
         self._pop_cache = self._build_popularity_cache()
         self._initialized = True
 
-    def eval(self, recommendations, dataset: DataSet, label="test"):
-        if not self._initialized:
-            self._init_state(dataset)
+    def eval(self, collected, dataset: DataSet, label="test"):
+        """Evaluate the recommendations collected over the eval rows."""
 
         if dataset is None:
             raise ValueError("Argument `dataset` cannot be None")
 
-        real_eval_dict = self._data.eval_set.get_dict()
-        if self._session_only:
-            # SESSION_ONLY eval: each session-row's ground truth is only that
-            # session's own masked (last) item, never another session of the
-            # same user, so metrics reflect a genuine leave-last-item-out
-            # prediction before being averaged back to the user
-            # (see `_aggregate_sessions_to_users`).
-            sessions = self._data.eval_sessions
-            eval_data = {
-                row_id: {item: real_eval_dict.get(owner_user, {}).get(item)}
-                for row_id, owner_user, item in zip(
-                    sessions.row_public_ids, sessions.owner_public_ids, sessions.target_public_ids
-                )
-            }
-        else:
-            eval_data = real_eval_dict
+        if not self._initialized:
+            self._init_state(dataset)
 
-        eval_data = self._apply_eval_user_filter(eval_data)
+        recommendations = collected.recs
+        eval_data = collected.ground_truth
+        self._row_owner_map = collected.owner_map
+        self._multi_row = self._row_owner_map is not None
 
         eval_obj = self._build_eval_object(eval_data)
 
@@ -196,142 +180,30 @@ class Evaluator(object):
             additional_metrics=self._complex_metrics,
         )
 
-    def _load_eval_users(self):
-        file_path = self.eval_config.user_filter_file
-        if not file_path:
-            return None
-
-        file_path = path_absolute(file_path)
-        if not check_path(file_path):
-            raise FileNotFoundError(f"User filter file not found: {file_path}")
-
-        sep = self.eval_config.reader.sep
-        id_space = self.eval_config.user_filter_id_space.strip().lower()
-
-        raw_users = []
-        with open(file_path, "r", encoding="utf-8") as handle:
-            for line in handle:
-                line = line.strip()
-                if not line or line.startswith("#"):
-                    continue
-                token = line
-                if sep:
-                    token = line.split(sep)[0]
-                elif "\t" in line:
-                    token = line.split("\t")[0]
-                elif "," in line:
-                    token = line.split(",")[0]
-                else:
-                    token = line.split()[0]
-                token = token.strip()
-                if token:
-                    raw_users.append(token)
-
-        if not raw_users:
-            self.logger.warning("User filter file is empty; skipping user filtering.")
-            return None
-
-        if id_space in {"private", "internal"}:
-            users, _ = self._data.get_inverse_mappings()
-            mapped = set()
-            invalid = 0
-            for token in raw_users:
-                try:
-                    idx = int(token)
-                except (TypeError, ValueError):
-                    invalid += 1
-                    continue
-                if 0 <= idx < len(users):
-                    mapped.add(users[idx])
-                else:
-                    invalid += 1
-            if invalid:
-                self.logger.warning(
-                    "Dropped invalid private user ids from filter list",
-                    extra={"context": {"count": invalid}}
-                )
-            return mapped if mapped else None
-
-        casted = set()
-        invalid = 0
-        for token in raw_users:
-            try:
-                casted.add(self._cast_user_id(token, str))
-            except (TypeError, ValueError):
-                invalid += 1
-        if invalid:
-            self.logger.warning(
-                "Dropped invalid public user ids from filter list",
-                extra={"context": {"count": invalid}}
-            )
-
-        if not casted:
-            self.logger.warning("No valid users found in user filter file.")
-            return None
-
-        known_users, _ = self._data.get_users_items()
-        known_set = set(known_users) if known_users else None
-        if known_set is not None:
-            filtered = casted & known_set
-            dropped = len(casted) - len(filtered)
-            if dropped:
-                self.logger.warning(
-                    "Dropped unknown users from filter list",
-                    extra={"context": {"count": dropped}}
-                )
-            return filtered if filtered else None
-
-        return casted
-
-    def _apply_eval_user_filter(self, eval_dict):
-        if not self._eval_users:
-            return eval_dict
-        if self._session_only:
-            filtered = {
-                row_id: items for row_id, items in eval_dict.items()
-                if self._session_owner_map.get(row_id) in self._eval_users
-            }
-        else:
-            filtered = {u: items for u, items in eval_dict.items() if u in self._eval_users}
-        self.logger.info(
-            "Evaluation user filter applied",
-            extra={"context": {"users": len(self._eval_users)}}
-        )
-        return filtered
-
-    def _aggregate_sessions_to_users(self, per_entity_values):
-        """Group per-(virtual session-row) metric values by their real owning
+    def _aggregate_rows_to_users(self, per_entity_values):
+        """Group per-(virtual eval-row) metric values by their real owning
         user and average within each user, so the final scalar (and any
-        per-user statistical results) are computed per user, not per session."""
+        per-user statistical results) are computed per user, not per row."""
         if not per_entity_values:
             return per_entity_values
 
         grouped = {}
         for row_id, value in per_entity_values.items():
-            owner = self._session_owner_map.get(row_id, row_id)
+            owner = self._row_owner_map.get(row_id, row_id)
             grouped.setdefault(owner, []).append(value)
 
         return {owner: float(np.mean(values)) for owner, values in grouped.items()}
-
-    @staticmethod
-    def _cast_user_id(token, target_type):
-        if target_type in (int, np.int32, np.int64) or np.issubdtype(target_type, np.integer):
-            return int(float(token))
-        if target_type in (float, np.float32, np.float64) or np.issubdtype(target_type, np.floating):
-            return float(token)
-        return str(token)
 
     def _process_eval_data(self, recommendations, eval_data, eval_obj, label):
         if (not eval_data) or (not eval_obj):
             return None, None
 
-        recommendations = {u: recs for u, recs in recommendations.items() if eval_data.get(u, [])}
         rounding_factor = 5
         eval_start_time = time()
 
         results = {}
         statistical_results = {}
-        session_mode = self._session_only
+        multi_row = self._multi_row
 
         remaining_metric_names = list(self._metrics)
         accelerated_metric_names = []
@@ -355,15 +227,15 @@ class Evaluator(object):
                         relevance_threshold=self._rel_threshold,
                         metric_names=accelerated_metric_names,
                         device=self._accelerate_device or str(get_device()),
-                        return_user_metrics=bool(self._paired_ttest) or session_mode,
+                        return_user_metrics=bool(self._paired_ttest) or multi_row,
                     )
 
-                    if session_mode:
-                        # accel.results/user_results are per session-row here;
+                    if multi_row:
+                        # accel.results/user_results are per eval row here;
                         # re-derive the reported scalar from the per-user mean
-                        # of per-session values, not the flat per-row mean.
+                        # of per-row values, not the flat per-row mean.
                         for metric_name in accelerated_metric_names:
-                            per_user = self._aggregate_sessions_to_users(accel.user_results[metric_name])
+                            per_user = self._aggregate_rows_to_users(accel.user_results[metric_name])
                             results[metric_name] = (
                                 float(np.mean(list(per_user.values()))) if per_user else float("nan")
                             )
@@ -409,14 +281,14 @@ class Evaluator(object):
             metric_name = metric_object.name
             user_metric = None
 
-            if (self._paired_ttest or session_mode) and isinstance(metric_object, StatisticalMetric):
+            if (self._paired_ttest or multi_row) and isinstance(metric_object, StatisticalMetric):
                 user_metric = metric_object.eval_user_metric()
 
-                if session_mode:
-                    # Per-session values first, then averaged within each real
+                if multi_row:
+                    # Per-row values first, then averaged within each real
                     # user, so both the reported scalar and the statistical
                     # (paired-test) breakdown are computed per user.
-                    user_metric = self._aggregate_sessions_to_users(user_metric)
+                    user_metric = self._aggregate_rows_to_users(user_metric)
 
                 if self._paired_ttest:
                     statistical_results[metric_name] = user_metric
@@ -427,10 +299,10 @@ class Evaluator(object):
             else:
                 results[metric_name] = metric_object.eval()
 
-        if accelerated_metric_names and not session_mode and self._should_verify_accelerated():
+        if accelerated_metric_names and not multi_row and self._should_verify_accelerated():
             # The accelerated-vs-legacy cross-check compares flat per-row
-            # means; it doesn't apply once session-rows are aggregated to
-            # per-user values first, so it's skipped in session mode.
+            # means; it doesn't apply once eval rows are aggregated to
+            # per-user values first, so it's skipped for multi-row evaluation.
             self._verify_accelerated_results(
                 accelerated_metric_names=accelerated_metric_names,
                 recommendations=recommendations,

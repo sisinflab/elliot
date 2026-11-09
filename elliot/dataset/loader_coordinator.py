@@ -153,26 +153,15 @@ class DataSetLoader:
         df = self.dataframe
 
         # FIXED/HIERARCHY strategies return a list of (folds, train, test) tuples
-        # (one per test fold): union the users/items across every split of the
-        # first test fold, falling back to its first validation fold's train/val
-        # when no standalone train set was found (see `Reader.read_tabular_split`)
+        # (one per test fold): union the users/items of the first test fold's train
+        # (already the train + val union, see `Reader.read_tabular_split`) and test
         if isinstance(df, list):
-            folds, train, test = df[0]
+            _, train, test = df[0]
             users |= set(test["userId"].unique())
             items |= set(test["itemId"].unique())
 
-            # No standalone train file: fall back to the first validation fold's train+val union
-            if train is None:
-                tr, val = folds[0]
-
-                users |= set(tr["userId"].unique())
-                items |= set(tr["itemId"].unique())
-
-                users |= set(val["userId"].unique())
-                items |= set(val["itemId"].unique())
-            else:
-                users |= set(train["userId"].unique())
-                items |= set(train["itemId"].unique())
+            users |= set(train["userId"].unique())
+            items |= set(train["itemId"].unique())
 
         # DATASET strategy: a single DataFrame, split later on
         else:
@@ -532,15 +521,9 @@ class DataSetLoader:
             # Test level
             self.logger.info(f"Test Fold {p1}")
 
-            # No standalone train file: reuse the first validation fold's own train split
-            train = (
-                original_train
-                if original_train is not None else folds[0][0]
-            )
-
             test_data_object = DataSet(
                 config=self.config,
-                train_data=train,
+                train_data=original_train,
                 eval_data=test,
                 side_info=self.side_information,
                 evaluation_set="test",
@@ -554,15 +537,9 @@ class DataSetLoader:
                 # Validation level
                 self.logger.info(f"Test Fold {p1} - Validation Fold {p2}")
 
-                # No standalone train file: reuse the test fold's already-built train view
-                train_data = (
-                    test_data_object.train_set
-                    if original_train is None else train
-                )
-
                 val_data_object = DataSet(
                     config=self.config,
-                    train_data=train_data,
+                    train_data=train,
                     eval_data=val,
                     side_info=self.side_information,
                     evaluation_set="validation",
@@ -578,29 +555,6 @@ class DataSetLoader:
             train_val_data.append(val_list)
 
         return train_val_data, main_data
-
-    def prepare_dataset(self, val_data: List[List[DataSet]], main_data: List[DataSet]):
-        """Sample user negative items eagerly only when explicitly requested
-        in config, and cache them for reuse when constructing the DataLoaders,
-        avoiding repeated sampling across evaluation calls.
-
-        Args:
-            val_data (List[List[DataSet]]): Per-test-fold lists of validation-fold
-                `DataSet`s, as returned by `build()`.
-            main_data (List[DataSet]): Per-test-fold `DataSet`s, as returned by
-                `build()`.
-        """
-        self.logger.info("Preparing dataset for evaluation")
-
-        for p1, (folds, main) in enumerate(zip(val_data, main_data)):
-            # Test level
-            self.logger.info(f"Test Fold {p1}")
-            main.sample_user_negatives()
-
-            for p2, fold in enumerate(folds):
-                # Validation level
-                self.logger.info(f"Test Fold {p1} - Validation Fold {p2}")
-                fold.sample_user_negatives()
 
 
 def build_mock_dataset(config: ExperimentConfig) -> Tuple[List[List[DataSet]], List[DataSet]]:

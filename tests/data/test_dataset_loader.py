@@ -57,7 +57,8 @@ class TestDataSetLoader:
         assert folds[0][0].shape[0] == 40
         assert folds[0][1].shape[0] == 5
         assert len(df[0][0]) == 1
-        assert train is None
+        # The test fold trains on train + validation
+        assert train.shape[0] == 45
         assert test.shape[0] == 5
 
     def test_hierarchy(self):
@@ -83,6 +84,26 @@ class TestDataSetLoader:
         assert folds == []
         assert train.shape[0] == 45
         assert test.shape[0] == 5
+
+    def test_hierarchy_single_validation_fold(self):
+        config = {
+            "dataset": "hierarchy_strategy_single_val",
+            "data_config": {
+                "strategy": "hierarchy",
+                "data_folder": data_folder
+            }
+        }
+
+        loader = get_loader(config)
+
+        # The test fold trains on train + validation
+        folds, train, test = loader.dataframe[0]
+        assert len(folds) == 1
+        assert train.shape[0] == 45
+        assert test.shape[0] == 5
+
+        _, main_data = loader.build()
+        assert main_data[0].train_set.dataframe.shape[0] == 45
 
     def test_dataset(self):
         config = {
@@ -162,7 +183,8 @@ class TestDataSetLoader:
         assert folds[0][0].shape[0] == 40
         assert folds[0][1].shape[0] == 5
         assert len(df[0][0]) == 1
-        assert train is None
+        # The test fold trains on train + validation
+        assert train.shape[0] == 45
         assert test.shape[0] == 5
 
     def test_hierarchy_sequential(self):

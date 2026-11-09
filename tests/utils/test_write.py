@@ -6,7 +6,7 @@ from pathlib import Path
 from elliot.utils.write import Writer
 from elliot.utils.folder import path_joiner, check_path, check_dir
 
-from tests.utils.test_read import read_tabular, read_sequence_tabular, read_model, read_json
+from tests.utils.test_read import read_tabular, read_sequence_tabular, read_model, read_json, reader
 from tests.params import writer_folder, writer_path
 
 check_dir(writer_folder, replace=True)
@@ -29,7 +29,7 @@ class TestWriteTabular:
 
         write_tabular(df, path)
 
-        assert Path(path).read_text() == "1\tx\n2\ty\n"
+        assert Path(path).read_text(encoding="utf-8") == "1\tx\n2\ty\n"
 
     def test_with_header_bool(self):
         df = pd.DataFrame({"a": [1], "b": ["x"]})
@@ -37,7 +37,7 @@ class TestWriteTabular:
 
         write_tabular(df, path, header=True)
 
-        assert Path(path).read_text() == "a\tb\n1\tx\n"
+        assert Path(path).read_text(encoding="utf-8") == "a\tb\n1\tx\n"
 
     def test_with_header_alias_list(self):
         df = pd.DataFrame({"a": [1], "b": ["x"]})
@@ -45,7 +45,7 @@ class TestWriteTabular:
 
         write_tabular(df, path, header=["col1", "col2"])
 
-        assert Path(path).read_text() == "col1\tcol2\n1\tx\n"
+        assert Path(path).read_text(encoding="utf-8") == "col1\tcol2\n1\tx\n"
 
     def test_header_alias_mismatch_falls_back_to_no_header(self):
         df = pd.DataFrame({"a": [1], "b": ["x"]})
@@ -53,7 +53,7 @@ class TestWriteTabular:
 
         write_tabular(df, path, header=["only_one"])
 
-        assert Path(path).read_text() == "1\tx\n"
+        assert Path(path).read_text(encoding="utf-8") == "1\tx\n"
 
     def test_columns_positional_selection_and_reorder(self):
         df = pd.DataFrame({"a": [1], "b": [2], "c": [3]})
@@ -61,7 +61,7 @@ class TestWriteTabular:
 
         write_tabular(df, path, columns=[2, 0])
 
-        assert Path(path).read_text() == "3\t1\n"
+        assert Path(path).read_text(encoding="utf-8") == "3\t1\n"
 
     def test_columns_semantic_selection(self):
         df = pd.DataFrame({"a": [1], "b": [2]})
@@ -69,7 +69,7 @@ class TestWriteTabular:
 
         write_tabular(df, path, columns=["b"])
 
-        assert Path(path).read_text() == "2\n"
+        assert Path(path).read_text(encoding="utf-8") == "2\n"
 
     def test_no_columns_matched_writes_empty_file(self):
         df = pd.DataFrame({"a": [1]})
@@ -77,7 +77,7 @@ class TestWriteTabular:
 
         write_tabular(df, path, columns=["missing"])
 
-        assert Path(path).read_text() == ""
+        assert Path(path).read_text(encoding="utf-8") == ""
 
     def test_custom_separator(self):
         df = pd.DataFrame({"a": [1], "b": [2]})
@@ -85,7 +85,7 @@ class TestWriteTabular:
 
         write_tabular(df, path, sep=",")
 
-        assert Path(path).read_text() == "1,2\n"
+        assert Path(path).read_text(encoding="utf-8") == "1,2\n"
 
     def test_callback_fn_applied(self):
         df = pd.DataFrame({"a": [1]})
@@ -111,7 +111,7 @@ class TestWriteSequenceTabular:
 
         write_sequence_tabular(df, path, format="wide")
 
-        assert Path(path).read_text() == "1\t3\t1\t2\n2\t5\t4\n"
+        assert Path(path).read_text(encoding="utf-8") == "1\t3\t1\t2\n2\t5\t4\n"
 
     def test_wide_writes_one_line_per_session(self):
         df = pd.DataFrame({
@@ -124,7 +124,7 @@ class TestWriteSequenceTabular:
 
         write_sequence_tabular(df, path, format="wide")
 
-        assert Path(path).read_text() == "1\t1\t2\n1\t3\t4\n2\t5\n"
+        assert Path(path).read_text(encoding="utf-8") == "1\t1\t2\n1\t3\t4\n2\t5\n"
 
     def test_wide_without_timestamp_groups_by_user_only(self):
         df = pd.DataFrame({
@@ -135,7 +135,7 @@ class TestWriteSequenceTabular:
 
         write_sequence_tabular(df, path, format="wide")
 
-        assert Path(path).read_text() == "1\t1\t2\n2\t3\n"
+        assert Path(path).read_text(encoding="utf-8") == "1\t1\t2\n2\t3\n"
 
     def test_wide_header_alias_list(self):
         df = pd.DataFrame({"userId": ["1"], "itemId": ["1"]})
@@ -143,7 +143,7 @@ class TestWriteSequenceTabular:
 
         write_sequence_tabular(df, path, format="wide", header=["user", "items"])
 
-        assert Path(path).read_text() == "user\titems\n1\t1\n"
+        assert Path(path).read_text(encoding="utf-8") == "user\titems\n1\t1\n"
 
     def test_wide_header_alias_mismatch_falls_back_to_no_header(self):
         df = pd.DataFrame({"userId": ["1"], "itemId": ["1"]})
@@ -151,7 +151,7 @@ class TestWriteSequenceTabular:
 
         write_sequence_tabular(df, path, format="wide", header=["only_one"])
 
-        assert Path(path).read_text() == "1\t1\n"
+        assert Path(path).read_text(encoding="utf-8") == "1\t1\n"
 
     def test_inline_without_timestamp_column(self):
         df = pd.DataFrame({
@@ -162,7 +162,7 @@ class TestWriteSequenceTabular:
 
         write_sequence_tabular(df, path, format="inline", header=True)
 
-        assert Path(path).read_text() == "userId\tsequence\n1\t1 2\n2\t3\n"
+        assert Path(path).read_text(encoding="utf-8") == "userId\tsequence\n1\t1 2\n2\t3\n"
 
     def test_inline_custom_sequence_sep(self):
         df = pd.DataFrame({
@@ -174,7 +174,7 @@ class TestWriteSequenceTabular:
 
         write_sequence_tabular(df, path, format="inline", sequence_sep=",")
 
-        assert "1,2" in Path(path).read_text()
+        assert "1,2" in Path(path).read_text(encoding="utf-8")
 
     def test_inline_header_alias_list(self):
         df = pd.DataFrame({"userId": ["1"], "itemId": ["1"]})
@@ -182,7 +182,7 @@ class TestWriteSequenceTabular:
 
         write_sequence_tabular(df, path, format="inline", header=["U", "S"])
 
-        assert Path(path).read_text() == "U\tS\n1\t1\n"
+        assert Path(path).read_text(encoding="utf-8") == "U\tS\n1\t1\n"
 
     def test_inline_columns_excludes_timestamp_from_output(self):
         df = pd.DataFrame({"userId": ["1"], "itemId": ["1"], "timestamp": [5]})
@@ -190,7 +190,10 @@ class TestWriteSequenceTabular:
 
         write_sequence_tabular(df, path, format="inline", columns=["userId", "sequence"])
 
-        assert Path(path).read_text() == "1\t1\n"
+        assert Path(path).read_text(encoding="utf-8") == "1\t1\n"
+
+
+class TestWriteSequenceTabularFailures:
 
     def test_invalid_format(self):
         df = pd.DataFrame({"userId": ["1"], "itemId": ["1"]})
@@ -261,7 +264,7 @@ class TestWriteRecommendations:
 #
 #         files = list(Path(save_folder).glob("rec_cutoff_5*.tsv"))
 #         assert len(files) == 1
-#         assert files[0].read_text() == "model_a\t0.5\t0.3\n"
+#         assert files[0].read_text(encoding="utf-8") == "model_a\t0.5\t0.3\n"
 #
 #     def test_writes_triplets_when_requested(self, tmp_path):
 #         results = {5: {"model_a": {"nDCG": 0.5, "Precision": 0.3}}}
@@ -271,7 +274,7 @@ class TestWriteRecommendations:
 #
 #         files = list(Path(save_folder).glob("triplets_rec_cutoff_5*.tsv"))
 #         assert len(files) == 1
-#         assert files[0].read_text() == "model_a\tnDCG\t0.5\nmodel_a\tPrecision\t0.3\n"
+#         assert files[0].read_text(encoding="utf-8") == "model_a\tnDCG\t0.5\nmodel_a\tPrecision\t0.3\n"
 #
 #     def test_skips_empty_cutoffs(self, tmp_path):
 #         save_folder = str(tmp_path)
@@ -290,7 +293,7 @@ class TestWriteRecommendations:
 #
 #         files = list(Path(save_folder).glob("rec_training_time*.tsv"))
 #         assert len(files) == 1
-#         assert files[0].read_text() == "model_a\t1.23\n"
+#         assert files[0].read_text(encoding="utf-8") == "model_a\t1.23\n"
 #
 #
 # class TestWriteTrials:
@@ -302,7 +305,7 @@ class TestWriteRecommendations:
 #
 #         files = list(Path(save_folder).glob("trials_model_a*.json"))
 #         assert len(files) == 1
-#         assert json.loads(files[0].read_text()) == [{"loss": 0.1}, {"loss": 0.2}]
+#         assert json.loads(files[0].read_text(encoding="utf-8")) == [{"loss": 0.1}, {"loss": 0.2}]
 #
 #     def test_writes_tabular_format(self, tmp_path):
 #         save_folder = str(tmp_path)
@@ -311,7 +314,7 @@ class TestWriteRecommendations:
 #
 #         files = list(Path(save_folder).glob("trials_model_a*.tsv"))
 #         assert len(files) == 1
-#         assert files[0].read_text() == "0.1\n"
+#         assert files[0].read_text(encoding="utf-8") == "0.1\n"
 #
 #
 # class TestWriteParams:
@@ -324,7 +327,7 @@ class TestWriteRecommendations:
 #
 #         files = list(Path(save_folder).glob("bestmodelparams_cutoff_10*.json"))
 #         assert len(files) == 1
-#         assert json.loads(files[0].read_text()) == params
+#         assert json.loads(files[0].read_text(encoding="utf-8")) == params
 #
 #
 # class TestWriteStatisticalResults:
@@ -336,7 +339,7 @@ class TestWriteRecommendations:
 #
 #         files = list(Path(save_folder).glob("stat_wilcoxon_cutoff_5*.tsv"))
 #         assert len(files) == 1
-#         assert files[0].read_text() == "0.1\n0.2\n"
+#         assert files[0].read_text(encoding="utf-8") == "0.1\n0.2\n"
 #
 #     def test_skips_when_empty(self, tmp_path):
 #         save_folder = str(tmp_path)
@@ -354,7 +357,7 @@ class TestWriteDictAsTable:
         write_dict_as_table(data, writer_folder, file_name="summary")
 
         path = writer_path("summary")
-        assert Path(path).read_text() == "model_a\t0.5\nmodel_b\t0.6\n"
+        assert Path(path).read_text(encoding="utf-8") == "model_a\t0.5\nmodel_b\t0.6\n"
 
 
 class TestWriteJson:
@@ -364,14 +367,14 @@ class TestWriteJson:
 
         write_json({"a": 1, "b": [1, 2]}, path)
 
-        assert Path(path).read_text() == '{\n  "a": 1,\n  "b": [\n    1,\n    2\n  ]\n}'
+        assert Path(path).read_text(encoding="utf-8") == '{\n  "a": 1,\n  "b": [\n    1,\n    2\n  ]\n}'
 
     def test_custom_indent(self):
         path = writer_path("data", ext="json")
 
         write_json({"a": 1}, path, indent=4)
 
-        assert Path(path).read_text() == '{\n    "a": 1\n}'
+        assert Path(path).read_text(encoding="utf-8") == '{\n    "a": 1\n}'
 
 
 class TestReaderWriterInteroperability:
@@ -460,6 +463,32 @@ class TestReaderWriterInteroperability:
         loaded = read_json(path)
 
         assert loaded == {"a": 1, "b": [1, 2, 3]}
+
+    # Non-ASCII ids must survive a round trip whatever the platform default encoding
+    @pytest.mark.parametrize("format", ["wide", "inline"])
+    def test_sequence_roundtrip_non_ascii(self, format):
+        df = pd.DataFrame({"userId": ["josé", "josé"], "itemId": ["café", "naïve"]})
+        path = writer_path(f"{format}_non_ascii")
+
+        write_sequence_tabular(df, path, format=format)
+        back = read_sequence_tabular(path, format=format, header=False)
+
+        assert list(back["itemId"]) == ["café", "naïve"]
+
+    def test_negatives_roundtrip_non_ascii(self):
+        save_folder = writer_path(folder="negatives_non_ascii")
+
+        writer.write_negatives({"josé": ["café", "naïve"]}, save_folder)
+        loaded = reader.read_negatives(save_folder)
+
+        assert loaded == {"josé": ["café", "naïve"]}
+
+    def test_json_roundtrip_non_ascii(self):
+        path = writer_path("data_non_ascii", ext="json")
+
+        write_json({"item": "café"}, path)
+
+        assert read_json(path) == {"item": "café"}
 
 
 if __name__ == '__main__':

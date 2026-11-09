@@ -91,7 +91,7 @@ class Interactions:
             # needs it right away, so build it now instead of on first access
             _ = self.sparse_ratings
 
-        # Shared by reference -- never copied/mutated. The materialized payload itself
+        # Shared by reference - never copied/mutated. The materialized payload itself
         # lives on `self._side_info` (cached once for the whole experiment); this
         # instance's own `_side_info_cache` just holds a reference to it
         self._side_info_cache = (
@@ -405,16 +405,16 @@ class Interactions:
         return sum(len(items) for items in self._p_dict.values())
 
     def get_positive_items(self) -> List[List[int]]:
-        """Return the list of positive (private) item indices per (private) user
-        index, sorted by user index.
+        """Return the list of positive (private) item indices for every mapped
+        (private) user index, sorted by user index. Users with no interactions in
+        this split get an empty list, so the result is always aligned with the
+        fold's user domain.
 
         Returns:
             List[List[int]]: Positive item indices per user.
         """
-        users = sorted(list(self._p_dict.keys()))
-
         pos = []
-        for u in users:
+        for u in range(len(self._u_map)):
             # Deduplicate, then materialize as a plain list per user
             items_train = self._p_dict.get(u, ())
             train_set = list(set(items_train))

@@ -1,4 +1,4 @@
-from typing import Callable, List, Optional, Tuple, Union
+from typing import Callable, List, Tuple, Union
 import pandas as pd
 import numpy as np
 import math
@@ -30,7 +30,7 @@ class Splitter:
 
     Supported splitting strategies:
 
-    - `fixed_timestamp`: Splits data using a predefined or computed timestamp threshold.
+    - `fixed_timestamp`: Splits data using a predefined, ratio-based or computed timestamp threshold.
     - `best_timestamp`: Automatically selects the best timestamp across users for splitting.
     - `temporal_hold_out`: Uses the most recent interactions (per user) for testing.
     - `temporal_leave_n_out`: Leaves the last N events per user as the test set.
@@ -48,13 +48,13 @@ class Splitter:
         sequential: True|False
         test_splitting:
           strategy: fixed_timestamp|temporal_hold_out|random_subsampling|random_cross_validation
-          timestamp: best|1609786061
+          timestamp: 1609786061
           test_ratio: 0.2
           leave_n_out: 1
           folds: 5
         validation_splitting:
           strategy: fixed_timestamp|temporal_hold_out|random_subsampling|random_cross_validation
-          timestamp: best|1609786061
+          timestamp: 1609786061
           test_ratio: 0.2
           leave_n_out: 1
           folds: 5
@@ -87,12 +87,12 @@ class Splitter:
 
     def process_splitting(
         self
-    ) -> List[Tuple[List[Tuple[pd.DataFrame, pd.DataFrame]], Optional[pd.DataFrame], pd.DataFrame]]:
+    ) -> List[Tuple[List[Tuple[pd.DataFrame, pd.DataFrame]], pd.DataFrame, pd.DataFrame]]:
         """Execute the configured splitting strategy (Train/Test or Train/Validation/Test).
 
         Returns:
-            List[Tuple[List[Tuple[pd.DataFrame, pd.DataFrame]], Optional[pd.DataFrame], pd.DataFrame]]:
-                A list of ([(train, val), ...], train|None, test) tuples.
+            List[Tuple[List[Tuple[pd.DataFrame, pd.DataFrame]], pd.DataFrame, pd.DataFrame]]:
+                A list of ([(train, val), ...], train, test) tuples.
         """
 
         tuple_list = self.handle_hierarchy(self.data, self.splitting_config.test_splitting)
@@ -100,11 +100,10 @@ class Splitter:
         if self.splitting_config.validation_splitting is not None:
             tuple_list = [
                 (
-                    val_list := self.handle_hierarchy(train, self.splitting_config.validation_splitting),
-                    train if len(val_list) > 1 else None,
+                    self.handle_hierarchy(train, self.splitting_config.validation_splitting),
+                    train,
                     test
-                )
-                for train, test in tuple_list
+                ) for train, test in tuple_list
             ]
             self.logger.info(
                 "Completed data split",
@@ -165,7 +164,10 @@ class Splitter:
                         f"(e.g. sequence data without real timestamps). "
                         f"Use 'temporal_holdout' instead, as it relies on each user's own order."
                     )
-                if cfg.timestamp is not None:
+                if cfg.test_ratio is not None:
+                    timestamp = float(data["timestamp"].quantile(1 - cfg.test_ratio))
+                    tuple_list = self.splitting_passed_timestamp(working, timestamp)
+                elif cfg.timestamp is not None:
                     self._check_timestamp_range(working, cfg.timestamp)
                     tuple_list = self.splitting_passed_timestamp(working, cfg.timestamp)
                 else:
@@ -224,7 +226,26 @@ class Splitter:
         if use_sessions:
             tuple_list = [self._expand_sessions(data, train_p, test_p) for train_p, test_p in tuple_list]
 
+        for _, test in tuple_list:
+            self._log_holdout_stats(test)
+
         return tuple_list
+
+    def _log_holdout_stats(self, test: pd.DataFrame):
+        """Log the holdout's number of users, average length per user and time span.
+
+        Args:
+            test (pd.DataFrame): The holdout side of a split.
+        """
+        holdout_len = test.groupby("userId").size()
+        self.logger.info(
+            "Holdout statistics",
+            extra={"context": {
+                "users": int(holdout_len.size),
+                "avg_holdout_len": float(holdout_len.mean()) if holdout_len.size else 0.0,
+                "time_span": float(test["timestamp"].max() - test["timestamp"].min()) if len(test) else 0.0
+            }}
+        )
 
     @staticmethod
     def _build_session_proxy(data: pd.DataFrame) -> pd.DataFrame:

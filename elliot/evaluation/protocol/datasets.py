@@ -4,42 +4,37 @@ from torch.utils.data import Dataset
 from torch.nn.utils.rnn import pad_sequence
 from tqdm import tqdm
 
+from elliot.evaluation.protocol.targets import EvalTargets
+
 
 class NegEvalDataset(Dataset):
     """Evaluation dataset pairing sampled negatives with the ground-truth positive(s)
-    for each user, used when `NegativeSamplingConfig` is configured (as opposed to
-    `FullEvalDataset`'s full-ranking evaluation).
+    for each eval row, used when `evaluation.negative_sampling` is configured (as
+    opposed to `FullEvalDataset`'s full-ranking evaluation).
 
     Args:
-        num_users (int): Total number of users (or eval rows, for SESSION_ONLY
-            evaluation) to evaluate.
+        rows (EvalTargets): The eval rows to evaluate; each row's target item(s) are
+            all candidates, exactly as all of them are relevant for the evaluator.
         eval_neg_items (List[List[int]]): Negative item indices per row, already
-            sampled. Under SESSION_ONLY evaluation this is the owning user's single,
-            once-sampled negative list broadcast to every session row they own (see
-            `DataSet._get_user_negatives()`), so that FLAT and SESSION_ONLY models are
-            always scored against the same negatives.
-        eval_pos_items (List[List[int]]): Ground-truth positive item indices per user.
+            sampled: the owning user's single, once-sampled negative list broadcast
+            to every row they own (see `EvalProtocol.sample_user_negatives()`), so that
+            every session strategy and target is scored against the same negatives.
         evaluation_set (str): Name of this fold's eval split ("test" or "validation").
             Defaults to "test".
-        leave_one_out (bool): If True, only the first ground-truth positive per user is
-            kept. Defaults to False.
     """
 
     def __init__(
         self,
-        num_users: int,
+        rows: EvalTargets,
         eval_neg_items: List[List[int]],
-        eval_pos_items: List[List[int]],
-        evaluation_set: str = "test",
-        leave_one_out: bool = False
+        evaluation_set: str = "test"
     ):
         # Initializing variables
-        self.num_users = num_users
-        self.leave_one_out = leave_one_out
+        self.rows = rows
 
         self._evaluation_set = evaluation_set
 
-        self.eval_items = self._add_indices(eval_neg_items, eval_pos_items)
+        self.eval_items = self._add_indices(eval_neg_items, rows.target_items)
 
     def _add_indices(self, neg: List[List[int]], pos: List[List[int]]) -> Optional[List[torch.Tensor]]:
         """Add test or validation samples to the sampled negatives.
@@ -66,8 +61,6 @@ class NegEvalDataset(Dataset):
             for neg_u, pos_u in zip(neg, pos):
                 if not neg_u:
                     pos_u = []
-                elif self.leave_one_out:
-                    pos_u = [pos_u[0]] if pos_u else []
 
                 final_items.append(torch.tensor(neg_u + pos_u))
                 t.update(1)
@@ -75,7 +68,7 @@ class NegEvalDataset(Dataset):
         return final_items
 
     def __len__(self) -> int:
-        return self.num_users
+        return self.rows.n_rows
 
     def __getitem__(self, index: int) -> Tuple[int, torch.Tensor]:
         return index, self.eval_items[index]
@@ -110,21 +103,20 @@ class NegEvalDataset(Dataset):
 
 
 class FullEvalDataset(Dataset):
-    """Full-ranking evaluation dataset: one entry per user, with no sampled
+    """Full-ranking evaluation dataset: one entry per eval row, with no sampled
     negatives (candidates are every item, ranked at evaluation time), used when no
-    `NegativeSamplingConfig` is configured.
+    `evaluation.negative_sampling` is configured.
 
     Args:
-        num_users (int): Total number of users (or eval rows, for SESSION_ONLY
-            evaluation) to evaluate.
+        rows (EvalTargets): The eval rows to evaluate.
     """
 
-    def __init__(self, num_users: int):
+    def __init__(self, rows: EvalTargets):
         # Initializing variables
-        self.num_users = num_users
+        self.rows = rows
 
     def __len__(self) -> int:
-        return self.num_users
+        return self.rows.n_rows
 
     def __getitem__(self, index: int) -> int:
         return index

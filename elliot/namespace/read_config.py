@@ -42,12 +42,12 @@ class BaseReaderConfig(BaseConfig):
     Attributes:
         ext (List[str], optional): List of valid file extensions for reading. Defaults to None.
         patterns (str, optional): Filename patterns to match (e.g., "*.tsv"). Defaults to None.
-        encoding (str, optional): File encoding. Defaults to None (using the platform default).
+        encoding (str): File encoding. Defaults to "utf-8".
     """
 
     ext: Optional[List[str]] = None
     patterns: Optional[str] = None
-    encoding: Optional[str] = None
+    encoding: str = "utf-8"
 
     @field_validator("ext", mode="after")
     @classmethod

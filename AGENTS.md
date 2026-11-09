@@ -89,6 +89,19 @@ Datasets live in `data/<dataset_name>/`.
 
 Metrics listed under `evaluation.simple_metrics` are computed at every cutoff in `evaluation.cutoffs`. The `validation_metric` (e.g. `nDCG@10`) **must** be present in `simple_metrics` and its cutoff **must** be in `cutoffs`; violations raise exceptions at startup.
 
+The evaluation protocol lives in `evaluation.protocol` and is shared by every model of the experiment:
+- `target: all|first|last|random|successive` decides what each eval row predicts (default: `last` if any model is SESSION_ONLY, `all` otherwise; validation uses `last` unless `all`). SESSION_ONLY models allow only `last|random|successive`; SESSION_ONLY mixed with other models allows only `last`, with `test_splitting: {strategy: temporal_holdout, leave_n_out: 1}`. Rules live in `ExperimentConfig.validate_evaluation_target()`.
+- `negative_sampling` (optional) only decides the candidates (targets + sampled negatives per user); absent means full ranking.
+- `mask_seen` (default `true`) excludes already-seen items from full-ranking recommendations.
+- `user_filter: {path, id_space: public|private, reader}` (optional) restricts evaluation to the users listed in `path`.
+
+Fields set at their old location (`evaluation.target`, top-level `negative_sampling`, …) raise an error pointing to the new one.
+
+The protocol lives in `elliot/evaluation/protocol/`, not in `DataSet` (which only holds a fold's train/eval data):
+- `EvalProtocol` (one per fold) builds and caches the eval rows (`EvalTargets`, ground truth and user filter applied) per session strategy, and samples the negatives (`NegativeSampler`) once per fold, so every model of the fold is scored on the same rows and negatives. `prepare_protocols(config, val_data, main_data)`, called once in `run.py` right after `DataSetLoader.build()`, attaches it to each fold's `DataSet` as `dataset.protocol` (the dataset only hosts it and never imports `evaluation`; reading `protocol` before preparation raises a `RuntimeError`). A test fold standing in for missing validation folds is prepared once.
+- `EvalProtocol.get_eval_dataloader(batch_size, session_strategy)` wraps the cached `NegEvalDataset`/`FullEvalDataset` of that strategy in a dataloader (its dataset carries its rows, `dataloader.dataset.rows`).
+- At every evaluation the trainer requests that dataloader from `dataset.protocol` (with its eval batch size and the model's session strategy) and `collect(model, dataloader, protocol, k)` (`elliot/evaluation/protocol/collector.py`) scores only its rows, returning a `CollectedRecs` (recs, ground truth, row→owner map) that `Evaluator.eval()` consumes as is. `SequentialRecommender`s also receive each row's context sequence (`user_seq`, `seq_len`), built by the collector from the eval rows.
+
 ## Testing
 
 ```bash

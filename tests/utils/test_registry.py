@@ -53,6 +53,9 @@ class TestBasicRegistry:
         cls = registry.get_class("TestClass")
         assert getattr(cls, "extra_attribute", None) == "example"
 
+
+class TestBasicRegistryFailures:
+
     def test_missing_class(self):
         registry = BasicRegistry("TestRegistry")
 
