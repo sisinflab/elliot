@@ -80,7 +80,8 @@ class ModelCoordinator(object):
                 params=model_config,
                 interactions=train_val_obj.train_set,
                 seed=self.config.random_seed,
-                sessions=train_val_obj.train_sessions
+                sessions=train_val_obj.train_sessions,
+                side_info=train_val_obj.side_info
             )
 
             trainer = get_trainer(model)(
@@ -180,7 +181,8 @@ class ModelCoordinator(object):
             params=model_config,
             interactions=self.main_data.train_set,
             seed=self.config.random_seed,
-            sessions=self.main_data.train_sessions
+            sessions=self.main_data.train_sessions,
+            side_info=self.main_data.side_info
         )
 
         trainer = get_trainer(model)(

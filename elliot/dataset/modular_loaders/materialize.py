@@ -186,7 +186,7 @@ def graph_item_entity_ids_to_tensor(payload: GraphPayload, device: Optional[Any]
     from the KG's shared entity embedding table.
 
     `payload` is expected to already be this fold's private-id view (as returned by
-    `Interactions.get_side_info()`, via `remap_graph_payload` - see
+    `FoldSideInfo.get()`, via `remap_graph_payload` - see
     `elliot.dataset.modular_loaders.remap`), i.e. `item_entity_map` keyed by private
     item id, not the loader's raw public-id-keyed one.
 

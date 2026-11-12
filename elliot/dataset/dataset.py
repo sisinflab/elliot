@@ -5,6 +5,7 @@ import logging as pylog
 from elliot.dataset.modular_loaders import SideInformation
 from elliot.dataset.interactions import Interactions
 from elliot.dataset.sessions import Sessions
+from elliot.dataset.side_info import FoldSideInfo
 from elliot.namespace import ExperimentConfig
 from elliot.utils import logging
 
@@ -14,7 +15,8 @@ if TYPE_CHECKING:
 
 class DataSet:
     """Train/eval pair for one fold. Wraps the fold's `Interactions` (train and eval)
-    and `Sessions` (train) views, sharing the fold's (user, item) mappings. How the
+    and `Sessions` (train) views, plus its private view of the side information
+    (`FoldSideInfo`), all sharing the fold's (user, item) mappings. How the
     eval view is evaluated is up to the fold's `EvalProtocol`, attached from outside
     as `protocol` by `elliot.evaluation.protocol.prepare_protocols()`: the dataset
     only hosts it, so that it lives (and is shared) exactly as long as the fold.
@@ -36,6 +38,7 @@ class DataSet:
     train_set: Interactions
     eval_set: Interactions
     train_sessions: Sessions
+    side_info: Optional[FoldSideInfo] = None
 
     def __init__(
         self,
@@ -94,8 +97,7 @@ class DataSet:
             dataframe=train_data,
             name="train",
             mappings=self.get_mappings(),
-            inv_mappings=self.get_inverse_mappings(),
-            side_info=side_info
+            inv_mappings=self.get_inverse_mappings()
         )
 
         num_users, num_items = self.train_set.dims
@@ -136,9 +138,16 @@ class DataSet:
             dataframe=eval_data,
             name=self._evaluation_set,
             mappings=self.get_mappings(),
-            inv_mappings=self.get_inverse_mappings(),
-            side_info=side_info
+            inv_mappings=self.get_inverse_mappings()
         )
+
+        # Build the fold's private view of the (shared) side information
+        if side_info is not None:
+            self.side_info = FoldSideInfo(
+                side_info=side_info,
+                mappings=self.get_mappings(),
+                inv_mappings=self.get_inverse_mappings()
+            )
 
         # Build the ordered, per-user/session view of train for sequential models
         self.train_sessions = Sessions(

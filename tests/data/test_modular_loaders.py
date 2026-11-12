@@ -39,12 +39,12 @@ def load_data(side_information, before_first_load=None):
     name = side_information["dataloader"]
     loader = get_loader(side_information)
     val_data, main_data = loader.build()
-    train_set = main_data[0].train_set
+    fold = main_data[0]
 
     if before_first_load is not None:
-        before_first_load(train_set.get_loader(name))
+        before_first_load(fold.side_info.get_loader(name))
 
-    return train_set.get_side_info(name), train_set, loader
+    return fold.side_info.get(name), fold, loader
 
 
 class TestItemAttributes:
@@ -56,10 +56,10 @@ class TestItemAttributes:
             "attribute_file": path_joiner(self.data_path, "attributes.tsv"),
         }
 
-        payloads, train_set, _ = load_data(config)
+        payloads, fold, _ = load_data(config)
 
         payload = payloads["item_features"]
-        assert payload.shape[0] == train_set.dims[1]
+        assert payload.shape[0] == fold.train_set.dims[1]
         assert len(payload.col_ids) > 0
         assert embedding_to_dense(payload).sum() > 0
 
@@ -89,10 +89,10 @@ class TestPairwiseLoaders:
             field_name: path_joiner(self.data_path, file_name),
         }
 
-        payloads, train_set, _ = load_data(config)
+        payloads, fold, _ = load_data(config)
 
         payload = payloads[key_name]
-        assert payload.shape[0] == payload.shape[1] == train_set.dims[dim]
+        assert payload.shape[0] == payload.shape[1] == fold.train_set.dims[dim]
         assert payload.sparse.nnz > 0
 
     @pytest.mark.parametrize("name,key_name,field_name", [
@@ -127,20 +127,20 @@ class TestChainedKG:
             "threshold": 0,
         }
 
-        payloads, train_set, _ = load_data(config)
+        payloads, fold, _ = load_data(config)
 
-        chainedkg = train_set.get_loader("ChainedKG")
+        chainedkg = fold.side_info.get_loader("ChainedKG")
         assert chainedkg.alignment is not None
         assert chainedkg.get_mapped()[1]  # non-empty, real item domain
 
         payload = payloads["item_features"]
-        assert payload.shape[0] == train_set.dims[1]
+        assert payload.shape[0] == fold.train_set.dims[1]
         assert len(payload.col_ids) > 0
 
         # Second request returns the exact same cached dict (no reload) -- the general
         # caching contract itself is covered end-to-end in
-        # `TestInteractionsPrivateSideInfoView`.
-        assert train_set.get_side_info("ChainedKG") is payloads
+        # `TestFoldSideInfoPrivateView`.
+        assert fold.side_info.get("ChainedKG") is payloads
 
 
 class TestKAHFMLoader:
@@ -155,10 +155,10 @@ class TestKAHFMLoader:
             "threshold": 1.0,
         }
 
-        payloads, train_set, _ = load_data(config)
+        payloads, fold, _ = load_data(config)
 
         payload = payloads["item_features"]
-        assert payload.shape[0] == train_set.dims[1]
+        assert payload.shape[0] == fold.train_set.dims[1]
         assert len(payload.col_ids) > 0
 
 
@@ -175,10 +175,10 @@ class TestKGFlexLoader:
             "threshold": 0,
         }
 
-        payloads, train_set, _ = load_data(config)
+        payloads, fold, _ = load_data(config)
 
         payload = payloads["item_features"]
-        assert payload.shape[0] == train_set.dims[1]
+        assert payload.shape[0] == fold.train_set.dims[1]
         assert len(payload.col_ids) > 0
 
 
@@ -364,10 +364,10 @@ class TestTextualAttribute:
             "textual_features": self.data_path,
         }
 
-        payloads, train_set, _ = load_data(config)
+        payloads, fold, _ = load_data(config)
         dense = embedding_to_dense(payloads["item_features"])
 
-        assert dense.shape == (train_set.dims[1], 8)
+        assert dense.shape == (fold.train_set.dims[1], 8)
 
     def test_materialization_memory_override_returns_dense_payload(self):
         config = {
@@ -392,12 +392,12 @@ class TestVisualAttribute:
             "visual_feature_folder_path": self.data_path,
         }
 
-        payloads, train_set, _ = load_data(config)
+        payloads, fold, _ = load_data(config)
 
         payload = payloads["visual_features"]
         assert payload.dense is None
         assert payload.row_loader is not None
-        assert embedding_to_dense(payload).shape == (train_set.dims[1], 16)
+        assert embedding_to_dense(payload).shape == (fold.train_set.dims[1], 16)
 
     def test_materialization_memory_override_returns_dense_payload(self):
         config = {

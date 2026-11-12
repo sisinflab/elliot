@@ -8,7 +8,7 @@ from torch import nn, Tensor
 from torch.utils.data import DataLoader
 from abc import ABC, abstractmethod
 
-from elliot.dataset import Interactions, Sessions
+from elliot.dataset import FoldSideInfo, Interactions, Sessions
 from elliot.dataset.modular_loaders.materialize import graph_item_entity_ids_to_tensor
 from elliot.dataset.samplers import CombinedDataLoader
 from elliot.namespace import RecommenderConfig
@@ -33,9 +33,11 @@ class AbstractRecommender(ABC):
         seed: int,
         interactions: Interactions,
         *args,
+        side_info: Optional[FoldSideInfo] = None,
         **kwargs
     ):
         self._interactions = interactions
+        self._side_info = side_info
         self._seed = seed
         self._users, self._items = interactions.get_users_items()
         self._num_users, self._num_items = interactions.dims
@@ -55,7 +57,9 @@ class AbstractRecommender(ABC):
         self.set_seed(seed)
         self.set_params(params)
 
-        missing = [name for name in self.loaders if name not in self._interactions.side_information]
+        missing = [
+            name for name in self.loaders if self._side_info is None or name not in self._side_info
+        ]
         if missing:
             raise KeyError(
                 f"{self.__class__.__name__} declares `loaders` entries not present in "
@@ -163,7 +167,7 @@ class AbstractRecommender(ABC):
             allowed_types=SamplerType.SIDE_INFO,
             config=side_info_sampler_config
         )
-        side_info_dataloader = self._interactions.get_side_info_dataloader(
+        side_info_dataloader = self._side_info.get_dataloader(
             sampler_name=sampler_name,
             batch_size=batch_size,
             seed=self._seed,
@@ -458,7 +462,7 @@ class KnowledgeAwareRecommender(GeneralRecommender):
     ):
         super().__init__(params, seed, interactions, *args, **kwargs)
 
-        payload = self._interactions.get_side_info(self.loaders[0])["kg_triples"]
+        payload = self._side_info.get(self.loaders[0])["kg_triples"]
 
         self.n_entities = payload.n_entities
         self.n_relations = payload.n_relations

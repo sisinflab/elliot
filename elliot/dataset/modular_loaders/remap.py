@@ -1,7 +1,7 @@
 """Public (shared/global) payload -> per-fold private-id view. Given a payload keyed by
 the public ids a loader's `discover()`/`filter()` narrowed to, and a fold's own
 `u_map`/`i_map`, builds a new payload reindexed by that fold's private ids `0..n-1`.
-Called only by `Interactions.get_side_info()`, and must never mutate the shared payload
+Called only by `FoldSideInfo.get()`, and must never mutate the shared payload
 in place.
 """
 

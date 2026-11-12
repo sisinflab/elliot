@@ -9,7 +9,7 @@ from elliot.dataset.modular_loaders.formats import Payload
 class SideInformation(Mapping):
     """Shared, centrally-cached handle to the side-information loaders discovered for one
     experiment. A single instance of this class is created once by `DataSetLoader` and
-    held, by reference, on every fold's `DataSet`/`Interactions`/`Sessions` - it is never
+    held, by reference, by every fold's `FoldSideInfo` (`dataset.side_info`) - it is never
     copied. It materializes and caches each loader's payload exactly once for the whole
     experiment (`get_payload()`), and reference-counts it across models (`mapped_uses()`/
     `marked_as_done()`) so it can be dropped once nothing still needs it.
@@ -50,13 +50,13 @@ class SideInformation(Mapping):
         return self._payloads[name]
 
     def register_private_view(self, name: str, owner):
-        """Record that `owner` (an `Interactions` instance) has cached its own
+        """Record that `owner` (a `FoldSideInfo` instance) has cached its own
         fold-private view derived from this loader's payload, so `marked_as_done()`
         can tell it to drop that view once nobody still needs the loader.
 
         Args:
             name (str): Name of the registered loader.
-            owner (Interactions): The `Interactions` instance that cached a
+            owner (FoldSideInfo): The `FoldSideInfo` instance that cached a
                 fold-private view derived from this loader's payload.
         """
         owners = self._private_view_owners.get(name)
@@ -101,6 +101,6 @@ class SideInformation(Mapping):
         if self._remaining_uses[name] == 0 and self._payloads[name] is not None:
             self._payloads[name] = None
             for owner in list(self._private_view_owners[name]):
-                owner.forget_side_info(name)
+                owner.forget(name)
             self._private_view_owners[name].clear()
             self._loaders[name].unload()
