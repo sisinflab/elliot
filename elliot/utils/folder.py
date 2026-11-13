@@ -41,7 +41,8 @@ def check_dir(
 def list_dir(
     path: Union[str, PathLike[str]]
 ) -> Generator[str, None, None]:
-    _dirs = [d for d in Path(path).iterdir()]
+    _natural_key = lambda p: [int(t) if t.isdigit() else t.lower() for t in re.split(r"(\d+)", p.name)]
+    _dirs = sorted(Path(path).iterdir(), key=_natural_key)
     for d in _dirs:
         yield str(d)
 

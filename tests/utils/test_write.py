@@ -4,12 +4,10 @@ import torch
 from pathlib import Path
 
 from elliot.utils.write import Writer
-from elliot.utils.folder import path_joiner, check_path, check_dir
+from elliot.utils.folder import path_joiner, check_path
 
 from tests.utils.test_read import read_tabular, read_sequence_tabular, read_model, read_json, reader
-from tests.params import writer_folder, writer_path
-
-check_dir(writer_folder, replace=True)
+from tests.params import writer_path
 
 writer = Writer()
 
@@ -23,73 +21,73 @@ write_json = writer.write_json
 
 class TestWriteTabular:
 
-    def test_basic_write_no_header(self):
+    def test_basic_write_no_header(self, tmp_path):
         df = pd.DataFrame({"a": [1, 2], "b": ["x", "y"]})
-        path = writer_path("out")
+        path = writer_path(tmp_path, "out")
 
         write_tabular(df, path)
 
         assert Path(path).read_text(encoding="utf-8") == "1\tx\n2\ty\n"
 
-    def test_with_header_bool(self):
+    def test_with_header_bool(self, tmp_path):
         df = pd.DataFrame({"a": [1], "b": ["x"]})
-        path = writer_path("out_header_bool")
+        path = writer_path(tmp_path, "out_header_bool")
 
         write_tabular(df, path, header=True)
 
         assert Path(path).read_text(encoding="utf-8") == "a\tb\n1\tx\n"
 
-    def test_with_header_alias_list(self):
+    def test_with_header_alias_list(self, tmp_path):
         df = pd.DataFrame({"a": [1], "b": ["x"]})
-        path = writer_path("out_header")
+        path = writer_path(tmp_path, "out_header")
 
         write_tabular(df, path, header=["col1", "col2"])
 
         assert Path(path).read_text(encoding="utf-8") == "col1\tcol2\n1\tx\n"
 
-    def test_header_alias_mismatch_falls_back_to_no_header(self):
+    def test_header_alias_mismatch_falls_back_to_no_header(self, tmp_path):
         df = pd.DataFrame({"a": [1], "b": ["x"]})
-        path = writer_path("out_header_mismatch")
+        path = writer_path(tmp_path, "out_header_mismatch")
 
         write_tabular(df, path, header=["only_one"])
 
         assert Path(path).read_text(encoding="utf-8") == "1\tx\n"
 
-    def test_columns_positional_selection_and_reorder(self):
+    def test_columns_positional_selection_and_reorder(self, tmp_path):
         df = pd.DataFrame({"a": [1], "b": [2], "c": [3]})
-        path = writer_path("out_columns_positional")
+        path = writer_path(tmp_path, "out_columns_positional")
 
         write_tabular(df, path, columns=[2, 0])
 
         assert Path(path).read_text(encoding="utf-8") == "3\t1\n"
 
-    def test_columns_semantic_selection(self):
+    def test_columns_semantic_selection(self, tmp_path):
         df = pd.DataFrame({"a": [1], "b": [2]})
-        path = writer_path("out_columns_semantic")
+        path = writer_path(tmp_path, "out_columns_semantic")
 
         write_tabular(df, path, columns=["b"])
 
         assert Path(path).read_text(encoding="utf-8") == "2\n"
 
-    def test_no_columns_matched_writes_empty_file(self):
+    def test_no_columns_matched_writes_empty_file(self, tmp_path):
         df = pd.DataFrame({"a": [1]})
-        path = writer_path("out_no_columns_matched")
+        path = writer_path(tmp_path, "out_no_columns_matched")
 
         write_tabular(df, path, columns=["missing"])
 
         assert Path(path).read_text(encoding="utf-8") == ""
 
-    def test_custom_separator(self):
+    def test_custom_separator(self, tmp_path):
         df = pd.DataFrame({"a": [1], "b": [2]})
-        path = writer_path("out_custom_separator")
+        path = writer_path(tmp_path, "out_custom_separator")
 
         write_tabular(df, path, sep=",")
 
         assert Path(path).read_text(encoding="utf-8") == "1,2\n"
 
-    def test_callback_fn_applied(self):
+    def test_callback_fn_applied(self, tmp_path):
         df = pd.DataFrame({"a": [1]})
-        path = writer_path("out_callback")
+        path = writer_path(tmp_path, "out_callback")
         received = {}
 
         write_tabular(
@@ -101,92 +99,92 @@ class TestWriteTabular:
 
 class TestWriteSequenceTabular:
 
-    def test_wide_orders_items_by_timestamp(self):
+    def test_wide_orders_items_by_timestamp(self, tmp_path):
         df = pd.DataFrame({
             "userId": ["1", "1", "1", "2", "2"],
             "itemId": ["1", "2", "3", "4", "5"],
             "timestamp": [1, 2, 0, 1, 0],
         })
-        path = writer_path("wide")
+        path = writer_path(tmp_path, "wide")
 
         write_sequence_tabular(df, path, format="wide")
 
         assert Path(path).read_text(encoding="utf-8") == "1\t3\t1\t2\n2\t5\t4\n"
 
-    def test_wide_writes_one_line_per_session(self):
+    def test_wide_writes_one_line_per_session(self, tmp_path):
         df = pd.DataFrame({
             "userId": ["1", "1", "1", "1", "2"],
             "itemId": ["1", "2", "3", "4", "5"],
             "sessionId": [0, 0, 1, 1, 0],
             "timestamp": [0, 1, 2, 3, 0],
         })
-        path = writer_path("wide_session_id")
+        path = writer_path(tmp_path, "wide_session_id")
 
         write_sequence_tabular(df, path, format="wide")
 
         assert Path(path).read_text(encoding="utf-8") == "1\t1\t2\n1\t3\t4\n2\t5\n"
 
-    def test_wide_without_timestamp_groups_by_user_only(self):
+    def test_wide_without_timestamp_groups_by_user_only(self, tmp_path):
         df = pd.DataFrame({
             "userId": ["1", "1", "2"],
             "itemId": ["1", "2", "3"]
         })
-        path = writer_path("wide_no_timestamp")
+        path = writer_path(tmp_path, "wide_no_timestamp")
 
         write_sequence_tabular(df, path, format="wide")
 
         assert Path(path).read_text(encoding="utf-8") == "1\t1\t2\n2\t3\n"
 
-    def test_wide_header_alias_list(self):
+    def test_wide_header_alias_list(self, tmp_path):
         df = pd.DataFrame({"userId": ["1"], "itemId": ["1"]})
-        path = writer_path("wide_header")
+        path = writer_path(tmp_path, "wide_header")
 
         write_sequence_tabular(df, path, format="wide", header=["user", "items"])
 
         assert Path(path).read_text(encoding="utf-8") == "user\titems\n1\t1\n"
 
-    def test_wide_header_alias_mismatch_falls_back_to_no_header(self):
+    def test_wide_header_alias_mismatch_falls_back_to_no_header(self, tmp_path):
         df = pd.DataFrame({"userId": ["1"], "itemId": ["1"]})
-        path = writer_path("wide_header_mismatch")
+        path = writer_path(tmp_path, "wide_header_mismatch")
 
         write_sequence_tabular(df, path, format="wide", header=["only_one"])
 
         assert Path(path).read_text(encoding="utf-8") == "1\t1\n"
 
-    def test_inline_without_timestamp_column(self):
+    def test_inline_without_timestamp_column(self, tmp_path):
         df = pd.DataFrame({
             "userId": ["1", "1", "2"],
             "itemId": ["1", "2", "3"]
         })
-        path = writer_path("inline_no_timestamp")
+        path = writer_path(tmp_path, "inline_no_timestamp")
 
         write_sequence_tabular(df, path, format="inline", header=True)
 
         assert Path(path).read_text(encoding="utf-8") == "userId\tsequence\n1\t1 2\n2\t3\n"
 
-    def test_inline_custom_sequence_sep(self):
+    def test_inline_custom_sequence_sep(self, tmp_path):
         df = pd.DataFrame({
             "userId": ["1", "1"],
             "itemId": ["1", "2"],
             "timestamp": [0, 1]
         })
-        path = writer_path("inline_custom_sequence_sep")
+        path = writer_path(tmp_path, "inline_custom_sequence_sep")
 
         write_sequence_tabular(df, path, format="inline", sequence_sep=",")
 
         assert "1,2" in Path(path).read_text(encoding="utf-8")
 
-    def test_inline_header_alias_list(self):
+    def test_inline_header_alias_list(self, tmp_path):
         df = pd.DataFrame({"userId": ["1"], "itemId": ["1"]})
-        path = writer_path("inline_header")
+        path = writer_path(tmp_path, "inline_header")
 
         write_sequence_tabular(df, path, format="inline", header=["U", "S"])
 
         assert Path(path).read_text(encoding="utf-8") == "U\tS\n1\t1\n"
 
-    def test_inline_columns_excludes_timestamp_from_output(self):
+    def test_inline_columns_excludes_timestamp_from_output(self, tmp_path):
         df = pd.DataFrame({"userId": ["1"], "itemId": ["1"], "timestamp": [5]})
-        path = writer_path("inline_columns")
+        path = writer_path(tmp_path, "inline_columns")
 
         write_sequence_tabular(df, path, format="inline", columns=["userId", "sequence"])
 
@@ -195,9 +193,9 @@ class TestWriteSequenceTabular:
 
 class TestWriteSequenceTabularFailures:
 
-    def test_invalid_format(self):
+    def test_invalid_format(self, tmp_path):
         df = pd.DataFrame({"userId": ["1"], "itemId": ["1"]})
-        path = writer_path("invalid_format")
+        path = writer_path(tmp_path, "invalid_format")
 
         with pytest.raises(ValueError):
             write_sequence_tabular(df, path, format="invalid_format")
@@ -205,49 +203,49 @@ class TestWriteSequenceTabularFailures:
 
 class TestWriteModel:
 
-    def test_writes_model_file_with_expected_name(self):
+    def test_writes_model_file_with_expected_name(self, tmp_path):
         model_obj = {"weights": [1, 2, 3]}
 
-        write_model(model_obj, writer_folder, model_name="mymodel")
+        write_model(model_obj, tmp_path, model_name="mymodel")
 
-        path = writer_path("best-weights-mymodel", ext="pth")
+        path = writer_path(tmp_path, "best-weights-mymodel", ext="pth")
         assert check_path(path)
         assert torch.load(path) == model_obj
 
-    def test_creates_missing_save_folder(self):
-        save_folder = path_joiner(writer_folder, "nested", "models")
+    def test_creates_missing_save_folder(self, tmp_path):
+        save_folder = path_joiner(tmp_path, "nested", "models")
 
         write_model({"weights": [1]}, save_folder, model_name="mymodel")
 
         assert check_path(path_joiner(save_folder, "best-weights-mymodel.pth"))
 
-    def test_custom_extension(self):
-        write_model({"weights": [1]}, writer_folder, model_name="mymodel", ext=".pt")
+    def test_custom_extension(self, tmp_path):
+        write_model({"weights": [1]}, tmp_path, model_name="mymodel", ext=".pt")
 
-        assert check_path(writer_path("best-weights-mymodel", ext="pt"))
+        assert check_path(writer_path(tmp_path, "best-weights-mymodel", ext="pt"))
 
 
 class TestWriteRecommendations:
 
-    def test_writes_top_k_recommendations(self):
+    def test_writes_top_k_recommendations(self, tmp_path):
         recs = {"1": [("1", 0.9), ("2", 0.5)], "2": [("3", 0.7)]}
 
-        write_recommendations(recs, writer_folder, model_name="mymodel")
+        write_recommendations(recs, tmp_path, model_name="mymodel")
 
-        path = writer_path("mymodel")
+        path = writer_path(tmp_path, "mymodel")
         assert check_path(path)
         with open(path) as f:
             assert f.read() == "1\t1\t0.9\n1\t2\t0.5\n2\t3\t0.7\n"
 
-    def test_it_suffix_included_in_filename(self):
+    def test_it_suffix_included_in_filename(self, tmp_path):
         recs = {"1": [("1", 0.9)]}
 
-        write_recommendations(recs, writer_folder, model_name="mymodel", it=3)
+        write_recommendations(recs, tmp_path, model_name="mymodel", it=3)
 
-        assert check_path(writer_path("mymodel_it=3"))
+        assert check_path(writer_path(tmp_path, "mymodel_it=3"))
 
-    def test_creates_missing_save_folder(self):
-        save_folder = path_joiner(writer_folder, "nested", "recs")
+    def test_creates_missing_save_folder(self, tmp_path):
+        save_folder = path_joiner(tmp_path, "nested", "recs")
 
         write_recommendations({"1": [("1", 0.5)]}, save_folder, model_name="mymodel")
 
@@ -351,26 +349,26 @@ class TestWriteRecommendations:
 
 class TestWriteDictAsTable:
 
-    def test_writes_dict_as_table(self):
+    def test_writes_dict_as_table(self, tmp_path):
         data = {"model_a": {"nDCG": 0.5}, "model_b": {"nDCG": 0.6}}
 
-        write_dict_as_table(data, writer_folder, file_name="summary")
+        write_dict_as_table(data, tmp_path, file_name="summary")
 
-        path = writer_path("summary")
+        path = writer_path(tmp_path, "summary")
         assert Path(path).read_text(encoding="utf-8") == "model_a\t0.5\nmodel_b\t0.6\n"
 
 
 class TestWriteJson:
 
-    def test_writes_json_with_default_indent(self):
-        path = writer_path("data", ext="json")
+    def test_writes_json_with_default_indent(self, tmp_path):
+        path = writer_path(tmp_path, "data", ext="json")
 
         write_json({"a": 1, "b": [1, 2]}, path)
 
         assert Path(path).read_text(encoding="utf-8") == '{\n  "a": 1,\n  "b": [\n    1,\n    2\n  ]\n}'
 
-    def test_custom_indent(self):
-        path = writer_path("data", ext="json")
+    def test_custom_indent(self, tmp_path):
+        path = writer_path(tmp_path, "data", ext="json")
 
         write_json({"a": 1}, path, indent=4)
 
@@ -382,9 +380,9 @@ class TestReaderWriterInteroperability:
     on layout for methods whose files are meant to be read back.
     """
 
-    def test_tabular_roundtrip_with_header(self):
+    def test_tabular_roundtrip_with_header(self, tmp_path):
         df = pd.DataFrame({"userId": ["1", "2"], "rating": [5, 3]})
-        path = writer_path("out")
+        path = writer_path(tmp_path, "out")
 
         write_tabular(df, path, header=True)
         back = read_tabular(path, header=True)
@@ -392,31 +390,31 @@ class TestReaderWriterInteroperability:
         assert list(back.columns) == ["userId", "rating"]
         assert back["rating"].tolist() == [5, 3]
 
-    def test_sequence_wide_header_is_skippable_on_read(self):
+    def test_sequence_wide_header_is_skippable_on_read(self, tmp_path):
         df = pd.DataFrame({"userId": ["1", "1"], "itemId": ["1", "2"], "timestamp": [0, 1]})
-        path = writer_path("wide")
+        path = writer_path(tmp_path, "wide")
 
         write_sequence_tabular(df, path, format="wide", header=True)
         back = read_sequence_tabular(path, format="wide", header=True, columns=["userId"])
 
         assert list(back["itemId"]) == ["1", "2"]
 
-    def test_sequence_wide_roundtrip_without_timestamp(self):
+    def test_sequence_wide_roundtrip_without_timestamp(self, tmp_path):
         df = pd.DataFrame({"userId": ["1", "1", "2"], "itemId": ["1", "2", "3"]})
-        path = writer_path("wide")
+        path = writer_path(tmp_path, "wide")
 
         write_sequence_tabular(df, path, format="wide")
         back = read_sequence_tabular(path, format="wide", header=False, columns=["userId"])
 
         assert back.shape[0] == 3
 
-    def test_sequence_inline_orders_items_and_keeps_first_timestamp(self):
+    def test_sequence_inline_orders_items_and_keeps_first_timestamp(self, tmp_path):
         df = pd.DataFrame({
             "userId": ["1", "1", "1", "2", "2"],
             "itemId": ["2", "3", "1", "5", "4"],
             "timestamp": [1, 2, 0, 1, 0],
         })
-        path = writer_path("inline")
+        path = writer_path(tmp_path, "inline")
 
         write_sequence_tabular(df, path, format="inline", header=True)
         back = read_sequence_tabular(
@@ -430,14 +428,14 @@ class TestReaderWriterInteroperability:
         assert list(u2["itemId"]) == ["4", "5"]
         assert (u2["timestamp"] == 0).all()
 
-    def test_sequence_inline_writes_one_row_per_session(self):
+    def test_sequence_inline_writes_one_row_per_session(self, tmp_path):
         df = pd.DataFrame({
             "userId": ["1", "1", "1", "1"],
             "itemId": ["1", "2", "3", "4"],
             "sessionId": [0, 0, 1, 1],
             "timestamp": [0, 1, 2, 3],
         })
-        path = writer_path("inline")
+        path = writer_path(tmp_path, "inline")
 
         write_sequence_tabular(df, path, format="inline", header=True)
         back = read_sequence_tabular(
@@ -448,16 +446,16 @@ class TestReaderWriterInteroperability:
         sessions = back.groupby("timestamp")["itemId"].apply(list).sort_index()
         assert list(sessions) == [["1", "2"], ["3", "4"]]
 
-    def test_model_roundtrip(self):
+    def test_model_roundtrip(self, tmp_path):
         model_obj = {"weights": [1, 2, 3]}
 
-        write_model(model_obj, writer_folder, model_name="mymodel")
-        loaded = read_model(writer_folder, model_name="mymodel")
+        write_model(model_obj, tmp_path, model_name="mymodel")
+        loaded = read_model(tmp_path, model_name="mymodel")
 
         assert loaded == model_obj
 
-    def test_json_roundtrip(self):
-        path = writer_path("data", ext="json")
+    def test_json_roundtrip(self, tmp_path):
+        path = writer_path(tmp_path, "data", ext="json")
 
         write_json({"a": 1, "b": [1, 2, 3]}, path)
         loaded = read_json(path)
@@ -466,25 +464,25 @@ class TestReaderWriterInteroperability:
 
     # Non-ASCII ids must survive a round trip whatever the platform default encoding
     @pytest.mark.parametrize("format", ["wide", "inline"])
-    def test_sequence_roundtrip_non_ascii(self, format):
+    def test_sequence_roundtrip_non_ascii(self, tmp_path, format):
         df = pd.DataFrame({"userId": ["josé", "josé"], "itemId": ["café", "naïve"]})
-        path = writer_path(f"{format}_non_ascii")
+        path = writer_path(tmp_path, f"{format}_non_ascii")
 
         write_sequence_tabular(df, path, format=format)
         back = read_sequence_tabular(path, format=format, header=False)
 
         assert list(back["itemId"]) == ["café", "naïve"]
 
-    def test_negatives_roundtrip_non_ascii(self):
-        save_folder = writer_path(folder="negatives_non_ascii")
+    def test_negatives_roundtrip_non_ascii(self, tmp_path):
+        save_folder = writer_path(tmp_path, subfolder="negatives_non_ascii")
 
         writer.write_negatives({"josé": ["café", "naïve"]}, save_folder)
         loaded = reader.read_negatives(save_folder)
 
         assert loaded == {"josé": ["café", "naïve"]}
 
-    def test_json_roundtrip_non_ascii(self):
-        path = writer_path("data_non_ascii", ext="json")
+    def test_json_roundtrip_non_ascii(self, tmp_path):
+        path = writer_path(tmp_path, "data_non_ascii", ext="json")
 
         write_json({"item": "café"}, path)
 

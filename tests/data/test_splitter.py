@@ -2,7 +2,7 @@ import pytest
 
 from elliot.dataset import DataSetLoader
 from elliot.namespace import build_namespace
-from elliot.utils.folder import path_joiner, check_path, parent_dir
+from elliot.utils.folder import path_joiner, check_path
 
 from tests.params import params_splitting_fail as p, dataset_path
 
@@ -202,8 +202,8 @@ class TestSplitter:
         assert not train.empty and not test.empty
         assert train['timestamp'].max() < test['timestamp'].min()
 
-    def test_saving_on_disk(self):
-        save_folder = "./splitter/splitting"
+    def test_saving_on_disk(self, tmp_path):
+        save_folder = path_joiner(tmp_path, "splitting")
         config = {
             "save_on_disk": True,
             "save_folder": save_folder,
@@ -215,9 +215,8 @@ class TestSplitter:
 
         load_and_split_data(config)
 
-        current_folder = parent_dir(current_path)
-        train_path = path_joiner(current_folder, save_folder, "0", "train.tsv")
-        test_path = path_joiner(current_folder, save_folder, "0", "test.tsv")
+        train_path = path_joiner(save_folder, "0", "train.tsv")
+        test_path = path_joiner(save_folder, "0", "test.tsv")
         assert check_path(train_path)
         assert check_path(test_path)
 

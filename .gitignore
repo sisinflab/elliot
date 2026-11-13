@@ -32,7 +32,6 @@ pip-selfcheck.json
 /local_sample_main.py
 /tests/configs
 /tests/elliot_root
-**/writer/
 
 .Python
 build/

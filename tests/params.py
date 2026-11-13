@@ -19,9 +19,8 @@ reader_path = lambda file_name=None, ext="tsv", folder=None: (
     path_joiner(reader_folder, folder or f"{file_name}.{ext}")
 )
 
-writer_folder = path_joiner(test_path, "utils", "writer")
-writer_path = lambda file_name=None, ext="tsv", folder=None: (
-    path_joiner(writer_folder, folder or f"{file_name}.{ext}")
+writer_path = lambda folder, file_name=None, ext="tsv", subfolder=None: (
+    path_joiner(folder, subfolder or f"{file_name}.{ext}")
 )
 
 

@@ -336,6 +336,37 @@ class Reader:
 
         return only_files
 
+    def find_file(
+        self,
+        folder: str,
+        name: str,
+        **kwargs: Any
+    ) -> str:
+        """Find the file in a folder whose name, without extension, matches the given one.
+
+        Args:
+            folder (str): Path to the folder to search.
+            name (str): File name to look for, without extension.
+            **kwargs (Any): Additional keyword arguments passed to the `read_folder` method
+                (e.g. `ext` or `patterns` to restrict the candidate files).
+
+        Returns:
+            str: Path of the matching file, or an empty string if no file matches.
+
+        Raises:
+            ValueError: If more than one file matches (e.g. same name with different extensions).
+        """
+        matches = [p for p in self.read_folder(folder, **kwargs) if file_name(p) == name]
+
+        # Picking one among several matches would depend on the folder listing order
+        if len(matches) > 1:
+            raise ValueError(
+                f"Ambiguous file '{name}' in folder '{folder}': found {matches}. "
+                f"Remove the extra files or restrict the accepted extensions."
+            )
+
+        return matches[0] if matches else ""
+
     def read_tabular_split(
         self,
         read_folder: str,
@@ -365,9 +396,7 @@ class Reader:
         read_fn = self.read_sequence_tabular if sequential else self.read_tabular
 
         def get_file_path(folder, name):
-            files = self.read_folder(folder, **kwargs)
-            by_name = {file_name(p): p for p in files}
-            return by_name.get(name, "")
+            return self.find_file(folder, name, **kwargs)
 
         tuple_list = []
 
@@ -557,11 +586,14 @@ class Reader:
 
         Raises:
             FileNotFoundError: If the file is not found in the specified folder.
+            ValueError: If more than one file matches the model name.
             RuntimeError: If there is an error while loading the model.
         """
-        files = self.read_folder(read_folder, **kwargs)
-        by_name = {file_name(p): p for p in files}
-        path = by_name.get(f"best-weights-{model_name}", "")
+        name = f"best-weights-{model_name}"
+        path = self.find_file(read_folder, name, **kwargs)
+
+        if not path:
+            raise FileNotFoundError(f"Model file '{name}' not found in folder '{read_folder}'")
 
         model = torch.load(path)
 

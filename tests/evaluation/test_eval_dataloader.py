@@ -368,8 +368,8 @@ class TestEvalDataloader:
         check_dataloader(val_dataloader, val_negatives)
         check_dataloader(test_dataloader, test_negatives)
 
-    def test_neg_saving_on_disk(self):
-        save_folder = path_joiner(eval_data_folder, "negative")
+    def test_neg_saving_on_disk(self, tmp_path):
+        save_folder = path_joiner(tmp_path, "negative")
         config = {
             "negative_sampling": {
                 "strategy": "random",
@@ -381,8 +381,8 @@ class TestEvalDataloader:
 
         eval_data(config, batch_size=2)
 
-        val_path = path_joiner(save_folder.format("eval_dataloader"), "test1_val1_negative.tsv")
-        test_path = path_joiner(save_folder.format("eval_dataloader"), "test1_negative.tsv")
+        val_path = path_joiner(save_folder, "test1_val1_negative.tsv")
+        test_path = path_joiner(save_folder, "test1_negative.tsv")
         assert check_path(val_path)
         assert check_path(test_path)
 
