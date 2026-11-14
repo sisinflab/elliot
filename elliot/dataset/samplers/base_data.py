@@ -1,9 +1,12 @@
 from typing import Any, Iterator, Tuple
+import random
+import numpy as np
 import torch
 from torch.utils.data import Dataset, TensorDataset, DataLoader
 
 from elliot.dataset.samplers.base_sampler import AbstractSampler
 from elliot.utils.enums import SamplerMaterialization
+from elliot.utils.utils import get_device, get_num_workers
 
 
 class PipelineDataset(Dataset):
@@ -63,6 +66,69 @@ def build_dataset(sampler: AbstractSampler) -> Dataset:
         setattr(dataset, 'collate_fn', collate_fn)
 
     return dataset
+
+
+def _seed_worker(worker_id: int) -> None:
+    """Reseed a dataloader worker's numpy and `random` global RNGs.
+
+    PyTorch gives every worker its own torch seed (`base_seed + worker_id`) but
+    leaves numpy's global state as copied from the parent, so without this every
+    worker would draw the same negatives. Samplers draw from numpy's/`random`'s
+    global state, so both are reseeded from the worker's own torch seed.
+
+    Args:
+        worker_id (int): The worker's index (unused; already folded into the torch seed).
+    """
+    worker_seed = torch.initial_seed() % 2 ** 32
+    np.random.seed(worker_seed)
+    random.seed(worker_seed)
+
+
+def build_dataloader(
+    dataset: Dataset,
+    batch_size: int,
+    seed: int,
+    shuffle: bool = True
+) -> DataLoader:
+    """Build the training `DataLoader` over `dataset`, forwarding any `collate_fn`
+    attached to it by `build_dataset`.
+
+    Worker processes (see `ExperimentConfig.num_workers`) are only used for lazy
+    `PipelineDataset`s, where each sample is built on demand: an eagerly materialized
+    `TensorDataset` is just indexed, so workers would only add overhead. With
+    workers, shuffling draws from a dedicated generator seeded with `seed` (also the
+    source of every worker's seed) and workers are kept alive across epochs; with
+    none, the loader is built exactly as before (shuffling from torch's global RNG).
+
+    Args:
+        dataset (Dataset): The dataset to load from, as returned by `build_dataset`.
+        batch_size (int): Batch size.
+        seed (int): Seed for the shuffling generator and worker seeds, used only
+            when worker processes are enabled.
+        shuffle (bool): Whether to reshuffle every epoch. Defaults to True.
+
+    Returns:
+        DataLoader: The configured dataloader.
+    """
+    num_workers = get_num_workers() if isinstance(dataset, PipelineDataset) else 0
+
+    worker_kwargs = {}
+    if num_workers > 0:
+        worker_kwargs = dict(
+            num_workers=num_workers,
+            worker_init_fn=_seed_worker,
+            generator=torch.Generator().manual_seed(seed),
+            persistent_workers=True,
+            pin_memory=get_device().type == "cuda",
+        )
+
+    return DataLoader(
+        dataset,
+        batch_size=batch_size,
+        collate_fn=getattr(dataset, 'collate_fn', None),
+        shuffle=shuffle,
+        **worker_kwargs
+    )
 
 
 class CombinedDataLoader:

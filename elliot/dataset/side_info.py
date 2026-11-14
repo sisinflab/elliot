@@ -9,7 +9,7 @@ from elliot.dataset.modular_loaders.remap import (
     remap_text_payload,
 )
 from elliot.dataset.modular_loaders.formats import EmbeddingPayload, GraphPayload, TextPayload
-from elliot.dataset.samplers.base_data import build_dataset
+from elliot.dataset.samplers.base_data import build_dataloader, build_dataset
 from elliot.utils.enums import EntityAxis
 from elliot.utils.registry import sampler_registry
 
@@ -140,12 +140,7 @@ class FoldSideInfo:
             self._cached_datasets[sampler_name] = build_dataset(sampler)
 
         dataset = self._cached_datasets[sampler_name]
-        dataloader = DataLoader(
-            dataset,
-            batch_size=batch_size,
-            collate_fn=getattr(dataset, 'collate_fn', None),
-            shuffle=True
-        )
+        dataloader = build_dataloader(dataset, batch_size=batch_size, seed=seed)
 
         return dataloader
 

@@ -6,8 +6,8 @@ import time
 import torch
 import numpy as np
 from abc import ABC, abstractmethod
+from collections.abc import Sized
 from tqdm import tqdm
-from torch.utils.data import DataLoader
 
 from elliot.namespace import RecommenderConfig, ExperimentConfig
 from elliot.dataset import DataSet
@@ -119,8 +119,6 @@ class AbstractTrainer(ABC):
         training_dataloader = self.model.get_training_dataloader(
             batch_size=self.model_config.batch_size
         )
-        if not isinstance(training_dataloader, DataLoader):
-            self.model_config.meta.verbose = False
 
         for it in self.iterate():
             self.logger.debug(
@@ -296,6 +294,16 @@ class AbstractTrainer(ABC):
     def _train_epoch(self, it, dataloader, *args):
         raise NotImplementedError()
 
+    def _progress_bar(self, it, dataloader):
+        # Dataloaders without a length (e.g. a generator yielding a single
+        # full-epoch step) get no progress bar
+        sized = isinstance(dataloader, Sized)
+        return tqdm(
+            total=len(dataloader) if sized else None,
+            desc=f"Epoch {it + 1}/{self.model_config.epochs}",
+            disable=not (sized and self.model_config.meta.verbose)
+        )
+
     #@staticmethod
     #def _batch_remove(original_str: str, char_list):
     #    for c in char_list:
@@ -310,12 +318,7 @@ class BaseTrainer(AbstractTrainer):
     def _train_epoch(self, it, dataloader, *args):
         total_loss = 0.0
         steps = 0
-        iter_ = tqdm(
-            total=len(dataloader),
-            desc=f"Epoch {it + 1}/{self.model_config.epochs}",
-            disable=not self.model_config.meta.verbose
-        )
-        with iter_ as t:
+        with self._progress_bar(it, dataloader) as t:
             for batch in dataloader:
                 steps += 1
                 batch_loss = self.model.train_step(batch, *args)
@@ -351,12 +354,7 @@ class GeneralTrainer(AbstractTrainer):
     def _train_epoch(self, it, dataloader, *args):
         self.model.train()
         total_loss, steps = 0.0, 0
-        iter_ = tqdm(
-            total=len(dataloader),
-            desc=f"Epoch {it + 1}/{self.model_config.epochs}",
-            disable=not self.model_config.meta.verbose
-        )
-        with iter_ as t:
+        with self._progress_bar(it, dataloader) as t:
             for batch in dataloader:
                 steps += 1
                 self.optimizer.zero_grad()

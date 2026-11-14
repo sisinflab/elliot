@@ -223,9 +223,7 @@ class BaseRecommender(AbstractRecommender):
                 **self.sampler_config
             )
             return self._check_for_side_info_dataloader(dataloader, batch_size)
-        else:
-            for _ in range(1):
-                yield None
+        return (None for _ in range(1))
 
     @abstractmethod
     def predict(self, user_indices, item_indices=None, **kwargs):

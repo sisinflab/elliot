@@ -8,7 +8,7 @@ from collections import defaultdict
 from functools import cached_property
 from tqdm import tqdm
 
-from elliot.dataset.samplers.base_data import build_dataset
+from elliot.dataset.samplers.base_data import build_dataloader, build_dataset
 from elliot.utils.registry import sampler_registry
 
 
@@ -233,12 +233,7 @@ class Interactions:
             self._cached_datasets[sampler_name] = dataset
 
         dataset = self._cached_datasets[sampler_name]
-        dataloader = DataLoader(
-            dataset,
-            batch_size=batch_size,
-            collate_fn=getattr(dataset, 'collate_fn', None),
-            shuffle=True
-        )
+        dataloader = build_dataloader(dataset, batch_size=batch_size, seed=seed)
 
         return dataloader
 

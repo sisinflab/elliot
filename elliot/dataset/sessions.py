@@ -5,7 +5,7 @@ import pandas as pd
 from scipy.sparse import csr_matrix
 from torch.utils.data import Dataset, DataLoader
 
-from elliot.dataset.samplers.base_data import build_dataset
+from elliot.dataset.samplers.base_data import build_dataloader, build_dataset
 from elliot.utils import logging
 from elliot.utils.enums import SessionStrategy
 from elliot.utils.registry import sampler_registry
@@ -163,12 +163,7 @@ class Sessions:
             self._cached_datasets[cache_key] = dataset
 
         dataset = self._cached_datasets[cache_key]
-        dataloader = DataLoader(
-            dataset,
-            batch_size=batch_size,
-            collate_fn=getattr(dataset, 'collate_fn', None),
-            shuffle=True
-        )
+        dataloader = build_dataloader(dataset, batch_size=batch_size, seed=seed)
 
         return dataloader
 

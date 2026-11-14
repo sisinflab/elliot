@@ -8,6 +8,7 @@ from elliot.utils.enums import ModelType
 from elliot.utils.folder import parent_dir, path_relative
 
 _DEVICE = None
+_NUM_WORKERS = 0
 
 
 def _auto_device():
@@ -58,6 +59,31 @@ def get_device():
     if _DEVICE is None:
         _DEVICE = set_device(None)
     return _DEVICE
+
+
+def set_num_workers(requested=0):
+    """Set the number of dataloader worker processes used for lazily sampled datasets.
+
+    Args:
+        requested (int | str): A non-negative worker count, or "auto" for
+            `min(8, cpu_count // 2)`. Defaults to 0 (main-process loading).
+
+    Returns:
+        int: The resolved worker count.
+    """
+    global _NUM_WORKERS
+    if isinstance(requested, str) and requested.strip().lower() == "auto":
+        _NUM_WORKERS = min(8, max(1, (os.cpu_count() or 2) // 2))
+    else:
+        value = int(requested)
+        if value < 0:
+            raise ValueError(f"num_workers must be >= 0 or 'auto', got {requested!r}")
+        _NUM_WORKERS = value
+    return _NUM_WORKERS
+
+
+def get_num_workers():
+    return _NUM_WORKERS
 
 
 def get_model(model_name: str, config):
