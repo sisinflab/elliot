@@ -1,5 +1,4 @@
 import torch
-import torch.nn.functional as F
 from torch import nn
 
 from elliot.dataset import Interactions, Sessions
@@ -19,8 +18,11 @@ class Caser(SequentialRecommender):
 
     Args:
         embedding_size: Dimension of the item and user embeddings
-        n_h: Number of horizontal convolutional filters
+        n_h: Number of horizontal convolutional filters per filter height
         n_v: Number of vertical convolutional filters
+        h_max: Maximum height of the horizontal convolutional filters, which
+            span every height from 1 to h_max. 0 (the default) uses max_seq_len,
+            as in the paper; larger values are capped at max_seq_len
         dropout_prob: Dropout applied before the fully-connected layers
         reg_weight: L2 regularization weight over the embeddings used in a batch
         weight_decay: Weight decay passed to the Adam optimizer
@@ -43,6 +45,7 @@ class Caser(SequentialRecommender):
           embedding_size: 64
           n_h: 8
           n_v: 4
+          h_max: 4
           dropout_prob: 0.5
           neg_samples: 1
           max_seq_len: 10
@@ -60,6 +63,7 @@ class Caser(SequentialRecommender):
     embedding_size: int = 64
     n_h: int = 8
     n_v: int = 4
+    h_max: int = 0
     dropout_prob: float = 0.5
     reg_weight: float = 0.0
     weight_decay: float = 0.0
@@ -86,22 +90,23 @@ class Caser(SequentialRecommender):
             self._num_items + 1, self.embedding_size, padding_idx=self._num_items
         )
 
+        # Horizontal filter heights: [1, h_max], h_max defaulting to (and capped at) max_seq_len
+        if self.h_max < 0:
+            raise ValueError(f"Caser 'h_max' must be non-negative, got {self.h_max}.")
+        self._h_max = min(self.h_max, self.max_seq_len) if self.h_max else self.max_seq_len
+
         # Convolutional layers
-        # Vertical filters: span the whole sequence, one embedding dim at a
-        # time, to capture (weighted) union-level patterns across items
-        self.conv_v = nn.Conv2d(
-            in_channels=1, out_channels=self.n_v, kernel_size=(self.max_seq_len, 1)
-        )
-        # Horizontal filters: one Conv2d per window width i in [1, max_seq_len],
-        # sliding over the full embedding dim, to capture local sequential patterns
+        # Vertical filters
+        self.conv_v = nn.Linear(self.max_seq_len, self.n_v)
+        # Horizontal filters
         self.conv_h = nn.ModuleList([
-            nn.Conv2d(in_channels=1, out_channels=self.n_h, kernel_size=(i, self.embedding_size))
-            for i in range(1, self.max_seq_len + 1)
+            nn.Conv1d(in_channels=self.embedding_size, out_channels=self.n_h, kernel_size=h)
+            for h in range(1, self._h_max + 1)
         ])
 
         # Fully-connected layers
         self.fc1_dim_v = self.n_v * self.embedding_size
-        self.fc1_dim_h = self.n_h * self.max_seq_len
+        self.fc1_dim_h = self.n_h * self._h_max
         self.fc1 = nn.Linear(self.fc1_dim_v + self.fc1_dim_h, self.embedding_size)
         self.fc2 = nn.Linear(self.embedding_size + self.embedding_size, self.embedding_size)
 
@@ -144,16 +149,17 @@ class Caser(SequentialRecommender):
         Returns:
             Tensor: The sequence output embedding, shape `(batch, embedding_size)`.
         """
-        item_seq_emb = self.item_embedding(item_seq).unsqueeze(1)
+        # (batch, embedding_size, max_seq_len): embedding dims as channels
+        item_seq_emb = self.item_embedding(item_seq).transpose(1, 2)
         user_emb = self.user_embedding(user)
 
-        out_v = self.conv_v(item_seq_emb).view(-1, self.fc1_dim_v)
+        # (batch, embedding_size, n_v) -> (batch, n_v * embedding_size), filter-major
+        out_v = self.conv_v(item_seq_emb).transpose(1, 2).reshape(-1, self.fc1_dim_v)
 
-        out_hs = []
-        for conv in self.conv_h:
-            conv_out = self.ac_conv(conv(item_seq_emb).squeeze(3))
-            out_hs.append(F.max_pool1d(conv_out, conv_out.size(2)).squeeze(2))
-        out_h = torch.cat(out_hs, 1)
+        # Each filter's activations are max-pooled over all its positions
+        out_h = torch.cat(
+            [self.ac_conv(conv(item_seq_emb)).amax(dim=2) for conv in self.conv_h], 1
+        )
 
         conv_out = self.dropout(torch.cat([out_v, out_h], 1))
         z = self.ac_fc(self.fc1(conv_out))

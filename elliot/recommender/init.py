@@ -1,6 +1,18 @@
 import numpy as np
+import torch
 from torch import nn
 from torch.nn.init import xavier_normal_, xavier_uniform_, zeros_, normal_
+
+
+def _zero_padding_row(module: nn.Embedding):
+    """Re-zero the padding row overwritten by a full-matrix init.
+
+    The padding row gets no gradient, so a random init would stay a fixed
+    vector inside every padded sequence (as `nn.Embedding.reset_parameters` does).
+    """
+    if module.padding_idx is not None:
+        with torch.no_grad():
+            module.weight[module.padding_idx].zero_()
 
 
 def zeros_init(module):
@@ -13,7 +25,8 @@ def zeros_init(module):
 def normal_init(module, mean=0.0, std=0.1):
     if isinstance(module, nn.Embedding):
         normal_(module.weight.data, mean=mean, std=std)
-    elif isinstance(module, (nn.Linear, nn.Conv2d)):
+        _zero_padding_row(module)
+    elif isinstance(module, (nn.Linear, nn.Conv1d, nn.Conv2d)):
         normal_(module.weight.data, mean=mean, std=std)
         if module.bias is not None:
             zeros_(module.bias.data)
@@ -26,7 +39,8 @@ def normal_init(module, mean=0.0, std=0.1):
 def xavier_normal_init(module):
     if isinstance(module, nn.Embedding):
         xavier_normal_(module.weight.data)
-    elif isinstance(module, (nn.Linear, nn.Conv2d)):
+        _zero_padding_row(module)
+    elif isinstance(module, (nn.Linear, nn.Conv1d, nn.Conv2d)):
         xavier_normal_(module.weight.data)
         if module.bias is not None:
             zeros_(module.bias.data)
@@ -39,7 +53,8 @@ def xavier_normal_init(module):
 def xavier_uniform_init(module):
     if isinstance(module, nn.Embedding):
         xavier_uniform_(module.weight.data)
-    elif isinstance(module, (nn.Linear, nn.Conv2d)):
+        _zero_padding_row(module)
+    elif isinstance(module, (nn.Linear, nn.Conv1d, nn.Conv2d)):
         xavier_uniform_(module.weight.data)
         if module.bias is not None:
             zeros_(module.bias.data)

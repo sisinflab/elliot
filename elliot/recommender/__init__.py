@@ -12,7 +12,7 @@ from .unpersonalized import Random, MostPop
 from .autoencoders import MultiDAE, MultiVAE, EASER
 from .knowledge_aware import KaHFM, KaHFMBatch, KaHFMEmbeddings, CKE, KGIN, KGRec
 from .graph_based import NGCF, LightGCN, RP3beta
-from .sequential import BERT4Rec, Caser, GRU4Rec, SASRec
+from .sequential import BERT4Rec, Caser, GRU4Rec, SASRec, gSASRec
 from .visual_recommenders import VBPR, DeepStyle, ACF, DVBPR, VNPR
 from .knn import ItemKNN, UserKNN, AttributeItemKNN, AttributeUserKNN
 from .neural import DeepFM, DMF, NeuMF, NFM, GeneralizedMF, NAIS, UserAutoRec, ItemAutoRec, ConvNeuMF, WideAndDeep, ConvMF, NPR

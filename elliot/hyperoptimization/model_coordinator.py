@@ -9,6 +9,7 @@ import numpy as np
 import logging as pylog
 import time
 from hyperopt import STATUS_OK
+from pydantic import BaseModel
 
 from elliot.namespace import RecommenderConfig
 from elliot.result_handler import aggregate_val_folds_results
@@ -55,8 +56,8 @@ class ModelCoordinator(object):
         if args is not None:
             self.logger.info("Hyperparameter tuning exploration:")
             for k, v in args.items():
-                setattr(model_config, k, v)
                 self.logger.info(f"{phase} for '{k}'. Value extracted: {v}")
+            self._apply_params(model_config, args)
 
         internal_losses = []
         reports = []
@@ -172,9 +173,7 @@ class ModelCoordinator(object):
         self.logger.info(f"{phase}: Test Fold number {self.test_fold_index + 1}")
 
         model_config = self.model_config.model_copy(deep=True)
-
-        for k, v in args.items():
-            setattr(model_config, k, v)
+        self._apply_params(model_config, args)
 
         model = model_registry.get(
             name=self.model_name,
@@ -193,6 +192,21 @@ class ModelCoordinator(object):
         trainer.train(self.main_data, validate=False)
 
         return trainer.model
+
+    @classmethod
+    def _apply_params(cls, config: BaseModel, params: dict):
+        """Overwrite `config` fields with `params`, merging nested configs in place.
+
+        `params` may be a full `model_dump()` (where nested configs such as `meta`
+        are plain dicts): assigning those dicts directly would replace the nested
+        pydantic objects and drop their `exclude=True` fields.
+        """
+        for k, v in params.items():
+            current = getattr(config, k, None)
+            if isinstance(current, BaseModel) and isinstance(v, dict):
+                cls._apply_params(current, v)
+            else:
+                setattr(config, k, v)
 
     def _get_internal_loss(self, model):
         losses = getattr(model, "_losses", None)
