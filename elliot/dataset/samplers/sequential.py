@@ -1,4 +1,4 @@
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, Optional, Tuple
 import numpy as np
 import torch
 
@@ -10,6 +10,10 @@ from elliot.utils.registry import sampler_registry
 class SequentialSampler(PipelineSessionSampler):
     """Next-item prediction: (sequence, length, target[, negatives]).
 
+    One event per valid target position: the target's own prefix (its last
+    `max_seq_len` predecessors within the boundary segment) is the input, and the
+    model is supervised on that single position.
+
     Args:
         target_len (int): Number of consecutive future items predicted from a
             single context window. Defaults to 1, which keeps `target` a scalar
@@ -20,36 +24,19 @@ class SequentialSampler(PipelineSessionSampler):
     """
 
     def __init__(self, target_len: int = 1, **params: Any):
+        # Set before `super().__init__`, which computes the valid targets from it
         self.target_len = target_len
         super().__init__(**params)
 
     def _compute_valid_targets(self) -> np.ndarray:
-        """A flat position is a valid target window start iff it isn't its
-        boundary segment's first position (needs >=1 context item) and the
-        `target_len`-item window starting there doesn't run past the
-        segment's end.
+        """A flat position is a valid target window start iff it has at least one
+        predecessor in its boundary segment and the `target_len` items starting
+        there don't run past the segment's end.
 
         Returns:
             np.ndarray: The valid target flat tape positions.
         """
-        valid = super()._compute_valid_targets()
-        if self.target_len == 1:
-            return valid
-
-        n = len(self._flat_items)
-        valid_mask = np.zeros(n, dtype=bool)
-        valid_mask[valid] = True
-
-        starts = self._boundaries[:-1]
-        ends = self._boundaries[1:]
-
-        # Exclude positions whose target window would spill into the next segment
-        for k in range(1, self.target_len):
-            pos = ends - k
-            keep = pos >= starts
-            valid_mask[pos[keep]] = False
-
-        return np.arange(n)[valid_mask]
+        return super()._compute_valid_targets(horizon=self.target_len)
 
     def sample(self, it: int) -> Tuple[torch.Tensor, ...]:
         """Build the (sequence, length, target[, negatives]) sample for event `it`.
@@ -67,18 +54,19 @@ class SequentialSampler(PipelineSessionSampler):
                 flat position.
         """
         target_idx = int(self._valid_target_indices[it])
-        boundary_start = self._boundary_start_of(target_idx)
+        owner_user = int(self._flat_users[target_idx])
 
         # The target(s) are the item(s) at this flat position; context is everything before it
-        seq_tensor, seq_len = self._build_padded_sequence(target_idx, boundary_start)
-        owner_user = int(self._flat_users[target_idx])
+        seq_tensor, seq_len = self._build_padded_sequence(
+            target_idx, self._boundary_start_of(target_idx)
+        )
 
         if self.target_len == 1:
             target_item = int(self._flat_items[target_idx])
             target_tensor = torch.tensor(target_item, dtype=torch.long)
         else:
             target_items = self._flat_items[target_idx:target_idx + self.target_len]
-            target_tensor = torch.from_numpy(target_items.copy()).long()
+            target_tensor = torch.tensor(target_items, dtype=torch.long)
 
         ret = [seq_tensor, torch.tensor(seq_len, dtype=torch.long), target_tensor]
 
@@ -87,15 +75,11 @@ class SequentialSampler(PipelineSessionSampler):
                 negs = self._sample_negatives(
                     owner_user, self._neg_samples, exclude_item=target_item
                 )
-                ret.append(torch.tensor(negs, dtype=torch.long))
             else:
-                negs = np.stack([
-                    self._sample_negatives(
-                        owner_user, self._neg_samples, exclude_item=int(item)
-                    )
-                    for item in target_items
-                ])
-                ret.append(torch.tensor(negs, dtype=torch.long))
+                negs = self._sample_negatives_rows(
+                    owner_user, self._neg_samples, n_rows=self.target_len, exclude_items=target_items
+                )
+            ret.append(negs)
 
         return tuple(ret)
 
@@ -111,9 +95,6 @@ class UserSequentialSampler(SequentialSampler):
         **params (Any): Forwarded to `SequentialSampler.__init__`.
     """
 
-    def __init__(self, **params: Any):
-        super().__init__(**params)
-
     def sample(self, it: int) -> Tuple[torch.Tensor, ...]:
         """Build the (user, sequence, length, target[, negatives]) sample for
         event `it`.
@@ -125,15 +106,14 @@ class UserSequentialSampler(SequentialSampler):
             Tuple[torch.Tensor, ...]: `super().sample(it)`, with the owning
                 user index prepended.
         """
-        target_idx = int(self._valid_target_indices[it])
-        owner_user = int(self._flat_users[target_idx])
+        owner_user = int(self._flat_users[self._valid_target_indices[it]])
         return torch.tensor(owner_user, dtype=torch.long), *super().sample(it)
 
 
 @sampler_registry.register()
 class SameTargetSequentialSampler(PipelineSessionSampler):
     """Next-item prediction paired with a second sequence sampled from a
-    different boundary segment that shares the same target item.
+    different valid target position that shares the same target item.
 
     Args:
         **params (Any): Forwarded to `PipelineSessionSampler.__init__`.
@@ -142,15 +122,16 @@ class SameTargetSequentialSampler(PipelineSessionSampler):
     def __init__(self, **params: Any):
         super().__init__(**params)
 
-        # Initializing variables
-        self._target_to_indices: Dict[int, np.ndarray] = {}
-
-        # Group valid target positions by their target item, for the semantic-positive lookup
+        # Group valid target positions by their target item, for the semantic-positive
+        # lookup: one sort instead of one full scan per distinct item. The stable sort
+        # keeps each group's positions ascending, which `sample` relies on
         target_items = self._flat_items[self._valid_target_indices]
-        self._target_to_indices = {
-            int(t): self._valid_target_indices[target_items == t]
-            for t in np.unique(target_items)
-        }
+        order = np.argsort(target_items, kind="stable")
+        unique_items, group_starts = np.unique(target_items[order], return_index=True)
+
+        self._target_to_indices: Dict[int, np.ndarray] = dict(zip(
+            unique_items.tolist(), np.split(self._valid_target_indices[order], group_starts[1:])
+        ))
 
     def sample(self, it: int) -> Tuple[torch.Tensor, ...]:
         """Build the (sequence, length, target, semantic-positive sequence, length,
@@ -172,10 +153,16 @@ class SameTargetSequentialSampler(PipelineSessionSampler):
 
         # Find another sequence (not this one) that shares the same target item
         candidates = self._target_to_indices[pos_item]
-        others = candidates[candidates != target_idx]
+        n_others = len(candidates) - 1
 
-        if len(others):
-            sampled_idx = int(others[self._r_int(len(others))])
+        if n_others:
+            # Draw among the others by skipping this sample's own (sorted) slot, in
+            # O(log n) instead of materializing every other candidate
+            pick = self._r_int(n_others)
+            if pick >= np.searchsorted(candidates, target_idx):
+                pick += 1
+            sampled_idx = int(candidates[pick])
+
             sem_tensor, sem_len = self._build_padded_sequence(
                 sampled_idx, self._boundary_start_of(sampled_idx)
             )
@@ -198,62 +185,73 @@ class SameTargetSequentialSampler(PipelineSessionSampler):
 
 @sampler_registry.register()
 class SlidingWindowSampler(PipelineSessionSampler):
-    """Sequence-to-sequence windows (length `max_seq_len`, step `stride`)
-    within a boundary segment.
+    """Sequence-to-sequence windows (length `max_seq_len`, step `stride`) within a
+    boundary segment, left-aligned and right-padded.
+
+    Windows are anchored at the segment's end and slide backwards in time, so the
+    most recent items are always covered: when `stride` doesn't divide the
+    segment evenly, only its oldest items are left out. A segment no longer than
+    `max_seq_len` yields a single window holding all of it.
 
     Args:
         stride (int): Step, in flat tape positions, between consecutive windows
             within a boundary segment. Defaults to 1.
+        max_windows (int, optional): Keep at most this many windows per segment,
+            the most recent ones. Defaults to None, keeping every window.
         **params (Any): Forwarded to `PipelineSessionSampler.__init__`.
     """
 
-    def __init__(self, stride: int = 1, **params: Any):
+    def __init__(self, stride: int = 1, max_windows: Optional[int] = None, **params: Any):
         super().__init__(**params)
 
         # Initializing variables
         self.stride = stride
+        self.max_windows = max_windows
 
-        self._window_starts, self._window_boundary = self._compute_windows()
+        self._window_starts, self._window_ends = self._compute_windows()
         self.events = len(self._window_starts)
 
     def _compute_windows(self) -> Tuple[np.ndarray, np.ndarray]:
-        """Compute every window's start position and owning boundary segment id,
-        striding over each boundary segment long enough to hold at least two items.
+        """Compute every window's `[start, end)` flat tape span.
+
+        Only segments of at least two items host a window: a single item gives
+        nothing to predict, same as `_compute_valid_targets`.
 
         Returns:
-            Tuple[np.ndarray, np.ndarray]: `(window_starts, window_boundary)`, parallel
-                arrays giving each window's flat tape start position and owning
-                boundary segment id.
+            Tuple[np.ndarray, np.ndarray]: `(window_starts, window_ends)`, parallel
+                int64 arrays, windows ordered by segment and, within it, oldest first.
         """
-        # Only segments long enough to hold at least two items can host a window
-        seg_lens = np.diff(self._boundaries)
-        valid_segments = np.where(seg_lens >= 2)[0]
-
-        if len(valid_segments) == 0:
-            return np.array([], dtype=np.int64), np.array([], dtype=np.int64)
-
-        valid_lens = seg_lens[valid_segments]
-        valid_starts = self._boundaries[valid_segments]
+        starts, ends = self._segment_spans()
+        seg_lens = ends - starts
 
         # Number of stride-spaced windows that fit in each segment
-        num_windows = np.floor(
-            np.maximum(valid_lens - self.max_seq_len, 0) / self.stride
-        ).astype(int) + 1
-        total = int(np.sum(num_windows))
+        counts = np.where(
+            seg_lens >= 2, np.maximum(seg_lens - self.max_seq_len, 0) // self.stride + 1, 0
+        )
+        if self.max_windows is not None:
+            counts = np.minimum(counts, self.max_windows)
 
-        window_segments = np.repeat(valid_segments, num_windows)
+        # The segment's last window ends at its end, every older one `stride` earlier
+        segment, offset = self._ragged_arange(counts)
+        window_ends = ends[segment] - (counts[segment] - 1 - offset) * self.stride
+        window_starts = np.maximum(starts[segment], window_ends - self.max_seq_len)
 
-        cum = np.zeros(len(valid_segments) + 1, dtype=int)
-        cum[1:] = np.cumsum(num_windows)
+        return window_starts, window_ends
 
-        # Map each flat window index back to its owning segment and local offset
-        indices = np.arange(total)
-        segment_block = np.searchsorted(cum, indices, side="right") - 1
-        local_window_idx = indices - cum[segment_block]
+    def _window(self, it: int) -> Tuple[torch.Tensor, np.ndarray, int]:
+        """Event `it`'s padded window.
 
-        window_starts = valid_starts[segment_block] + local_window_idx * self.stride
+        Args:
+            it (int): Event index.
 
-        return window_starts.astype(np.int64), window_segments.astype(np.int64)
+        Returns:
+            Tuple[torch.Tensor, np.ndarray, int]: `(seq_tensor, seq_items,
+                owner_user)`: the padded window, shape `(max_seq_len,)`, its real
+                (pre-padding) items as a view of the flat tape, and its owning user.
+        """
+        start, end = int(self._window_starts[it]), int(self._window_ends[it])
+        seq_tensor, _ = self._padded_slice(start, end)
+        return seq_tensor, self._flat_items[start:end], int(self._flat_users[start])
 
     def sample(self, it: int) -> Tuple[torch.Tensor, ...]:
         """Build the (positive sequence[, negative sequence]) window sample for
@@ -263,37 +261,23 @@ class SlidingWindowSampler(PipelineSessionSampler):
             it (int): Event index.
 
         Returns:
-            Tuple[torch.Tensor, ...]: `(pos_seq,)`, or `(pos_seq, neg_seq)` when
-                `self.neg_samples > 0`.
+            Tuple[torch.Tensor, ...]: `(pos_seq,)`, shape `(max_seq_len,)`, or
+                `(pos_seq, neg_seq)` when `self.neg_samples > 0`, `neg_seq` shaped
+                `(max_seq_len, neg_samples)` with one negative set per positive
+                position (padding positions get padding negatives).
         """
-        start_idx = int(self._window_starts[it])
-        boundary_id = int(self._window_boundary[it])
-        boundary_end = int(self._boundaries[boundary_id + 1])
-
-        # Clip the window to its own boundary segment's end
-        end_idx = min(start_idx + self.max_seq_len, boundary_end)
-
-        seq_array = self._flat_items[start_idx:end_idx]
-        real_len = len(seq_array)
-        owner_user = int(self._flat_users[start_idx])
-
-        pos_seq = torch.full(
-            (self.max_seq_len,), self._padding_token, dtype=torch.long
-        )
-        pos_seq[:real_len] = torch.from_numpy(seq_array.copy())
+        pos_seq, seq_items, owner_user = self._window(it)
 
         if self._neg_samples > 0:
+            real_len = len(seq_items)
             neg_seq = torch.full(
                 (self.max_seq_len, self._neg_samples), self._padding_token, dtype=torch.long
             )
 
-            # One negative set per positive position in the window
-            for t in range(real_len):
-                negs = self._sample_negatives(
-                    owner_user, self._neg_samples, exclude_item=int(seq_array[t])
-                )
-                neg_seq[t, :len(negs)] = torch.tensor(negs, dtype=torch.long)
-
+            # One negative set per positive position in the window, all drawn at once
+            neg_seq[:real_len] = self._sample_negatives_rows(
+                owner_user, self._neg_samples, n_rows=real_len, exclude_items=seq_items
+            )
             return pos_seq, neg_seq
 
         return (pos_seq,)
@@ -314,7 +298,7 @@ class ClozeSampler(SlidingWindowSampler):
         mask_token_id (int): Token id substituted for a masked item.
         stride (int): Step, in flat tape positions, between consecutive windows
             within a boundary segment. Defaults to 1.
-        **params (Any): Forwarded to `PipelineSessionSampler.__init__`.
+        **params (Any): Forwarded to `SlidingWindowSampler.__init__`.
     """
 
     def __init__(self, mask_prob: float, mask_token_id: int, stride: int = 1, **params: Any):
@@ -336,53 +320,34 @@ class ClozeSampler(SlidingWindowSampler):
                 `(masked_seq_tensor, pos_items_tensor, neg_items_tensor,
                 masked_indices_tensor)`.
         """
-        start = int(self._window_starts[it])
-        boundary_id = int(self._window_boundary[it])
-        boundary_end = int(self._boundaries[boundary_id + 1])
-
-        # Clip the window to its own boundary segment's end, same as SlidingWindowSampler
-        end = min(start + self.max_seq_len, boundary_end)
-        owner_user = int(self._flat_users[start])
-
-        seq_array = self._flat_items[start:end].copy()
-        real_len = len(seq_array)
+        masked_seq_tensor, seq_items, owner_user = self._window(it)
+        real_len = len(seq_items)
+        window = masked_seq_tensor[:real_len]
 
         # Randomly mask a fraction of the window's positions
         num_to_mask = max(1, int(real_len * self.mask_prob))
         masked_positions = self._r_choice(real_len, size=num_to_mask, replace=False)
 
-        pos_targets = seq_array[masked_positions]
+        pos_targets = window[masked_positions]
 
         # Replace masked positions with the mask token in the input sequence
-        seq_array[masked_positions] = self.mask_token_id
+        window[masked_positions] = self.mask_token_id
 
-        neg_targets = np.full(
-            (num_to_mask, self._neg_samples), self._padding_token, dtype=np.int64
-        )
-        if self._neg_samples > 0:
-            for i in range(num_to_mask):
-                negs = self._sample_negatives(
-                    owner_user, self._neg_samples, exclude_item=int(pos_targets[i])
-                )
-                neg_targets[i, :len(negs)] = negs
-
-        # Pack the masked sequence, its pos/neg targets, and mask positions into fixed-size tensors
-        masked_seq_tensor = torch.full(
-            (self.max_seq_len,), self._padding_token, dtype=torch.long
-        )
-        masked_seq_tensor[:real_len] = torch.from_numpy(seq_array)
-
+        # Pack the pos/neg targets and mask positions into fixed-size tensors
         pos_items_tensor = torch.full(
             (self.max_seq_len,), self._padding_token, dtype=torch.long
         )
-        pos_items_tensor[:num_to_mask] = torch.from_numpy(pos_targets)
+        pos_items_tensor[:num_to_mask] = pos_targets
 
         neg_items_tensor = torch.full(
             (self.max_seq_len, self._neg_samples), self._padding_token, dtype=torch.long
         )
-        neg_items_tensor[:num_to_mask, :] = torch.from_numpy(neg_targets)
+        if self._neg_samples > 0:
+            neg_items_tensor[:num_to_mask, :] = self._sample_negatives_rows(
+                owner_user, self._neg_samples, n_rows=num_to_mask, exclude_items=pos_targets
+            )
 
         masked_indices_tensor = torch.zeros(self.max_seq_len, dtype=torch.long)
-        masked_indices_tensor[:num_to_mask] = torch.from_numpy(masked_positions.astype(np.int64))
+        masked_indices_tensor[:num_to_mask] = masked_positions
 
         return masked_seq_tensor, pos_items_tensor, neg_items_tensor, masked_indices_tensor

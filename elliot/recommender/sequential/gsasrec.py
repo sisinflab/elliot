@@ -56,7 +56,7 @@ class gSASRec(SequentialRecommender):
           neg_samples: 256
           gbce_t: 0.75
           reuse_item_embeddings: False
-          max_seq_len: 50
+          max_seq_len: 20
     """
 
     # Model hyperparameters
@@ -126,12 +126,14 @@ class gSASRec(SequentialRecommender):
         )
 
         # Sampler configuration
-        # Windows are one item longer than the model input: shifted by one,
-        # they give `max_seq_len` input positions, each with its next item as target
+        # One window per user, one item longer than the model input: shifted by one,
+        # it gives `max_seq_len` input positions, each with its next item as target
         self.sampler_config = {
             "name": "SlidingWindowSampler",
             "max_seq_len": self.max_seq_len + 1,
             "neg_samples": self.neg_samples,
+            "stride": 1,
+            "exclude_seen": False,
         }
 
         # Init weights
@@ -183,13 +185,15 @@ class gSASRec(SequentialRecommender):
 
         # Calculate gBCE loss
         pos_score = torch.sum(seq_output * pos_items_emb, dim=-1)
-        neg_score = torch.sum(seq_output.unsqueeze(1) * neg_items_emb, dim=-1)
-        main_loss = self.gbce_loss(pos_score, neg_score)
-        reg_loss = self.reg_weight * self.reg_loss(
-            self.item_embedding(item_seq), pos_items_emb, neg_items_emb
-        )
+        neg_score = torch.bmm(neg_items_emb, seq_output.unsqueeze(-1)).squeeze(-1)
+        loss = self.gbce_loss(pos_score, neg_score)
 
-        return main_loss + reg_loss
+        if self.reg_weight > 0:
+            loss = loss + self.reg_weight * self.reg_loss(
+                self.item_embedding(item_seq), pos_items_emb, neg_items_emb
+            )
+
+        return loss
 
     def predict(self, user_seq, seq_len, item_indices=None, user_indices=None, **kwargs):
         user_seq = user_seq.to(self._device)

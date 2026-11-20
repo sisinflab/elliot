@@ -23,7 +23,7 @@ from elliot.utils import wandb_logger
 from elliot.utils.callback import CallbackManager
 from elliot.utils.registry import callback_registry, model_registry
 
-print(u'''
+BANNER = u'''
 
   /\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\   /\\\\\\\\\\\\      /\\\\\\\\\\\\                         ''' + f'Version: {__version__}' + '''                              
   \\/\\\\\\///////////   \\////\\\\\\     \\////\\\\\\                                           
@@ -34,10 +34,11 @@ print(u'''
        \\/\\\\\\                 \\/\\\\\\        \\/\\\\\\     \\/\\\\\\  \\//\\\\\\  /\\\\\\      \\/\\\\\\ /\\\\   
         \\/\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\   /\\\\\\\\\\\\\\\\\\   /\\\\\\\\\\\\\\\\\\  \\/\\\\\\   \\///\\\\\\\\\\/       \\//\\\\\\\\\\  
          \\///////////////   \\/////////   \\/////////   \\///      \\/////          \\/////    
-         ''')
+         '''
 
 
 def run_experiment(config_path: str = "", config_overrides: Optional[List[str]] = None):
+    print(BANNER)
     logging_project.init()
     logger = logging_project.get_logger("__main__")
 

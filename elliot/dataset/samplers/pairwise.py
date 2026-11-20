@@ -36,30 +36,28 @@ class PairWiseSampler(PipelineSampler):
         ui = self._ui_dict[u]
         lui = self._lui_dict[u]
 
-        # A user who has rated every item has no valid negative: redraw a different user
-        if lui == self._nitems:
-            while u in self._sampled_users:
-                u = self._r_int(self._nusers)
+        # A user with no rated item, or with no unrated one, can't be used: redraw a usable user
+        if not 0 < lui < self._nitems:
+            u, ui, lui = self._draw_usable_user()
         self._freq_users[u] += 1
 
         i = ui[self._r_int(lui)]
         self._freq_items[i] += 1
 
         # Uniformly sample a negative item, excluding this user's positives
-        j = self._r_int(self._nitems)
-        while j in ui:
-            j = self._r_int(self._nitems)
+        j = self._sample_negative(u)
         self._freq_items[j] += 1
 
         return u, i, j
 
-    def _sample_users(self) -> np.ndarray:
+    def _sample_users(self) -> List[int]:
         """Draw one user per event, uniformly at random with replacement.
 
         Returns:
-            np.ndarray: The sampled user indices, one per event.
+            List[int]: The sampled user indices, one per event (a list of plain ints,
+                cheaper to index per event than a tensor or an array).
         """
-        return self._r_int(0, self._nusers, size=self.events)
+        return self._r_int(0, self._nusers, size=self.events).tolist()
 
     @property
     def freq_users(self) -> Dict[int, int]:
@@ -90,11 +88,11 @@ class PairWiseBatchSampler(PairWiseSampler):
 
         super().__init__(**params)
 
-    def _sample_users(self) -> np.ndarray:
+    def _sample_users(self) -> List[int]:
         """Draw users batch-by-batch, without replacement within each batch.
 
         Returns:
-            np.ndarray: The sampled user indices, one per event.
+            List[int]: The sampled user indices, one per event.
         """
         sampled_users = []
 
@@ -103,17 +101,17 @@ class PairWiseBatchSampler(PairWiseSampler):
             b_stop = min(b_start + self.b_size, self.events)
             current_b_size = b_stop - b_start
 
-            b_users = self._r_sample(self._users, k=current_b_size)
+            b_idx = self._r_sample(len(self._users), k=current_b_size).tolist()
 
-            sampled_users.extend(b_users)
+            sampled_users.extend(self._users[i] for i in b_idx)
 
-        return np.array(sampled_users)
+        return sampled_users
 
 
 @sampler_registry.register()
 class MFPairWiseSampler(PipelineSampler):
-    """One positive plus `m` sampled negatives per (user, item) training pair,
-    flattened into a single batch by `collate_fn`.
+    """`m` (user, positive item, negative item) triples per (user, item) training
+    pair.
 
     Args:
         m (int): Number of negatives sampled per positive pair.
@@ -126,46 +124,23 @@ class MFPairWiseSampler(PipelineSampler):
         # Initializing variables
         self.m = m
 
-        self._pos = [(u, i) for u, items in self._ui_dict.items() for i in items]
+        self._pos = self._usable_pairs()
 
         self.events = len(self._pos)
 
-    def sample(self, it: int) -> List[Tuple[int, int, int]]:
-        """Build one positive pair plus `self.m` sampled negative pairs for event `it`.
+    def sample(self, it: int) -> Tuple[List[int], List[int], List[int]]:
+        """Build the `self.m` (user, positive item, negative item) triples for event `it`.
 
         Args:
             it (int): Event index.
 
         Returns:
-            List[Tuple[int, int, int]]: The positive pair followed by `self.m`
-                negative pairs, each `(user, item, negative item)`.
+            Tuple[List[int], List[int], List[int]]: Users, positive items and
+                negative items, each of length `m`.
         """
         u, i = self._pos[it]
-        ui = self._ui_dict[u]
 
-        # Sample m distinct negatives for this positive pair
-        samples = set()
-        for _ in range(self.m):
-            j = self._r_int(self._nitems)
-            while j in ui:
-                j = self._r_int(self._nitems)
-            samples.add((u, i, j))
+        # m negatives for this positive pair, sampled with replacement
+        negs = [self._sample_negative(u) for _ in range(self.m)]
 
-        return list(samples)
-
-    def collate_fn(self, batch: List[List[Tuple[int, int, int]]]):
-        """Flatten the per-event lists of triples into a single batch before
-        delegating to `PipelineSampler.collate_fn`.
-
-        Args:
-            batch (List[List[Tuple[int, int, int]]]): One list of triples per event.
-
-        Returns:
-            Tuple[torch.Tensor, ...]: One tensor per tuple position.
-        """
-        # Flatten the per-event triple lists before the shared collate logic
-        concatenated = []
-        for lst in batch:
-            concatenated.extend(lst)
-
-        return super().collate_fn(concatenated)
+        return [u] * self.m, [i] * self.m, negs

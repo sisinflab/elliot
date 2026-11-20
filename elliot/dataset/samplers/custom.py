@@ -25,12 +25,9 @@ class SparseSampler(PipelineSampler):
         # Initializing variables
         self._train = sparse
 
-        # Pre-shuffle row order once; sample() just walks through it
-        self._indices = list(range(self.events))
-        self._r_shuffle(self._indices)
-
     def sample(self, it: int) -> np.ndarray:
-        """Return the dense row of `self._train` at shuffled position `it`.
+        """Return the dense row `it` of `self._train` (the training dataloader
+        already visits the rows in a random order).
 
         Args:
             it (int): Event index.
@@ -38,8 +35,7 @@ class SparseSampler(PipelineSampler):
         Returns:
             np.ndarray: The dense row.
         """
-        idx = self._indices[it]
-        return self._train[idx].toarray()
+        return self._train[it].toarray()
 
     def collate_fn(self, batch: List[np.ndarray]) -> torch.Tensor:
         """Stack a batch of dense rows into a single tensor.

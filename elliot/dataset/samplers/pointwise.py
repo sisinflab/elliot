@@ -1,5 +1,4 @@
 from typing import Any, List, Tuple, Union, Sequence
-import torch
 
 from elliot.dataset.samplers.base_sampler import TraditionalSampler, PipelineSampler
 from elliot.utils.registry import sampler_registry
@@ -32,23 +31,23 @@ class CustomPointWiseSparseSampler(PipelineSampler):
         ui = self._ui_dict[u]
         lui = self._lui_dict[u]
 
-        # A user who has rated every item can't be used here: redraw a different user
-        if lui == self._nitems:
-            while u in self._sampled_users:
-                u = self._r_int(self._nusers)
+        # A user with no rated item, or with no unrated one, can't be used: redraw a usable user
+        if not 0 < lui < self._nitems:
+            u, ui, lui = self._draw_usable_user()
 
         i = ui[self._r_int(lui)]
-        r = self._indexed_ratings[u][i]
+        r = float(self._indexed_ratings[u][i])
 
         return u, i, r
 
-    def _sample_users(self) -> Any:
+    def _sample_users(self) -> List[int]:
         """Draw one user per event, uniformly at random with replacement.
 
         Returns:
-            Any: The sampled user indices, one per event.
+            List[int]: The sampled user indices, one per event (a list of plain ints,
+                cheaper to index per event than a tensor or an array).
         """
-        return self._r_int(0, self._nusers, size=self.events)
+        return self._r_int(0, self._nusers, size=self.events).tolist()
 
 
 @sampler_registry.register()
@@ -60,8 +59,8 @@ class PointWisePosNegRatioRatingsSampler(PipelineSampler):
     Args:
         neg_ratio (int): Number of negative draws per positive draw, controlling the
             positive/negative sampling probability.
-        implicit (bool): If True, a positive sample's rating is always 1 rather than
-            its stored rating value. Defaults to False.
+        implicit (bool): If True, ratings are int labels (1 positive, 0 negative);
+            otherwise float, a positive's being its stored value. Defaults to False.
         **params (Any): Forwarded to `PipelineSampler.__init__`.
     """
 
@@ -88,36 +87,30 @@ class PointWisePosNegRatioRatingsSampler(PipelineSampler):
         ui = self._ui_dict[u]
         lui = self._lui_dict[u]
 
-        # A user who has rated every item can't be used here: redraw a different user
-        if lui == self._nitems:
-            while u in self._sampled_users:
-                u = self._r_int(self._nusers)
+        # A user with no rated item, or with no unrated one, can't be used: redraw a usable user
+        if not 0 < lui < self._nitems:
+            u, ui, lui = self._draw_usable_user()
 
-        # Randomly decide positive vs. negative at the configured ratio
-        boolean_list = [0] * self.neg_ratio + [1]
-        self._r_shuffle(boolean_list)
-
-        # Positive draw
-        if boolean_list[0]:
+        # Positive draw, with probability 1 / (neg_ratio + 1)
+        if self._r_int(self.neg_ratio + 1) == 0:
             i = ui[self._r_int(lui)]
-            r = self._indexed_ratings[u][i] if not self.implicit else 1
+            r = 1 if self.implicit else float(self._indexed_ratings[u][i])
 
         # Negative draw: any item the user hasn't rated
         else:
-            i = self._r_int(self._nitems)
-            while i in ui:
-                i = self._r_int(self._nitems)
-            r = 0
+            i = self._sample_negative(u)
+            r = 0 if self.implicit else 0.0
 
         return u, i, r
 
-    def _sample_users(self) -> Any:
+    def _sample_users(self) -> List[int]:
         """Draw one user per event, uniformly at random with replacement.
 
         Returns:
-            Any: The sampled user indices, one per event.
+            List[int]: The sampled user indices, one per event (a list of plain ints,
+                cheaper to index per event than a tensor or an array).
         """
-        return self._r_int(0, self._nusers, size=self.events)
+        return self._r_int(0, self._nusers, size=self.events).tolist()
 
 
 @sampler_registry.register()
@@ -154,8 +147,8 @@ class PointWisePosNegSampler(PointWisePosNegRatioRatingsSampler):
 
 @sampler_registry.register()
 class MFPointWisePosNegSampler(PipelineSampler):
-    """One positive plus `m` sampled negatives per (user, item) training pair,
-    flattened into a single batch by `collate_fn`.
+    """One positive plus `m` sampled negative (user, item, label) triples per
+    (user, item) training pair.
 
     Args:
         m (int): Number of negatives sampled per positive pair.
@@ -168,48 +161,25 @@ class MFPointWisePosNegSampler(PipelineSampler):
         # Initializing variables
         self.m = m
 
-        self._pos = [(u, i, 1) for u, items in self._ui_dict.items() for i in items]
+        self._pos = self._usable_pairs()
 
         self.events = len(self._pos)
 
-    def sample(self, it: int) -> List[Tuple[int, int, int]]:
-        """Build one positive triple plus `self.m` sampled negative triples for
+    def sample(self, it: int) -> Tuple[List[int], List[int], List[int]]:
+        """Build the positive plus `self.m` negative (user, item, label) triples for
         event `it`.
 
         Args:
             it (int): Event index.
 
         Returns:
-            List[Tuple[int, int, int]]: The positive triple followed by `self.m`
-                negative triples, each `(user, item, label)`.
+            Tuple[List[int], List[int], List[int]]: Users, items and labels, each of
+                length `m + 1`: the positive (label 1) first, then the negatives
+                (label 0).
         """
-        pos = self._pos[it]
-        u, i, _ = pos
-        ui = self._ui_dict[u]
+        u, i = self._pos[it]
 
-        # Sample m distinct negative items (label 0) for this positive pair
-        neg = set()
-        for _ in range(self.m):
-            j = self._r_int(self._nitems)
-            while j in ui:
-                j = self._r_int(self._nitems)
-            neg.add((u, j, 0))
+        # m negatives for this positive pair, sampled with replacement
+        negs = [self._sample_negative(u) for _ in range(self.m)]
 
-        return [pos] + list(neg)
-
-    def collate_fn(self, batch: List[List[Tuple[int, int, int]]]) -> Union[torch.Tensor, Tuple[torch.Tensor, ...]]:
-        """Flatten the per-event lists of triples into a single batch before
-        delegating to `PipelineSampler.collate_fn`.
-
-        Args:
-            batch (List[List[Tuple[int, int, int]]]): One list of triples per event.
-
-        Returns:
-            Union[torch.Tensor, Tuple[torch.Tensor, ...]]: One tensor per tuple position.
-        """
-        # Flatten the per-event triple lists before the shared collate logic
-        concatenated = []
-        for lst in batch:
-            concatenated.extend(lst)
-
-        return super().collate_fn(concatenated)
+        return [u] * (self.m + 1), [i] + negs, [1] + [0] * self.m

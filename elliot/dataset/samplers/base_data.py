@@ -1,18 +1,15 @@
 from typing import Any, Iterator, Tuple
-import random
-import numpy as np
 import torch
 from torch.utils.data import Dataset, TensorDataset, DataLoader
 
 from elliot.dataset.samplers.base_sampler import AbstractSampler
+from elliot.utils import logging as elog
 from elliot.utils.enums import SamplerMaterialization
 from elliot.utils.utils import get_device, get_num_workers
 
 
 class PipelineDataset(Dataset):
-    """Lazy `Dataset` for `SamplerType.PIPELINE` or `SamplerType.SEQUENTIAL` samplers,
-    replaying `sampler.sample` `m + 1` times per event (`m` extra negatives sampled per positive,
-    when the sampler declares one via its own `m` attribute).
+    """Lazy `Dataset` for pipeline samplers: one `sampler.sample` call per event.
 
     Args:
         sampler (AbstractSampler): The pipeline sampler to draw samples from.
@@ -21,14 +18,12 @@ class PipelineDataset(Dataset):
     def __init__(self, sampler: AbstractSampler):
         super().__init__()
         self.sampler = sampler
-        self.m = getattr(sampler, 'm', 0)
 
     def __len__(self) -> int:
-        return self.sampler.events * (self.m + 1)
+        return self.sampler.events
 
     def __getitem__(self, index: int) -> Any:
-        real_idx = index // (self.m + 1)
-        return self.sampler.sample(real_idx)
+        return self.sampler.sample(index)
 
 
 def build_dataset(sampler: AbstractSampler) -> Dataset:
@@ -50,7 +45,9 @@ def build_dataset(sampler: AbstractSampler) -> Dataset:
         # Eagerly materialize the whole stream into one in-memory tensor dataset
         case SamplerMaterialization.TRADITIONAL:
             samples = sampler.sample_full()
-            tensors = tuple(torch.tensor(x, dtype=torch.long) for x in zip(*samples))
+            columns = (torch.tensor(column) for column in zip(*samples))
+            # Integer columns become int64, a float one (e.g. ratings) is not truncated
+            tensors = tuple(t if t.is_floating_point() else t.long() for t in columns)
             dataset = TensorDataset(*tensors)
 
         # Lazy: sample one event per __getitem__ call
@@ -69,19 +66,20 @@ def build_dataset(sampler: AbstractSampler) -> Dataset:
 
 
 def _seed_worker(worker_id: int) -> None:
-    """Reseed a dataloader worker's numpy and `random` global RNGs.
+    """Reseed the RNG of the sampler a dataloader worker draws from.
 
-    PyTorch gives every worker its own torch seed (`base_seed + worker_id`) but
-    leaves numpy's global state as copied from the parent, so without this every
-    worker would draw the same negatives. Samplers draw from numpy's/`random`'s
-    global state, so both are reseeded from the worker's own torch seed.
+    Every worker receives an identical copy of the parent's sampler, own RNG state
+    included, so without this every worker would draw the same samples. PyTorch
+    gives every worker its own torch seed (`base_seed + worker_id`), which reseeds
+    the worker's copy of the sampler.
 
     Args:
         worker_id (int): The worker's index (unused; already folded into the torch seed).
     """
-    worker_seed = torch.initial_seed() % 2 ** 32
-    np.random.seed(worker_seed)
-    random.seed(worker_seed)
+    worker_info = torch.utils.data.get_worker_info()
+    sampler = getattr(worker_info.dataset, "sampler", None)
+    if isinstance(sampler, AbstractSampler):
+        sampler.reseed(torch.initial_seed())
 
 
 def build_dataloader(
@@ -114,6 +112,9 @@ def build_dataloader(
 
     worker_kwargs = {}
     if num_workers > 0:
+        elog.get_logger("DataLoader").info(
+            "Starting dataloader workers", extra={"context": {"num_workers": num_workers}}
+        )
         worker_kwargs = dict(
             num_workers=num_workers,
             worker_init_fn=_seed_worker,

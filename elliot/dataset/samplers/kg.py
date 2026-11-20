@@ -1,4 +1,4 @@
-from typing import Any, Dict, Iterable, Set, Tuple
+from typing import Any, Dict, Iterable, List, Set, Tuple
 import numpy as np
 
 from elliot.dataset.samplers.base_sampler import PipelineSideInfoSampler
@@ -41,10 +41,11 @@ class KGTriplesSampler(PipelineSideInfoSampler):
 
         self.events = len(self._kg_heads)
 
-        # (head, relation) -> observed tails, excluded when sampling a negative tail
-        self._hr_tails: Dict[Tuple[int, int], Set[int]] = {}
+        # (head, relation) -> sorted observed tails, excluded when sampling a negative tail
+        hr_tails: Dict[Tuple[int, int], Set[int]] = {}
         for h, r, t in zip(self._kg_heads, self._kg_relations, self._kg_tails):
-            self._hr_tails.setdefault((int(h), int(r)), set()).add(int(t))
+            hr_tails.setdefault((int(h), int(r)), set()).add(int(t))
+        self._hr_tails: Dict[Tuple[int, int], List[int]] = {hr: sorted(t) for hr, t in hr_tails.items()}
 
     def sample(self, it: int) -> Tuple[int, int, int, int]:
         """Build the `(head, relation, positive_tail, negative_tail)` quadruple for
@@ -61,9 +62,6 @@ class KGTriplesSampler(PipelineSideInfoSampler):
         r = int(self._kg_relations[it])
         pos_t = int(self._kg_tails[it])
 
-        pos_tails = self._hr_tails[(h, r)]
-        neg_t = self._r_int(self._n_entities)
-        while neg_t in pos_tails:
-            neg_t = self._r_int(self._n_entities)
+        neg_t = self._draw_negative(self._hr_tails[(h, r)], self._n_entities)
 
         return h, r, pos_t, neg_t

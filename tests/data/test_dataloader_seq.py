@@ -54,7 +54,7 @@ def _load_data(config_dict={}, load_as_session_only=False):
     return val_data[0][0], main_data[0]
 
 
-class TestTrainDataloader:
+class TestTrainSequentialDataloader:
 
     @pytest.mark.parametrize("strategy,expected", [
         (SessionStrategy.FLAT, {
@@ -80,7 +80,7 @@ class TestTrainDataloader:
             ((3, 5), 2, 1),
         }),
     ])
-    def test_sessions_sequential(self, strategy, expected):
+    def test_sequential(self, strategy, expected):
         config = {
             "sampler_name": "SequentialSampler",
             "strategy": strategy,
@@ -127,7 +127,7 @@ class TestTrainDataloader:
             (1, (3, 5), 2, 1),
         }),
     ])
-    def test_user_sessions_sequential(self, strategy, expected):
+    def test_user_sequential(self, strategy, expected):
         config = {
             "sampler_name": "UserSequentialSampler",
             "strategy": strategy,
@@ -150,7 +150,7 @@ class TestTrainDataloader:
         assert total_rows == len(expected)
         assert actual == expected
 
-    def test_sessions_same_target(self):
+    def test_same_target_sequential(self):
         config = {
             "sampler_name": "SameTargetSequentialSampler",
             "strategy": SessionStrategy.FLAT,
@@ -184,7 +184,7 @@ class TestTrainDataloader:
             (0, 1, 2), (3, 4, 3), (1, 3, 5), (3, 5, 1),
         }),
     ])
-    def test_sessions_sliding_window(self, strategy, expected):
+    def test_sliding_window(self, strategy, expected):
         config = {
             "sampler_name": "SlidingWindowSampler",
             "strategy": strategy,
@@ -205,6 +205,30 @@ class TestTrainDataloader:
         assert total_rows == len(expected)
         assert actual == expected
 
+    @pytest.mark.parametrize("max_windows,expected", [
+        # Windows slide backwards from each segment's end: with stride 2, user 0's
+        # (0, 1, 2, 3, 4, 3) gives (3, 4, 3) and (1, 2, 3), dropping only the oldest item
+        (None, {(1, 2, 3), (3, 4, 3), (3, 5, 3), (3, 5, 1)}),
+        (1, {(3, 4, 3), (3, 5, 1)}),
+    ])
+    def test_sliding_window_stride_keeps_tail(self, max_windows, expected):
+        config = {
+            "sampler_name": "SlidingWindowSampler",
+            "strategy": SessionStrategy.FLAT,
+            "batch_size": 3,
+            "max_seq_len": 3,
+            "stride": 2,
+            "max_windows": max_windows,
+            "seed": 0
+        }
+
+        train_dataloader, _ = train_data(load_as_session_only=True, **config)
+
+        actual = [tuple(row.tolist()) for (pos_seq,) in train_dataloader for row in pos_seq]
+
+        assert len(actual) == len(expected)
+        assert set(actual) == expected
+
     @pytest.mark.parametrize("strategy,expected", [
         (SessionStrategy.FLAT, {
             (0, 1, 2), (1, 2, 3), (2, 3, 4), (3, 4, 3), (1, 3, 5), (3, 5, 3), (5, 3, 5), (3, 5, 1),
@@ -213,7 +237,7 @@ class TestTrainDataloader:
             (0, 1, 2), (3, 4, 3), (1, 3, 5), (3, 5, 1),
         }),
     ])
-    def test_sessions_cloze(self, strategy, expected):
+    def test_cloze(self, strategy, expected):
         mask_token_id = 6
         config = {
             "sampler_name": "ClozeSampler",
@@ -254,6 +278,36 @@ class TestTrainDataloader:
             total_rows += len(masked_seq)
 
         assert total_rows == len(expected)
+
+    @pytest.mark.parametrize("exclude_seen", [True, False])
+    def test_exclude_seen(self, exclude_seen):
+        padding_token = 6
+        config = {
+            "sampler_name": "SlidingWindowSampler",
+            "strategy": SessionStrategy.FLAT,
+            "batch_size": 3,
+            "max_seq_len": 4,
+            "neg_samples": 50,
+            "exclude_seen": exclude_seen,
+            "seed": 0
+        }
+
+        train_dataloader, _ = train_data(**config)
+
+        hits_on_window = 0
+        for pos_seq, neg_seq in train_dataloader:
+            for window, negs in zip(pos_seq, neg_seq):
+                real = window != padding_token
+                items, real_negs = window[real], negs[real]
+
+                # A position's own positive is never one of its negatives
+                assert torch.all(real_negs != items.unsqueeze(-1))
+
+                # Every window item is a seen item of its user
+                hits_on_window += int(torch.isin(real_negs, items).sum())
+
+        # Seen items are never drawn when excluded, and drawn when they are not
+        assert (hits_on_window == 0) == exclude_seen
 
     def test_session_only_requested_on_flat_dataset_falls_back(self):
         params = {
