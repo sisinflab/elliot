@@ -8,7 +8,7 @@ from collections import defaultdict
 from functools import cached_property
 from tqdm import tqdm
 
-from elliot.dataset.samplers.base_data import build_dataloader, build_dataset
+from elliot.dataset.samplers.base_data import build_dataloader
 from elliot.utils.registry import sampler_registry
 
 
@@ -61,7 +61,7 @@ class Interactions:
 
         self._cold_items = set()
         self._cold_users = set()
-        self._cached_datasets = {}
+        self._cached_samplers = {}
 
         # Build the ratings dict, in both its public-id (`_dict`) and private-id
         # (`_p_dict`) views (most callers only ever need the latter)
@@ -215,11 +215,11 @@ class Interactions:
         device = torch.device(device or "cpu")
         cache_key = (sampler_name, str(device))
 
-        # Rebuild if never cached, or if the cached dataset's own size no longer
+        # Rebuild if never cached, or if the cached sampler's own size no longer
         # matches the requested number of transactions (e.g. a different sampling
         # ratio was requested for the same sampler name)
-        if (cache_key not in self._cached_datasets or
-            len(self._cached_datasets[cache_key]) != transactions):
+        if (cache_key not in self._cached_samplers or
+            self._cached_samplers[cache_key].events != transactions):
 
             users, items = self._get_users_and_items(private=True)
 
@@ -234,13 +234,10 @@ class Interactions:
                 seed=seed,
                 **kwargs
             )
+            self._cached_samplers[cache_key] = sampler.to(device)
 
-            dataset = build_dataset(sampler, device=device)
-
-            self._cached_datasets[cache_key] = dataset
-
-        dataset = self._cached_datasets[cache_key]
-        dataloader = build_dataloader(dataset, batch_size=batch_size, seed=seed)
+        sampler = self._cached_samplers[cache_key]
+        dataloader = build_dataloader(sampler, batch_size=batch_size, seed=seed)
 
         return dataloader
 

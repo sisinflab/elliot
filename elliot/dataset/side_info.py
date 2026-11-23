@@ -10,7 +10,7 @@ from elliot.dataset.modular_loaders.remap import (
     remap_text_payload,
 )
 from elliot.dataset.modular_loaders.formats import EmbeddingPayload, GraphPayload, TextPayload
-from elliot.dataset.samplers.base_data import build_dataloader, build_dataset
+from elliot.dataset.samplers.base_data import build_dataloader
 from elliot.utils.enums import EntityAxis
 from elliot.utils.registry import sampler_registry
 
@@ -50,7 +50,7 @@ class FoldSideInfo:
         self._views: Dict[str, Optional[Dict[str, Any]]] = {
             loader_name: None for loader_name in self._side_info
         }
-        self._cached_datasets = {}
+        self._cached_samplers = {}
 
     def __contains__(self, name: object) -> bool:
         return name in self._side_info
@@ -139,16 +139,16 @@ class FoldSideInfo:
         device = torch.device(device or "cpu")
         cache_key = (sampler_name, str(device))
 
-        if cache_key not in self._cached_datasets:
+        if cache_key not in self._cached_samplers:
             sampler = sampler_registry.get(
                 name=sampler_name,
                 seed=seed,
                 **kwargs
             )
-            self._cached_datasets[cache_key] = build_dataset(sampler, device=device)
+            self._cached_samplers[cache_key] = sampler.to(device)
 
-        dataset = self._cached_datasets[cache_key]
-        dataloader = build_dataloader(dataset, batch_size=batch_size, seed=seed)
+        sampler = self._cached_samplers[cache_key]
+        dataloader = build_dataloader(sampler, batch_size=batch_size, seed=seed)
 
         return dataloader
 

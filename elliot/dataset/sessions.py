@@ -6,7 +6,8 @@ from scipy.sparse import csr_matrix
 import torch
 from torch.utils.data import DataLoader
 
-from elliot.dataset.samplers.base_data import SamplerDataset, build_dataloader, build_dataset
+from elliot.dataset.samplers.base_data import build_dataloader
+from elliot.dataset.samplers.base_sampler import SessionSampler
 from elliot.utils import logging
 from elliot.utils.enums import SessionStrategy
 from elliot.utils.registry import sampler_registry
@@ -49,7 +50,7 @@ class Sessions:
         self._n_items = len(self._i_map)
         self._sparse = copy.deepcopy(sparse)
 
-        self._cached_datasets: Dict[Tuple[str, SessionStrategy, str], SamplerDataset] = {}
+        self._cached_samplers: Dict[Tuple[str, SessionStrategy, str], SessionSampler] = {}
 
         self._sparse.sort_indices()
         self._build_tape(dataframe)
@@ -146,8 +147,8 @@ class Sessions:
         device = torch.device(device or "cpu")
         cache_key = (sampler_name, strategy, str(device))
 
-        # Build (and cache) a fresh sampler/dataset for this (sampler, strategy) pair
-        if cache_key not in self._cached_datasets:
+        # Build (and cache) a fresh sampler for this (sampler, strategy) pair
+        if cache_key not in self._cached_samplers:
             sampler = sampler_registry.get(
                 name=sampler_name,
                 flat_items=self._flat_items,
@@ -164,12 +165,10 @@ class Sessions:
                 seed=seed,
                 **kwargs
             )
+            self._cached_samplers[cache_key] = sampler.to(device)
 
-            dataset = build_dataset(sampler, device=device)
-            self._cached_datasets[cache_key] = dataset
-
-        dataset = self._cached_datasets[cache_key]
-        dataloader = build_dataloader(dataset, batch_size=batch_size, seed=seed)
+        sampler = self._cached_samplers[cache_key]
+        dataloader = build_dataloader(sampler, batch_size=batch_size, seed=seed)
 
         return dataloader
 

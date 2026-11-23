@@ -1,115 +1,26 @@
-from typing import Iterator, Optional, Tuple, Union
-import math
+from typing import Iterator, Tuple, Union
 import torch
-from torch.utils.data import DataLoader, Dataset, Sampler
+from torch.utils.data import DataLoader
 
 from elliot.dataset.samplers.base_sampler import AbstractSampler
 
 Batch = Union[torch.Tensor, Tuple[torch.Tensor, ...]]
 
 
-class SamplerDataset(Dataset):
-    """Torch dataset over a sampler (already moved to the device its batches are
-    built on), indexed by a whole batch of event indices at once.
-
-    Args:
-        sampler (AbstractSampler): The sampler.
-    """
-
-    def __init__(self, sampler: AbstractSampler):
-        super().__init__()
-        self.sampler = sampler
-
-    def __len__(self) -> int:
-        return self.sampler.events
-
-    def __getitem__(self, indices: torch.Tensor) -> Batch:
-        """Build the batch for a batch of events.
-
-        Args:
-            indices (torch.Tensor): Event indices, on the sampler's device.
-
-        Returns:
-            Batch: The batch built by `sampler.sample`.
-        """
-        return self.sampler.sample(indices)
-
-    @staticmethod
-    def collate(batch: Batch) -> Batch:
-        """Return the batch as built by the sampler (torch's default conversion
-        would turn its tuple into a list).
-
-        Args:
-            batch (Batch): The batch.
-
-        Returns:
-            Batch: The same batch.
-        """
-        return batch
-
-
-class BatchIndexSampler(Sampler):
-    """Torch sampler yielding the event indices one whole batch at a time, as
-    tensors on the sampler's device: every epoch, a fresh permutation of the
-    events (or their order, if not shuffling) split into batches.
-
-    Args:
-        dataset (SamplerDataset): The dataset to index.
-        batch_size (int): Batch size; the last batch may be smaller.
-        seed (int): Seed of the shuffling generator.
-        shuffle (bool): Whether to reshuffle every epoch. Defaults to True.
-    """
-
-    def __init__(self, dataset: SamplerDataset, batch_size: int, seed: int, shuffle: bool = True):
-        super().__init__()
-        self.n_events = len(dataset)
-        self.batch_size = batch_size
-        self.shuffle = shuffle
-
-        self.device = dataset.sampler.device
-        self._generator = AbstractSampler.make_generator(
-            seed, AbstractSampler.SHUFFLE_STREAM, self.device
-        )
-
-    def __len__(self) -> int:
-        return math.ceil(self.n_events / self.batch_size)
-
-    def __iter__(self) -> Iterator[torch.Tensor]:
-        if self.shuffle:
-            order = torch.randperm(self.n_events, generator=self._generator, device=self.device)
-        else:
-            order = torch.arange(self.n_events, device=self.device)
-
-        yield from order.split(self.batch_size)
-
-
-def build_dataset(sampler: AbstractSampler, device: Optional[Union[str, torch.device]] = None) -> SamplerDataset:
-    """Wrap `sampler` into the `SamplerDataset` a dataset caches, after moving its
-    state to the device its batches are built on.
-
-    Args:
-        sampler (AbstractSampler): The sampler to wrap.
-        device (Union[str, torch.device], optional): Where the sampler builds its
-            batches, i.e. the consuming model's device. Defaults to None, the CPU.
-
-    Returns:
-        SamplerDataset: The dataset built from `sampler`.
-    """
-    return SamplerDataset(sampler.to(device or "cpu"))
-
-
 def build_dataloader(
-    dataset: SamplerDataset,
+    sampler: AbstractSampler,
     batch_size: int,
     seed: int,
     shuffle: bool = True
 ) -> DataLoader:
-    """Build the training dataloader over `dataset`: a torch `DataLoader` whose
-    `BatchIndexSampler` hands each batch's indices to the dataset at once
-    (`batch_size=None` disables torch's per-sample batching), in the main process.
+    """Build the training dataloader over `sampler` (already moved to the device
+    its batches are built on): a torch `DataLoader` using the sampler both as its
+    sampler, yielding a whole batch of event indices at a time (`batch_size=None`
+    disables torch's per-sample batching), and as its dataset, building that
+    batch at once, in the main process.
 
     Args:
-        dataset (SamplerDataset): The dataset to load from, as returned by `build_dataset`.
+        sampler (AbstractSampler): The sampler to load from.
         batch_size (int): Batch size.
         seed (int): Seed of the shuffling generator.
         shuffle (bool): Whether to reshuffle every epoch. Defaults to True.
@@ -117,12 +28,8 @@ def build_dataloader(
     Returns:
         DataLoader: The configured dataloader.
     """
-    return DataLoader(
-        dataset,
-        batch_size=None,
-        sampler=BatchIndexSampler(dataset, batch_size=batch_size, seed=seed, shuffle=shuffle),
-        collate_fn=SamplerDataset.collate
-    )
+    sampler.set_batching(batch_size, seed=seed, shuffle=shuffle)
+    return DataLoader(sampler, batch_size=None, sampler=sampler, collate_fn=lambda batch: batch)
 
 
 class CombinedDataLoader:

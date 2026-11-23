@@ -1,24 +1,31 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
 from abc import ABC, abstractmethod
 from itertools import chain
 from logging import LoggerAdapter
+import math
 import numpy as np
 import torch
 from scipy.sparse import csr_matrix
+from torch.utils.data import Sampler
 
 from elliot.utils import logging as elog
 from elliot.utils.enums import SamplerType, SessionStrategy
 
 
-class AbstractSampler(ABC):
+class AbstractSampler(Sampler[torch.Tensor], ABC):
     """Base class of every sampler.
 
     A sampler builds a whole batch at once: `sample(indices)` turns a batch of
     event indices into the batch's tensors, with tensor operations on
-    `self.device`. Every epoch, `BatchIndexSampler` splits a fresh permutation of
-    the `self.events` indices into batches, so every draw changes across epochs.
+    `self.device`.
+
+    It is both the torch `Sampler` and the dataset of its `DataLoader` (see
+    `build_dataloader`): iterating it yields, every epoch, a fresh permutation of
+    the `self.events` indices split into `batch_size` index tensors (so every draw
+    changes across epochs), and indexing it with one of them builds that batch.
+    The batching is set by `set_batching`, before iterating.
 
     Its state is built on CPU at construction time; every tensor `sample` reads is
     registered with `_register_state`, so that `to(device)` can move it.
@@ -50,6 +57,7 @@ class AbstractSampler(ABC):
         logger: Optional[LoggerAdapter] = None,
         **kwargs: Any
     ):
+        super().__init__()
         self.logger = logger or elog.get_logger(self.__class__.__name__, seed=seed)
 
         self._users = users if users is not None else []
@@ -65,6 +73,64 @@ class AbstractSampler(ABC):
 
         self._init_generator = self.make_generator(seed, self.INIT_STREAM)
         self._generator = self.make_generator(seed, self.BATCH_STREAM)
+
+        # Batching, set by `set_batching`
+        self.batch_size: Optional[int] = None
+        self.shuffle = True
+        self._shuffle_generator: Optional[torch.Generator] = None
+
+    def set_batching(self, batch_size: int, seed: int, shuffle: bool = True) -> AbstractSampler:
+        """Set how iterating splits the events into batches, restarting the
+        shuffling stream from `seed`. Called once per dataloader built over this
+        sampler (see `build_dataloader`), after `to`: building a new one rebatches
+        every earlier dataloader over it too.
+
+        Args:
+            batch_size (int): Batch size; the last batch may be smaller.
+            seed (int): Seed of the shuffling generator.
+            shuffle (bool): Whether to reshuffle every epoch. Defaults to True.
+
+        Returns:
+            AbstractSampler: This sampler.
+        """
+        self.batch_size = batch_size
+        self.shuffle = shuffle
+        self._shuffle_generator = self.make_generator(seed, self.SHUFFLE_STREAM, self.device)
+        return self
+
+    def __len__(self) -> int:
+        """Number of batches per epoch."""
+        if self.batch_size is None:
+            raise RuntimeError(f"{self.__class__.__name__} has no batching: call `set_batching` first.")
+        return math.ceil(self.events / self.batch_size)
+
+    def __iter__(self) -> Iterator[torch.Tensor]:
+        """Yield one epoch's event indices, one whole batch at a time, as tensors
+        on `self.device`.
+
+        Returns:
+            Iterator[torch.Tensor]: The batches' event indices.
+        """
+        if self.batch_size is None:
+            raise RuntimeError(f"{self.__class__.__name__} has no batching: call `set_batching` first.")
+
+        if self.shuffle:
+            order = torch.randperm(self.events, generator=self._shuffle_generator, device=self.device)
+        else:
+            order = torch.arange(self.events, device=self.device)
+
+        yield from order.split(self.batch_size)
+
+    def __getitem__(self, indices: torch.Tensor) -> Union[torch.Tensor, Tuple[torch.Tensor, ...]]:
+        """Build the batch for a batch of events, as the dataset of a `DataLoader`.
+
+        Args:
+            indices (torch.Tensor): Event indices, on `self.device`.
+
+        Returns:
+            Union[torch.Tensor, Tuple[torch.Tensor, ...]]: The batch built by `sample`.
+        """
+        return self.sample(indices)
 
     @abstractmethod
     def sample(self, indices: torch.Tensor) -> Union[torch.Tensor, Tuple[torch.Tensor, ...]]:
