@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 import numpy as np
 import pandas as pd
 import torch
@@ -186,6 +186,7 @@ class Interactions:
         sampler_name: str,
         batch_size: int = 1024,
         seed: int = 42,
+        device: Optional[Union[str, torch.device]] = None,
         **kwargs: Any
     ) -> DataLoader:
         """Build (or reuse a cached) dataloader over this split's interactions, for
@@ -195,6 +196,9 @@ class Interactions:
             sampler_name (str): Name of the sampler registered in `sampler_registry`.
             batch_size (int): Batch size for the returned dataloader. Defaults to 1024.
             seed (int): Random seed forwarded to the sampler. Defaults to 42.
+            device (Union[str, torch.device], optional): The consuming model's
+                device, where the batches are built. Defaults to None, the CPU (a
+                model without a torch device).
             **kwargs (Any): Additional keyword arguments forwarded to the sampler.
                 An explicit `transactions` overrides the sampler's event count and,
                 combined with a cache-size mismatch, forces a rebuild.
@@ -208,11 +212,14 @@ class Interactions:
             # Default event budget: one event per distinct (user, item) pair
             transactions = self.get_unique_pairs()
 
+        device = torch.device(device or "cpu")
+        cache_key = (sampler_name, str(device))
+
         # Rebuild if never cached, or if the cached dataset's own size no longer
         # matches the requested number of transactions (e.g. a different sampling
         # ratio was requested for the same sampler name)
-        if (sampler_name not in self._cached_datasets or
-            len(self._cached_datasets[sampler_name]) != transactions):
+        if (cache_key not in self._cached_datasets or
+            len(self._cached_datasets[cache_key]) != transactions):
 
             users, items = self._get_users_and_items(private=True)
 
@@ -228,11 +235,11 @@ class Interactions:
                 **kwargs
             )
 
-            dataset = build_dataset(sampler)
+            dataset = build_dataset(sampler, device=device)
 
-            self._cached_datasets[sampler_name] = dataset
+            self._cached_datasets[cache_key] = dataset
 
-        dataset = self._cached_datasets[sampler_name]
+        dataset = self._cached_datasets[cache_key]
         dataloader = build_dataloader(dataset, batch_size=batch_size, seed=seed)
 
         return dataloader

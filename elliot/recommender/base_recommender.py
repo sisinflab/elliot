@@ -139,9 +139,9 @@ class AbstractRecommender(ABC):
 
     def _check_for_side_info_dataloader(
         self,
-        dataloader: DataLoader[Any],
+        dataloader: DataLoader,
         batch_size: int
-    ) -> Union[DataLoader[Any], CombinedDataLoader]:
+    ) -> Union[DataLoader, CombinedDataLoader]:
         """Wrap `dataloader` together with a second one built from
         `self.side_info_sampler_config`, when the model declares one.
 
@@ -152,11 +152,11 @@ class AbstractRecommender(ABC):
         `CombinedDataLoader`) into the combined batch a model's `train_step` sees.
 
         Args:
-            dataloader (DataLoader[Any]): The (already built) primary training dataloader.
+            dataloader (DataLoader): The (already built) primary training dataloader.
             batch_size (int): Batch size for the side-information dataloader.
 
         Returns:
-            Union[DataLoader[Any], CombinedDataLoader]: The unwrapped `dataloader`,
+            Union[DataLoader, CombinedDataLoader]: The unwrapped `dataloader`,
                 or a `CombinedDataLoader` pairing it with the side-information dataloader.
         """
         if not self.side_info_sampler_config:
@@ -171,6 +171,8 @@ class AbstractRecommender(ABC):
             sampler_name=sampler_name,
             batch_size=batch_size,
             seed=self._seed,
+            # Batches stay on CPU for a model without a torch device
+            device=getattr(self, "_device", None),
             **side_info_sampler_config
         )
         return CombinedDataLoader(dataloader, side_info_dataloader)
@@ -312,6 +314,7 @@ class GeneralRecommender(nn.Module, AbstractRecommender):
             sampler_name=sampler_name,
             batch_size=batch_size,
             seed=self._seed,
+            device=self._device,
             **self.sampler_config
         )
         return self._check_for_side_info_dataloader(dataloader, batch_size)
@@ -525,6 +528,7 @@ class SequentialRecommender(GeneralRecommender):
             sampler_name=sampler_name,
             batch_size=batch_size,
             seed=self._seed,
+            device=self._device,
             strategy=self._session_strategy,
             **self.sampler_config
         )

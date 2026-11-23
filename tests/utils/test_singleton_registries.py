@@ -2,7 +2,7 @@ import pytest
 from types import SimpleNamespace
 
 from elliot.dataset.modular_loaders import AbstractLoader
-from elliot.dataset.samplers import PipelineSampler
+from elliot.dataset.samplers import InteractionSampler
 from elliot.evaluation.metrics import BaseMetric
 from elliot.namespace import build_namespace
 from elliot.recommender import BaseRecommender
@@ -46,12 +46,12 @@ class CustomLoader(AbstractLoader):
 
 
 @sampler_registry.register()
-class CustomSampler(PipelineSampler):
+class CustomSampler(InteractionSampler):
     def __init__(self, custom_param, **params):
         super().__init__(**params)
         self.custom_param = custom_param
 
-    def sample(self, it):
+    def sample(self, indices):
         pass
 
 

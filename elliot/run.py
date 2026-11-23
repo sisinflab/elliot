@@ -18,7 +18,7 @@ from elliot.namespace import build_namespace, ExperimentConfig
 from elliot.hyperoptimization import run_hyperopt, run_single, run_proxy, run_evaluation, requires_hyperopt
 from elliot.result_handler import ResultHandler, attach_test_fold_stats
 from elliot.utils import logging as logging_project
-from elliot.utils import set_device, set_num_workers
+from elliot.utils import set_device
 from elliot.utils import wandb_logger
 from elliot.utils.callback import CallbackManager
 from elliot.utils.registry import callback_registry, model_registry
@@ -54,7 +54,6 @@ def run_experiment(config_path: str = "", config_overrides: Optional[List[str]] 
     wandb_logger.init_tracking(mode, config, logger)
 
     _configure_torch_device(config, logger)
-    _configure_dataloaders(config, logger)
 
     if config.version != __version__:
         logger.error(f'Your config file uses a different version of Elliot! '
@@ -264,7 +263,6 @@ def config_test(config: ExperimentConfig):
     logger = logging_project.get_logger("__main__")
 
     _configure_torch_device(config, logger)
-    _configure_dataloaders(config, logger)
 
     logger.info("Start config test")
 
@@ -341,12 +339,6 @@ def _configure_torch_device(config, logger=None):
     device = set_device(requested)
     if logger is not None:
         logger.info("Torch device selected", extra={"context": {"device": str(device)}})
-
-
-def _configure_dataloaders(config, logger=None):
-    num_workers = set_num_workers(config.num_workers)
-    if logger is not None:
-        logger.info("Dataloader workers selected", extra={"context": {"num_workers": num_workers}})
 
 
 def _load_dotenv(dotenv_path: Path):

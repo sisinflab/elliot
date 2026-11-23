@@ -321,6 +321,10 @@ class Splitter:
     ) -> List[Tuple[pd.DataFrame, pd.DataFrame]]:
         """Split the dataset by leaving the last n items (per user) as test data.
 
+        Ties on the timestamp are ordered by row order, as every stable sort downstream
+        (`Sessions`, `EvalTargets`, `Interactions`): among events sharing a timestamp,
+        the last rows are the most recent ones, so they are the first left out.
+
         Args:
             d (pd.DataFrame): The dataset to split.
             n (int): Number of items per user to leave out for testing.
@@ -328,8 +332,11 @@ class Splitter:
         Returns:
             List[Tuple[pd.DataFrame, pd.DataFrame]]: A list containing one (train, test) tuple.
         """
-        rank = d.groupby('userId')['timestamp'].rank(method='first', ascending=False)
-        mask = rank <= n
+        # Ascending rank with method='first' ranks ties in row order, so the top n
+        # ranks are exactly the last n events of the user's time-ordered sequence
+        user_size = d.groupby('userId')['timestamp'].transform('size')
+        rank = d.groupby('userId')['timestamp'].rank(method='first', ascending=True)
+        mask = rank > user_size - n
 
         return self._split_with_mask(d, mask)
 

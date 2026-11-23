@@ -6,12 +6,9 @@ Module description:
 
 from .base_sampler import (
     AbstractSampler,
-    TraditionalSampler,
-    PipelineSampler,
-    TraditionalSessionSampler,
-    PipelineSessionSampler,
-    TraditionalSideInfoSampler,
-    PipelineSideInfoSampler
+    InteractionSampler,
+    SessionSampler,
+    SideInfoSampler
 )
 from .pointwise import (
     CustomPointWiseSparseSampler,

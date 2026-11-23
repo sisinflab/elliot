@@ -5,7 +5,7 @@ Module description:
 
 __version__ = '0.3.1'
 
-from typing import Annotated, Any, Dict, List, Literal, Optional, Union
+from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field, model_validator, create_model
 
 from elliot.namespace.common import BaseConfig, build_fields_from_annotations
@@ -46,8 +46,6 @@ class ExperimentConfig(BaseConfig):
         gpu (int, optional): GPU device index (do not set for CPU).
         device (str, optional): Device to use (automatically picked if not set).
         torch_device (str, optional): Torch device to use (automatically picked if not set).
-        num_workers (int | "auto"): Number of worker processes used to build training batches 
-            for lazily sampled (pipeline) datasets. Defaults to 0.
         backend (List[str]): List of supported training backends. Defaults to ["tensorflow"].
         path_output_rec_result (str): Path to the folder for recommendation results output.
         path_output_rec_weight (str): Path to the folder for learned model weights output.
@@ -74,7 +72,6 @@ class ExperimentConfig(BaseConfig):
     gpu: Optional[int] = None
     device: Optional[str] = None
     torch_device: Optional[str] = None
-    num_workers: Union[Annotated[int, Field(ge=0)], Literal["auto"]] = 0
     backend: List[str] = ["tensorflow"]
     path_output_rec_result: str = path_joiner("..", "results", "{0}", "recs")
     path_output_rec_weight: str = path_joiner("..", "results", "{0}", "weights")

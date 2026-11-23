@@ -49,11 +49,6 @@ class NegativeSamplingStrategy(Enum):
     FIXED = 'fixed'
 
 
-class SamplerMaterialization(Enum):
-    TRADITIONAL = 1
-    PIPELINE = 2
-
-
 class SamplerType(Enum):
     INTERACTIONS = 1
     SEQUENTIAL = 2

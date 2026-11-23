@@ -1,11 +1,12 @@
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, Optional, Tuple, Union
 import copy
 import numpy as np
 import pandas as pd
 from scipy.sparse import csr_matrix
-from torch.utils.data import Dataset, DataLoader
+import torch
+from torch.utils.data import DataLoader
 
-from elliot.dataset.samplers.base_data import build_dataloader, build_dataset
+from elliot.dataset.samplers.base_data import SamplerDataset, build_dataloader, build_dataset
 from elliot.utils import logging
 from elliot.utils.enums import SessionStrategy
 from elliot.utils.registry import sampler_registry
@@ -48,7 +49,7 @@ class Sessions:
         self._n_items = len(self._i_map)
         self._sparse = copy.deepcopy(sparse)
 
-        self._cached_datasets: Dict[Tuple[str, SessionStrategy], Dataset] = {}
+        self._cached_datasets: Dict[Tuple[str, SessionStrategy, str], SamplerDataset] = {}
 
         self._sparse.sort_indices()
         self._build_tape(dataframe)
@@ -112,6 +113,7 @@ class Sessions:
         strategy: SessionStrategy = SessionStrategy.FLAT,
         batch_size: int = 1024,
         seed: int = 42,
+        device: Optional[Union[str, torch.device]] = None,
         **kwargs: Any
     ) -> DataLoader:
         """Build (or reuse a cached) dataloader over this split's sessions, for the
@@ -122,6 +124,9 @@ class Sessions:
             strategy (SessionStrategy): FLAT or SESSION_ONLY. Defaults to FLAT.
             batch_size (int): Batch size for the returned dataloader. Defaults to 1024.
             seed (int): Random seed forwarded to the sampler. Defaults to 42.
+            device (Union[str, torch.device], optional): The consuming model's
+                device, where the batches are built. Defaults to None, the CPU (a
+                model without a torch device).
             **kwargs (Any): Additional keyword arguments forwarded to the sampler.
 
         Returns:
@@ -138,7 +143,8 @@ class Sessions:
                 "each user's full history will be treated as a single session."
             )
 
-        cache_key = (sampler_name, strategy)
+        device = torch.device(device or "cpu")
+        cache_key = (sampler_name, strategy, str(device))
 
         # Build (and cache) a fresh sampler/dataset for this (sampler, strategy) pair
         if cache_key not in self._cached_datasets:
@@ -159,7 +165,7 @@ class Sessions:
                 **kwargs
             )
 
-            dataset = build_dataset(sampler)
+            dataset = build_dataset(sampler, device=device)
             self._cached_datasets[cache_key] = dataset
 
         dataset = self._cached_datasets[cache_key]

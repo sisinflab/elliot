@@ -133,6 +133,7 @@ class gSASRec(SequentialRecommender):
             "max_seq_len": self.max_seq_len + 1,
             "neg_samples": self.neg_samples,
             "stride": 1,
+            "max_windows": 1,
             "exclude_seen": False,
         }
 

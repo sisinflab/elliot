@@ -1,53 +1,44 @@
-from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
-import time
-from bisect import bisect_left
+from __future__ import annotations
+
+from typing import Any, Dict, List, Optional, Tuple, Union
+from abc import ABC, abstractmethod
 from itertools import chain
+from logging import LoggerAdapter
 import numpy as np
 import torch
-from abc import ABC, abstractmethod
-from logging import LoggerAdapter
 from scipy.sparse import csr_matrix
-from tqdm import tqdm
 
 from elliot.utils import logging as elog
-from elliot.utils.enums import SamplerMaterialization, SamplerType, SessionStrategy
+from elliot.utils.enums import SamplerType, SessionStrategy
 
 
 class AbstractSampler(ABC):
-    """Base class every sampler registered in `sampler_registry` implements.
+    """Base class of every sampler.
 
-    A concrete sampler is always built from two orthogonal mixins, combined via
-    multiple inheritance: a domain mixin, which sets `type` and owns whatever
-    domain-specific state/helpers it needs (e.g. `_InteractionDataMixin`,
-    `_SessionDataMixin`, `_SideInfoMixin`), and a materialization-strategy mixin,
-    which sets `materialization` and owns how `sample(it)`'s stream becomes a
-    `torch.utils.data.Dataset` (`_TraditionalMixin` or `_PipelineMixin`). Neither
-    axis knows about the other, so any domain can be combined with either strategy.
+    A sampler builds a whole batch at once: `sample(indices)` turns a batch of
+    event indices into the batch's tensors, with tensor operations on
+    `self.device`. Every epoch, `BatchIndexSampler` splits a fresh permutation of
+    the `self.events` indices into batches, so every draw changes across epochs.
+
+    Its state is built on CPU at construction time; every tensor `sample` reads is
+    registered with `_register_state`, so that `to(device)` can move it.
 
     Args:
-        users (List[int], optional): Private user indices in this split's domain.
-            Defaults to `[]` - a side-info sampler (see `PipelineSideInfoSampler`,
-            `TraditionalSideInfoSampler`) draws from its own source and never
-            receives one.
-        items (List[int], optional): Private item indices in this split's domain.
-            Defaults to `[]`, for the same reason as `users`.
+        seed (int): Random seed.
+        users (List[int], optional): Private user indices of the split.
+        items (List[int], optional): Private item indices of the split.
         n_users (int): Total number of users. Defaults to 0.
         n_items (int): Total number of items. Defaults to 0.
-        seed (int): Random seed for reproducibility.
-        logger (LoggerAdapter, optional): Logging instance. Defaults to None, building
-            a fresh one via `elliot.utils.logging.get_logger`.
-        **kwargs (Any): Unused; absorbs any extra keyword arguments forwarded by
-            `sampler_registry.get()` that a concrete sampler doesn't itself declare.
+        logger (LoggerAdapter, optional): Logging instance.
+        **kwargs (Any): Ignored; absorbs what `sampler_registry.get()` forwards.
     """
 
     type: SamplerType
-    materialization: SamplerMaterialization
 
-    # Uniform floats drawn per refill of the single-integer `_r_int` buffer
-    RAND_BUFFER_SIZE: int = 8192
-
-    # Most negatives (rows * k) `_draw_negatives` draws one at a time instead of vectorized
-    SMALL_NEGATIVES_SIZE: int = 64
+    # Independent RNG streams of one seed
+    INIT_STREAM = 0     # draws made once, at construction time
+    BATCH_STREAM = 1    # draws made by `sample`
+    SHUFFLE_STREAM = 2  # epoch permutations
 
     def __init__(
         self,
@@ -61,579 +52,350 @@ class AbstractSampler(ABC):
     ):
         self.logger = logger or elog.get_logger(self.__class__.__name__, seed=seed)
 
-        # Initializing variables
         self._users = users if users is not None else []
         self._nusers = n_users
         self._items = items if items is not None else []
         self._nitems = n_items
 
-        # This sampler's own RNG: every draw comes from it, never from a global state
-        self.reseed(seed)
-
         self.events: int = 0
 
-    def reseed(self, seed: int):
-        """(Re)initialize this sampler's own torch RNG, discarding any buffered draw.
+        self._seed = seed
+        self.device = torch.device("cpu")
+        self._state_names: List[str] = []
 
-        Called once at construction time and again inside every dataloader worker
-        (see `elliot.dataset.samplers.base_data._seed_worker`), since each worker
-        receives an identical copy of the parent's sampler and RNG state.
+        self._init_generator = self.make_generator(seed, self.INIT_STREAM)
+        self._generator = self.make_generator(seed, self.BATCH_STREAM)
 
-        Args:
-            seed (int): The new seed.
-        """
-        self._generator = torch.Generator().manual_seed(seed)
-        self._rand_buffer: List[float] = []
-
-    def _r_int(
-        self,
-        low: int,
-        high: Optional[int] = None,
-        size: Optional[Union[int, Tuple[int, ...]]] = None
-    ) -> Union[int, torch.Tensor]:
-        """Uniform random integers in `[low, high)`, with `numpy.random.randint`'s
-        call convention: a single argument `n` is taken as the exclusive upper bound,
-        so `_r_int(n)` draws from `[0, n)`.
-
-        A single draw pops one uniform float off a buffer refilled `RAND_BUFFER_SIZE`
-        draws at a time, so the per-call overhead stays far below a torch call's.
-        That single draw is a plain `int`, cheap to index Python containers with and
-        usable as a dict key (a 0-d tensor is neither).
+    @abstractmethod
+    def sample(self, indices: torch.Tensor) -> Union[torch.Tensor, Tuple[torch.Tensor, ...]]:
+        """Build the batch for a batch of events.
 
         Args:
-            low (int): Lowest integer drawn, or the exclusive upper bound when `high`
-                is None.
-            high (int, optional): Exclusive upper bound. Defaults to None.
-            size (int or Tuple[int, ...], optional): Output shape. Defaults to None,
-                drawing a single integer.
+            indices (torch.Tensor): Event indices, on `self.device`.
 
         Returns:
-            Union[int, torch.Tensor]: A single int when `size` is None, else an int64
-                tensor shaped `size`.
-        """
-        if high is None:
-            low, high = 0, low
-
-        if size is not None:
-            size = (size,) if isinstance(size, int) else tuple(size)
-            return torch.randint(low, high, size, generator=self._generator)
-
-        if not self._rand_buffer:
-            self._rand_buffer = torch.rand(
-                self.RAND_BUFFER_SIZE, dtype=torch.float64, generator=self._generator
-            ).tolist()
-
-        span = high - low
-        # Guard against float rounding pushing `u * span` up to `span` itself
-        return low + min(int(self._rand_buffer.pop() * span), span - 1)
-
-    def _r_choice(self, a: int, size: int, replace: bool = True) -> torch.Tensor:
-        """Uniform random draw of `size` integers from `[0, a)`, with
-        `numpy.random.choice`'s call convention for an integer `a`.
-
-        Args:
-            a (int): Exclusive upper bound of the drawn integers.
-            size (int): Number of integers to draw.
-            replace (bool): Whether to draw with replacement. Defaults to True.
-
-        Returns:
-            torch.Tensor: The drawn int64 integers, shape `(size,)`.
-
-        Note:
-            Without replacement the draw permutes the whole `[0, a)`, costing
-            `O(a)` whatever `size`: keep `a` small on a per-event path.
-        """
-        if replace:
-            return torch.randint(a, (size,), generator=self._generator)
-        return torch.randperm(a, generator=self._generator)[:size]
-
-    def _r_sample(self, n: int, k: int) -> torch.Tensor:
-        """Draw `k` distinct indices from `[0, n)`, uniformly at random.
-
-        Args:
-            n (int): Number of indices to draw from.
-            k (int): Number of indices to draw.
-
-        Returns:
-            torch.Tensor: The drawn int64 indices, in random order, shape `(k,)`.
-
-        Note:
-            The draw permutes the whole `[0, n)`, costing `O(n)` whatever `k`:
-            keep `n` small on a per-event path.
-        """
-        return torch.randperm(n, generator=self._generator)[:k]
-
-    def _seen_items(self, user: int) -> Sequence[int]:
-        """`user`'s seen items, sorted: the ones `_sample_negative*` never draws.
-        Defined by the domain mixins that sample negatives for a user.
-
-        Args:
-            user (int): Private user index.
-
-        Returns:
-            Sequence[int]: The sorted item ids excluded from `user`'s negatives.
+            Union[torch.Tensor, Tuple[torch.Tensor, ...]]: The batch, on `self.device`.
         """
         raise NotImplementedError()
 
-    def _sample_negative(self, user: int) -> int:
-        """Uniformly sample one negative item for `user`, excluding its seen items.
+    @staticmethod
+    def make_generator(seed: int, stream: int, device: Union[str, torch.device] = "cpu") -> torch.Generator:
+        """Build a generator for one of the independent RNG streams of a seed.
 
         Args:
-            user (int): Private user index.
+            seed (int): The base seed.
+            stream (int): The stream (e.g. `BATCH_STREAM`).
+            device (Union[str, torch.device]): The generator's device. Defaults to CPU.
 
         Returns:
-            int: The sampled negative item id.
+            torch.Generator: The seeded generator.
         """
-        return self._draw_negative(self._seen_items(user), self._nitems)
+        state = np.random.SeedSequence([seed, stream]).generate_state(1, dtype=np.uint64)[0]
+        return torch.Generator(device=device).manual_seed(int(state & 0x7FFF_FFFF_FFFF_FFFF))
 
-    def _sample_negatives(self, user: int, k: int, exclude_item: Optional[int] = None) -> torch.Tensor:
-        """Uniformly sample, with replacement, `k` negative items for `user`,
-        excluding its seen items and, optionally, `exclude_item`.
+    def to(self, device: Union[str, torch.device]) -> AbstractSampler:
+        """Move the state to the device the batches will be built on. Meant to be
+        called once, before any batch is drawn.
 
         Args:
-            user (int): Private user index.
-            k (int): Number of negatives to sample.
-            exclude_item (int, optional): An extra item id to exclude (e.g. the
-                positive target). Defaults to None.
+            device (Union[str, torch.device]): The target device.
 
         Returns:
-            torch.Tensor: The sampled negative item ids, shape `(k,)`.
+            AbstractSampler: This sampler.
         """
-        exclude_items = None if exclude_item is None else [exclude_item]
-        return self._sample_negatives_rows(user, k, n_rows=1, exclude_items=exclude_items)[0]
+        device = torch.device(device)
+        for name in self._state_names:
+            value = getattr(self, name)
+            if value is not None:
+                setattr(self, name, value.to(device))
 
-    def _sample_negatives_rows(
-        self,
-        user: int,
-        k: int,
-        n_rows: int,
-        exclude_items: Optional[Union[np.ndarray, torch.Tensor, Sequence[int]]] = None
-    ) -> torch.Tensor:
-        """Uniformly sample, with replacement, `k` negative items for each of `n_rows`
-        rows of `user`, excluding its seen items and, optionally, each row's own
-        `exclude_items[row]`.
+        self.device = device
+        self._generator = self.make_generator(self._seed, self.BATCH_STREAM, device)
+        return self
+
+    def _register_state(self, name: str, value: Union[torch.Tensor, np.ndarray, KeySet, None]):
+        """Set an attribute and track it as state, moved by `to`.
 
         Args:
-            user (int): Private user index.
-            k (int): Number of negatives to sample per row.
-            n_rows (int): Number of rows to sample.
-            exclude_items (np.ndarray, torch.Tensor or Sequence[int], optional): One
-                extra item id to exclude per row, shape `(n_rows,)`. Defaults to None.
-
-        Returns:
-            torch.Tensor: The sampled negative item ids, shape `(n_rows, k)`.
+            name (str): The attribute name.
+            value (Union[torch.Tensor, np.ndarray, KeySet, None]): The value; a numpy
+                array is converted to a tensor.
         """
-        return self._draw_negatives(self._seen_items(user), self._nitems, k, n_rows, exclude_items)
+        if isinstance(value, np.ndarray):
+            value = torch.from_numpy(np.ascontiguousarray(value))
+        setattr(self, name, value)
+        if name not in self._state_names:
+            self._state_names.append(name)
 
-    def _draw_negative(self, seen: Sequence[int], n_candidates: int, exclude: Optional[int] = None) -> int:
-        """Rejection sampling of one negative from `[0, n_candidates)`, excluding
-        `seen` and, optionally, `exclude`.
+    @property
+    def _float_dtype(self) -> torch.dtype:
+        # MPS has no float64
+        return torch.float32 if self.device.type == "mps" else torch.float64
+
+    def _randint(self, high: int, size: Tuple[int, ...]) -> torch.Tensor:
+        """Draw uniform integers.
 
         Args:
-            seen (Sequence[int]): Sorted ids to exclude.
-            n_candidates (int): Candidates are drawn from `[0, n_candidates)`.
-            exclude (int, optional): An extra id to exclude. Defaults to None.
+            high (int): Exclusive upper bound.
+            size (Tuple[int, ...]): Output shape.
 
         Returns:
-            int: The sampled negative id.
-
-        Raises:
-            ValueError: If no candidate is left to draw.
+            torch.Tensor: Integers in `[0, high)`, int64.
         """
-        self._check_negative_pool(seen, n_candidates, None if exclude is None else [exclude])
+        return torch.randint(high, size, generator=self._generator, device=self.device)
 
-        n_seen = len(seen)
-        while True:
-            cand = self._r_int(n_candidates)
-            if cand == exclude:
-                continue
-            # Binary search since seen is sorted
-            pos = bisect_left(seen, cand)
-            if pos < n_seen and seen[pos] == cand:
-                continue
-            return cand
+    def _rand(self, size: Tuple[int, ...]) -> torch.Tensor:
+        """Draw uniform floats.
+
+        Args:
+            size (Tuple[int, ...]): Output shape.
+
+        Returns:
+            torch.Tensor: Floats in `[0, 1)`.
+        """
+        return torch.rand(size, generator=self._generator, device=self.device, dtype=self._float_dtype)
+
+    def _rand_below(self, highs: torch.Tensor) -> torch.Tensor:
+        """Draw one uniform integer per element, each with its own upper bound.
+
+        Args:
+            highs (torch.Tensor): Exclusive upper bounds.
+
+        Returns:
+            torch.Tensor: Integers in `[0, highs[i])` (0 where `highs[i] <= 0`), int64.
+        """
+        draws = (self._rand(tuple(highs.shape)) * highs.to(self._float_dtype)).long()
+        # Float rounding could push `u * high` up to `high` itself
+        return torch.minimum(draws, (highs - 1).clamp(min=0))
 
     def _draw_negatives(
         self,
-        seen: Sequence[int],
-        n_candidates: int,
+        owners: torch.Tensor,
         k: int,
-        n_rows: int = 1,
-        exclude_items: Optional[Union[np.ndarray, torch.Tensor, Sequence[int]]] = None
+        n_candidates: int,
+        seen: Optional[KeySet] = None,
+        exclude: Optional[torch.Tensor] = None
     ) -> torch.Tensor:
-        """Rejection sampling, with replacement, of `k` negatives from
-        `[0, n_candidates)` for each of `n_rows` rows, excluding `seen` and,
-        optionally, each row's own `exclude_items[row]`.
-
-        Run by `_draw_negatives_loop` for small requests (up to
-        `SMALL_NEGATIVES_SIZE` slots) and by `_draw_negatives_vectorized` otherwise.
+        """Draw, with replacement, `k` negatives per row, never one of the values
+        `seen` holds for the row's owner nor the row's own `exclude` value.
+        Rejected draws are redrawn until none is left.
 
         Args:
-            seen (Sequence[int]): Sorted ids excluded from every row.
-            n_candidates (int): Candidates are drawn from `[0, n_candidates)`.
-            k (int): Number of negatives to sample per row.
-            n_rows (int): Number of rows to sample. Defaults to 1.
-            exclude_items (np.ndarray, torch.Tensor or Sequence[int], optional): One
-                extra id to exclude per row, shape `(n_rows,)`. Defaults to None.
+            owners (torch.Tensor): The `seen` group of each row, shape `(n_rows,)`.
+            k (int): Negatives per row.
+            n_candidates (int): Negatives are drawn from `[0, n_candidates)`.
+            seen (KeySet, optional): Values excluded per owner.
+            exclude (torch.Tensor, optional): One value excluded per row; one
+                outside `[0, n_candidates)` excludes nothing.
 
         Returns:
-            torch.Tensor: The sampled negative ids, shape `(n_rows, k)`.
+            torch.Tensor: The negatives, int64, shape `(n_rows, k)`.
 
         Raises:
-            ValueError: If some row has no candidate left to draw.
+            ValueError: If some row has no candidate left.
         """
+        n_rows = owners.numel()
         if n_rows == 0 or k == 0:
-            return torch.empty((n_rows, k), dtype=torch.long)
+            return torch.empty((n_rows, k), dtype=torch.long, device=self.device)
 
-        self._check_negative_pool(seen, n_candidates, exclude_items)
+        self._check_negative_pool(owners, n_candidates, seen, exclude)
 
-        if n_rows * k <= self.SMALL_NEGATIVES_SIZE:
-            return self._draw_negatives_loop(seen, n_candidates, k, n_rows, exclude_items)
-        return self._draw_negatives_vectorized(seen, n_candidates, k, n_rows, exclude_items)
-
-    def _draw_negatives_loop(
-        self,
-        seen: Sequence[int],
-        n_candidates: int,
-        k: int,
-        n_rows: int,
-        exclude_items: Optional[Union[np.ndarray, torch.Tensor, Sequence[int]]]
-    ) -> torch.Tensor:
-        """`_draw_negatives` as a plain loop of `_draw_negative` calls: for a handful
-        of slots, far cheaper than the fixed overhead of torch calls.
-
-        Args:
-            seen (Sequence[int]): Sorted ids excluded from every row.
-            n_candidates (int): Candidates are drawn from `[0, n_candidates)`.
-            k (int): Number of negatives to sample per row.
-            n_rows (int): Number of rows to sample.
-            exclude_items (np.ndarray, torch.Tensor or Sequence[int], optional): One
-                extra id to exclude per row, shape `(n_rows,)`.
-
-        Returns:
-            torch.Tensor: The sampled negative ids, shape `(n_rows, k)`.
-        """
-        if exclude_items is None:
-            excluded = [None] * n_rows
-        else:
-            excluded = exclude_items.tolist() if hasattr(exclude_items, "tolist") else list(exclude_items)
-
-        negatives = [
-            self._draw_negative(seen, n_candidates, row_excluded)
-            for row_excluded in excluded for _ in range(k)
-        ]
-        return torch.tensor(negatives, dtype=torch.long).view(n_rows, k)
-
-    def _draw_negatives_vectorized(
-        self,
-        seen: Sequence[int],
-        n_candidates: int,
-        k: int,
-        n_rows: int,
-        exclude_items: Optional[Union[np.ndarray, torch.Tensor, Sequence[int]]]
-    ) -> torch.Tensor:
-        """`_draw_negatives` vectorized: every slot is drawn at once, then only the
-        rejected ones are redrawn, round after round.
-
-        Args:
-            seen (Sequence[int]): Sorted ids excluded from every row.
-            n_candidates (int): Candidates are drawn from `[0, n_candidates)`.
-            k (int): Number of negatives to sample per row.
-            n_rows (int): Number of rows to sample.
-            exclude_items (np.ndarray, torch.Tensor or Sequence[int], optional): One
-                extra id to exclude per row, shape `(n_rows,)`.
-
-        Returns:
-            torch.Tensor: The sampled negative ids, shape `(n_rows, k)`.
-        """
-        seen_items = torch.as_tensor(seen, dtype=torch.long)
-        n_seen = len(seen_items)
-        if exclude_items is not None:
-            exclude_items = torch.as_tensor(exclude_items, dtype=torch.long)
-
-        def rejected(cand: torch.Tensor, excluded: Optional[torch.Tensor]) -> torch.Tensor:
-            """Mask of the candidates that are seen ids or their row's excluded id."""
-            bad = torch.zeros(cand.shape, dtype=torch.bool)
-            if n_seen:
-                # Binary search since seen_items is sorted
-                pos = torch.searchsorted(seen_items, cand).clamp_(max=n_seen - 1)
-                bad |= seen_items[pos] == cand
-            if excluded is not None:
-                bad |= cand == excluded
+        def rejected(cand, row_owners, row_exclude):
+            bad = torch.zeros(cand.shape, dtype=torch.bool, device=cand.device)
+            if seen is not None:
+                bad |= seen.contains(row_owners, cand)
+            if row_exclude is not None:
+                bad |= cand == row_exclude
             return bad
 
-        out = torch.randint(n_candidates, (n_rows, k), generator=self._generator)
+        out = self._randint(n_candidates, (n_rows, k))
         rows, cols = torch.nonzero(
-            rejected(out, None if exclude_items is None else exclude_items[:, None]), as_tuple=True
+            rejected(out, owners[:, None], None if exclude is None else exclude[:, None]), as_tuple=True
         )
-
-        # Redraw only the rejected slots, until every slot holds a valid negative
-        while len(rows):
-            cand = torch.randint(n_candidates, (len(rows),), generator=self._generator)
+        while rows.numel():
+            cand = self._randint(n_candidates, (rows.numel(),))
             out[rows, cols] = cand
-            still_bad = rejected(cand, None if exclude_items is None else exclude_items[rows])
+            still_bad = rejected(cand, owners[rows], None if exclude is None else exclude[rows])
             rows, cols = rows[still_bad], cols[still_bad]
 
         return out
 
     @staticmethod
     def _check_negative_pool(
-        seen: Sequence[int],
+        owners: torch.Tensor,
         n_candidates: int,
-        exclude_items: Optional[Union[np.ndarray, torch.Tensor, Sequence[int]]] = None
+        seen: Optional[KeySet],
+        exclude: Optional[torch.Tensor]
     ):
-        """Make sure every row keeps at least one valid negative to draw.
+        """Check that every row of `_draw_negatives` has a candidate left.
 
         Args:
-            seen (Sequence[int]): Sorted ids excluded from every row.
-            n_candidates (int): Candidates are drawn from `[0, n_candidates)`.
-            exclude_items (np.ndarray, torch.Tensor or Sequence[int], optional): One
-                extra id excluded per row. Defaults to None.
+            owners (torch.Tensor): The `seen` group of each row.
+            n_candidates (int): Number of candidates.
+            seen (KeySet, optional): Values excluded per owner.
+            exclude (torch.Tensor, optional): One value excluded per row.
 
         Raises:
-            ValueError: If some row has no candidate left to draw.
+            ValueError: If some row has no candidate left.
         """
-        # With at least two candidates left every row keeps one, whatever it excludes
-        n_left = n_candidates - len(seen)
-        if n_left > 1:
+        # With two candidates left for every owner, every row keeps one: no check (nor device sync) needed
+        if n_candidates - (seen.max_count if seen is not None else 0) > 1:
             return
 
-        no_pool = n_left <= 0
-        if exclude_items is not None and not no_pool:
-            # An excluded id already among the seen ones doesn't shrink the pool any further
-            excluded = np.asarray(exclude_items).reshape(-1)
-            no_pool = bool(np.any(~np.isin(excluded, seen)))
-        if no_pool:
+        n_left = torch.full(owners.shape, n_candidates, dtype=torch.long, device=owners.device)
+        if seen is not None:
+            n_left -= seen.counts[owners]
+        if exclude is not None:
+            # An excluded value already seen doesn't shrink the pool any further
+            shrinks = (exclude >= 0) & (exclude < n_candidates)
+            if seen is not None:
+                shrinks &= ~seen.contains(owners, exclude)
+            n_left -= shrinks.long()
+
+        if bool((n_left <= 0).any()):
             raise ValueError("No candidate left to sample negatives from.")
 
-    @abstractmethod
-    def sample(self, it: int) -> Any:
-        """Build a single sample for event index `it`.
 
-        Args:
-            it (int): Event index.
-
-        Returns:
-            Any: The sample, whose shape is defined by the concrete sampler.
-        """
-        raise NotImplementedError()
-
-    def sample_eval(self, it: int) -> Any:
-        """Optional hook: `sample`'s evaluation-time counterpart. Default is a no-op.
-
-        Args:
-            it (int): Event index.
-
-        Returns:
-            Any: The sample, whose shape is defined by the concrete sampler.
-        """
-        pass
-
-
-class _TraditionalMixin:
-    """Materialization strategy: eagerly builds the whole event stream at once,
-    via `sample_full()`, for consumption as a single in-memory `TensorDataset`.
-    """
-
-    materialization = SamplerMaterialization.TRADITIONAL
-
-    def sample_full(self, val: bool = False) -> List[Any]:
-        """Build every sample in the event stream at once, in event order.
-
-        `build_dataset` calls it once and the resulting dataset is cached, so every
-        epoch replays these exact samples (negatives included): the training
-        dataloader only reshuffles their order. A sampler whose draws must change
-        across epochs belongs to the pipeline materialization instead.
-
-        Args:
-            val (bool): If True, use `sample_eval` instead of `sample`.
-                Defaults to False.
-
-        Returns:
-            List[Any]: The full sample stream.
-        """
-        start = time.time()
-
-        iter_data = tqdm(
-            range(self.events),
-            total=self.events,
-            desc="Sampling",
-            leave=False
-        )
-        samples = []
-
-        # Pick sample() or its eval-time counterpart
-        sample_fn = self.sample if not val else self.sample_eval
-
-        for it in iter_data:
-            output = sample_fn(it)
-
-            # A hook may explode one sample into several (e.g. windowed sequences)
-            if isinstance(output, list):
-                samples.extend(output)
-            else:
-                samples.append(output)
-
-        end = time.time()
-
-        self.logger.debug(
-            "Completed sampling",
-            extra={"context": {"duration_sec": round(end - start, 4), "events": len(samples)}}
-        )
-
-        return samples
-
-
-class _PipelineMixin:
-    """Materialization strategy: lazily sampled, `sample(it)` called on demand,
-    once per dataset index, by `PipelineDataset`.
-    """
-
-    materialization = SamplerMaterialization.PIPELINE
-
-    def collate_fn(self, batch: List[Any]) -> Tuple[torch.Tensor, ...]:
-        """Stack each tuple position of a batch of samples into its own tensor.
-
-        The batch needs no shuffling here: the training dataloader already draws
-        its samples in a random order.
-
-        Args:
-            batch (List[Any]): The batch of samples, all tuples of the same length;
-                each tuple position holds either same-shape tensors, plain scalars or
-                lists of scalars, consistently across the batch.
-
-        Returns:
-            Tuple[torch.Tensor, ...]: One tensor per tuple position: tensors stacked
-                along a new batch dimension, scalars (lists concatenated) converted
-                into an int64 tensor, or a floating one if any value is a float.
-        """
-        # Transpose the batch of tuples into one tensor per tuple position
-        tensors = []
-        for column in zip(*batch):
-            if isinstance(column[0], torch.Tensor):
-                tensors.append(torch.stack(column))
-                continue
-
-            # A sample's list (e.g. a positive plus its negatives) adds one row per value
-            if isinstance(column[0], list):
-                column = list(chain.from_iterable(column))
-
-            # Integer columns become int64, a float one (e.g. ratings) is not truncated
-            tensor = torch.tensor(column)
-            tensors.append(tensor if tensor.is_floating_point() else tensor.long())
-
-        return tuple(tensors)
-
-
-class _InteractionDataMixin:
-    """Domain: `SamplerType.INTERACTIONS`. A split's interaction dict, indexed
-    for O(1) sampling.
+class InteractionSampler(AbstractSampler):
+    """Base of the samplers drawing from a split's interactions.
 
     Args:
-        train_dict (Dict[int, Dict[int, float]]): Private-id-keyed ratings dict for
-            this split (`user -> {item: rating}`).
-        transactions (int): Number of events to sample.
-        **kwargs (Any): Forwarded to `AbstractSampler.__init__`.
+        train_dict (Dict[int, Dict[int, float]]): Private ratings dict (`user -> {item: rating}`).
+        transactions (int): Number of events.
+        **kwargs (Any): Forwarded to `AbstractSampler`.
     """
 
     type = SamplerType.INTERACTIONS
 
-    def __init__(
-        self,
-        train_dict: Dict[int, Dict[int, float]],
-        transactions: int,
-        **kwargs: Any
-    ):
+    def __init__(self, train_dict: Dict[int, Dict[int, float]], transactions: int, **kwargs: Any):
         super().__init__(**kwargs)
 
-        # Initializing variables
         self.events = transactions
         self._indexed_ratings = train_dict
 
-        # Per-user sorted item list and its length, cached for O(1) sampling
-        self._ui_dict = {u: sorted(set(self._indexed_ratings[u])) for u in self._indexed_ratings}
-        self._lui_dict = {u: len(v) for u, v in self._ui_dict.items()}
+    def _build_interaction_state(self, with_ratings: bool = False):
+        """Register the state most interaction samplers share:
 
-        # Per-event pre-drawn users, set by the samplers that draw them up front
-        self._sampled_users: List[int] = []
-
-        # Users with at least one rated and one unrated item, built on first need
-        # by `_draw_usable_user`
-        self._usable_users: Optional[List[int]] = None
-
-    def _draw_usable_user(self) -> Tuple[int, List[int], int]:
-        """Uniformly draw a user with at least one rated and one unrated item, as a
-        fallback for a pre-drawn user who can't be used (e.g. one who rated every
-        item, leaving no valid negative).
-
-        Returns:
-            Tuple[int, List[int], int]: The drawn user, its rated items and their count.
-
-        Raises:
-            ValueError: If no user has both a rated and an unrated item.
-        """
-        if self._usable_users is None:
-            self._usable_users = [
-                u for u, lui in self._lui_dict.items() if 0 < lui < self._nitems
-            ]
-            if not self._usable_users:
-                raise ValueError("No user has both a rated and an unrated item to sample from.")
-
-        u = self._usable_users[self._r_int(len(self._usable_users))]
-        return u, self._ui_dict[u], self._lui_dict[u]
-
-    def _usable_pairs(self) -> List[Tuple[int, int]]:
-        """Every (user, rated item) pair of the users with at least one unrated item,
-        the only ones a negative can be sampled for.
-
-        Returns:
-            List[Tuple[int, int]]: The (user, item) pairs.
-        """
-        return [
-            (u, i) 
-            for u, items in self._ui_dict.items() if len(items) < self._nitems 
-            for i in items
-        ]
-
-    def _seen_items(self, user: int) -> List[int]:
-        """`user`'s rated items, sorted.
+        - `_ui_indptr`, `_ui_indices` (and `_ui_ratings`): every user's sorted rated
+          items, as a CSR;
+        - `_ui_seen`: the same pairs as a `KeySet`, to exclude them from negatives;
+        - `_ui_usable`, `_ui_usable_users`: the users with at least one rated and
+          one unrated item.
 
         Args:
-            user (int): Private user index.
+            with_ratings (bool): Also register `_ui_ratings` (float32). Defaults to False.
+        """
+        rated = {u: sorted(items) for u, items in self._indexed_ratings.items()}
+
+        degree = np.zeros(self._nusers, dtype=np.int64)
+        for u, items in rated.items():
+            degree[u] = len(items)
+        indptr = np.concatenate(([0], np.cumsum(degree)))
+
+        users = np.repeat(np.arange(self._nusers, dtype=np.int64), degree)
+        indices = np.fromiter(
+            chain.from_iterable(rated.get(u, ()) for u in range(self._nusers)),
+            dtype=np.int64, count=int(indptr[-1])
+        )
+
+        self._register_state("_ui_indptr", indptr)
+        self._register_state("_ui_indices", indices)
+        self._register_state("_ui_seen", KeySet.from_pairs(users, indices, self._nusers, self._nitems))
+
+        if with_ratings:
+            ratings = np.fromiter(
+                (self._indexed_ratings[u][i] for u, i in zip(users.tolist(), indices.tolist())),
+                dtype=np.float32, count=len(indices)
+            )
+            self._register_state("_ui_ratings", ratings)
+
+        usable = (degree > 0) & (degree < self._nitems)
+        self._register_state("_ui_usable", usable)
+        self._register_state("_ui_usable_users", np.flatnonzero(usable).astype(np.int64))
+        self._n_usable_users = int(usable.sum())
+
+    def _register_usable_pairs(self):
+        """Register `_pair_users`/`_pair_items`: every (user, rated item) pair of the
+        users with at least one unrated item. Needs `_build_interaction_state`."""
+        degree = np.diff(self._ui_indptr.numpy())
+        users = np.repeat(np.arange(self._nusers, dtype=np.int64), degree)
+        keep = (degree < self._nitems)[users]
+
+        self._register_state("_pair_users", users[keep])
+        self._register_state("_pair_items", self._ui_indices.numpy()[keep])
+
+    def _draw_users(self) -> torch.Tensor:
+        """Draw one user per event, uniformly, once at construction time.
 
         Returns:
-            List[int]: The sorted item ids excluded from `user`'s negatives.
+            torch.Tensor: Private user indices, int64, shape `(events,)`.
         """
-        return self._ui_dict[user]
+        return torch.randint(self._nusers, (self.events,), generator=self._init_generator)
+
+    def _redraw_unusable_users(self, users: torch.Tensor) -> torch.Tensor:
+        """Replace every unusable user (no rated or no unrated item) with a random usable one.
+
+        Args:
+            users (torch.Tensor): Private user indices.
+
+        Returns:
+            torch.Tensor: The users, unusable ones replaced.
+
+        Raises:
+            ValueError: If no user is usable.
+        """
+        if self._n_usable_users == self._nusers:
+            return users
+        if self._n_usable_users == 0:
+            raise ValueError("No user has both a rated and an unrated item to sample from.")
+
+        # Drawn for every row, avoiding a device sync, and kept only where needed
+        redrawn = self._ui_usable_users[self._randint(self._n_usable_users, tuple(users.shape))]
+        return torch.where(self._ui_usable[users], users, redrawn)
+
+    def _draw_rated(self, users: torch.Tensor) -> torch.Tensor:
+        """Draw one random rated item per user.
+
+        Args:
+            users (torch.Tensor): Private user indices, each with a rated item.
+
+        Returns:
+            torch.Tensor: The items' CSR positions (index `_ui_indices`/`_ui_ratings` with them).
+        """
+        start = self._ui_indptr[users]
+        return start + self._rand_below(self._ui_indptr[users + 1] - start)
+
+    def _draw_unrated(self, users: torch.Tensor, k: int) -> torch.Tensor:
+        """Draw `k` random unrated items per user, with replacement.
+
+        Args:
+            users (torch.Tensor): Private user indices, each with an unrated item.
+            k (int): Items per user.
+
+        Returns:
+            torch.Tensor: The items, int64, shape `(len(users), k)`.
+        """
+        return self._draw_negatives(users, k, self._nitems, seen=self._ui_seen)
 
 
-class _SessionDataMixin:
-    """Domain: `SamplerType.SEQUENTIAL`. `Sessions`' flat item tape, plus the
-    boundary bookkeeping and helpers every session/sequential sampler builds on.
-
-    Subclasses receive the same globally sorted (by user, session, timestamp)
-    tape regardless of strategy: the only thing that changes between FLAT and
-    SESSION_ONLY is which boundary array bounds a sequence (per-user vs.
-    per-session), resolved once here.
+class SessionSampler(AbstractSampler):
+    """Base of the samplers drawing from `Sessions`' flat item tape, sorted by
+    user, session and timestamp. A sequence never crosses its boundary segment:
+    the user's history (FLAT) or the session (SESSION_ONLY).
 
     Args:
-        flat_items (np.ndarray): Item id per flat tape position.
-        flat_users (np.ndarray): Owning (private) user index per flat tape position.
-        flat_session (np.ndarray): Owning (private) session index per flat tape position.
-        user_offsets (np.ndarray): Per-user boundary array over the flat tape.
-        session_offsets (np.ndarray): Per-session boundary array over the flat tape.
-        sparse (csr_matrix): Train interaction matrix, used to exclude seen items when
-            sampling negatives.
+        flat_items (np.ndarray): Item per tape position.
+        flat_users (np.ndarray): Owning (private) user per tape position.
+        flat_session (np.ndarray): Owning (private) session per tape position.
+        user_offsets (np.ndarray): Per-user boundaries over the tape.
+        session_offsets (np.ndarray): Per-session boundaries over the tape.
+        sparse (csr_matrix): Train interactions, the items excluded from negatives.
         strategy (SessionStrategy): FLAT or SESSION_ONLY. Defaults to FLAT.
-        max_seq_len (int): Maximum sequence length built from the flat tape. Defaults
-            to 50.
-        neg_samples (int): Number of negatives sampled per target, or 0 to disable
-            negative sampling. Defaults to 0.
-        exclude_seen (bool): Whether sampled negatives exclude every item the user
-            has in `sparse`. If False, only each row's own excluded item (e.g. its
-            positive target) is, so that every other item is drawn with the same
-            probability. Defaults to True.
-        **kwargs (Any): Forwarded to `AbstractSampler.__init__`.
+        max_seq_len (int): Maximum sequence length. Defaults to 50.
+        neg_samples (int): Negatives per target, 0 for none. Defaults to 0.
+        exclude_seen (bool): Whether negatives exclude every item the user has in
+            `sparse`, not only the row's own target. Defaults to True.
+        **kwargs (Any): Forwarded to `AbstractSampler`.
     """
 
     type = SamplerType.SEQUENTIAL
@@ -654,41 +416,53 @@ class _SessionDataMixin:
     ):
         super().__init__(**kwargs)
 
-        # Initializing variables
         self._flat_items = np.asarray(flat_items)
         self._flat_users = np.asarray(flat_users)
         self._flat_session = np.asarray(flat_session)
-        self._user_offsets = np.asarray(user_offsets)
-        self._session_offsets = np.asarray(session_offsets)
         self._sparse = sparse
 
-        self.strategy = strategy if isinstance(strategy, SessionStrategy) else SessionStrategy(strategy)
+        self.strategy = SessionStrategy(strategy)
         self.max_seq_len = max_seq_len
 
         self._neg_samples = neg_samples
         self._exclude_seen = exclude_seen
         self._padding_token = self._nitems
 
-        # Which boundary array bounds a sequence: per-session (SESSION_ONLY) or per-user (FLAT)
-        self._boundaries = (
-            self._session_offsets if self.strategy == SessionStrategy.SESSION_ONLY else self._user_offsets
-        )
-        self._valid_target_indices = self._compute_valid_targets()
+        session_only = self.strategy == SessionStrategy.SESSION_ONLY
+        self._boundaries = np.asarray(session_offsets if session_only else user_offsets, dtype=np.int64)
+        self._segment_of = self._flat_session if session_only else self._flat_users
 
+        self._valid_target_indices = self._compute_valid_targets()
         self.events = len(self._valid_target_indices)
+
+        self._build_session_state()
+
+    def _build_session_state(self):
+        """Register the tape's items and users (`_tape_items`, `_tape_users`, int32
+        when they fit) and, if negatives exclude seen items, each user's items in
+        `sparse` as a `KeySet` (`_tape_seen`)."""
+        def compact(array):
+            fits = array.size == 0 or int(array.max()) < np.iinfo(np.int32).max
+            return array.astype(np.int32 if fits else np.int64, copy=False)
+
+        self._register_state("_tape_items", compact(self._flat_items))
+        self._register_state("_tape_users", compact(self._flat_users))
+
+        seen = None
+        if self._neg_samples > 0 and self._exclude_seen:
+            coo = self._sparse.tocoo()
+            seen = KeySet.from_pairs(coo.row, coo.col, self._sparse.shape[0], self._nitems)
+        self._register_state("_tape_seen", seen)
 
     @staticmethod
     def _ragged_arange(counts: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-        """Enumerate `counts[g]` rows for every group `g`, vectorized: the
-        concatenation of `arange(counts[g])` over all groups, plus each row's group.
+        """Concatenate `arange(counts[g])` over every group `g`.
 
         Args:
-            counts (np.ndarray): Non-negative number of rows per group.
+            counts (np.ndarray): Number of rows per group.
 
         Returns:
-            Tuple[np.ndarray, np.ndarray]: `(group, offset)`, parallel int64 arrays
-                of length `counts.sum()`: each row's group id and its offset within
-                that group, groups in order and offsets ascending within each.
+            Tuple[np.ndarray, np.ndarray]: `(group, offset)` of every row, int64.
         """
         counts = np.asarray(counts, dtype=np.int64)
         group = np.repeat(np.arange(len(counts), dtype=np.int64), counts)
@@ -696,208 +470,152 @@ class _SessionDataMixin:
         return group, np.arange(len(group), dtype=np.int64) - group_first_row[group]
 
     def _segment_spans(self) -> Tuple[np.ndarray, np.ndarray]:
-        """Every boundary segment's `[start, end)` flat tape span.
+        """Get the tape span of every boundary segment.
 
         Returns:
-            Tuple[np.ndarray, np.ndarray]: `(starts, ends)`, int64, one per segment.
+            Tuple[np.ndarray, np.ndarray]: `(starts, ends)`, ends exclusive.
         """
-        boundaries = self._boundaries.astype(np.int64, copy=False)
-        return boundaries[:-1], boundaries[1:]
+        return self._boundaries[:-1], self._boundaries[1:]
 
     def _compute_valid_targets(self, horizon: int = 1) -> np.ndarray:
-        """A flat position `p` is a valid target iff it has at least one predecessor
-        in its boundary segment and the `horizon` items starting at `p` all fit in
-        that segment, i.e. `start + 1 <= p <= end - horizon`.
+        """Find the tape positions `p` with at least one predecessor in their
+        segment and room for `horizon` targets from `p` on.
 
         Args:
-            horizon (int): Number of consecutive target items starting at `p`.
-                Defaults to 1, plain next-item prediction.
+            horizon (int): Consecutive targets per position. Defaults to 1.
 
         Returns:
-            np.ndarray: The valid target flat tape positions, ascending.
+            np.ndarray: The valid target positions, ascending.
         """
         starts, ends = self._segment_spans()
         first = starts + 1
-        counts = np.maximum(ends - horizon + 1 - first, 0)
-
-        segment, offset = self._ragged_arange(counts)
+        segment, offset = self._ragged_arange(np.maximum(ends - horizon + 1 - first, 0))
         return first[segment] + offset
 
-    def _boundary_id_of(self, idx: int) -> int:
-        """Return the boundary segment (user, if FLAT; session, if SESSION_ONLY)
-        owning flat tape position `idx`.
+    def _register_target_events(self):
+        """Register `_ev_target`/`_ev_start`, per event: the target position and
+        where its input sequence starts (at most `max_seq_len` items back, never
+        before its segment's start)."""
+        targets = self._valid_target_indices.astype(np.int64, copy=False)
+        segment_starts = self._boundaries[self._segment_of[targets]]
+
+        self._register_state("_ev_target", targets)
+        self._register_state("_ev_start", np.maximum(segment_starts, targets - self.max_seq_len))
+
+    def _padded_batch(self, starts: torch.Tensor, ends: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Read one sequence per row from the tape, left-aligned and right-padded.
 
         Args:
-            idx (int): Flat tape position.
+            starts (torch.Tensor): First tape position per row.
+            ends (torch.Tensor): Exclusive last tape position per row, at most
+                `max_seq_len` after its start.
 
         Returns:
-            int: The owning boundary segment id.
+            Tuple[torch.Tensor, torch.Tensor]: The sequences, int64, shape
+                `(batch, max_seq_len)`, and their real lengths.
         """
-        return (
-            int(self._flat_users[idx]) if self.strategy == SessionStrategy.FLAT
-            else int(self._flat_session[idx])
-        )
+        offsets = torch.arange(self.max_seq_len, device=starts.device)
+        lengths = ends - starts
+        real = offsets < lengths[:, None]
 
-    def _boundary_start_of(self, idx: int) -> int:
-        """Return the flat tape position where `idx`'s boundary segment starts.
+        positions = torch.where(real, starts[:, None] + offsets, 0)
+        seq = torch.where(real, self._tape_items[positions].long(), self._padding_token)
+        return seq, lengths
+
+    def _draw_session_negatives(self, owners: torch.Tensor, k: int, exclude: torch.Tensor) -> torch.Tensor:
+        """Draw `k` negative items per row, never the row's `exclude` item nor, if
+        `exclude_seen`, any item its owner has seen.
 
         Args:
-            idx (int): Flat tape position.
+            owners (torch.Tensor): Owning user per row.
+            k (int): Negatives per row.
+            exclude (torch.Tensor): Item excluded per row (the padding token excludes nothing).
 
         Returns:
-            int: The start position of the owning boundary segment.
+            torch.Tensor: The negatives, int64, shape `(rows, k)`.
         """
-        return int(self._boundaries[self._boundary_id_of(idx)])
-
-    def _build_padded_sequence(self, end_idx: int, boundary_start: int) -> Tuple[torch.Tensor, int]:
-        """Build a padded item sequence ending (exclusively) at `end_idx`, clipped to
-        `boundary_start` and to `max_seq_len` items.
-
-        Args:
-            end_idx (int): Flat tape position, exclusive, ending the sequence.
-            boundary_start (int): Flat tape position where the owning boundary
-                segment starts; the sequence never reaches further back than this.
-
-        Returns:
-            Tuple[torch.Tensor, int]: The padded sequence tensor (length
-                `max_seq_len`) and its true (pre-padding) length.
-        """
-        # Never reach further back than the boundary segment's own start
-        return self._padded_slice(max(boundary_start, end_idx - self.max_seq_len), end_idx)
-
-    def _padded_slice(self, start: int, end: int) -> Tuple[torch.Tensor, int]:
-        """The flat tape items in `[start, end)`, left-aligned in a `max_seq_len`
-        tensor and right-padded with the padding token.
-
-        Args:
-            start (int): First flat tape position, inclusive.
-            end (int): Last flat tape position, exclusive; `end - start` must not
-                exceed `max_seq_len`.
-
-        Returns:
-            Tuple[torch.Tensor, int]: The padded sequence tensor (length
-                `max_seq_len`) and its true (pre-padding) length.
-        """
-        # Built in numpy and converted once.
-        # The array is freshly allocated, so the tensor never aliases the flat tape
-        seq_len = end - start
-        seq_array = np.full(self.max_seq_len, self._padding_token, dtype=np.int64)
-        seq_array[:seq_len] = self._flat_items[start:end]
-        return torch.from_numpy(seq_array), seq_len
-
-    def _seen_items(self, user: int) -> np.ndarray:
-        """`user`'s items in `self._sparse`, sorted (none if not `self._exclude_seen`).
-
-        Args:
-            user (int): Private user index.
-
-        Returns:
-            np.ndarray: The sorted item ids excluded from `user`'s negatives.
-        """
-        if not self._exclude_seen:
-            return self._sparse.indices[:0]
-        return self._sparse.indices[self._sparse.indptr[user]:self._sparse.indptr[user + 1]]
+        return self._draw_negatives(owners.long(), k, self._nitems, seen=self._tape_seen, exclude=exclude)
 
 
-class _SideInfoMixin:
-    """Domain: `SamplerType.SIDE_INFO`. Draws from a model's side information
-    (e.g. a knowledge graph, item/user attributes, ...) rather than its
-    interaction data.
-
-    A side-info sampler is wired in separately from the interaction sampler,
-    through a recommender's own `side_info_sampler_config`: the two are sampled,
-    batched and cached entirely independently, and only zipped together
-    (via `CombinedDataLoader`) into the single batch a model's `train_step` sees.
-    """
+class SideInfoSampler(AbstractSampler):
+    """Base of the samplers drawing from side information (e.g. a knowledge graph)
+    instead of interactions. Wired in through a recommender's own
+    `side_info_sampler_config`, and zipped with the interaction batches by
+    `CombinedDataLoader`."""
 
     type = SamplerType.SIDE_INFO
 
 
-class TraditionalSampler(_TraditionalMixin, _InteractionDataMixin, AbstractSampler):
-    """Interaction sampler, eagerly materialized.
+class KeySet:
+    """A set of `(group, value)` pairs (e.g. the items each user has seen),
+    queried in batch on any device. Each pair is stored as the key
+    `group * span + value`, kept sorted, so a batch of membership queries is a
+    single `torch.searchsorted`.
 
     Args:
-        train_dict (Dict[int, Dict[int, float]]): Private-id-keyed ratings dict for
-            this split (`user -> {item: rating}`).
-        transactions (int): Number of events to sample.
-        **kwargs (Any): Forwarded to `AbstractSampler.__init__`.
+        keys (torch.Tensor): Sorted, unique int64 keys.
+        counts (torch.Tensor): Number of values per group.
+        span (int): Exclusive upper bound of the values.
     """
 
+    def __init__(self, keys: torch.Tensor, counts: torch.Tensor, span: int):
+        self.keys = keys
+        self.counts = counts
+        self.span = span
+        self.max_count = int(counts.max()) if counts.numel() else 0
 
-class PipelineSampler(_PipelineMixin, _InteractionDataMixin, AbstractSampler):
-    """Interaction sampler, lazily sampled on demand.
+    @classmethod
+    def from_pairs(cls, groups: np.ndarray, values: np.ndarray, n_groups: int, span: int) -> KeySet:
+        """Build the set, on CPU, dropping duplicate pairs.
 
-    Args:
-        train_dict (Dict[int, Dict[int, float]]): Private-id-keyed ratings dict for
-            this split (`user -> {item: rating}`).
-        transactions (int): Number of events to sample.
-        **kwargs (Any): Forwarded to `AbstractSampler.__init__`.
-    """
+        Args:
+            groups (np.ndarray): Group per pair, in `[0, n_groups)`.
+            values (np.ndarray): Value per pair, in `[0, span)`.
+            n_groups (int): Number of groups.
+            span (int): Exclusive upper bound of the values.
 
+        Returns:
+            KeySet: The set.
+        """
+        keys = np.unique(
+            np.asarray(groups, dtype=np.int64) * span 
+            + np.asarray(values, dtype=np.int64)
+        )
+        counts = (
+            np.bincount(keys // span, minlength=n_groups) 
+            if span else np.zeros(n_groups, dtype=np.int64)
+        )
+        return cls(torch.from_numpy(keys), torch.from_numpy(counts.astype(np.int64)), span)
 
-class TraditionalSessionSampler(_TraditionalMixin, _SessionDataMixin, AbstractSampler):
-    """Session sampler, eagerly materialized.
+    def contains(self, groups: torch.Tensor, values: torch.Tensor) -> torch.Tensor:
+        """Check, element-wise, which `(group, value)` pairs are in the set.
 
-    Args:
-        flat_items (np.ndarray): Item id per flat tape position.
-        flat_users (np.ndarray): Owning (private) user index per flat tape position.
-        flat_session (np.ndarray): Owning (private) session index per flat tape position.
-        user_offsets (np.ndarray): Per-user boundary array over the flat tape.
-        session_offsets (np.ndarray): Per-session boundary array over the flat tape.
-        sparse (csr_matrix): Train interaction matrix, used to exclude seen items when
-            sampling negatives.
-        strategy (SessionStrategy): FLAT or SESSION_ONLY. Defaults to FLAT.
-        max_seq_len (int): Maximum sequence length built from the flat tape. Defaults
-            to 50.
-        neg_samples (int): Number of negatives sampled per target, or 0 to disable
-            negative sampling. Defaults to 0.
-        exclude_seen (bool): Whether sampled negatives exclude every item the user
-            has in `sparse`. If False, only each row's own excluded item (e.g. its
-            positive target) is, so that every other item is drawn with the same
-            probability. Defaults to True.
-        **kwargs (Any): Forwarded to `AbstractSampler.__init__`.
-    """
+        Args:
+            groups (torch.Tensor): Groups, broadcastable with `values`.
+            values (torch.Tensor): Values; one outside `[0, span)` is never in the set.
 
+        Returns:
+            torch.Tensor: Bool mask of the pairs in the set.
+        """
+        values = values.long()
+        in_range = (values >= 0) & (values < self.span)
+        if not self.keys.numel():
+            return torch.zeros_like(in_range)
 
-class PipelineSessionSampler(_PipelineMixin, _SessionDataMixin, AbstractSampler):
-    """Session sampler, lazily sampled on demand.
+        query = groups.long() * self.span + values
+        pos = torch.searchsorted(self.keys, query).clamp_(max=self.keys.numel() - 1)
+        return (self.keys[pos] == query) & in_range
 
-    Args:
-        flat_items (np.ndarray): Item id per flat tape position.
-        flat_users (np.ndarray): Owning (private) user index per flat tape position.
-        flat_session (np.ndarray): Owning (private) session index per flat tape position.
-        user_offsets (np.ndarray): Per-user boundary array over the flat tape.
-        session_offsets (np.ndarray): Per-session boundary array over the flat tape.
-        sparse (csr_matrix): Train interaction matrix, used to exclude seen items when
-            sampling negatives.
-        strategy (SessionStrategy): FLAT or SESSION_ONLY. Defaults to FLAT.
-        max_seq_len (int): Maximum sequence length built from the flat tape. Defaults
-            to 50.
-        neg_samples (int): Number of negatives sampled per target, or 0 to disable
-            negative sampling. Defaults to 0.
-        exclude_seen (bool): Whether sampled negatives exclude every item the user
-            has in `sparse`. If False, only each row's own excluded item (e.g. its
-            positive target) is, so that every other item is drawn with the same
-            probability. Defaults to True.
-        **kwargs (Any): Forwarded to `AbstractSampler.__init__`.
-    """
+    def to(self, device: torch.device) -> KeySet:
+        """Copy the set to a device.
 
+        Args:
+            device (torch.device): The target device.
 
-class TraditionalSideInfoSampler(_TraditionalMixin, _SideInfoMixin, AbstractSampler):
-    """Side-info sampler, eagerly materialized.
-
-    Args:
-        seed (int): Random seed for reproducibility.
-        logger (LoggerAdapter, optional): Logging instance. Defaults to None.
-        **kwargs (Any): Forwarded to `AbstractSampler.__init__`.
-    """
-
-
-class PipelineSideInfoSampler(_PipelineMixin, _SideInfoMixin, AbstractSampler):
-    """Side-info sampler, lazily sampled on demand.
-
-    Args:
-        seed (int): Random seed for reproducibility.
-        logger (LoggerAdapter, optional): Logging instance. Defaults to None.
-        **kwargs (Any): Forwarded to `AbstractSampler.__init__`.
-    """
+        Returns:
+            KeySet: The set, on `device`.
+        """
+        moved = KeySet.__new__(KeySet)
+        moved.keys, moved.counts = self.keys.to(device), self.counts.to(device)
+        moved.span, moved.max_count = self.span, self.max_count
+        return moved

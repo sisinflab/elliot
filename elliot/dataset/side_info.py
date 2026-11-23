@@ -1,4 +1,5 @@
-from typing import Any, Dict, Iterator, List, Optional, Tuple
+from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
+import torch
 from torch.utils.data import DataLoader
 
 from elliot.dataset.modular_loaders.cache import SideInformation
@@ -111,10 +112,11 @@ class FoldSideInfo:
         sampler_name: str,
         batch_size: int = 1024,
         seed: int = 42,
+        device: Optional[Union[str, torch.device]] = None,
         **kwargs: Any
     ) -> DataLoader:
         """Build (or reuse a cached) dataloader for a side-info sampler (see
-        `PipelineSideInfoSampler`/`TraditionalSideInfoSampler`), entirely
+        `SideInfoSampler`), entirely
         independent of the fold's interaction data.
 
         Unlike `Interactions.get_dataloader`, no `train_dict`/`users`/`items`/`n_users`/
@@ -126,20 +128,26 @@ class FoldSideInfo:
             sampler_name (str): Name of the sampler registered in `sampler_registry`.
             batch_size (int): Batch size for the returned dataloader. Defaults to 1024.
             seed (int): Random seed forwarded to the sampler. Defaults to 42.
+            device (Union[str, torch.device], optional): The consuming model's
+                device, where the batches are built. Defaults to None, the CPU (a
+                model without a torch device).
             **kwargs (Any): Additional keyword arguments forwarded to the sampler.
 
         Returns:
             DataLoader: The (possibly cached) dataloader for this sampler.
         """
-        if sampler_name not in self._cached_datasets:
+        device = torch.device(device or "cpu")
+        cache_key = (sampler_name, str(device))
+
+        if cache_key not in self._cached_datasets:
             sampler = sampler_registry.get(
                 name=sampler_name,
                 seed=seed,
                 **kwargs
             )
-            self._cached_datasets[sampler_name] = build_dataset(sampler)
+            self._cached_datasets[cache_key] = build_dataset(sampler, device=device)
 
-        dataset = self._cached_datasets[sampler_name]
+        dataset = self._cached_datasets[cache_key]
         dataloader = build_dataloader(dataset, batch_size=batch_size, seed=seed)
 
         return dataloader

@@ -1,18 +1,19 @@
-from typing import Any, Iterator, Tuple
+from typing import Iterator, Optional, Tuple, Union
+import math
 import torch
-from torch.utils.data import Dataset, TensorDataset, DataLoader
+from torch.utils.data import DataLoader, Dataset, Sampler
 
 from elliot.dataset.samplers.base_sampler import AbstractSampler
-from elliot.utils import logging as elog
-from elliot.utils.enums import SamplerMaterialization
-from elliot.utils.utils import get_device, get_num_workers
+
+Batch = Union[torch.Tensor, Tuple[torch.Tensor, ...]]
 
 
-class PipelineDataset(Dataset):
-    """Lazy `Dataset` for pipeline samplers: one `sampler.sample` call per event.
+class SamplerDataset(Dataset):
+    """Torch dataset over a sampler (already moved to the device its batches are
+    built on), indexed by a whole batch of event indices at once.
 
     Args:
-        sampler (AbstractSampler): The pipeline sampler to draw samples from.
+        sampler (AbstractSampler): The sampler.
     """
 
     def __init__(self, sampler: AbstractSampler):
@@ -22,113 +23,105 @@ class PipelineDataset(Dataset):
     def __len__(self) -> int:
         return self.sampler.events
 
-    def __getitem__(self, index: int) -> Any:
-        return self.sampler.sample(index)
+    def __getitem__(self, indices: torch.Tensor) -> Batch:
+        """Build the batch for a batch of events.
+
+        Args:
+            indices (torch.Tensor): Event indices, on the sampler's device.
+
+        Returns:
+            Batch: The batch built by `sampler.sample`.
+        """
+        return self.sampler.sample(indices)
+
+    @staticmethod
+    def collate(batch: Batch) -> Batch:
+        """Return the batch as built by the sampler (torch's default conversion
+        would turn its tuple into a list).
+
+        Args:
+            batch (Batch): The batch.
+
+        Returns:
+            Batch: The same batch.
+        """
+        return batch
 
 
-def build_dataset(sampler: AbstractSampler) -> Dataset:
-    """Wrap `sampler` into the `torch.utils.data.Dataset` matching its declared
-    `SamplerType`: an eagerly materialized `TensorDataset` for `TRADITIONAL`, or a
-    lazy `PipelineDataset`/`SequentialDataset` for `PIPELINE`/`SEQUENTIAL`. Any
-    `collate_fn` the sampler itself defines is attached to the returned dataset.
+class BatchIndexSampler(Sampler):
+    """Torch sampler yielding the event indices one whole batch at a time, as
+    tensors on the sampler's device: every epoch, a fresh permutation of the
+    events (or their order, if not shuffling) split into batches.
+
+    Args:
+        dataset (SamplerDataset): The dataset to index.
+        batch_size (int): Batch size; the last batch may be smaller.
+        seed (int): Seed of the shuffling generator.
+        shuffle (bool): Whether to reshuffle every epoch. Defaults to True.
+    """
+
+    def __init__(self, dataset: SamplerDataset, batch_size: int, seed: int, shuffle: bool = True):
+        super().__init__()
+        self.n_events = len(dataset)
+        self.batch_size = batch_size
+        self.shuffle = shuffle
+
+        self.device = dataset.sampler.device
+        self._generator = AbstractSampler.make_generator(
+            seed, AbstractSampler.SHUFFLE_STREAM, self.device
+        )
+
+    def __len__(self) -> int:
+        return math.ceil(self.n_events / self.batch_size)
+
+    def __iter__(self) -> Iterator[torch.Tensor]:
+        if self.shuffle:
+            order = torch.randperm(self.n_events, generator=self._generator, device=self.device)
+        else:
+            order = torch.arange(self.n_events, device=self.device)
+
+        yield from order.split(self.batch_size)
+
+
+def build_dataset(sampler: AbstractSampler, device: Optional[Union[str, torch.device]] = None) -> SamplerDataset:
+    """Wrap `sampler` into the `SamplerDataset` a dataset caches, after moving its
+    state to the device its batches are built on.
 
     Args:
         sampler (AbstractSampler): The sampler to wrap.
+        device (Union[str, torch.device], optional): Where the sampler builds its
+            batches, i.e. the consuming model's device. Defaults to None, the CPU.
 
     Returns:
-        Dataset: The dataset built from `sampler`.
-
-    Raises:
-        ValueError: If `sampler.type` is not a recognized `SamplerType`.
+        SamplerDataset: The dataset built from `sampler`.
     """
-    match sampler.materialization:
-        # Eagerly materialize the whole stream into one in-memory tensor dataset
-        case SamplerMaterialization.TRADITIONAL:
-            samples = sampler.sample_full()
-            columns = (torch.tensor(column) for column in zip(*samples))
-            # Integer columns become int64, a float one (e.g. ratings) is not truncated
-            tensors = tuple(t if t.is_floating_point() else t.long() for t in columns)
-            dataset = TensorDataset(*tensors)
-
-        # Lazy: sample one event per __getitem__ call
-        case SamplerMaterialization.PIPELINE:
-            dataset = PipelineDataset(sampler)
-
-        case _:
-            raise ValueError(f"Invalid sampler type {sampler.type}")
-
-    # Forward the sampler's own collate_fn, if it declares one
-    collate_fn = getattr(sampler, 'collate_fn', None)
-    if collate_fn is not None:
-        setattr(dataset, 'collate_fn', collate_fn)
-
-    return dataset
-
-
-def _seed_worker(worker_id: int) -> None:
-    """Reseed the RNG of the sampler a dataloader worker draws from.
-
-    Every worker receives an identical copy of the parent's sampler, own RNG state
-    included, so without this every worker would draw the same samples. PyTorch
-    gives every worker its own torch seed (`base_seed + worker_id`), which reseeds
-    the worker's copy of the sampler.
-
-    Args:
-        worker_id (int): The worker's index (unused; already folded into the torch seed).
-    """
-    worker_info = torch.utils.data.get_worker_info()
-    sampler = getattr(worker_info.dataset, "sampler", None)
-    if isinstance(sampler, AbstractSampler):
-        sampler.reseed(torch.initial_seed())
+    return SamplerDataset(sampler.to(device or "cpu"))
 
 
 def build_dataloader(
-    dataset: Dataset,
+    dataset: SamplerDataset,
     batch_size: int,
     seed: int,
     shuffle: bool = True
 ) -> DataLoader:
-    """Build the training `DataLoader` over `dataset`, forwarding any `collate_fn`
-    attached to it by `build_dataset`.
-
-    Worker processes (see `ExperimentConfig.num_workers`) are only used for lazy
-    `PipelineDataset`s, where each sample is built on demand: an eagerly materialized
-    `TensorDataset` is just indexed, so workers would only add overhead. With
-    workers, shuffling draws from a dedicated generator seeded with `seed` (also the
-    source of every worker's seed) and workers are kept alive across epochs; with
-    none, the loader is built exactly as before (shuffling from torch's global RNG).
+    """Build the training dataloader over `dataset`: a torch `DataLoader` whose
+    `BatchIndexSampler` hands each batch's indices to the dataset at once
+    (`batch_size=None` disables torch's per-sample batching), in the main process.
 
     Args:
-        dataset (Dataset): The dataset to load from, as returned by `build_dataset`.
+        dataset (SamplerDataset): The dataset to load from, as returned by `build_dataset`.
         batch_size (int): Batch size.
-        seed (int): Seed for the shuffling generator and worker seeds, used only
-            when worker processes are enabled.
+        seed (int): Seed of the shuffling generator.
         shuffle (bool): Whether to reshuffle every epoch. Defaults to True.
 
     Returns:
         DataLoader: The configured dataloader.
     """
-    num_workers = get_num_workers() if isinstance(dataset, PipelineDataset) else 0
-
-    worker_kwargs = {}
-    if num_workers > 0:
-        elog.get_logger("DataLoader").info(
-            "Starting dataloader workers", extra={"context": {"num_workers": num_workers}}
-        )
-        worker_kwargs = dict(
-            num_workers=num_workers,
-            worker_init_fn=_seed_worker,
-            generator=torch.Generator().manual_seed(seed),
-            persistent_workers=True,
-            pin_memory=get_device().type == "cuda",
-        )
-
     return DataLoader(
         dataset,
-        batch_size=batch_size,
-        collate_fn=getattr(dataset, 'collate_fn', None),
-        shuffle=shuffle,
-        **worker_kwargs
+        batch_size=None,
+        sampler=BatchIndexSampler(dataset, batch_size=batch_size, seed=seed, shuffle=shuffle),
+        collate_fn=SamplerDataset.collate
     )
 
 
@@ -143,8 +136,8 @@ class CombinedDataLoader:
     when both have the same length neither is cycled.
 
     Args:
-        primary (DataLoader): The main (typically interaction) dataloader; sets
-            the combined stream's length whenever it is the longer of the two.
+        primary (DataLoader): The main (typically interaction) dataloader;
+            sets the combined stream's length whenever it is the longer of the two.
         side_info (DataLoader): The side-information dataloader, zipped alongside.
     """
 
@@ -163,13 +156,18 @@ class CombinedDataLoader:
         )
 
         for primary_batch, side_info_batch in zip(primary_iter, side_info_iter):
-            yield tuple(primary_batch) + tuple(side_info_batch)
+            yield self._as_tuple(primary_batch) + self._as_tuple(side_info_batch)
 
     def __len__(self) -> int:
         return max(len(self._primary), len(self._side_info))
 
     @staticmethod
-    def _cycle(dataloader: DataLoader) -> Iterator:
+    def _as_tuple(batch: Batch) -> Tuple[torch.Tensor, ...]:
+        # A single-tensor batch is one element, not a sequence of rows
+        return (batch,) if isinstance(batch, torch.Tensor) else tuple(batch)
+
+    @staticmethod
+    def _cycle(dataloader: DataLoader) -> Iterator[Batch]:
         """Replay `dataloader` indefinitely, restarting its iterator (so it keeps
         reshuffling) every time it is exhausted, rather than caching one pass like
         `itertools.cycle` would.
@@ -178,7 +176,7 @@ class CombinedDataLoader:
             dataloader (DataLoader): The dataloader to replay indefinitely.
 
         Returns:
-            Iterator: An iterator yielding `dataloader`'s batches, forever.
+            Iterator[Batch]: An iterator yielding `dataloader`'s batches, forever.
         """
         while True:
             yield from dataloader

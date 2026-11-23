@@ -1,57 +1,45 @@
-from typing import Any, List, Tuple, Union, Sequence
+from typing import Any, Tuple
+import torch
 
-from elliot.dataset.samplers.base_sampler import TraditionalSampler, PipelineSampler
+from elliot.dataset.samplers.base_sampler import InteractionSampler
 from elliot.utils.registry import sampler_registry
 
 
 @sampler_registry.register()
-class CustomPointWiseSparseSampler(PipelineSampler):
+class CustomPointWiseSparseSampler(InteractionSampler):
     """One observed (user, item, rating) triple per event.
 
     Args:
-        **params (Any): Forwarded to `PipelineSampler.__init__`.
+        **params (Any): Forwarded to `InteractionSampler.__init__`.
     """
 
     def __init__(self, **params: Any):
         super().__init__(**params)
 
-        # Initializing variables
-        self._sampled_users = self._sample_users()
+        self._build_interaction_state(with_ratings=True)
 
-    def sample(self, it: int) -> Tuple[int, int, float]:
-        """Build the observed (user, item, rating) triple for event `it`.
+        # Initializing variables
+        self._register_state("_sampled_users", self._draw_users())
+
+    def sample(self, indices: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """Build the observed (user, item, rating) triples for events `indices`.
 
         Args:
-            it (int): Event index.
+            indices (torch.Tensor): Event indices.
 
         Returns:
-            Tuple[int, int, float]: The (user, item, rating) triple.
+            Tuple[torch.Tensor, torch.Tensor, torch.Tensor]: Users and items (int64)
+                and ratings (float32), shape `(batch,)` each.
         """
-        u = self._sampled_users[it]
-        ui = self._ui_dict[u]
-        lui = self._lui_dict[u]
-
         # A user with no rated item, or with no unrated one, can't be used: redraw a usable user
-        if not 0 < lui < self._nitems:
-            u, ui, lui = self._draw_usable_user()
+        users = self._redraw_unusable_users(self._sampled_users[indices])
 
-        i = ui[self._r_int(lui)]
-        r = float(self._indexed_ratings[u][i])
-
-        return u, i, r
-
-    def _sample_users(self) -> List[int]:
-        """Draw one user per event, uniformly at random with replacement.
-
-        Returns:
-            List[int]: The sampled user indices, one per event (a list of plain ints,
-                cheaper to index per event than a tensor or an array).
-        """
-        return self._r_int(0, self._nusers, size=self.events).tolist()
+        pos = self._draw_rated(users)
+        return users, self._ui_indices[pos], self._ui_ratings[pos]
 
 
 @sampler_registry.register()
-class PointWisePosNegRatioRatingsSampler(PipelineSampler):
+class PointWisePosNegRatioRatingsSampler(InteractionSampler):
     """One (user, item, rating) triple per event, item and rating drawn as either a
     positive (with probability `1 / (neg_ratio + 1)`) or a negative (rating 0)
     interaction.
@@ -61,7 +49,7 @@ class PointWisePosNegRatioRatingsSampler(PipelineSampler):
             positive/negative sampling probability.
         implicit (bool): If True, ratings are int labels (1 positive, 0 negative);
             otherwise float, a positive's being its stored value. Defaults to False.
-        **params (Any): Forwarded to `PipelineSampler.__init__`.
+        **params (Any): Forwarded to `InteractionSampler.__init__`.
     """
 
     def __init__(self, neg_ratio: int, implicit: bool = False, **params: Any):
@@ -71,46 +59,40 @@ class PointWisePosNegRatioRatingsSampler(PipelineSampler):
         self.neg_ratio = neg_ratio
         self.implicit = implicit
 
-        self._sampled_users = self._sample_users()
+        self._build_interaction_state(with_ratings=not implicit)
 
-    def sample(self, it: int) -> Sequence[Union[int, float]]:
-        """Build the (user, item, rating) triple for event `it`, item and rating
-        drawn as either a positive or a negative interaction.
+        self._register_state("_sampled_users", self._draw_users())
+
+    def sample(self, indices: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """Build the (user, item, rating) triples for events `indices`, each item
+        and rating drawn as either a positive or a negative interaction.
 
         Args:
-            it (int): Event index.
+            indices (torch.Tensor): Event indices.
 
         Returns:
-            Sequence[Union[int, float]]: The (user, item, rating) triple.
+            Tuple[torch.Tensor, torch.Tensor, torch.Tensor]: Users and items (int64)
+                and ratings, shape `(batch,)` each: int64 labels if `implicit`,
+                float32 ratings otherwise.
         """
-        u = self._sampled_users[it]
-        ui = self._ui_dict[u]
-        lui = self._lui_dict[u]
-
         # A user with no rated item, or with no unrated one, can't be used: redraw a usable user
-        if not 0 < lui < self._nitems:
-            u, ui, lui = self._draw_usable_user()
+        users = self._redraw_unusable_users(self._sampled_users[indices])
 
         # Positive draw, with probability 1 / (neg_ratio + 1)
-        if self._r_int(self.neg_ratio + 1) == 0:
-            i = ui[self._r_int(lui)]
-            r = 1 if self.implicit else float(self._indexed_ratings[u][i])
+        is_pos = self._randint(self.neg_ratio + 1, tuple(users.shape)) == 0
 
+        # Both draws are made for every row, then picked: no device sync needed
+        pos = self._draw_rated(users)
         # Negative draw: any item the user hasn't rated
+        neg_items = self._draw_unrated(users, 1)[:, 0]
+
+        items = torch.where(is_pos, self._ui_indices[pos], neg_items)
+        if self.implicit:
+            ratings = is_pos.long()
         else:
-            i = self._sample_negative(u)
-            r = 0 if self.implicit else 0.0
+            ratings = torch.where(is_pos, self._ui_ratings[pos], torch.zeros_like(self._ui_ratings[pos]))
 
-        return u, i, r
-
-    def _sample_users(self) -> List[int]:
-        """Draw one user per event, uniformly at random with replacement.
-
-        Returns:
-            List[int]: The sampled user indices, one per event (a list of plain ints,
-                cheaper to index per event than a tensor or an array).
-        """
-        return self._r_int(0, self._nusers, size=self.events).tolist()
+        return users, items, ratings
 
 
 @sampler_registry.register()
@@ -146,13 +128,13 @@ class PointWisePosNegSampler(PointWisePosNegRatioRatingsSampler):
 
 
 @sampler_registry.register()
-class MFPointWisePosNegSampler(PipelineSampler):
+class MFPointWisePosNegSampler(InteractionSampler):
     """One positive plus `m` sampled negative (user, item, label) triples per
     (user, item) training pair.
 
     Args:
         m (int): Number of negatives sampled per positive pair.
-        **params (Any): Forwarded to `PipelineSampler.__init__`.
+        **params (Any): Forwarded to `InteractionSampler.__init__`.
     """
 
     def __init__(self, m: int, **params: Any):
@@ -161,25 +143,30 @@ class MFPointWisePosNegSampler(PipelineSampler):
         # Initializing variables
         self.m = m
 
-        self._pos = self._usable_pairs()
+        self._build_interaction_state()
+        self._register_usable_pairs()
 
-        self.events = len(self._pos)
+        self.events = len(self._pair_users)
 
-    def sample(self, it: int) -> Tuple[List[int], List[int], List[int]]:
-        """Build the positive plus `self.m` negative (user, item, label) triples for
-        event `it`.
+    def sample(self, indices: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """Build the positive plus `self.m` negative (user, item, label) triples of
+        every event in `indices`, each event's triples consecutive.
 
         Args:
-            it (int): Event index.
+            indices (torch.Tensor): Event indices.
 
         Returns:
-            Tuple[List[int], List[int], List[int]]: Users, items and labels, each of
-                length `m + 1`: the positive (label 1) first, then the negatives
-                (label 0).
+            Tuple[torch.Tensor, torch.Tensor, torch.Tensor]: Users, items and labels,
+                int64, shape `(batch * (m + 1),)` each: per event, the positive
+                (label 1) first, then the negatives (label 0).
         """
-        u, i = self._pos[it]
+        users, pos = self._pair_users[indices], self._pair_items[indices]
 
         # m negatives for this positive pair, sampled with replacement
-        negs = [self._sample_negative(u) for _ in range(self.m)]
+        negs = self._draw_unrated(users, self.m)
 
-        return [u] * (self.m + 1), [i] + negs, [1] + [0] * self.m
+        items = torch.cat((pos[:, None], negs), dim=1).reshape(-1)
+        labels = torch.zeros((len(users), self.m + 1), dtype=torch.long, device=users.device)
+        labels[:, 0] = 1
+
+        return users.repeat_interleave(self.m + 1), items, labels.reshape(-1)

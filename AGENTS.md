@@ -75,6 +75,7 @@ Reference configs: `config_files/test_config.yaml` (minimal), `config_files/adva
 - `device: mps|cpu|cuda` explicitly selects the torch device.
 - Environment variable `ELLIOT_DEVICE=cuda|mps|cpu` is also honoured.
 - Auto-detection order: CUDA → MPS → CPU (`elliot/utils/utils.py::_auto_device()`).
+- Training batches: every sampler builds whole batches at once (`sample(indices)`, tensor ops, no per-sample path and no worker processes) on the consuming model's device (CPU for numpy models), served by a torch `DataLoader` (`batch_size=None`, one `BatchIndexSampler` index tensor per batch). Samplers derive from `InteractionSampler`, `SessionSampler` or `SideInfoSampler` (`elliot/dataset/samplers/base_sampler.py`) and register the tensors `sample` reads with `_register_state`.
 
 ## Data Format
 
