@@ -148,7 +148,7 @@ class RecommenderConfig(BaseConfig):
             if isinstance(value, str):
                 value = literal_eval(value)
             elif isinstance(value, list):
-                search, parse = (value[0], value[1:]) if value[0] in SearchSpace else ([], value)
+                search, parse = ([value[0]], value[1:]) if value[0] in SearchSpace else ([], value)
                 parse = [literal_eval(t) for t in parse]
                 value = search + parse
 

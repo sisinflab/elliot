@@ -50,7 +50,9 @@ class FoldSideInfo:
         self._views: Dict[str, Optional[Dict[str, Any]]] = {
             loader_name: None for loader_name in self._side_info
         }
-        self._cached_samplers = {}
+        
+        # (configuration, sampler) of the last side-info sampler built
+        self._cached_sampler = None
 
     def __contains__(self, name: object) -> bool:
         return name in self._side_info
@@ -137,17 +139,19 @@ class FoldSideInfo:
             DataLoader: The (possibly cached) dataloader for this sampler.
         """
         device = torch.device(device or "cpu")
-        cache_key = (sampler_name, str(device))
+        config = (sampler_name, str(device), seed, kwargs)
 
-        if cache_key not in self._cached_samplers:
+        # Reuse the last sampler only if built with this exact configuration
+        # (e.g. not across hyperparameter trials)
+        if self._cached_sampler is None or self._cached_sampler[0] != config:
             sampler = sampler_registry.get(
                 name=sampler_name,
                 seed=seed,
                 **kwargs
             )
-            self._cached_samplers[cache_key] = sampler.to(device)
+            self._cached_sampler = (config, sampler.to(device))
 
-        sampler = self._cached_samplers[cache_key]
+        sampler = self._cached_sampler[1]
         dataloader = build_dataloader(sampler, batch_size=batch_size, seed=seed)
 
         return dataloader

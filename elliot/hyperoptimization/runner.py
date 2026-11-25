@@ -24,20 +24,6 @@ class RunOutcome:
     all_trial_results: list
 
 
-class HyperoptRandomState:
-    def __init__(self, seed: int):
-        self._rng = np.random.default_rng(seed=seed)
-
-    def integers(self, *args, **kwargs):
-        value = self._rng.integers(*args, **kwargs)
-        if isinstance(value, np.integer):
-            return int(value)
-        return value
-
-    def __getattr__(self, name):
-        return getattr(self._rng, name)
-
-
 def requires_hyperopt(model_config: RecommenderConfig) -> bool:
     excluded = {"meta", "early_stopping", "best_iteration", "name"}
     for field_name in model_config.model_fields:
@@ -57,8 +43,7 @@ def run_hyperopt(
     test_fold_index: int
 ) -> RunOutcome:
 
-    rstate = HyperoptRandomState(seed=config.random_seed)
-    engine = HyperOptEngine(rstate=rstate)
+    engine = HyperOptEngine(rstate=np.random.default_rng(config.random_seed))
 
     model_config.prepare_fields_for_search()
 
@@ -76,8 +61,13 @@ def run_hyperopt(
         model_config=model_config
     )
 
-    results = tuning.best_trial["result"] if tuning.best_trial is not None else {}
-    best_params = tuning.best_params if tuning.best_trial is not None else None
+    if tuning.best_trial is None:
+        raise RuntimeError(
+            f"Every hyperparameter trial of {model_name} failed: no configuration to train."
+        )
+
+    results = tuning.best_trial["result"]
+    best_params = tuning.best_params
 
     best_model = tuning.best_model
     if best_model is None:

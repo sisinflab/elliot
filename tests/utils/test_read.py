@@ -4,7 +4,7 @@ import numpy as np
 from elliot.utils.folder import file_full_name, path_joiner
 from elliot.utils.read import Reader
 
-from tests.params import reader_folder, reader_path
+from tests.utils import reader_folder, reader_path
 
 
 reader = Reader()

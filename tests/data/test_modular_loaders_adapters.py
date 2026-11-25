@@ -26,7 +26,7 @@ from elliot.dataset.modular_loaders.formats import EmbeddingPayload, GraphPayloa
 from elliot.utils.enums import Materialization
 from elliot.utils.folder import path_joiner
 
-from tests.params import data_folder
+from tests.data import data_folder
 
 
 class TestAdapters:

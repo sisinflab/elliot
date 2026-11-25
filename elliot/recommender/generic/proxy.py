@@ -17,14 +17,14 @@ class ProxyRecommender(BaseRecommender):
     strict: bool = False
     model_name: Optional[str] = None
 
-    def __init__(self, params, interactions, seed, *args, **kwargs):
+    def __init__(self, params, seed, interactions, *args, **kwargs):
         """
         Create a Proxy recommender to evaluate already generated recommendations.
         :param name: data loader object
         :param path: path to the directory rec. results
         :param args: parameters
         """
-        super().__init__(params, interactions, seed, *args, **kwargs)
+        super().__init__(params, seed, interactions, *args, **kwargs)
 
         self._reader_config = params.meta.rec_reader
 

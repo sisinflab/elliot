@@ -6,7 +6,7 @@ from elliot.utils.enums import (
 )
 from elliot.utils.folder import path_joiner, path_absolute, parent_dir
 
-from tests.params import params_namespace_fail as p, config_path
+from tests.namespace import params_namespace_fail as p, config_path
 
 
 def _sample_config(config_dict={}, load_as_session_only=False):

@@ -6,8 +6,8 @@ from elliot.namespace import build_namespace
 from elliot.utils.enums import SessionStrategy
 from elliot.utils.folder import path_joiner
 
-from tests.params import params_eval_protocol_fail as p
-from tests.params import data_folder, dataset_path
+from tests.evaluation import params_eval_protocol_fail as p
+from tests.data import data_folder, dataset_path
 
 current_path = path_joiner(__file__)
 

@@ -6,8 +6,7 @@ from elliot.evaluation.protocol import EvalProtocol, prepare_protocols
 from elliot.namespace import build_namespace
 from elliot.utils.folder import path_joiner, check_path
 
-from tests.params import params_eval_protocol_fail as p
-from tests.params import eval_data_folder, eval_dataset_path, user_filter_path
+from tests.evaluation import params_eval_protocol_fail as p, eval_data_folder, eval_dataset_path, user_filter_path
 
 current_path = path_joiner(__file__)
 

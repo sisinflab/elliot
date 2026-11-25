@@ -7,7 +7,7 @@ from elliot.utils.write import Writer
 from elliot.utils.folder import path_joiner, check_path
 
 from tests.utils.test_read import read_tabular, read_sequence_tabular, read_model, read_json, reader
-from tests.params import writer_path
+from tests.utils import writer_path
 
 writer = Writer()
 

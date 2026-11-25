@@ -109,7 +109,7 @@ The protocol lives in `elliot/evaluation/protocol/`, not in `DataSet` (which onl
 pytest tests/
 ```
 
-`tests/params.py` provides `generate_param_combinations()` for building parametrised test cases. Config validation tests use `config_test: True` in the YAML to run dry without actually training.
+`tests/__init__.py` provides `test_path` and `generate_param_combinations()`; each test package's `__init__.py` (`tests/data`, `tests/evaluation`, `tests/hyperoptimization`, ...) holds its data paths and its `params_<component>_fail` cases. Config validation tests use `config_test: True` in the YAML to run dry without actually training.
 
 ## WandB Integration
 

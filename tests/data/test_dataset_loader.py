@@ -5,7 +5,7 @@ from elliot.namespace import build_namespace
 from elliot.utils.enums import SessionStrategy
 from elliot.utils.folder import path_joiner
 
-from tests.params import params_dataset_loader_fail as p, data_folder, dataset_path
+from tests.data import params_dataset_loader_fail as p, data_folder, dataset_path
 
 current_path = path_joiner(__file__)
 

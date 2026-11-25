@@ -4,7 +4,7 @@ from elliot.dataset import DataSetLoader
 from elliot.namespace import build_namespace
 from elliot.utils.folder import path_joiner
 
-from tests.params import params_pre_filtering_fail as p, dataset_path
+from tests.data import params_pre_filtering_fail as p, dataset_path
 
 current_path = path_joiner(__file__)
 

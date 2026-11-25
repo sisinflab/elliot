@@ -9,7 +9,7 @@ import numpy as np
 import logging as pylog
 import time
 from hyperopt import STATUS_OK
-from pydantic import BaseModel
+from pydantic import BaseModel, TypeAdapter
 
 from elliot.namespace import RecommenderConfig
 from elliot.result_handler import aggregate_val_folds_results
@@ -200,11 +200,16 @@ class ModelCoordinator(object):
         `params` may be a full `model_dump()` (where nested configs such as `meta`
         are plain dicts): assigning those dicts directly would replace the nested
         pydantic objects and drop their `exclude=True` fields.
+        Values of declared fields are validated against their type, so that e.g. a
+        float sampled by a q-distribution (`quniform`, ...) for an int field becomes an int.
         """
+        fields = type(config).model_fields
         for k, v in params.items():
             current = getattr(config, k, None)
             if isinstance(current, BaseModel) and isinstance(v, dict):
                 cls._apply_params(current, v)
+            elif k in fields:
+                setattr(config, k, TypeAdapter(fields[k].annotation).validate_python(v))
             else:
                 setattr(config, k, v)
 

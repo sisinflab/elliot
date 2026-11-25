@@ -50,7 +50,8 @@ class Sessions:
         self._n_items = len(self._i_map)
         self._sparse = copy.deepcopy(sparse)
 
-        self._cached_samplers: Dict[Tuple[str, SessionStrategy, str], SessionSampler] = {}
+        # (configuration, sampler) of the last training sampler built
+        self._cached_sampler: Optional[Tuple[tuple, SessionSampler]] = None
 
         self._sparse.sort_indices()
         self._build_tape(dataframe)
@@ -145,10 +146,11 @@ class Sessions:
             )
 
         device = torch.device(device or "cpu")
-        cache_key = (sampler_name, strategy, str(device))
+        config = (sampler_name, strategy, str(device), seed, kwargs)
 
-        # Build (and cache) a fresh sampler for this (sampler, strategy) pair
-        if cache_key not in self._cached_samplers:
+        # Reuse the last sampler only if built with this exact configuration
+        # (e.g. not across hyperparameter trials changing `max_seq_len`)
+        if self._cached_sampler is None or self._cached_sampler[0] != config:
             sampler = sampler_registry.get(
                 name=sampler_name,
                 flat_items=self._flat_items,
@@ -165,9 +167,9 @@ class Sessions:
                 seed=seed,
                 **kwargs
             )
-            self._cached_samplers[cache_key] = sampler.to(device)
+            self._cached_sampler = (config, sampler.to(device))
 
-        sampler = self._cached_samplers[cache_key]
+        sampler = self._cached_sampler[1]
         dataloader = build_dataloader(sampler, batch_size=batch_size, seed=seed)
 
         return dataloader

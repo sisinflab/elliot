@@ -61,7 +61,9 @@ class Interactions:
 
         self._cold_items = set()
         self._cold_users = set()
-        self._cached_samplers = {}
+        
+        # (configuration, sampler) of the last training sampler built
+        self._cached_sampler = None
 
         # Build the ratings dict, in both its public-id (`_dict`) and private-id
         # (`_p_dict`) views (most callers only ever need the latter)
@@ -213,14 +215,11 @@ class Interactions:
             transactions = self.get_unique_pairs()
 
         device = torch.device(device or "cpu")
-        cache_key = (sampler_name, str(device))
+        config = (sampler_name, str(device), seed, transactions, kwargs)
 
-        # Rebuild if never cached, or if the cached sampler's own size no longer
-        # matches the requested number of transactions (e.g. a different sampling
-        # ratio was requested for the same sampler name)
-        if (cache_key not in self._cached_samplers or
-            self._cached_samplers[cache_key].events != transactions):
-
+        # Reuse the last sampler only if built with this exact configuration
+        # (e.g. not across hyperparameter trials changing `neg_samples`)
+        if self._cached_sampler is None or self._cached_sampler[0] != config:
             users, items = self._get_users_and_items(private=True)
 
             sampler = sampler_registry.get(
@@ -234,9 +233,9 @@ class Interactions:
                 seed=seed,
                 **kwargs
             )
-            self._cached_samplers[cache_key] = sampler.to(device)
+            self._cached_sampler = (config, sampler.to(device))
 
-        sampler = self._cached_samplers[cache_key]
+        sampler = self._cached_sampler[1]
         dataloader = build_dataloader(sampler, batch_size=batch_size, seed=seed)
 
         return dataloader

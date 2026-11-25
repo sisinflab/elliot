@@ -8,7 +8,7 @@ from elliot.namespace import build_namespace
 from elliot.recommender import BaseRecommender
 from elliot.utils.registry import side_info_registry, sampler_registry, metric_registry, model_registry
 
-from tests.params import config_path
+from tests.namespace import config_path
 
 
 _experiment_config = {

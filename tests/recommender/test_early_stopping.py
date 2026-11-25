@@ -3,7 +3,7 @@ import pytest
 from elliot.namespace import EarlyStoppingConfig
 from elliot.recommender.early_stopping import EarlyStopping
 
-from tests.params import params_early_stopping_fail as p
+from tests.recommender import params_early_stopping_fail as p
 
 metric = "nDCG"
 cutoff = 10
